@@ -1,81 +1,96 @@
 import telebot
 from telebot import types
-import datetime
+from datetime import datetime, timedelta
 
-# توکن جدید
 TOKEN = "7462131830:AAENzKipQzuxQ4UYkl9vcVgmmfDMKMUvZi8"
 bot = telebot.TeleBot(TOKEN)
 
-# دستور /start
+# دیتابیس ساده برای شارژ
+group_expiry = {}
+
+# ======================
+# شروع در پیوی (پنل مدیریت)
+# ======================
 @bot.message_handler(commands=['start'])
 def start(message):
-    markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
-    markup.add("🔐 قفل لینک", "🔓 باز کردن لینک")
-    markup.add("🚫 بن", "🔇 سکوت")
-    markup.add("👮 مدیر", "🆔 ایدی")
-    markup.add("📊 آمار", "📖 راهنما")
-    markup.add("⏰ ساعت", "📅 تاریخ")
-    bot.send_message(message.chat.id, "به ربات مدیریت گروه خوش آمدی 🌹", reply_markup=markup)
+    if message.chat.type == "private":
+        markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
+        markup.add("⏳ شارژ گروه", "❓ راهنما")
+        bot.send_message(message.chat.id, "👋 خوش آمدید! این پنل فقط مخصوص مدیر است.", reply_markup=markup)
+    else:
+        bot.reply_to(message, "برای استفاده از پنل مدیریت به پیوی من بیا.")
 
-# قفل لینک
-@bot.message_handler(func=lambda m: m.text == "🔐 قفل لینک")
-def lock_links(message):
-    bot.send_message(message.chat.id, "✅ لینک‌ها قفل شدند.")
+# ======================
+# دستورات در پیوی مدیر
+# ======================
+@bot.message_handler(func=lambda m: m.chat.type == "private")
+def private_handler(message):
+    text = message.text
 
-# باز کردن لینک
-@bot.message_handler(func=lambda m: m.text == "🔓 باز کردن لینک")
-def unlock_links(message):
-    bot.send_message(message.chat.id, "✅ لینک‌ها باز شدند.")
+    if text == "⏳ شارژ گروه":
+        bot.send_message(message.chat.id, "مدت شارژ را انتخاب کن:\n/charge7 (7 روز)\n/charge30 (30 روز)")
 
-# بن
-@bot.message_handler(func=lambda m: m.text == "🚫 بن")
-def ban_user(message):
-    bot.send_message(message.chat.id, "🚫 کاربر بن شد (نمونه).")
-
-# سکوت
-@bot.message_handler(func=lambda m: m.text == "🔇 سکوت")
-def mute_user(message):
-    bot.send_message(message.chat.id, "🔇 کاربر سکوت شد (نمونه).")
-
-# مدیر
-@bot.message_handler(func=lambda m: m.text == "👮 مدیر")
-def admins(message):
-    bot.send_message(message.chat.id, "👮 لیست مدیران نمایش داده می‌شود (نمونه).")
-
-# ایدی
-@bot.message_handler(func=lambda m: m.text == "🆔 ایدی")
-def user_id(message):
-    bot.send_message(message.chat.id, f"🆔 ایدی شما: {message.from_user.id}")
-
-# آمار
-@bot.message_handler(func=lambda m: m.text == "📊 آمار")
-def stats(message):
-    bot.send_message(message.chat.id, "📊 آمار گروه: نمونه تستی.")
-
-# راهنما
-@bot.message_handler(func=lambda m: m.text == "📖 راهنما")
-def help(message):
-    text = """
+    elif text == "❓ راهنما":
+        bot.send_message(message.chat.id, """
 📖 راهنما:
-🔐 قفل لینک / 🔓 باز کردن لینک  
-🚫 بن / 🔇 سکوت  
-👮 مدیر / 🆔 ایدی  
-📊 آمار / 📖 راهنما  
-⏰ ساعت / 📅 تاریخ
-"""
-    bot.send_message(message.chat.id, text)
+دستورات گروه:
+- قفل لینک
+- باز کردن لینک
+- بن (ریپلای)
+- سکوت (ریپلای)
+- آمار
+- ایدی
+- ساعت
+- تاریخ
+- لفت بده
+""")
 
-# ساعت
-@bot.message_handler(func=lambda m: m.text == "⏰ ساعت")
-def clock(message):
-    now = datetime.datetime.now().strftime("%H:%M:%S")
-    bot.send_message(message.chat.id, f"⏰ ساعت الان: {now}")
+    elif text.startswith("/charge7"):
+        group_id = -100123456789  # آیدی گروهت رو اینجا بذار
+        group_expiry[group_id] = datetime.now() + timedelta(days=7)
+        bot.send_message(message.chat.id, "✅ گروه برای 7 روز شارژ شد.")
 
-# تاریخ
-@bot.message_handler(func=lambda m: m.text == "📅 تاریخ")
-def date_today(message):
-    today = datetime.datetime.now().strftime("%Y-%m-%d")
-    bot.send_message(message.chat.id, f"📅 تاریخ امروز: {today}")
+    elif text.startswith("/charge30"):
+        group_id = -100123456789
+        group_expiry[group_id] = datetime.now() + timedelta(days=30)
+        bot.send_message(message.chat.id, "✅ گروه برای 30 روز شارژ شد.")
 
-# اجرای ربات
+# ======================
+# دستورات داخل گروه
+# ======================
+@bot.message_handler(func=lambda m: m.chat.type in ["group", "supergroup"])
+def group_handler(message):
+    cid = message.chat.id
+    text = message.text
+
+    # اگر شارژ گروه تمام شده
+    if cid in group_expiry and datetime.now() > group_expiry[cid]:
+        bot.send_message(cid, "⛔️ شارژ گروه تمام شده. لطفا با مدیر تماس بگیرید.")
+        return
+
+    if text == "قفل لینک":
+        bot.send_message(cid, "🔒 لینک‌ها قفل شدند.")
+
+    elif text == "باز کردن لینک":
+        bot.send_message(cid, "🔓 لینک‌ها آزاد شدند.")
+
+    elif text == "ایدی":
+        bot.send_message(cid, f"🆔 ایدی شما: {message.from_user.id}\n🆔 ایدی گروه: {cid}")
+
+    elif text == "آمار":
+        members = bot.get_chat_members_count(cid)
+        bot.send_message(cid, f"👥 تعداد اعضا: {members}")
+
+    elif text == "ساعت":
+        bot.send_message(cid, f"⏰ {datetime.now().strftime('%H:%M:%S')}")
+
+    elif text == "تاریخ":
+        bot.send_message(cid, f"📅 {datetime.now().strftime('%Y-%m-%d')}")
+
+    elif text == "لفت بده":
+        bot.send_message(cid, "👋 خداحافظ، من از گروه خارج می‌شوم.")
+        bot.leave_chat(cid)
+
+# ======================
+print("🤖 Bot is running...")
 bot.infinity_polling()
