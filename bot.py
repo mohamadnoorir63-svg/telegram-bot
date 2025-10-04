@@ -10,7 +10,6 @@ SUDO_ID = 7089376754  # آیدی عددی شما
 bot = telebot.TeleBot(TOKEN, parse_mode="HTML")
 # ==================
 
-# راهنما
 HELP_TEXT = """
 📖 لیست دستورات:
 
@@ -22,7 +21,8 @@ HELP_TEXT = """
 👑 مدیر / ❌ حذف مدیر (ریپلای)
 🎉 خوشامد روشن / خاموش
 ✍️ خوشامد متن [متن دلخواه]
-🖼 ثبت عکس (روی عکس ریپلای کن و بفرست: ثبت عکس)
+🖼 ثبت عکس (ریپلای روی عکس و بفرست: ثبت عکس)
+🧹 پاکسازی (حذف ۵۰ پیام آخر)
 🚪 لفت بده (فقط سودو)
 """
 
@@ -52,8 +52,18 @@ welcome_photos = {}
 
 @bot.message_handler(content_types=['new_chat_members'])
 def welcome(m):
-    if not welcome_enabled.get(m.chat.id): return
     for u in m.new_chat_members:
+        # قفل تبچی (حذف یوزرهای بدون نام یا سرویس)
+        if u.is_bot and lock_bots.get(m.chat.id):
+            try: bot.kick_chat_member(m.chat.id, u.id)
+            except: pass
+            continue
+        if (not u.first_name or u.first_name.strip()=="") and lock_tabcchi.get(m.chat.id):
+            try: bot.kick_chat_member(m.chat.id, u.id)
+            except: pass
+            continue
+
+        if not welcome_enabled.get(m.chat.id): return
         name = u.first_name
         txt = welcome_texts.get(m.chat.id, "خوش آمدی 🌹").replace("{name}", name)
         if m.chat.id in welcome_photos:
@@ -90,8 +100,12 @@ def leave_cmd(m):
     bot.send_message(m.chat.id,"به دستور سودو خارج می‌شوم 👋")
     bot.leave_chat(m.chat.id)
 
-# ========= قفل لینک =========
+# ========= قفل‌ها =========
 lock_links = {}
+lock_stickers = {}
+lock_bots = {}
+lock_tabcchi = {}
+
 @bot.message_handler(func=lambda m: m.text=="قفل لینک")
 def lock_links_cmd(m):
     lock_links[m.chat.id]=True
@@ -102,8 +116,6 @@ def unlock_links_cmd(m):
     lock_links[m.chat.id]=False
     bot.reply_to(m,"🔓 لینک‌ها آزاد شدند.")
 
-# ========= قفل استیکر =========
-lock_stickers = {}
 @bot.message_handler(func=lambda m: m.text=="قفل استیکر")
 def lock_sticker_cmd(m):
     lock_stickers[m.chat.id]=True
@@ -114,6 +126,27 @@ def unlock_sticker_cmd(m):
     lock_stickers[m.chat.id]=False
     bot.reply_to(m,"🧷 استیکرها آزاد شدند.")
 
+@bot.message_handler(func=lambda m: m.text=="قفل ربات")
+def lock_bot_cmd(m):
+    lock_bots[m.chat.id]=True
+    bot.reply_to(m,"🤖 اضافه شدن ربات‌ها قفل شد.")
+
+@bot.message_handler(func=lambda m: m.text=="باز کردن ربات")
+def unlock_bot_cmd(m):
+    lock_bots[m.chat.id]=False
+    bot.reply_to(m,"🤖 اضافه شدن ربات‌ها آزاد شد.")
+
+@bot.message_handler(func=lambda m: m.text=="قفل تبچی")
+def lock_tabcchi_cmd(m):
+    lock_tabcchi[m.chat.id]=True
+    bot.reply_to(m,"🚫 ورود تبچی‌ها قفل شد.")
+
+@bot.message_handler(func=lambda m: m.text=="باز کردن تبچی")
+def unlock_tabcchi_cmd(m):
+    lock_tabcchi[m.chat.id]=False
+    bot.reply_to(m,"🚫 ورود تبچی‌ها آزاد شد.")
+
+# جلوگیری از استیکر
 @bot.message_handler(content_types=['sticker'])
 def block_sticker(m):
     if lock_stickers.get(m.chat.id) and m.from_user.id!=SUDO_ID:
@@ -158,41 +191,24 @@ def unmute_user(m):
     except:
         bot.reply_to(m,"❗ نتوانستم حذف سکوت کنم.")
 
-# ========= ارتقا مدیر =========
-@bot.message_handler(func=lambda m: m.reply_to_message and m.text=="مدیر")
-def promote_user(m):
-    try:
-        bot.promote_chat_member(
-            m.chat.id, m.reply_to_message.from_user.id,
-            can_manage_chat=True, can_delete_messages=True,
-            can_restrict_members=True, can_pin_messages=True,
-            can_invite_users=True
-        )
-        bot.reply_to(m,"👑 کاربر مدیر شد.")
-    except:
-        bot.reply_to(m,"❗ نتوانستم مدیر کنم.")
+# ========= پاکسازی =========
+@bot.message_handler(func=lambda m: m.text=="پاکسازی")
+def clear_messages(m):
+    if m.from_user.id!=SUDO_ID: return
+    for i in range(m.message_id-1, m.message_id-51, -1):
+        try: bot.delete_message(m.chat.id, i)
+        except: pass
+    bot.reply_to(m,"🧹 ۵۰ پیام آخر پاک شد.")
 
-@bot.message_handler(func=lambda m: m.reply_to_message and m.text=="حذف مدیر")
-def demote_user(m):
-    try:
-        bot.promote_chat_member(
-            m.chat.id, m.reply_to_message.from_user.id,
-            can_manage_chat=False, can_delete_messages=False,
-            can_restrict_members=False, can_pin_messages=False,
-            can_invite_users=False
-        )
-        bot.reply_to(m,"❌ کاربر از مدیریت حذف شد.")
-    except:
-        bot.reply_to(m,"❗ نتوانستم حذف مدیر کنم.")
-
-# ========= ضد لینک =========
+# ========= ضد لینک + جانم سودو =========
 @bot.message_handler(content_types=['text'])
-def anti_links(m):
-    # اگر سودو چیزی نوشت → جواب بده "جانم سودو 👑"
-    if m.from_user.id == SUDO_ID and not m.text.startswith(("بن","سکوت","مدیر","خوشامد")):
+def text_handler(m):
+    # فقط وقتی سودو بگه "ربات"
+    if m.from_user.id == SUDO_ID and m.text.strip()=="ربات":
         return bot.reply_to(m,"جانم سودو 👑")
 
-    if lock_links.get(m.chat.id) and not m.from_user.id==SUDO_ID:
+    # حذف لینک
+    if lock_links.get(m.chat.id) and m.from_user.id!=SUDO_ID:
         if re.search(r"(t\.me|http)", m.text.lower()):
             try: bot.delete_message(m.chat.id, m.message_id)
             except: pass
