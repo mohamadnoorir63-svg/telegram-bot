@@ -16,15 +16,29 @@ HELP_TEXT = """
 ⏰ ساعت | 📅 تاریخ | 📊 آمار | 🆔 ایدی
 🔒 قفل لینک / باز کردن لینک
 🧷 قفل استیکر / باز کردن استیکر
+🤖 قفل ربات / باز کردن ربات
+🚫 قفل تبچی / باز کردن تبچی
+🔐 قفل گروه / باز کردن گروه
 🚫 بن / ✅ حذف بن (ریپلای)
 🔕 سکوت / 🔊 حذف سکوت (ریپلای)
 👑 مدیر / ❌ حذف مدیر (ریپلای)
 🎉 خوشامد روشن / خاموش
 ✍️ خوشامد متن [متن دلخواه]
-🖼 ثبت عکس (ریپلای روی عکس و بفرست: ثبت عکس)
+🖼 ثبت عکس (روی عکس ریپلای کن و بفرست: ثبت عکس)
 🧹 پاکسازی (حذف ۵۰ پیام آخر)
+📢 ارسال پیام (فقط سودو)
 🚪 لفت بده (فقط سودو)
 """
+
+# ذخیره گروه‌ها
+joined_groups = set()
+
+# ========= وقتی ربات وارد گروه شد =========
+@bot.my_chat_member_handler()
+def track_groups(update):
+    chat = update.chat
+    if chat.type in ["group","supergroup"]:
+        joined_groups.add(chat.id)
 
 # ========= دستورات پایه =========
 @bot.message_handler(func=lambda m: m.text=="راهنما")
@@ -53,16 +67,6 @@ welcome_photos = {}
 @bot.message_handler(content_types=['new_chat_members'])
 def welcome(m):
     for u in m.new_chat_members:
-        # قفل تبچی (حذف یوزرهای بدون نام یا سرویس)
-        if u.is_bot and lock_bots.get(m.chat.id):
-            try: bot.kick_chat_member(m.chat.id, u.id)
-            except: pass
-            continue
-        if (not u.first_name or u.first_name.strip()=="") and lock_tabcchi.get(m.chat.id):
-            try: bot.kick_chat_member(m.chat.id, u.id)
-            except: pass
-            continue
-
         if not welcome_enabled.get(m.chat.id): return
         name = u.first_name
         txt = welcome_texts.get(m.chat.id, "خوش آمدی 🌹").replace("{name}", name)
@@ -105,6 +109,19 @@ lock_links = {}
 lock_stickers = {}
 lock_bots = {}
 lock_tabcchi = {}
+lock_group = {}
+
+@bot.message_handler(func=lambda m: m.text=="قفل گروه")
+def lock_group_cmd(m):
+    lock_group[m.chat.id]=True
+    bot.set_chat_permissions(m.chat.id, types.ChatPermissions(can_send_messages=False))
+    bot.reply_to(m,"🔐 گروه قفل شد (فقط مدیران می‌توانند پیام دهند).")
+
+@bot.message_handler(func=lambda m: m.text=="باز کردن گروه")
+def unlock_group_cmd(m):
+    lock_group[m.chat.id]=False
+    bot.set_chat_permissions(m.chat.id, types.ChatPermissions(can_send_messages=True))
+    bot.reply_to(m,"✅ گروه باز شد. همه می‌توانند پیام دهند.")
 
 @bot.message_handler(func=lambda m: m.text=="قفل لینک")
 def lock_links_cmd(m):
@@ -199,6 +216,28 @@ def clear_messages(m):
         try: bot.delete_message(m.chat.id, i)
         except: pass
     bot.reply_to(m,"🧹 ۵۰ پیام آخر پاک شد.")
+
+# ========= ارسال پیام همگانی =========
+waiting_broadcast = {}
+
+@bot.message_handler(func=lambda m: m.from_user.id==SUDO_ID and m.text=="ارسال")
+def ask_broadcast(m):
+    waiting_broadcast[m.from_user.id] = True
+    bot.reply_to(m,"📢 متن یا عکس خود را بفرست تا به همه گروه‌ها ارسال شود.")
+
+@bot.message_handler(func=lambda m: m.from_user.id==SUDO_ID and waiting_broadcast.get(m.from_user.id))
+def do_broadcast(m):
+    waiting_broadcast[m.from_user.id] = False
+    success = 0
+    for gid in joined_groups:
+        try:
+            if m.content_type=="text":
+                bot.send_message(gid, m.text)
+            elif m.content_type=="photo":
+                bot.send_photo(gid, m.photo[-1].file_id, caption=m.caption or "")
+            success+=1
+        except: pass
+    bot.reply_to(m,f"✅ پیام به {success} گروه ارسال شد.")
 
 # ========= ضد لینک + جانم سودو =========
 @bot.message_handler(content_types=['text'])
