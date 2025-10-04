@@ -23,7 +23,56 @@ banned_users = {}
 # ========= خوشامدگویی =========
 @bot.message_handler(content_types=['new_chat_members'])
 def welcome(m):
-    if not welcome_enabled.get(m.chat.id): return
+   # سکوت
+@bot.message_handler(func=lambda m: m.reply_to_message and m.text=="سکوت")
+def mute_user(m):
+    if not m.reply_to_message: return
+    try:
+        bot.restrict_chat_member(
+            m.chat.id,
+            m.reply_to_message.from_user.id,
+            permissions=telebot.types.ChatPermissions(can_send_messages=False)
+        )
+        bot.reply_to(m, "🔇 کاربر در سکوت قرار گرفت.")
+    except Exception as e:
+        bot.reply_to(m, f"⚠️ خطا: {e}")
+
+# حذف سکوت
+@bot.message_handler(func=lambda m: m.reply_to_message and m.text=="حذف سکوت")
+def unmute_user(m):
+    if not m.reply_to_message: return
+    try:
+        bot.restrict_chat_member(
+            m.chat.id,
+            m.reply_to_message.from_user.id,
+            permissions=telebot.types.ChatPermissions(can_send_messages=True,
+                                                      can_send_media_messages=True,
+                                                      can_send_other_messages=True,
+                                                      can_add_web_page_previews=True)
+        )
+        bot.reply_to(m, "🔊 سکوت کاربر برداشته شد.")
+    except Exception as e:
+        bot.reply_to(m, f"⚠️ خطا: {e}")
+
+# بن
+@bot.message_handler(func=lambda m: m.reply_to_message and m.text=="بن")
+def ban_user(m):
+    if not m.reply_to_message: return
+    try:
+        bot.ban_chat_member(m.chat.id, m.reply_to_message.from_user.id)
+        bot.reply_to(m, "🚫 کاربر بن شد.")
+    except Exception as e:
+        bot.reply_to(m, f"⚠️ خطا: {e}")
+
+# حذف بن
+@bot.message_handler(func=lambda m: m.reply_to_message and m.text=="حذف بن")
+def unban_user(m):
+    if not m.reply_to_message: return
+    try:
+        bot.unban_chat_member(m.chat.id, m.reply_to_message.from_user.id)
+        bot.reply_to(m, "✅ بن کاربر برداشته شد.")
+    except Exception as e:
+        bot.reply_to(m, f"⚠️ خطا: {e}") if not welcome_enabled.get(m.chat.id): return
     for u in m.new_chat_members:
         # قفل ربات
         if lock_bots.get(m.chat.id) and u.is_bot:
