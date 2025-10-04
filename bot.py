@@ -29,15 +29,11 @@ def G(cid:int):
     k=str(cid)
     if k not in db["groups"]:
         db["groups"][k] = {
-            "expires": 0,
             "locks": {"links": False, "stickers": False, "group": False},
             "welcome": {"enabled": False, "text": "خوش آمدید 🌹", "photo": None}
         }
         save(db)
     return db["groups"][k]
-
-def is_charged(cid:int)->bool:
-    return int(G(cid)["expires"]) > int(time.time())
 
 def is_sudo(uid:int)->bool: return uid == SUDO_ID
 
@@ -69,14 +65,11 @@ HELP_GROUP = (
 "• خوشامد متن <متن>\n"
 "• ثبت عکس (روی عکس ریپلای کن و بفرست ثبت عکس)\n"
 "• لفت بده (فقط سودو)\n"
-"—\n"
-"🔋 شارژ گروه (فقط سودو): «شارژ 30» یا /charge 30\n"
 )
 
 # ====== WELCOME ======
 @bot.message_handler(content_types=['new_chat_members'], func=lambda m: m.chat.type in ("group","supergroup"))
 def welcome_members(m):
-    if not is_charged(m.chat.id): return
     w = G(m.chat.id)["welcome"]
     if not w["enabled"]: return
     group_name = telebot.util.escape_html(m.chat.title or "")
@@ -89,25 +82,22 @@ def welcome_members(m):
         else:
             bot.send_message(m.chat.id, text)
 
-@bot.message_handler(func=lambda m: m.chat.type in ("group","supergroup") and m.text in ("خوشامد روشن","/welcome_on"))
+@bot.message_handler(func=lambda m: m.text in ("خوشامد روشن","/welcome_on"))
 def welcome_on(m):
-    if not is_charged(m.chat.id): return
     if not is_admin(m.chat.id, m.from_user.id): return
     G(m.chat.id)["welcome"]["enabled"]=True
     save(db)
     bot.reply_to(m, "✅ خوشامد روشن شد.")
 
-@bot.message_handler(func=lambda m: m.chat.type in ("group","supergroup") and m.text in ("خوشامد خاموش","/welcome_off"))
+@bot.message_handler(func=lambda m: m.text in ("خوشامد خاموش","/welcome_off"))
 def welcome_off(m):
-    if not is_charged(m.chat.id): return
     if not is_admin(m.chat.id, m.from_user.id): return
     G(m.chat.id)["welcome"]["enabled"]=False
     save(db)
     bot.reply_to(m, "❌ خوشامد خاموش شد.")
 
-@bot.message_handler(func=lambda m: m.chat.type in ("group","supergroup") and m.text and m.text.startswith("خوشامد متن"))
+@bot.message_handler(func=lambda m: m.text and m.text.startswith("خوشامد متن"))
 def welcome_text(m):
-    if not is_charged(m.chat.id): return
     if not is_admin(m.chat.id, m.from_user.id): return
     txt = m.text.replace("خوشامد متن", "", 1).strip()
     if not txt: return bot.reply_to(m, "نمونه: خوشامد متن خوش آمدی {name} به {group} 🌹")
@@ -115,9 +105,8 @@ def welcome_text(m):
     save(db)
     bot.reply_to(m, f"✏️ متن خوشامد ذخیره شد:\n{txt}")
 
-@bot.message_handler(func=lambda m: m.chat.type in ("group","supergroup") and m.reply_to_message and m.text=="ثبت عکس")
+@bot.message_handler(func=lambda m: m.reply_to_message and m.text=="ثبت عکس")
 def welcome_photo(m):
-    if not is_charged(m.chat.id): return
     if not is_admin(m.chat.id, m.from_user.id): return
     if not m.reply_to_message.photo: return bot.reply_to(m, "❗ باید روی یک عکس ریپلای کنید.")
     fid = m.reply_to_message.photo[-1].file_id
@@ -128,41 +117,31 @@ def welcome_photo(m):
 # ====== BASIC GROUP COMMANDS ======
 def ir_time(): return datetime.now(IR_TZ)
 
-@bot.message_handler(func=lambda m: m.chat.type in ("group","supergroup") and m.text in ("راهنما","/help","help"))
-def help_cmd(m):
-    if not is_charged(m.chat.id) and not is_sudo(m.from_user.id): return
-    bot.reply_to(m, HELP_GROUP)
+@bot.message_handler(func=lambda m: m.text in ("راهنما","/help","help"))
+def help_cmd(m): bot.reply_to(m, HELP_GROUP)
 
-@bot.message_handler(func=lambda m: m.chat.type in ("group","supergroup") and m.text in ("ساعت","/time","time"))
-def time_cmd(m):
-    if not is_charged(m.chat.id) and not is_sudo(m.from_user.id): return
-    bot.reply_to(m, f"⏰ ساعت: <b>{ir_time().strftime('%H:%M:%S')}</b>")
+@bot.message_handler(func=lambda m: m.text in ("ساعت","/time","time"))
+def time_cmd(m): bot.reply_to(m, f"⏰ ساعت: <b>{ir_time().strftime('%H:%M:%S')}</b>")
 
-@bot.message_handler(func=lambda m: m.chat.type in ("group","supergroup") and m.text in ("تاریخ","/date","date"))
-def date_cmd(m):
-    if not is_charged(m.chat.id) and not is_sudo(m.from_user.id): return
-    bot.reply_to(m, f"📅 تاریخ: <b>{ir_time().strftime('%Y-%m-%d')}</b>")
+@bot.message_handler(func=lambda m: m.text in ("تاریخ","/date","date"))
+def date_cmd(m): bot.reply_to(m, f"📅 تاریخ: <b>{ir_time().strftime('%Y-%m-%d')}</b>")
 
-@bot.message_handler(func=lambda m: m.chat.type in ("group","supergroup") and m.text in ("آمار","/stats","stats"))
+@bot.message_handler(func=lambda m: m.text in ("آمار","/stats","stats"))
 def stats_group(m):
-    if not is_charged(m.chat.id) and not is_sudo(m.from_user.id): return
     try: cnt = bot.get_chat_member_count(m.chat.id)
     except: cnt = "نامشخص"
     locks = G(m.chat.id)["locks"]
-    exp   = G(m.chat.id)["expires"]
-    exp_s = datetime.fromtimestamp(exp, IR_TZ).strftime("%Y-%m-%d %H:%M") if exp else "—"
     bot.reply_to(m, f"👥 اعضا: <b>{cnt}</b>\n"
-                    f"🔒 لینک: {'✅' if locks['links'] else '❌'} | استیکر: {'✅' if locks['stickers'] else '❌'} | گروه: {'✅' if locks['group'] else '❌'}\n"
-                    f"⏳ انقضا: {exp_s}")
+                    f"🔒 لینک: {'✅' if locks['links'] else '❌'} | "
+                    f"استیکر: {'✅' if locks['stickers'] else '❌'} | "
+                    f"گروه: {'✅' if locks['group'] else '❌'}")
 
-@bot.message_handler(func=lambda m: m.chat.type in ("group","supergroup") and m.text in ("ایدی","/id","id"))
+@bot.message_handler(func=lambda m: m.text in ("ایدی","/id","id"))
 def id_cmd(m):
-    if not is_charged(m.chat.id) and not is_sudo(m.from_user.id): return
     bot.reply_to(m, f"🆔 آیدی شما: <code>{m.from_user.id}</code>\n🆔 آیدی گروه: <code>{m.chat.id}</code>")
 
-@bot.message_handler(func=lambda m: m.chat.type in ("group","supergroup") and m.text in ("لینک","/link","بهشت"))
+@bot.message_handler(func=lambda m: m.text in ("لینک","/link","بهشت"))
 def link_cmd(m):
-    if not is_charged(m.chat.id) and not is_sudo(m.from_user.id): return
     if not bot_has_admin(m.chat.id):
         return bot.reply_to(m, "⚠️ ربات باید ادمین با اجازه Invite باشد.")
     try:
@@ -171,7 +150,7 @@ def link_cmd(m):
     except: bot.reply_to(m, "نتوانستم لینک را بگیرم.")
 
 # ====== LEAVE (SUDO ONLY) ======
-@bot.message_handler(func=lambda m: m.chat.type in ("group","supergroup") and m.text in ("لفت بده","/leave"))
+@bot.message_handler(func=lambda m: m.text in ("لفت بده","/leave"))
 def leave_here(m):
     if not is_sudo(m.from_user.id): return
     bot.reply_to(m, "خداحافظ 👋")
