@@ -1,8 +1,7 @@
 # -*- coding: utf-8 -*-
-import telebot
+import telebot, re
 from telebot import types
 from datetime import datetime
-import re
 
 # ==================
 TOKEN = "7462131830:AAEGzgbjETaf3eukzGHW613i4y61Cs7lzTE"
@@ -10,20 +9,20 @@ SUDO_ID = 7089376754  # آیدی عددی شما
 bot = telebot.TeleBot(TOKEN, parse_mode="HTML")
 # ==================
 
-# راهنما
 HELP_TEXT = """
 📖 لیست دستورات:
 
 ⏰ ساعت | 📅 تاریخ | 📊 آمار | 🆔 ایدی
 🔒 قفل لینک / باز کردن لینک
 🧷 قفل استیکر / باز کردن استیکر
-🔐 قفل گروه / باز کردن گروه
+📛 قفل تبچی / باز کردن تبچی
+🤖 قفل ربات / باز کردن ربات
 🚫 بن / ✅ حذف بن (ریپلای)
 🔕 سکوت / 🔊 حذف سکوت (ریپلای)
 👑 مدیر / ❌ حذف مدیر (ریپلای)
 🎉 خوشامد روشن / خاموش
-✍️ خوشامد متن [متن دلخواه]
-🖼 ثبت عکس (روی عکس ریپلای کن و بفرست: ثبت عکس)
+✍️ خوشامد متن <متن>
+🖼 ثبت عکس (ریپلای روی عکس و بفرست ثبت عکس)
 🚪 لفت بده (فقط سودو)
 """
 
@@ -47,9 +46,7 @@ def stats(m):
     bot.reply_to(m, f"📊 اعضای گروه: {count}")
 
 # ========= خوشامدگویی =========
-welcome_enabled = {}
-welcome_texts = {}
-welcome_photos = {}
+welcome_enabled, welcome_texts, welcome_photos = {}, {}, {}
 
 @bot.message_handler(content_types=['new_chat_members'])
 def welcome(m):
@@ -91,8 +88,8 @@ def leave_cmd(m):
     bot.send_message(m.chat.id,"به دستور سودو خارج می‌شوم 👋")
     bot.leave_chat(m.chat.id)
 
-# ========= قفل لینک (ساده) =========
-lock_links = {}
+# ========= قفل لینک =========
+lock_links, lock_stickers, lock_tabchi, lock_bots = {}, {}, {}, {}
 
 @bot.message_handler(func=lambda m: m.text=="قفل لینک")
 def lock_links_cmd(m):
@@ -106,10 +103,70 @@ def unlock_links_cmd(m):
 
 @bot.message_handler(content_types=['text'])
 def anti_links(m):
-    if lock_links.get(m.chat.id) and not m.from_user.id==SUDO_ID:
+    if lock_links.get(m.chat.id) and m.from_user.id!=SUDO_ID:
         if re.search(r"(t\.me|http)", m.text.lower()):
             try: bot.delete_message(m.chat.id, m.message_id)
             except: pass
+
+# ========= قفل استیکر =========
+@bot.message_handler(func=lambda m: m.text=="قفل استیکر")
+def lock_sticker_cmd(m):
+    lock_stickers[m.chat.id]=True
+    bot.reply_to(m,"🧷 استیکرها قفل شدند.")
+
+@bot.message_handler(func=lambda m: m.text=="باز کردن استیکر")
+def unlock_sticker_cmd(m):
+    lock_stickers[m.chat.id]=False
+    bot.reply_to(m,"🧷 استیکرها آزاد شدند.")
+
+@bot.message_handler(content_types=['sticker'])
+def anti_sticker(m):
+    if lock_stickers.get(m.chat.id) and m.from_user.id!=SUDO_ID:
+        try: bot.delete_message(m.chat.id, m.message_id)
+        except: pass
+
+# ========= قفل تبچی =========
+@bot.message_handler(content_types=['new_chat_members'])
+def anti_tabchi(m):
+    if lock_tabchi.get(m.chat.id):
+        for u in m.new_chat_members:
+            if u.username and ("bot" not in u.username.lower()):
+                if "t.me" in u.username.lower() or "spam" in u.username.lower():
+                    try:
+                        bot.kick_chat_member(m.chat.id,u.id)
+                        bot.send_message(m.chat.id,f"🚫 کاربر {u.first_name} به خاطر تبچی حذف شد.")
+                    except: pass
+
+@bot.message_handler(func=lambda m: m.text=="قفل تبچی")
+def lock_tabchi_cmd(m):
+    lock_tabchi[m.chat.id]=True
+    bot.reply_to(m,"📛 تبچی قفل شد.")
+
+@bot.message_handler(func=lambda m: m.text=="باز کردن تبچی")
+def unlock_tabchi_cmd(m):
+    lock_tabchi[m.chat.id]=False
+    bot.reply_to(m,"📛 تبچی آزاد شد.")
+
+# ========= قفل ربات =========
+@bot.message_handler(content_types=['new_chat_members'])
+def anti_bot(m):
+    if lock_bots.get(m.chat.id):
+        for u in m.new_chat_members:
+            if u.is_bot:
+                try:
+                    bot.kick_chat_member(m.chat.id,u.id)
+                    bot.send_message(m.chat.id,"🤖 ربات ممنوعه و حذف شد.")
+                except: pass
+
+@bot.message_handler(func=lambda m: m.text=="قفل ربات")
+def lock_bots_cmd(m):
+    lock_bots[m.chat.id]=True
+    bot.reply_to(m,"🤖 ربات‌ها قفل شدند.")
+
+@bot.message_handler(func=lambda m: m.text=="باز کردن ربات")
+def unlock_bots_cmd(m):
+    lock_bots[m.chat.id]=False
+    bot.reply_to(m,"🤖 ربات‌ها آزاد شدند.")
 
 # ========= RUN =========
 print("🤖 Bot is running...")
