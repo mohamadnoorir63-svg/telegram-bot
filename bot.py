@@ -29,21 +29,18 @@ HELP_TEXT = """
 
 # ========= دستورات پایه =========
 
-@bot.message_handler(func=lambda m: m.text and m.text.strip().lower() in ["راهنما","/help","help"])
+@bot.message_handler(func=lambda m: m.text and any(x in m.text.lower() for x in ["راهنما","/help","help"]))
 def help_cmd(m): 
     bot.reply_to(m, HELP_TEXT)
 
 @bot.message_handler(func=lambda m: m.text=="ساعت")
-def time_cmd(m): 
-    bot.reply_to(m, f"⏰ ساعت: {datetime.now().strftime('%H:%M:%S')}")
+def time_cmd(m): bot.reply_to(m, f"⏰ ساعت: {datetime.now().strftime('%H:%M:%S')}")
 
 @bot.message_handler(func=lambda m: m.text=="تاریخ")
-def date_cmd(m): 
-    bot.reply_to(m, f"📅 تاریخ: {datetime.now().strftime('%Y-%m-%d')}")
+def date_cmd(m): bot.reply_to(m, f"📅 تاریخ: {datetime.now().strftime('%Y-%m-%d')}")
 
 @bot.message_handler(func=lambda m: m.text=="ایدی")
-def id_cmd(m): 
-    bot.reply_to(m, f"🆔 آیدی شما: <code>{m.from_user.id}</code>\n🆔 آیدی گروه: <code>{m.chat.id}</code>")
+def id_cmd(m): bot.reply_to(m, f"🆔 آیدی شما: <code>{m.from_user.id}</code>\n🆔 آیدی گروه: <code>{m.chat.id}</code>")
 
 @bot.message_handler(func=lambda m: m.text=="آمار")
 def stats(m):
