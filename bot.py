@@ -1,454 +1,497 @@
 # -*- coding: utf-8 -*-
+# Simple Persian group manager bot - pyTelegramBotAPI==4.14.0
+# Author: you + ChatGPT
+
 import telebot
-import re
-import json
-import os
-from datetime import datetime, timedelta, timezone
+from telebot import types
+import re, json, os, time
+from datetime import datetime, timedelta
 
-# ========= تنظیمات =========
-TOKEN    = "PUT_YOUR_TELEGRAM_BOT_TOKEN_HERE"   # ← 7462131830:AAENzKipQzuxQ4UYkl9vcVgmmfDMKMUvZi8"   توکن ربات
-SUDO_ID  = 7089376754                           # ← 7089376754آیدی عددی سودو (صاحب ربات)
-DATA_FILE = "groups.json"                       # ذخیرهٔ لوکال (برای پایداری بهتر بعداً Redis بگذار)
+TOKEN   = "7462131830:AAENzKipQzuxQ4UYkl9vcVgmmfDMKMUvZi8"   # توکن شما
+SUDO_ID = 7089376754                                         # آیدی عددی سودو
 
-bot = telebot.TeleBot(TOKEN, parse_mode="HTML")
-IR_TZ = timezone(timedelta(hours=3, minutes=30))  # Asia/Tehran بدون نیاز به pytz
+DATA_FILE = "data.json"
 
-# ========= ذخیره/لود =========
-def load_data():
+# ---------- helpers: storage ----------
+def load_db():
     if not os.path.exists(DATA_FILE):
-        return {}
+        save_db({"groups": {}, "await": {}})
     with open(DATA_FILE, "r", encoding="utf-8") as f:
-        try:
-            return json.load(f)
-        except:
-            return {}
+        return json.load(f)
 
-def save_data():
+def save_db(db):
     with open(DATA_FILE, "w", encoding="utf-8") as f:
         json.dump(db, f, ensure_ascii=False, indent=2)
 
-db = load_data()  # ساختار: { chat_id(str): {expires_at:int, locks:{...}, welcome:{...}} }
+db = load_db()
 
-def ensure_chat(chat_id: int):
-    key = str(chat_id)
-    if key not in db:
-        db[key] = {
-            "expires_at": 0,
-            "locks": {
-                "links": False,
-                "stickers": False,
-                "group_locked": False
-            },
-            "welcome": {
-                "enabled": False,
-                "text": "خوش آمدید 🌹",
-                "photo_id": None
-            }
+def g(chat_id):
+    chat_id = str(chat_id)
+    if chat_id not in db["groups"]:
+        db["groups"][chat_id] = {
+            "expires": 0,
+            "locks": {"links": False, "stickers": False, "group": False},
+            "welcome": {"enabled": False, "text": "خوش آمدید 🌹", "photo": None}
         }
-        save_data()
-    return db[key]
+        save_db(db)
+    return db["groups"][chat_id]
 
-def is_charged(chat_id: int) -> bool:
-    data = ensure_chat(chat_id)
-    return int(data.get("expires_at", 0)) > int(datetime.now(timezone.utc).timestamp())
+def is_charged(chat_id):
+    return time.time() < g(chat_id)["expires"]
 
-def require_bot_admin(message) -> bool:
+def iran_now():
+    # زمان ایران بدون کتابخانه‌ی اضافی
+    return datetime.utcnow() + timedelta(hours=3, minutes=30)
+
+def is_sudo(uid): return int(uid) == int(SUDO_ID)
+
+def is_admin(chat_id, user_id):
     try:
-        me = bot.get_chat_member(message.chat.id, bot.get_me().id)
-        status = me.status
-        # باید بتونه Delete/Restrict/Invite داشته باشه برای برخی قابلیت‌ها
-        return status in ("administrator", "creator")
-    except:
+        st = bot.get_chat_member(chat_id, user_id).status
+        return st in ("administrator", "creator")
+    except Exception:
         return False
 
-def is_admin(chat_id: int, user_id: int) -> bool:
-    if user_id == SUDO_ID:
-        return True
-    try:
-        m = bot.get_chat_member(chat_id, user_id)
-        return m.status in ("administrator", "creator")
-    except:
-        return False
+def need_admin_rights(m):
+    bot.reply_to(m, "⚠️ ربات باید ادمین با دسترسی حذف/محدودسازی/ارتقا باشد.")
+# --------------------------------------
 
-def sudo_only(user_id: int) -> bool:
-    return user_id == SUDO_ID
+bot = telebot.TeleBot(TOKEN, parse_mode="HTML")
 
-def persian_or_english(text: str, patterns):
-    """بررسی چند عبارت (فارسی/انگلیسی)"""
-    t = (text or "").strip()
-    return any(t.lower().startswith(p.lower()) for p in patterns)
-
-# ========= پیام‌های کمکی =========
-HELP_GROUP = (
-    "📌 دستورات گروه (اگر گروه شارژ باشد):\n"
-    "• ساعت\n• تاریخ\n• آمار (members)\n• ایدی\n"
-    "• لینک (دریافت لینک دعوت)\n"
-    "• قفل لینک / باز کردن لینک\n"
-    "• قفل استیکر / باز کردن استیکر\n"
-    "• قفل گروه / باز کردن گروه\n"
-    "• پاکسازی (حذف ۵۰ پیام اخیر)\n"
-    "• بن (با ریپلای) / سکوت (با ریپلای) / حذف سکوت (با ریپلای)\n"
-    "• لفت بده (فقط سودو)\n"
-    "• خوشامد روشن/خاموش — ویرایش خوشامد (متن/عکس)\n"
-    "—\n"
-    "برای مدیران: پاسخ بده به پیام کاربر و بگو «بن» یا «سکوت» یا «حذف سکوت»."
-)
-
-HELP_PM_SUDO = (
-    "🔐 پنل مدیریتی (فقط سودو) — در پیوی ربات:\n"
-    "/panel – آمار و فهرست گروه‌های شارژ شده\n"
-    "/broadcast متن – ارسال پیام به همه گروه‌های شارژ\n"
-    "⚡ شارژ از داخل خود گروه: «شارژ 30» (عدد = روز)\n"
-    "⚡ یا در پیوی: /charge <group_id> <days>\n"
-    "/welcome <group_id> <text> – تنظیم متن خوشامد (یا با عکس: /welcomepic در ریپلای)\n"
-)
-
-START_TEXT_USER = "سلام! من یک ربات مدیریت گروه هستم. من را به گروه‌تان اضافه و ادمین کنید تا فعال شوم."
-
-# ========= /start (PM) =========
-@bot.message_handler(commands=['start'])
-def cmd_start(m):
-    if m.chat.type != "private":
-        return
-    if sudo_only(m.from_user.id):
-        bot.reply_to(m, "سلام سودو 👑\n" + HELP_PM_SUDO)
-    else:
-        bot.reply_to(m, START_TEXT_USER)
-
-# ========= پنل سودو در پیوی =========
-@bot.message_handler(commands=['panel'])
-def cmd_panel(m):
-    if m.chat.type != "private": return
-    if not sudo_only(m.from_user.id): return
-    now = int(datetime.now(timezone.utc).timestamp())
-    total = 0
-    charged = 0
-    lines = []
-    for k, v in db.items():
-        if not str(k).startswith('-100') and not str(k).startswith('-'):  # فقط سوپرگروه‌ها غالباً -100...
-            pass
-        total += 1
-        exp = int(v.get("expires_at", 0))
-        ok = exp > now
-        if ok: charged += 1
-        exp_str = datetime.fromtimestamp(exp, IR_TZ).strftime("%Y-%m-%d %H:%M") if exp else "—"
-        lines.append(f"گروه <code>{k}</code> | شارژ: {'✅' if ok else '❌'} | انقضا: {exp_str}")
-    text = f"📊 آمار گروه‌ها:\nمجموع: <b>{total}</b> | شارژ: <b>{charged}</b>\n\n" + ("\n".join(lines[:50]) or "هیچ گروهی ثبت نیست.")
-    bot.reply_to(m, text)
-
-@bot.message_handler(commands=['broadcast'])
-def cmd_broadcast(m):
-    if m.chat.type != "private": return
-    if not sudo_only(m.from_user.id): return
-    parts = m.text.split(maxsplit=1)
-    if len(parts) < 2:
-        bot.reply_to(m, "فرمت: /broadcast متن")
-        return
-    msg = parts[1]
-    sent = 0
-    for k, v in db.items():
-        try:
-            if is_charged(int(k)):
-                bot.send_message(int(k), msg)
-                sent += 1
-        except: pass
-    bot.reply_to(m, f"پیام به {sent} گروه ارسال شد.")
-
-@bot.message_handler(commands=['charge'])
-def cmd_charge(m):
-    # /charge group_id days  (در پیوی)  یا «شارژ 30» (در خود گروه)
+# =============== SUDO: private panel ===============
+@bot.message_handler(commands=["start"])
+def start_cmd(m):
     if m.chat.type == "private":
-        if not sudo_only(m.from_user.id): return
-        parts = m.text.split()
-        if len(parts) != 3:
-            bot.reply_to(m, "فرمت درست: /charge group_id روز\nمثال: /charge -1001234567890 30")
-            return
-        try:
-            gid = int(parts[1])
-            days = int(parts[2])
-        except:
-            bot.reply_to(m, "مقادیر نادرست‌اند.")
-            return
-        data = ensure_chat(gid)
-        exp = datetime.now(timezone.utc) + timedelta(days=days)
-        data["expires_at"] = int(exp.timestamp())
-        save_data()
-        bot.reply_to(m, f"گروه <code>{gid}</code> برای {days} روز شارژ شد. ✅")
-    else:
-        # داخل گروه: «شارژ 30» فقط توسط سودو
-        if not sudo_only(m.from_user.id): return
-        txt = (m.text or "").strip()
-        # اجازه بده /charge 30 یا «شارژ 30»
-        mo = re.match(r"^/?charge\s+(\d+)$", txt, re.IGNORECASE) or re.match(r"^شارژ\s+(\d+)$", txt)
-        if not mo:
-            return
-        days = int(mo.group(1))
-        data = ensure_chat(m.chat.id)
-        exp = datetime.now(timezone.utc) + timedelta(days=days)
-        data["expires_at"] = int(exp.timestamp())
-        save_data()
-        bot.reply_to(m, f"گروه برای <b>{days}</b> روز شارژ شد. ✅")
-
-# ========= خوشامدگویی =========
-@bot.message_handler(func=lambda m: m.chat.type in ("group","supergroup"), content_types=['new_chat_members'])
-def on_new_member(m):
-    if not is_charged(m.chat.id):
-        try:
-            bot.leave_chat(m.chat.id)
-        except: pass
-        return
-    data = ensure_chat(m.chat.id)
-    w = data["welcome"]
-    if not w.get("enabled"): return
-    text = w.get("text") or "خوش آمدید 🌹"
-    names = "، ".join([f"<a href='tg://user?id={u.id}'>{telebot.util.escape_html(u.first_name or '')}</a>" for u in m.new_chat_members])
-    msg = text.replace("{name}", names).replace("{group}", telebot.util.escape_html(m.chat.title or ""))
-    if w.get("photo_id"):
-        bot.send_photo(m.chat.id, w["photo_id"], caption=msg)
-    else:
-        bot.send_message(m.chat.id, msg)
-
-# مدیر گروه می‌تواند خوشامد را روشن/خاموش/ویرایش کند
-@bot.message_handler(func=lambda m: m.chat.type in ("group","supergroup"))
-def group_text_commands(m):
-    txt = (m.text or "").strip()
-
-    # شارژ تمام شده؟ هر پیام تریگر چک
-    if not is_charged(m.chat.id):
-        if sudo_only(m.from_user.id):
-            pass
+        if is_sudo(m.from_user.id):
+            txt = (
+                "🔐 <b>پنل سودو</b>\n"
+                "• /panel – نمایش پنل\n"
+                "• /broadcast – ارسال پیام به همه‌ی گروه‌های شارژ\n"
+                "• /stats – آمار گروه‌ها و تاریخ انقضا\n\n"
+                "• در گروه: <code>شارژ 30</code> (یا /charge 30) برای شارژ همان گروه\n"
+            )
+            bot.reply_to(m, txt)
         else:
-            try: bot.leave_chat(m.chat.id)
-            except: pass
-            return
+            bot.reply_to(m, "سلام! من یک ربات مدیریت گروه هستم. مرا به گروه‌تان اضافه و ادمین کنید ✅")
+    else:
+        pass
 
-    # فقط سودو: لفت بده
-    if txt in ("لفت بده", "leave") and sudo_only(m.from_user.id):
-        try:
-            bot.send_message(m.chat.id, "خدانگهدار 👋")
-            bot.leave_chat(m.chat.id)
-        except: pass
-        return
+@bot.message_handler(commands=["panel"])
+def panel_cmd(m):
+    if m.chat.type != "private": return
+    if not is_sudo(m.from_user.id): return
+    total = len(db["groups"])
+    active = sum(1 for cid in db["groups"] if is_charged(int(cid)))
+    txt = f"🛠 <b>پنل مدیریتی</b>\nگروه‌ها: {total}\nفعّال: {active}\n\n" \
+          f"• /stats – لیست گروه‌ها و انقضا\n" \
+          f"• /broadcast – ارسال پیام به همه‌ی گروه‌های شارژ"
+    bot.reply_to(m, txt)
 
-    # راهنما
-    if txt in ("راهنما", "help", "/help"):
-        bot.reply_to(m, HELP_GROUP)
+@bot.message_handler(commands=["stats"])
+def stats_cmd(m):
+    if m.chat.type != "private": return
+    if not is_sudo(m.from_user.id): return
+    if not db["groups"]:
+        bot.reply_to(m, "هیچ گروهی ثبت نشده.")
         return
+    lines = []
+    for cid, info in db["groups"].items():
+        exp_ts = info.get("expires", 0)
+        if exp_ts == 0:
+            status = "⛔ شارژ نشده"
+        else:
+            exp = datetime.utcfromtimestamp(exp_ts) + timedelta(hours=3, minutes=30)
+            status = "✅ تا " + exp.strftime("%Y-%m-%d %H:%M")
+        lines.append(f"<code>{cid}</code> → {status}")
+    bot.reply_to(m, "📊 <b>آمار گروه‌ها</b>\n" + "\n".join(lines))
 
-    # ساعت/تاریخ
-    if txt in ("ساعت", "time"):
-        now = datetime.now(IR_TZ).strftime("%H:%M:%S")
-        bot.reply_to(m, f"⏰ ساعت: <b>{now}</b>")
-        return
-    if txt in ("تاریخ", "date"):
-        d = datetime.now(IR_TZ).strftime("%Y-%m-%d")
-        bot.reply_to(m, f"📅 تاریخ: <b>{d}</b>")
-        return
+@bot.message_handler(commands=["broadcast"])
+def bc_start(m):
+    if m.chat.type != "private": return
+    if not is_sudo(m.from_user.id): return
+    db["await"][str(m.from_user.id)] = "broadcast"
+    save_db(db)
+    bot.reply_to(m, "پیام بعدی شما به همه‌ی گروه‌های شارژ ارسال خواهد شد. برای لغو: /cancel")
 
-    # آمار اعضا
-    if txt in ("آمار", "stats", "/stats"):
-        try:
-            cnt = bot.get_chat_members_count(m.chat.id)
-            bot.reply_to(m, f"👥 اعضا: <b>{cnt}</b>")
-        except:
-            bot.reply_to(m, "نتوانستم آمار را بگیرم.")
-        return
+@bot.message_handler(commands=["cancel"])
+def cancel_await(m):
+    if m.chat.type != "private": return
+    key = str(m.from_user.id)
+    if db["await"].get(key):
+        db["await"].pop(key, None)
+        save_db(db)
+        bot.reply_to(m, "لغو شد.")
+    else:
+        bot.reply_to(m, "در حال انتظار پیام نبودم.")
 
-    # ایدی
-    if txt in ("ایدی", "id", "/id"):
-        bot.reply_to(m, f"🆔 آیدی شما: <code>{m.from_user.id}</code>\n🆔 آیدی گروه: <code>{m.chat.id}</code>")
-        return
+@bot.message_handler(func=lambda m: m.chat.type=="private")
+def private_flow(m):
+    key = str(m.from_user.id)
+    if db["await"].get(key) == "broadcast" and is_sudo(m.from_user.id):
+        sent = 0
+        for cid, info in db["groups"].items():
+            if is_charged(int(cid)):
+                try:
+                    bot.copy_message(cid, m.chat.id, m.message_id)
+                    sent += 1
+                except Exception:
+                    pass
+        db["await"].pop(key, None)
+        save_db(db)
+        bot.reply_to(m, f"پیام به {sent} گروهِ شارژ ارسال شد ✅")
 
-    # لینک گروه
-    if txt in ("لینک", "link", "/link"):
-        if not require_bot_admin(m):
-            bot.reply_to(m, "⚠️ ربات باید ادمین باشد (اجازهٔ invite).")
-            return
-        try:
-            link = bot.export_chat_invite_link(m.chat.id)
-            bot.reply_to(m, f"🔗 لینک گروه:\n{link}")
-        except:
-            bot.reply_to(m, "نتوانستم لینک را بگیرم. مطمئن شو ربات اجازهٔ Invite دارد.")
-        return
+# =============== GROUP: charge ===============
+# فارسی: "شارژ 30" ، انگلیسی: "/charge 30"
+@bot.message_handler(func=lambda m: m.chat.type in ["group","supergroup"], regexp=r"^/?charge\s+\d+$")
+def charge_en(m):
+    if not is_sudo(m.from_user.id): return
+    days = int(m.text.split()[-1])
+    charge_group(m.chat.id, days)
 
-    # قفل/باز کردن لینک
-    if txt in ("قفل لینک", "lock links"):
-        if not is_admin(m.chat.id, m.from_user.id): return
-        data = ensure_chat(m.chat.id)
-        data["locks"]["links"] = True
-        save_data()
-        bot.reply_to(m, "🔒 لینک‌ها قفل شدند. ✅")
-        return
-    if txt in ("باز کردن لینک", "unlock links"):
-        if not is_admin(m.chat.id, m.from_user.id): return
-        data = ensure_chat(m.chat.id)
-        data["locks"]["links"] = False
-        save_data()
-        bot.reply_to(m, "🔓 لینک‌ها آزاد شدند. ✅")
-        return
+@bot.message_handler(func=lambda m: m.chat.type in ["group","supergroup"] and m.text and m.text.strip().startswith("شارژ "))
+def charge_fa(m):
+    if not is_sudo(m.from_user.id): return
+    try:
+        days = int(m.text.strip().split()[1])
+        charge_group(m.chat.id, days)
+    except Exception:
+        bot.reply_to(m, "فرمت: <code>شارژ 30</code>")
 
-    # قفل/باز کردن استیکر
-    if txt in ("قفل استیکر", "lock stickers"):
-        if not is_admin(m.chat.id, m.from_user.id): return
-        data = ensure_chat(m.chat.id)
-        data["locks"]["stickers"] = True
-        save_data()
-        bot.reply_to(m, "🧷 ارسال استیکر ممنوع شد. ✅")
-        return
-    if txt in ("باز کردن استیکر", "unlock stickers"):
-        if not is_admin(m.chat.id, m.from_user.id): return
-        data = ensure_chat(m.chat.id)
-        data["locks"]["stickers"] = False
-        save_data()
-        bot.reply_to(m, "🧷 ارسال استیکر آزاد شد. ✅")
-        return
+def charge_group(chat_id, days):
+    info = g(chat_id)
+    base = max(time.time(), info["expires"])
+    info["expires"] = int(base + days*24*3600)
+    save_db(db)
+    till = datetime.utcfromtimestamp(info["expires"]) + timedelta(hours=3, minutes=30)
+    bot.send_message(chat_id, f"✅ گروه برای <b>{days}</b> روز شارژ شد.\nانقضا: <code>{till.strftime('%Y-%m-%d %H:%M')}</code>")
 
-    # قفل/باز کردن گروه (فقط مدیر – نیاز به Restrict Members برای ربات)
-    if txt in ("قفل گروه", "lock group"):
-        if not is_admin(m.chat.id, m.from_user.id): return
-        if not require_bot_admin(m):
-            bot.reply_to(m, "⚠️ ربات باید ادمین با دسترسی محدودکردن باشد.")
-            return
-        try:
-            bot.set_chat_permissions(m.chat.id, telebot.types.ChatPermissions(can_send_messages=False))
-            data = ensure_chat(m.chat.id)
-            data["locks"]["group_locked"] = True
-            save_data()
-            bot.reply_to(m, "گروه قفل شد. 🔒")
-        except:
-            bot.reply_to(m, "نتوانستم گروه را قفل کنم.")
-        return
-
-    if txt in ("باز کردن گروه", "unlock group"):
-        if not is_admin(m.chat.id, m.from_user.id): return
-        if not require_bot_admin(m):
-            bot.reply_to(m, "⚠️ ربات باید ادمین باشد.")
-            return
-        try:
-            bot.set_chat_permissions(m.chat.id, telebot.types.ChatPermissions(can_send_messages=True))
-            data = ensure_chat(m.chat.id)
-            data["locks"]["group_locked"] = False
-            save_data()
-            bot.reply_to(m, "گروه باز شد. 🔓")
-        except:
-            bot.reply_to(m, "نتوانستم گروه را باز کنم.")
-        return
-
-    # پاکسازی ۵۰ پیام
-    if txt in ("پاکسازی", "clear", "/clear"):
-        if not is_admin(m.chat.id, m.from_user.id): return
-        if not require_bot_admin(m):
-            bot.reply_to(m, "⚠️ ربات باید دسترسی حذف پیام داشته باشد.")
-            return
-        deleted = 0
-        base = m.message_id
-        for mid in range(base-1, base-1-50, -1):
-            if mid <= 0: break
-            try:
-                bot.delete_message(m.chat.id, mid); deleted += 1
-            except: pass
-        bot.reply_to(m, f"🧹 {deleted} پیام اخیر حذف شد.")
-        return
-
-    # خوشامد روشن/خاموش/ویرایش
-    if txt in ("خوشامد روشن", "welcome on"):
-        if not is_admin(m.chat.id, m.from_user.id): return
-        data = ensure_chat(m.chat.id)
-        data["welcome"]["enabled"] = True
-        save_data()
-        bot.reply_to(m, "✨ خوشامدگویی روشن شد.")
-        return
-    if txt in ("خوشامد خاموش", "welcome off"):
-        if not is_admin(m.chat.id, m.from_user.id): return
-        data = ensure_chat(m.chat.id)
-        data["welcome"]["enabled"] = False
-        save_data()
-        bot.reply_to(m, "✨ خوشامدگویی خاموش شد.")
-        return
-    if txt.startswith("ویرایش خوشامد ") or txt.lower().startswith("setwelcome "):
-        if not is_admin(m.chat.id, m.from_user.id): return
-        new_text = txt.replace("ویرایش خوشامد", "", 1).strip() if txt.startswith("ویرایش خوشامد ") else txt.split(" ",1)[1]
-        data = ensure_chat(m.chat.id)
-        data["welcome"]["text"] = new_text or "خوش آمدید 🌹"
-        save_data()
-        bot.reply_to(m, "متن خوشامد ویرایش شد. می‌تونی از {name} و {group} هم استفاده کنی.")
-        return
-    if txt in ("خوشامد عکس", "welcomepic"):
-        # باید روی یک عکس ریپلای شود
-        if not is_admin(m.chat.id, m.from_user.id): return
-        if not m.reply_to_message or not (m.reply_to_message.photo):
-            bot.reply_to(m, "روی یک عکس ریپلای کن و بگو «خوشامد عکس».")
-            return
-        file_id = m.reply_to_message.photo[-1].file_id
-        data = ensure_chat(m.chat.id)
-        data["welcome"]["photo_id"] = file_id
-        save_data()
-        bot.reply_to(m, "عکس خوشامد ذخیره شد.")
-        return
-    if txt in ("حذف عکس خوشامد", "rmwelcomepic"):
-        if not is_admin(m.chat.id, m.from_user.id): return
-        data = ensure_chat(m.chat.id)
-        data["welcome"]["photo_id"] = None
-        save_data()
-        bot.reply_to(m, "عکس خوشامد حذف شد.")
-        return
-
-    # بن/سکوت/حذف سکوت (با ریپلای)
-    if txt in ("بن", "ban"):
-        if not is_admin(m.chat.id, m.from_user.id): return
-        if not require_bot_admin(m): return
-        if not m.reply_to_message: return
-        try:
-            bot.ban_chat_member(m.chat.id, m.reply_to_message.from_user.id)
-            bot.reply_to(m, "کاربر بن شد. 🚫")
-        except:
-            pass
-        return
-    if txt in ("سکوت", "mute"):
-        if not is_admin(m.chat.id, m.from_user.id): return
-        if not require_bot_admin(m): return
-        if not m.reply_to_message: return
-        try:
-            perms = telebot.types.ChatPermissions(can_send_messages=False)
-            bot.restrict_chat_member(m.chat.id, m.reply_to_message.from_user.id, permissions=perms)
-            bot.reply_to(m, "کاربر در سکوت قرار گرفت. 🔇")
-        except:
-            pass
-        return
-    if txt in ("حذف سکوت", "unmute"):
-        if not is_admin(m.chat.id, m.from_user.id): return
-        if not require_bot_admin(m): return
-        if not m.reply_to_message: return
-        try:
-            perms = telebot.types.ChatPermissions(can_send_messages=True)
-            bot.restrict_chat_member(m.chat.id, m.reply_to_message.from_user.id, permissions=perms)
-            bot.reply_to(m, "سکوت کاربر برداشته شد. 🔊")
-        except:
-            pass
-        return
-
-# ========= حذف لینک‌ها / استیکرها وقتی قفل است =========
-URL_RE = re.compile(r"(https?://|t\.me/)", re.IGNORECASE)
-
-@bot.message_handler(func=lambda m: m.chat.type in ("group","supergroup"), content_types=['text','sticker','photo','document','animation'])
-def filters_guard(m):
+# =============== GROUP: helpers guard ===============
+def need_charge(m):
     if not is_charged(m.chat.id):
-        return
-    data = ensure_chat(m.chat.id)
-    # لینک
-    if data["locks"].get("links") and m.content_type == 'text':
-        if URL_RE.search(m.text or "") and not is_admin(m.chat.id, m.from_user.id):
-            if require_bot_admin(m):
-                try: bot.delete_message(m.chat.id, m.message_id)
-                except: pass
-            return
-    # استیکر
-    if data["locks"].get("stickers") and m.content_type == 'sticker':
-        if not is_admin(m.chat.id, m.from_user.id) and require_bot_admin(m):
-            try: bot.delete_message(m.chat.id, m.message_id)
-            except: pass
-            return
+        if is_sudo(m.from_user.id):
+            return False
+        bot.reply_to(m, "⛔ این گروه شارژ نیست. فقط سودو قادر به استفاده از فرمان‌هاست.")
+        return True
+    return False
 
-# ========= اجرای ربات =========
-print("Bot is running...")
-bot.infinity_polling(timeout=30, long_polling_timeout=30, skip_pending=True)
+def need_admin(m):
+    if not is_admin(m.chat.id, m.from_user.id) and not is_sudo(m.from_user.id):
+        bot.reply_to(m, "این دستور مخصوص مدیران گروه است.")
+        return True
+    return False
+
+# =============== GROUP: basic info ===============
+@bot.message_handler(func=lambda m: m.chat.type in ["group","supergroup"] and m.text in ["ساعت","/time"])
+def time_cmd(m):
+    if need_charge(m): return
+    now = iran_now().strftime("%H:%M:%S")
+    bot.reply_to(m, f"⏰ ساعت: <code>{now}</code>")
+
+@bot.message_handler(func=lambda m: m.chat.type in ["group","supergroup"] and m.text in ["تاریخ","/date"])
+def date_cmd(m):
+    if need_charge(m): return
+    d = iran_now().strftime("%Y-%m-%d")
+    bot.reply_to(m, f"📅 تاریخ: <code>{d}</code>")
+
+@bot.message_handler(func=lambda m: m.chat.type in ["group","supergroup"] and m.text in ["آمار","/stats"])
+def group_stats(m):
+    if need_charge(m): return
+    try:
+        cnt = bot.get_chat_member_count(m.chat.id)
+    except Exception:
+        cnt = "نامشخص"
+    info = g(m.chat.id)
+    locks = info["locks"]
+    exp = datetime.utcfromtimestamp(info["expires"]) + timedelta(hours=3, minutes=30) if info["expires"] else None
+    txt = (
+        f"📊 آمار گروه\n"
+        f"اعضا: <b>{cnt}</b>\n"
+        f"قفل لینک: {'✅' if locks['links'] else '❌'} | "
+        f"قفل استیکر: {'✅' if locks['stickers'] else '❌'} | "
+        f"قفل گروه: {'✅' if locks['group'] else '❌'}\n"
+        f"انقضا: {exp.strftime('%Y-%m-%d %H:%M') if exp else 'نامشخص'}"
+    )
+    bot.reply_to(m, txt)
+
+@bot.message_handler(func=lambda m: m.chat.type in ["group","supergroup"] and m.text in ["ایدی","/id"])
+def id_cmd(m):
+    if need_charge(m): return
+    bot.reply_to(m, f"🆔 آیدی شما: <code>{m.from_user.id}</code>\n🆔 آیدی گروه: <code>{m.chat.id}</code>")
+
+# =============== GROUP: link (invite) ===============
+@bot.message_handler(func=lambda m: m.chat.type in ["group","supergroup"] and m.text in ["لینک","بهشت","/link"])
+def link_cmd(m):
+    if need_charge(m): return
+    try:
+        link = bot.export_chat_invite_link(m.chat.id)
+        bot.reply_to(m, f"🔗 لینک گروه:\n{link}")
+    except Exception:
+        need_admin_rights(m)
+
+# =============== GROUP: locks ===============
+@bot.message_handler(func=lambda m: m.chat.type in ["group","supergroup"] and m.text in ["قفل لینک","/lock_links"])
+def lock_links(m):
+    if need_charge(m): return
+    if need_admin(m): return
+    g(m.chat.id)["locks"]["links"] = True
+    save_db(db)
+    bot.reply_to(m, "✅ لینک‌ها قفل شدند.")
+
+@bot.message_handler(func=lambda m: m.chat.type in ["group","supergroup"] and m.text in ["باز کردن لینک","/unlock_links"])
+def unlock_links(m):
+    if need_charge(m): return
+    if need_admin(m): return
+    g(m.chat.id)["locks"]["links"] = False
+    save_db(db)
+    bot.reply_to(m, "🔓 لینک‌ها آزاد شدند.")
+
+@bot.message_handler(content_types=["text"], func=lambda m: m.chat.type in ["group","supergroup"])
+def anti_link(m):
+    if not is_charged(m.chat.id): return
+    if g(m.chat.id)["locks"]["links"]:
+        has_entity_link = any(ent.type in ("url","text_link") for ent in (m.entities or []))
+        has_pattern = bool(re.search(r"(https?://|t\.me/|telegram\.me/|telegram\.org/)", m.text or "", flags=re.I))
+        if (has_entity_link or has_pattern) and not is_admin(m.chat.id, m.from_user.id) and not is_sudo(m.from_user.id):
+            try:
+                bot.delete_message(m.chat.id, m.message_id)
+            except Exception:
+                pass
+
+@bot.message_handler(func=lambda m: m.chat.type in ["group","supergroup"] and m.text in ["قفل استیکر","/lock_stickers"])
+def lock_stickers(m):
+    if need_charge(m): return
+    if need_admin(m): return
+    g(m.chat.id)["locks"]["stickers"] = True
+    save_db(db)
+    bot.reply_to(m, "✅ ارسال استیکر ممنوع شد.")
+
+@bot.message_handler(func=lambda m: m.chat.type in ["group","supergroup"] and m.text in ["باز کردن استیکر","/unlock_stickers"])
+def unlock_stickers(m):
+    if need_charge(m): return
+    if need_admin(m): return
+    g(m.chat.id)["locks"]["stickers"] = False
+    save_db(db)
+    bot.reply_to(m, "🔓 ارسال استیکر آزاد شد.")
+
+@bot.message_handler(content_types=["sticker"], func=lambda m: m.chat.type in ["group","supergroup"])
+def anti_sticker(m):
+    if not is_charged(m.chat.id): return
+    if g(m.chat.id)["locks"]["stickers"] and not is_admin(m.chat.id, m.from_user.id) and not is_sudo(m.from_user.id):
+        try: bot.delete_message(m.chat.id, m.message_id)
+        except: pass
+
+@bot.message_handler(func=lambda m: m.chat.type in ["group","supergroup"] and m.text in ["قفل گروه","/lock_group"])
+def lock_group(m):
+    if need_charge(m): return
+    if need_admin(m): return
+    try:
+        perms = types.ChatPermissions(can_send_messages=False)
+        bot.set_chat_permissions(m.chat.id, perms)
+        g(m.chat.id)["locks"]["group"] = True
+        save_db(db)
+        bot.reply_to(m, "🔒 گروه قفل شد (فقط مدیران مجازند).")
+    except Exception:
+        need_admin_rights(m)
+
+@bot.message_handler(func=lambda m: m.chat.type in ["group","supergroup"] and m.text in ["باز کردن گروه","/unlock_group"])
+def unlock_group(m):
+    if need_charge(m): return
+    if need_admin(m): return
+    try:
+        perms = types.ChatPermissions(can_send_messages=True, can_send_media_messages=True, can_send_other_messages=True)
+        bot.set_chat_permissions(m.chat.id, perms)
+        g(m.chat.id)["locks"]["group"] = False
+        save_db(db)
+        bot.reply_to(m, "✅ گروه باز شد.")
+    except Exception:
+        need_admin_rights(m)
+
+# =============== GROUP: moderation (reply) ===============
+def target_user_id(m):
+    if not m.reply_to_message: return None
+    if m.reply_to_message.from_user: return m.reply_to_message.from_user.id
+    return None
+
+@bot.message_handler(func=lambda m: m.chat.type in ["group","supergroup"] and m.text in ["سکوت","/mute"])
+def mute_user(m):
+    if need_charge(m): return
+    if need_admin(m): return
+    uid = target_user_id(m)
+    if not uid: return bot.reply_to(m, "روی پیام شخص ریپلای کنید.")
+    try:
+        bot.restrict_chat_member(m.chat.id, uid, types.ChatPermissions(can_send_messages=False))
+        bot.reply_to(m, "🔇 کاربر در سکوت قرار گرفت.")
+    except Exception:
+        need_admin_rights(m)
+
+@bot.message_handler(func=lambda m: m.chat.type in ["group","supergroup"] and m.text in ["حذف سکوت","/unmute"])
+def unmute_user(m):
+    if need_charge(m): return
+    if need_admin(m): return
+    uid = target_user_id(m)
+    if not uid: return bot.reply_to(m, "روی پیام شخص ریپلای کنید.")
+    try:
+        bot.restrict_chat_member(m.chat.id, uid, types.ChatPermissions(can_send_messages=True, can_send_media_messages=True, can_send_other_messages=True))
+        bot.reply_to(m, "🔉 سکوت کاربر برداشته شد.")
+    except Exception:
+        need_admin_rights(m)
+
+@bot.message_handler(func=lambda m: m.chat.type in ["group","supergroup"] and m.text in ["بن","/ban"])
+def ban_user(m):
+    if need_charge(m): return
+    if need_admin(m): return
+    uid = target_user_id(m)
+    if not uid: return bot.reply_to(m, "روی پیام شخص ریپلای کنید.")
+    try:
+        bot.ban_chat_member(m.chat.id, uid)
+        bot.reply_to(m, "⛔ کاربر بن شد.")
+    except Exception:
+        need_admin_rights(m)
+
+@bot.message_handler(func=lambda m: m.chat.type in ["group","supergroup"] and m.text in ["حذف بن","/unban"])
+def unban_user(m):
+    if need_charge(m): return
+    if need_admin(m): return
+    uid = target_user_id(m)
+    if not uid: return bot.reply_to(m, "روی پیام شخص ریپلای کنید.")
+    try:
+        bot.unban_chat_member(m.chat.id, uid, only_if_banned=True)
+        bot.reply_to(m, "✅ بن کاربر برداشته شد.")
+    except Exception:
+        need_admin_rights(m)
+
+@bot.message_handler(func=lambda m: m.chat.type in ["group","supergroup"] and m.text in ["مدیر","/promote"])
+def promote_user(m):
+    if need_charge(m): return
+    if not is_admin(m.chat.id, m.from_user.id) and not is_sudo(m.from_user.id):
+        return bot.reply_to(m, "فقط مدیران می‌توانند ارتقا دهند.")
+    uid = target_user_id(m)
+    if not uid: return bot.reply_to(m, "روی پیام شخص ریپلای کنید.")
+    try:
+        bot.promote_chat_member(
+            m.chat.id, uid,
+            can_manage_chat=True, can_delete_messages=True, can_invite_users=True,
+            can_restrict_members=True, can_pin_messages=True, can_promote_members=False,
+            can_manage_video_chats=True
+        )
+        bot.reply_to(m, "🛡 کاربر مدیر شد.")
+    except Exception:
+        need_admin_rights(m)
+
+@bot.message_handler(func=lambda m: m.chat.type in ["group","supergroup"] and m.text in ["حذف مدیر","/demote"])
+def demote_user(m):
+    if need_charge(m): return
+    if not is_admin(m.chat.id, m.from_user.id) and not is_sudo(m.from_user.id):
+        return bot.reply_to(m, "فقط مدیران می‌توانند عزل کنند.")
+    uid = target_user_id(m)
+    if not uid: return bot.reply_to(m, "روی پیام شخص ریپلای کنید.")
+    try:
+        bot.promote_chat_member(
+            m.chat.id, uid,
+            can_manage_chat=False, can_delete_messages=False, can_invite_users=False,
+            can_restrict_members=False, can_pin_messages=False, can_promote_members=False,
+            can_manage_video_chats=False
+        )
+        bot.reply_to(m, "⬇️ کاربر از مدیریت حذف شد.")
+    except Exception:
+        need_admin_rights(m)
+
+# =============== GROUP: clean last 50 ===============
+@bot.message_handler(func=lambda m: m.chat.type in ["group","supergroup"] and m.text in ["پاکسازی","/clear"])
+def clear_msgs(m):
+    if need_charge(m): return
+    if not is_admin(m.chat.id, m.from_user.id) and not is_sudo(m.from_user.id):
+        return bot.reply_to(m, "این دستور مخصوص مدیران است.")
+    ok = 0
+    for mid in range(m.message_id-1, max(m.message_id-200, 1), -1):
+        try:
+            bot.delete_message(m.chat.id, mid)
+            ok += 1
+            if ok >= 50: break
+        except Exception:
+            pass
+    bot.reply_to(m, f"🧹 {ok} پیام حذف شد.")
+
+# =============== GROUP: welcome ===============
+@bot.message_handler(content_types=["new_chat_members"], func=lambda m: m.chat.type in ["group","supergroup"])
+def welcome(m):
+    if not is_charged(m.chat.id): return
+    w = g(m.chat.id)["welcome"]
+    if not w["enabled"]: return
+    for u in m.new_chat_members:
+        name = (u.first_name or "") + (" " + u.last_name if u.last_name else "")
+        text = w["text"].replace("{name}", name).replace("{id}", str(u.id))
+        if w["photo"]:
+            try:
+                bot.send_photo(m.chat.id, w["photo"], caption=text)
+            except Exception:
+                bot.send_message(m.chat.id, text)
+        else:
+            bot.send_message(m.chat.id, text)
+
+@bot.message_handler(func=lambda m: m.chat.type in ["group","supergroup"] and m.text in ["خوشامد روشن","/welcome_on"])
+def welcome_on(m):
+    if need_charge(m): return
+    if need_admin(m): return
+    g(m.chat.id)["welcome"]["enabled"] = True
+    save_db(db)
+    bot.reply_to(m, "✅ خوشامدگویی روشن شد.")
+
+@bot.message_handler(func=lambda m: m.chat.type in ["group","supergroup"] and m.text in ["خوشامد خاموش","/welcome_off"])
+def welcome_off(m):
+    if need_charge(m): return
+    if need_admin(m): return
+    g(m.chat.id)["welcome"]["enabled"] = False
+    save_db(db)
+    bot.reply_to(m, "🔕 خوشامدگویی خاموش شد.")
+
+@bot.message_handler(func=lambda m: m.chat.type in ["group","supergroup"] and m.text and m.text.startswith("خوشامد متن"))
+def welcome_text(m):
+    if need_charge(m): return
+    if need_admin(m): return
+    txt = m.text.replace("خوشامد متن", "", 1).strip()
+    if not txt:
+        return bot.reply_to(m, "نمونه: <code>خوشامد متن خوش آمدی {name}</code>\nمتغیرها: {name} {id}")
+    g(m.chat.id)["welcome"]["text"] = txt
+    save_db(db)
+    bot.reply_to(m, "✍️ متن خوشامد ذخیره شد.")
+
+@bot.message_handler(func=lambda m: m.chat.type in ["group","supergroup"] and m.text in ["خوشامد عکس","/welcome_photo"])
+def welcome_photo_set(m):
+    if need_charge(m): return
+    if need_admin(m): return
+    bot.reply_to(m, "روی عکس مورد نظر ریپلای کنید و بفرستید: «ثبت عکس»")
+
+@bot.message_handler(content_types=["photo"], func=lambda m: m.chat.type in ["group","supergroup"] and m.reply_to_message and (m.reply_to_message.text or "") == "ثبت عکس")
+def save_welcome_photo(m):
+    if need_charge(m): return
+    if need_admin(m): return
+    fid = m.photo[-1].file_id
+    g(m.chat.id)["welcome"]["photo"] = fid
+    save_db(db)
+    bot.reply_to(m, "🖼 عکس خوشامد ذخیره شد.")
+
+# =============== GROUP: leave by sudo ===============
+@bot.message_handler(func=lambda m: m.chat.type in ["group","supergroup"] and m.text in ["لفت بده","/leave"])
+def leave_group(m):
+    if not is_sudo(m.from_user.id): return
+    bot.reply_to(m, "خداحافظ 👋")
+    try:
+        bot.leave_chat(m.chat.id)
+    except Exception:
+        pass
+
+# =============== guard: auto leave when expired ===============
+@bot.message_handler(func=lambda m: m.chat.type in ["group","supergroup"])
+def quit_if_expired(m):
+    info = g(m.chat.id)
+    if info["expires"] and time.time() > info["expires"]:
+        try:
+            bot.send_message(m.chat.id, "⛔ شارژ این گروه تمام شد. ربات خارج می‌شود.")
+            bot.leave_chat(m.chat.id)
+        except Exception:
+            pass
+
+# =============== run ===============
+print("Bot is up.")
+bot.infinity_polling(skip_pending=True, timeout=20)
