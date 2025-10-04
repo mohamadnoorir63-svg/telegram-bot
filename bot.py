@@ -16,15 +16,15 @@ HELP_TEXT = """
 ⏰ ساعت | 📅 تاریخ | 📊 آمار | 🆔 ایدی
 🔒 قفل لینک / باز کردن لینک
 🧷 قفل استیکر / باز کردن استیکر
+🎙 قفل ویس / باز کردن ویس
+🎵 قفل موزیک / باز کردن موزیک
 🤖 قفل ربات / باز کردن ربات
 🚫 قفل تبچی / باز کردن تبچی
 🔐 قفل گروه / باز کردن گروه
-🎙 قفل ویس / باز کردن ویس
-🎵 قفل موزیک / باز کردن موزیک
 🚫 بن / ✅ حذف بن (ریپلای)
 🔕 سکوت / 🔊 حذف سکوت (ریپلای)
+📌 پین (ریپلای) / ❌ حذف پین (ریپلای)
 👑 مدیر / ❌ حذف مدیر (ریپلای)
-📌 پن (ریپلای) / حذف پن
 🎉 خوشامد روشن / خاموش
 ✍️ خوشامد متن [متن دلخواه]
 🖼 ثبت عکس (ریپلای روی عکس و بفرست: ثبت عکس)
@@ -34,7 +34,7 @@ HELP_TEXT = """
 🚪 لفت بده (فقط سودو)
 """
 
-# ذخیره‌ی گروه‌هایی که ربات داخل‌شان است (برای ارسال همگانی)
+# ذخیره گروه‌ها
 joined_groups = set()
 
 @bot.my_chat_member_handler()
@@ -43,7 +43,7 @@ def track_groups(update):
     if chat and chat.type in ("group","supergroup"):
         joined_groups.add(chat.id)
 
-# ===== helper: چک ادمین بودن کاربر اجراکننده
+# ===== helper =====
 def is_admin(chat_id, user_id):
     try:
         st = bot.get_chat_member(chat_id, user_id).status
@@ -70,25 +70,6 @@ def stats(m):
     except: count = "نامشخص"
     bot.reply_to(m, f"📊 اعضای گروه: {count}")
 
-# ========= پن پیام =========
-@bot.message_handler(func=lambda m: m.reply_to_message and m.text=="پن")
-def pin_message(m):
-    if not is_admin(m.chat.id, m.from_user.id): return
-    try:
-        bot.pin_chat_message(m.chat.id, m.reply_to_message.message_id)
-        bot.reply_to(m,"📌 پیام پین شد.")
-    except:
-        bot.reply_to(m,"❗ نتوانستم پیام را پین کنم.")
-
-@bot.message_handler(func=lambda m: m.text=="حذف پن")
-def unpin_message(m):
-    if not is_admin(m.chat.id, m.from_user.id): return
-    try:
-        bot.unpin_chat_message(m.chat.id)
-        bot.reply_to(m,"❌ آخرین پیام پین شده آزاد شد.")
-    except:
-        bot.reply_to(m,"❗ نتوانستم پیام را آزاد کنم.")
-
 # ========= خوشامدگویی =========
 welcome_enabled = {}
 welcome_texts = {}
@@ -97,18 +78,7 @@ welcome_photos = {}
 @bot.message_handler(content_types=['new_chat_members'])
 def welcome(m):
     for u in m.new_chat_members:
-        # قفل ربات/تبچی
-        if u.is_bot and lock_bots.get(m.chat.id):
-            try: bot.ban_chat_member(m.chat.id, u.id)
-            except: pass
-            continue
-        if (not u.first_name or u.first_name.strip()=="") and lock_tabcchi.get(m.chat.id):
-            try: bot.ban_chat_member(m.chat.id, u.id)
-            except: pass
-            continue
-
-        if not welcome_enabled.get(m.chat.id): 
-            continue
+        if not welcome_enabled.get(m.chat.id): continue
         name = u.first_name or ""
         txt = welcome_texts.get(m.chat.id, "خوش آمدی 🌹").replace("{name}", name)
         if m.chat.id in welcome_photos:
@@ -143,13 +113,8 @@ def save_photo(m):
     bot.reply_to(m, "🖼 عکس خوشامد ذخیره شد.")
 
 # ========= قفل‌ها =========
-lock_links = {}
-lock_stickers = {}
-lock_bots = {}
-lock_tabcchi = {}
-lock_group = {}
-lock_voice = {}
-lock_audio = {}
+lock_links, lock_stickers, lock_bots, lock_tabcchi = {},{},{},{}
+lock_group, lock_voice, lock_music = {},{},{}
 
 @bot.message_handler(func=lambda m: m.text=="قفل ویس")
 def lock_voice_cmd(m):
@@ -164,37 +129,83 @@ def unlock_voice_cmd(m):
     bot.reply_to(m,"🎙 ویس‌ها آزاد شدند.")
 
 @bot.message_handler(func=lambda m: m.text=="قفل موزیک")
-def lock_audio_cmd(m):
+def lock_music_cmd(m):
     if not is_admin(m.chat.id, m.from_user.id): return
-    lock_audio[m.chat.id]=True
+    lock_music[m.chat.id]=True
     bot.reply_to(m,"🎵 موزیک‌ها قفل شدند.")
 
 @bot.message_handler(func=lambda m: m.text=="باز کردن موزیک")
-def unlock_audio_cmd(m):
+def unlock_music_cmd(m):
     if not is_admin(m.chat.id, m.from_user.id): return
-    lock_audio[m.chat.id]=False
+    lock_music[m.chat.id]=False
     bot.reply_to(m,"🎵 موزیک‌ها آزاد شدند.")
 
 @bot.message_handler(content_types=['voice'])
 def block_voice(m):
-    if lock_voice.get(m.chat.id) and m.from_user.id!=SUDO_ID:
+    if lock_voice.get(m.chat.id) and not is_admin(m.chat.id, m.from_user.id):
         try: bot.delete_message(m.chat.id, m.message_id)
         except: pass
 
 @bot.message_handler(content_types=['audio'])
-def block_audio(m):
-    if lock_audio.get(m.chat.id) and m.from_user.id!=SUDO_ID:
+def block_music(m):
+    if lock_music.get(m.chat.id) and not is_admin(m.chat.id, m.from_user.id):
         try: bot.delete_message(m.chat.id, m.message_id)
         except: pass
 
-# ========= پاکسازی =========
-@bot.message_handler(func=lambda m: m.text=="پاکسازی")
-def clear_messages(m):
+# ========= پین پیام =========
+@bot.message_handler(func=lambda m: m.reply_to_message and m.text=="پین")
+def pin_message(m):
     if not is_admin(m.chat.id, m.from_user.id): return
-    for i in range(m.message_id-1, m.message_id-51, -1):
-        try: bot.delete_message(m.chat.id, i)
+    try:
+        bot.pin_chat_message(m.chat.id, m.reply_to_message.message_id)
+        bot.reply_to(m,"📌 پیام پین شد.")
+    except:
+        bot.reply_to(m,"❗ نتوانستم پین کنم.")
+
+@bot.message_handler(func=lambda m: m.reply_to_message and m.text=="حذف پین")
+def unpin_message(m):
+    if not is_admin(m.chat.id, m.from_user.id): return
+    try:
+        bot.unpin_chat_message(m.chat.id, m.reply_to_message.message_id)
+        bot.reply_to(m,"❌ پین حذف شد.")
+    except:
+        bot.reply_to(m,"❗ نتوانستم حذف پین کنم.")
+
+# ========= پنل مدیریتی در پیوی سودو =========
+@bot.message_handler(func=lambda m: m.chat.type=="private" and m.from_user.id==SUDO_ID and m.text=="پنل")
+def sudo_panel(m):
+    kb = types.InlineKeyboardMarkup()
+    kb.add(types.InlineKeyboardButton("📖 راهنما", callback_data="help"))
+    kb.add(types.InlineKeyboardButton("📢 ارسال همگانی", callback_data="broadcast"))
+    kb.add(types.InlineKeyboardButton("🛠 وضعیت ربات", callback_data="status"))
+    bot.send_message(m.chat.id,"🛠 پنل مدیریتی:",reply_markup=kb)
+
+@bot.callback_query_handler(func=lambda c: c.data=="help")
+def cb_help(c): bot.answer_callback_query(c.id); bot.send_message(c.message.chat.id, HELP_TEXT)
+
+@bot.callback_query_handler(func=lambda c: c.data=="status")
+def cb_status(c): bot.answer_callback_query(c.id); bot.send_message(c.message.chat.id,"از دستور «وضعیت ربات» داخل گروه استفاده کنید.")
+
+@bot.callback_query_handler(func=lambda c: c.data=="broadcast")
+def cb_broadcast(c):
+    bot.answer_callback_query(c.id)
+    bot.send_message(c.message.chat.id,"📢 متن یا عکس خود را بفرست تا همگانی شود.")
+    waiting_broadcast[c.from_user.id] = True
+
+waiting_broadcast = {}
+@bot.message_handler(func=lambda m: m.from_user.id==SUDO_ID and waiting_broadcast.get(m.from_user.id))
+def do_broadcast(m):
+    waiting_broadcast[m.from_user.id] = False
+    success = 0
+    for gid in list(joined_groups):
+        try:
+            if m.content_type=="text":
+                bot.send_message(gid, m.text)
+            elif m.content_type=="photo":
+                bot.send_photo(gid, m.photo[-1].file_id, caption=m.caption or "")
+            success+=1
         except: pass
-    bot.reply_to(m,"🧹 ۵۰ پیام آخر پاک شد.")
+    bot.reply_to(m,f"✅ پیام به {success} گروه ارسال شد.")
 
 # ========= RUN =========
 print("🤖 Bot is running...")
