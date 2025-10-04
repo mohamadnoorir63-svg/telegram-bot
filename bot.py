@@ -2,6 +2,7 @@
 import telebot
 from telebot import types
 from datetime import datetime
+from re import search
 
 # ==================
 TOKEN = "7462131830:AAEGzgbjETaf3eukzGHW613i4y61Cs7lzTE"
@@ -28,17 +29,21 @@ HELP_TEXT = """
 
 # ========= دستورات پایه =========
 
-@bot.message_handler(func=lambda m: m.text=="راهنما")
-def help_cmd(m): bot.reply_to(m, HELP_TEXT)
+@bot.message_handler(func=lambda m: m.text and m.text.strip().lower() in ["راهنما","/help","help"])
+def help_cmd(m): 
+    bot.reply_to(m, HELP_TEXT)
 
 @bot.message_handler(func=lambda m: m.text=="ساعت")
-def time_cmd(m): bot.reply_to(m, f"⏰ ساعت: {datetime.now().strftime('%H:%M:%S')}")
+def time_cmd(m): 
+    bot.reply_to(m, f"⏰ ساعت: {datetime.now().strftime('%H:%M:%S')}")
 
 @bot.message_handler(func=lambda m: m.text=="تاریخ")
-def date_cmd(m): bot.reply_to(m, f"📅 تاریخ: {datetime.now().strftime('%Y-%m-%d')}")
+def date_cmd(m): 
+    bot.reply_to(m, f"📅 تاریخ: {datetime.now().strftime('%Y-%m-%d')}")
 
 @bot.message_handler(func=lambda m: m.text=="ایدی")
-def id_cmd(m): bot.reply_to(m, f"🆔 آیدی شما: <code>{m.from_user.id}</code>\n🆔 آیدی گروه: <code>{m.chat.id}</code>")
+def id_cmd(m): 
+    bot.reply_to(m, f"🆔 آیدی شما: <code>{m.from_user.id}</code>\n🆔 آیدی گروه: <code>{m.chat.id}</code>")
 
 @bot.message_handler(func=lambda m: m.text=="آمار")
 def stats(m):
@@ -92,7 +97,6 @@ def leave_cmd(m):
     bot.leave_chat(m.chat.id)
 
 # ========= قفل لینک (ساده) =========
-from re import search
 lock_links = {}
 
 @bot.message_handler(func=lambda m: m.text=="قفل لینک")
