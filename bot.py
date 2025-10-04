@@ -2,7 +2,7 @@
 import telebot
 from telebot import types
 from datetime import datetime
-from re import search
+import re
 
 # ==================
 TOKEN = "7462131830:AAEGzgbjETaf3eukzGHW613i4y61Cs7lzTE"
@@ -22,16 +22,14 @@ HELP_TEXT = """
 🔕 سکوت / 🔊 حذف سکوت (ریپلای)
 👑 مدیر / ❌ حذف مدیر (ریپلای)
 🎉 خوشامد روشن / خاموش
-✍️ خوشامد متن <متن>
-🖼 ثبت عکس (ریپلای روی عکس و بفرست ثبت عکس)
+✍️ خوشامد متن [متن دلخواه]
+🖼 ثبت عکس (روی عکس ریپلای کن و بفرست: ثبت عکس)
 🚪 لفت بده (فقط سودو)
 """
 
 # ========= دستورات پایه =========
-
-@bot.message_handler(func=lambda m: m.text and any(x in m.text.lower() for x in ["راهنما","/help","help"]))
-def help_cmd(m): 
-    bot.reply_to(m, HELP_TEXT)
+@bot.message_handler(func=lambda m: m.text=="راهنما")
+def help_cmd(m): bot.reply_to(m, HELP_TEXT)
 
 @bot.message_handler(func=lambda m: m.text=="ساعت")
 def time_cmd(m): bot.reply_to(m, f"⏰ ساعت: {datetime.now().strftime('%H:%M:%S')}")
@@ -109,7 +107,7 @@ def unlock_links_cmd(m):
 @bot.message_handler(content_types=['text'])
 def anti_links(m):
     if lock_links.get(m.chat.id) and not m.from_user.id==SUDO_ID:
-        if search(r"(t\.me|http)", m.text.lower()):
+        if re.search(r"(t\.me|http)", m.text.lower()):
             try: bot.delete_message(m.chat.id, m.message_id)
             except: pass
 
