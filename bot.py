@@ -5,24 +5,40 @@ from datetime import datetime
 import re
 
 # ==================
-TOKEN = "توکن_اینجا"
+TOKEN = "7462131830:AAEGzgbjETaf3eukzGHW613i4y61Cs7lzTE"
 SUDO_ID = 7089376754  # آیدی عددی شما
 bot = telebot.TeleBot(TOKEN, parse_mode="HTML")
 # ==================
 
+# راهنما
+HELP_TEXT = """
+📖 لیست دستورات:
+
+⏰ ساعت | 📅 تاریخ | 📊 آمار | 🆔 ایدی
+🔒 قفل لینک / باز کردن لینک
+🧷 قفل استیکر / باز کردن استیکر
+🔐 قفل گروه / باز کردن گروه
+🚫 بن / ✅ حذف بن (ریپلای)
+🔕 سکوت / 🔊 حذف سکوت (ریپلای)
+👑 مدیر / ❌ حذف مدیر (ریپلای)
+🎉 خوشامد روشن / خاموش
+✍️ خوشامد متن [متن دلخواه]
+🖼 ثبت عکس (روی عکس ریپلای کن و بفرست: ثبت عکس)
+🚪 لفت بده (فقط سودو)
+"""
+
 # ========= دستورات پایه =========
+@bot.message_handler(func=lambda m: m.text=="راهنما")
+def help_cmd(m): bot.reply_to(m, HELP_TEXT)
 
 @bot.message_handler(func=lambda m: m.text=="ساعت")
-def time_cmd(m): 
-    bot.reply_to(m, f"⏰ ساعت: {datetime.now().strftime('%H:%M:%S')}")
+def time_cmd(m): bot.reply_to(m, f"⏰ ساعت: {datetime.now().strftime('%H:%M:%S')}")
 
 @bot.message_handler(func=lambda m: m.text=="تاریخ")
-def date_cmd(m): 
-    bot.reply_to(m, f"📅 تاریخ: {datetime.now().strftime('%Y-%m-%d')}")
+def date_cmd(m): bot.reply_to(m, f"📅 تاریخ: {datetime.now().strftime('%Y-%m-%d')}")
 
 @bot.message_handler(func=lambda m: m.text=="ایدی")
-def id_cmd(m): 
-    bot.reply_to(m, f"🆔 آیدی شما: <code>{m.from_user.id}</code>\n🆔 آیدی گروه: <code>{m.chat.id}</code>")
+def id_cmd(m): bot.reply_to(m, f"🆔 آیدی شما: <code>{m.from_user.id}</code>\n🆔 آیدی گروه: <code>{m.chat.id}</code>")
 
 @bot.message_handler(func=lambda m: m.text=="آمار")
 def stats(m):
@@ -75,7 +91,7 @@ def leave_cmd(m):
     bot.send_message(m.chat.id,"به دستور سودو خارج می‌شوم 👋")
     bot.leave_chat(m.chat.id)
 
-# ========= قفل لینک =========
+# ========= قفل لینک (ساده) =========
 lock_links = {}
 
 @bot.message_handler(func=lambda m: m.text=="قفل لینک")
@@ -94,53 +110,6 @@ def anti_links(m):
         if re.search(r"(t\.me|http)", m.text.lower()):
             try: bot.delete_message(m.chat.id, m.message_id)
             except: pass
-
-# ========= سکوت / بن =========
-
-@bot.message_handler(func=lambda m: m.reply_to_message and m.text=="سکوت")
-def mute_user(m):
-    try:
-        bot.restrict_chat_member(
-            m.chat.id,
-            m.reply_to_message.from_user.id,
-            permissions=telebot.types.ChatPermissions(can_send_messages=False)
-        )
-        bot.reply_to(m, "🔇 کاربر در سکوت قرار گرفت.")
-    except Exception as e:
-        bot.reply_to(m, f"⚠️ خطا: {e}")
-
-@bot.message_handler(func=lambda m: m.reply_to_message and m.text=="حذف سکوت")
-def unmute_user(m):
-    try:
-        bot.restrict_chat_member(
-            m.chat.id,
-            m.reply_to_message.from_user.id,
-            permissions=telebot.types.ChatPermissions(
-                can_send_messages=True,
-                can_send_media_messages=True,
-                can_send_other_messages=True,
-                can_add_web_page_previews=True
-            )
-        )
-        bot.reply_to(m, "🔊 سکوت کاربر برداشته شد.")
-    except Exception as e:
-        bot.reply_to(m, f"⚠️ خطا: {e}")
-
-@bot.message_handler(func=lambda m: m.reply_to_message and m.text=="بن")
-def ban_user(m):
-    try:
-        bot.ban_chat_member(m.chat.id, m.reply_to_message.from_user.id)
-        bot.reply_to(m, "🚫 کاربر بن شد.")
-    except Exception as e:
-        bot.reply_to(m, f"⚠️ خطا: {e}")
-
-@bot.message_handler(func=lambda m: m.reply_to_message and m.text=="حذف بن")
-def unban_user(m):
-    try:
-        bot.unban_chat_member(m.chat.id, m.reply_to_message.from_user.id)
-        bot.reply_to(m, "✅ بن کاربر برداشته شد.")
-    except Exception as e:
-        bot.reply_to(m, f"⚠️ خطا: {e}")
 
 # ========= RUN =========
 print("🤖 Bot is running...")
