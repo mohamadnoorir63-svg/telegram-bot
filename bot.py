@@ -6,7 +6,7 @@ import telebot
 from telebot import types
 
 # ====== CONFIG ======
-TOKEN   =  TOKEN = "7462131830:AAENzKipQzuxQ4UYkl9vcVgmmfDMKMUvZi8" # توکن شما
+TOKEN   =  TOKEN = 7462131830:AAEGzgbjETaf3eukzGHW613i4y61Cs7lzTE # توکن شما
 SUDO_ID = 7089376754                                         # آیدی سودو
 DATA    = "data.json"
 IR_TZ   = timezone(timedelta(hours=3, minutes=30))
