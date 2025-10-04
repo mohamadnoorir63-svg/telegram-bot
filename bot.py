@@ -1,51 +1,81 @@
-from telebot import TeleBot, types
-from datetime import datetime
+import telebot
+from telebot import types
+import datetime
 
-# ربات با توکن تو
-bot = TeleBot("7462131830:AAENzKipQzuxQ4UYkl9vcVgmmfDMKMUvZi8")
+# توکن جدید
+TOKEN = "7462131830:AAENzKipQzuxQ4UYkl9vcVgmmfDMKMUvZi8"
+bot = telebot.TeleBot(TOKEN)
 
-# لیست قفل‌ها
-locks = {
-    "link": False,
-}
-
-# دستور شروع
+# دستور /start
 @bot.message_handler(commands=['start'])
 def start(message):
-    markup = types.InlineKeyboardMarkup()
-    btn1 = types.InlineKeyboardButton("🔐 پنل مدیریت", callback_data="panel")
-    markup.add(btn1)
-    bot.reply_to(message, "سلام! ربات روشنه ✅", reply_markup=markup)
-
-# وقتی روی دکمه پنل زد
-@bot.callback_query_handler(func=lambda call: call.data == "panel")
-def panel(call):
-    markup = types.InlineKeyboardMarkup()
-    btn1 = types.InlineKeyboardButton("🚫 قفل لینک", callback_data="lock_link")
-    btn2 = types.InlineKeyboardButton("✅ باز کردن لینک", callback_data="unlock_link")
-    markup.add(btn1, btn2)
-    bot.edit_message_text("🔐 پنل مدیریت", call.message.chat.id, call.message.message_id, reply_markup=markup)
+    markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
+    markup.add("🔐 قفل لینک", "🔓 باز کردن لینک")
+    markup.add("🚫 بن", "🔇 سکوت")
+    markup.add("👮 مدیر", "🆔 ایدی")
+    markup.add("📊 آمار", "📖 راهنما")
+    markup.add("⏰ ساعت", "📅 تاریخ")
+    bot.send_message(message.chat.id, "به ربات مدیریت گروه خوش آمدی 🌹", reply_markup=markup)
 
 # قفل لینک
-@bot.callback_query_handler(func=lambda call: call.data == "lock_link")
-def lock_link(call):
-    locks["link"] = True
-    bot.answer_callback_query(call.id, "قفل لینک فعال شد 🚫")
+@bot.message_handler(func=lambda m: m.text == "🔐 قفل لینک")
+def lock_links(message):
+    bot.send_message(message.chat.id, "✅ لینک‌ها قفل شدند.")
 
 # باز کردن لینک
-@bot.callback_query_handler(func=lambda call: call.data == "unlock_link")
-def unlock_link(call):
-    locks["link"] = False
-    bot.answer_callback_query(call.id, "قفل لینک غیرفعال شد ✅")
+@bot.message_handler(func=lambda m: m.text == "🔓 باز کردن لینک")
+def unlock_links(message):
+    bot.send_message(message.chat.id, "✅ لینک‌ها باز شدند.")
 
-# حذف پیام‌های دارای لینک وقتی قفل فعاله
-@bot.message_handler(func=lambda message: "http" in message.text.lower() if message.text else False)
-def check_links(message):
-    if locks["link"]:
-        try:
-            bot.delete_message(message.chat.id, message.message_id)
-        except:
-            pass
+# بن
+@bot.message_handler(func=lambda m: m.text == "🚫 بن")
+def ban_user(message):
+    bot.send_message(message.chat.id, "🚫 کاربر بن شد (نمونه).")
 
-print("ربات روشن شد ✅")
+# سکوت
+@bot.message_handler(func=lambda m: m.text == "🔇 سکوت")
+def mute_user(message):
+    bot.send_message(message.chat.id, "🔇 کاربر سکوت شد (نمونه).")
+
+# مدیر
+@bot.message_handler(func=lambda m: m.text == "👮 مدیر")
+def admins(message):
+    bot.send_message(message.chat.id, "👮 لیست مدیران نمایش داده می‌شود (نمونه).")
+
+# ایدی
+@bot.message_handler(func=lambda m: m.text == "🆔 ایدی")
+def user_id(message):
+    bot.send_message(message.chat.id, f"🆔 ایدی شما: {message.from_user.id}")
+
+# آمار
+@bot.message_handler(func=lambda m: m.text == "📊 آمار")
+def stats(message):
+    bot.send_message(message.chat.id, "📊 آمار گروه: نمونه تستی.")
+
+# راهنما
+@bot.message_handler(func=lambda m: m.text == "📖 راهنما")
+def help(message):
+    text = """
+📖 راهنما:
+🔐 قفل لینک / 🔓 باز کردن لینک  
+🚫 بن / 🔇 سکوت  
+👮 مدیر / 🆔 ایدی  
+📊 آمار / 📖 راهنما  
+⏰ ساعت / 📅 تاریخ
+"""
+    bot.send_message(message.chat.id, text)
+
+# ساعت
+@bot.message_handler(func=lambda m: m.text == "⏰ ساعت")
+def clock(message):
+    now = datetime.datetime.now().strftime("%H:%M:%S")
+    bot.send_message(message.chat.id, f"⏰ ساعت الان: {now}")
+
+# تاریخ
+@bot.message_handler(func=lambda m: m.text == "📅 تاریخ")
+def date_today(message):
+    today = datetime.datetime.now().strftime("%Y-%m-%d")
+    bot.send_message(message.chat.id, f"📅 تاریخ امروز: {today}")
+
+# اجرای ربات
 bot.infinity_polling()
