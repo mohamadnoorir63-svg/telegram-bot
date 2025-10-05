@@ -35,7 +35,8 @@ HELP_TEXT = """
 👑 مدیر / ❌ حذف مدیر (ریپلای)
 📌 پن / ❌ حذف پن    (ریپلای)
 📋 لیست مدیران گروه | 📋 لیست مدیران ربات
-🧹 پاکسازی              (۵۰ پیام)
+🧹 پاکسازی              (تا ۹۹۹۹ پیام)
+🧹 حذف [عدد]           (پاکسازی تعداد مشخص)
 📢 ارسال                (فقط سودو)
 ➕ افزودن سودو [آیدی]
 ➖ حذف سودو [آیدی]
@@ -234,7 +235,7 @@ def list_group_admins(m):
 @bot.message_handler(func=lambda m: cmd_text(m)=="لیست مدیران ربات")
 def list_sudos(m): bot.reply_to(m,"📋 سودوها:\n"+"\n".join([f"<code>{i}</code>" for i in sudo_ids]))
 
-# ========= پاکسازی =========
+# ========= پاکسازی (جدید) =========
 def bulk_delete(m,n):
     if not is_admin(m.chat.id,m.from_user.id): return
     d=0
@@ -243,8 +244,21 @@ def bulk_delete(m,n):
         except: pass
     bot.reply_to(m,f"🧹 {d} پیام پاک شد.")
 
-@bot.message_handler(func=lambda m: cmd_text(m)=="پاکسازی") 
-def c50(m): bulk_delete(m,50)
+# دستور پاکسازی → تا ۹۹۹۹ پیام
+@bot.message_handler(func=lambda m: cmd_text(m)=="پاکسازی")
+def clear_all(m): bulk_delete(m,9999)
+
+# دستور حذف [عدد] → پاکسازی تعداد مشخص
+@bot.message_handler(func=lambda m: cmd_text(m).startswith("حذف "))
+def clear_custom(m):
+    if not is_admin(m.chat.id,m.from_user.id): return
+    parts=cmd_text(m).split()
+    if len(parts)<2: return
+    try: num=int(parts[1])
+    except: return bot.reply_to(m,"❗ عدد معتبر وارد کن.")
+    if num<=0: return bot.reply_to(m,"❗ عدد باید بیشتر از صفر باشد.")
+    if num>9999: num=9999
+    bulk_delete(m,num)
 
 # ========= ارسال همگانی =========
 waiting_broadcast={}
