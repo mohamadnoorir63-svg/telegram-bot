@@ -481,4 +481,10 @@ def text_guard(m):
 
     # فوروارد
     if locks["forward"].get(m.chat.id, False):
-   
+        if getattr(m, "forward_from", None) or getattr(m, "forward_from_chat", None):
+            try: bot.delete_message(m.chat.id, m.message_id)
+            except: pass
+
+# ===== شروع =====
+print("🤖 Bot is running...")
+bot.infinity_polling()
