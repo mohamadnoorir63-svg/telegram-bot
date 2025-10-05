@@ -70,12 +70,13 @@ def cmd_text(m):
 
 # ========= حذف خودکار پیام‌ها =========
 def auto_del(chat_id,msg_id,delay=7):
-    """حذف پیام ربات بعد از delay ثانیه"""
     def _():
         time.sleep(delay)
         try: bot.delete_message(chat_id,msg_id)
         except: pass
-    threading.Thread(target=_).start()# ========= فونت‌ساز =========
+    threading.Thread(target=_).start()
+
+# ========= فونت‌ساز =========
 FONTS = [
     # انگلیسی — حالت Bold
     lambda txt: "".join({"a":"ᗩ","b":"ᗷ","c":"ᑕ","d":"ᗪ","e":"E","f":"ᖴ","g":"G","h":"ᕼ",
@@ -182,7 +183,9 @@ def toggle_lock(m):
             return
     locks[key][m.chat.id]=enable
     msg = bot.reply_to(m,f"{'🔒' if enable else '🔓'} {name} {'فعال شد' if enable else 'آزاد شد'}")
-    auto_del(m.chat.id,msg.message_id)# ========= پنل شیشه‌ای =========
+    auto_del(m.chat.id,msg.message_id)
+
+# ========= پنل شیشه‌ای =========
 @bot.message_handler(func=lambda m: cmd_text(m)=="پنل")
 def locks_panel(m):
     if not is_admin(m.chat.id,m.from_user.id): return
@@ -194,7 +197,7 @@ def locks_panel(m):
     kb.add(*btns)
     kb.add(types.InlineKeyboardButton("❌ بستن", callback_data=f"close:{m.chat.id}"))
     msg = bot.reply_to(m,"🛠 پنل مدیریت قفل‌ها:",reply_markup=kb)
-    auto_del(m.chat.id,msg.message_id,delay=30)  # تا 30 ثانیه بمونه
+    auto_del(m.chat.id,msg.message_id,delay=30)
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith("toggle:"))
 def cb_toggle(call):
@@ -207,7 +210,6 @@ def cb_toggle(call):
     locks[key][chat_id]=not current
     bot.answer_callback_query(call.id,f"{'فعال' if locks[key][chat_id] else 'غیرفعال'} شد ✅")
 
-    # آپدیت پنل
     kb = types.InlineKeyboardMarkup(row_width=2)
     btns=[]
     for name,k in LOCK_MAP.items():
@@ -221,9 +223,7 @@ def cb_toggle(call):
 def cb_close(call):
     try:
         bot.delete_message(call.message.chat.id, call.message.message_id)
-    except: pass
-
-# ========= دستورات عمومی =========
+    except: pass# ========= دستورات عمومی =========
 # ⏰ ساعت → برای همه
 @bot.message_handler(func=lambda m: cmd_text(m)=="ساعت")
 def time_cmd(m):
@@ -264,7 +264,9 @@ def group_link(m):
         msg = bot.reply_to(m,f"📎 لینک گروه:\n{link}")
     except:
         msg = bot.reply_to(m,"❗ نتوانستم لینک بگیرم. (بات باید ادمین با مجوز دعوت باشد)")
-    auto_del(m.chat.id,msg.message_id,delay=7)# ========= بن / سکوت =========
+    auto_del(m.chat.id,msg.message_id,delay=7)
+
+# ========= بن / سکوت =========
 @bot.message_handler(func=lambda m: m.reply_to_message and cmd_text(m)=="بن")
 def ban_user(m):
     if is_admin(m.chat.id,m.from_user.id):
@@ -336,9 +338,7 @@ def reset_warn(m):
         uid = m.reply_to_message.from_user.id
         warnings.get(m.chat.id,{}).pop(uid,None)
         msg = bot.reply_to(m,"✅ اخطارها حذف شد.")
-        auto_del(m.chat.id,msg.message_id,delay=7)
-
-# ========= مدیر / حذف مدیر =========
+        auto_del(m.chat.id,msg.message_id,delay=7)# ========= مدیر / حذف مدیر =========
 @bot.message_handler(func=lambda m: m.reply_to_message and cmd_text(m)=="مدیر")
 def promote(m):
     if is_admin(m.chat.id,m.from_user.id):
@@ -472,9 +472,7 @@ def do_bc(m):
         except: 
             pass
     msg = bot.reply_to(m,f"✅ به {s} گروه ارسال شد.")
-    auto_del(m.chat.id,msg.message_id,delay=10)
-
-# ========= استارت در پیوی =========
+    auto_del(m.chat.id,msg.message_id,delay=10)# ========= استارت در پیوی =========
 @bot.message_handler(commands=['start'])
 def start_cmd(m):
     if m.chat.type == "private":
@@ -482,8 +480,13 @@ def start_cmd(m):
         # افزودن به گروه
         btn1 = types.InlineKeyboardButton("➕ افزودن به گروه", url=f"https://t.me/{bot.get_me().username}?startgroup=new")
         # پشتیبانی
-        btn2 = types.InlineKeyboardButton("📞 پشتیبانی", url="https://t.me/NOORI_NOOR")
+        btn2 = types.InlineKeyboardButton("📞 پشتیبانی", url=f"https://t.me/{SUPPORT_ID}")
         kb.add(btn1, btn2)
+
+        if is_sudo(m.from_user.id):  # اگر سودو باشد، پنل مدیریتی هم ببیند
+            btn3 = types.InlineKeyboardButton("🛠 پنل مدیریتی", callback_data=f"sudo_panel:{m.chat.id}")
+            kb.add(btn3)
+
         bot.send_message(
             m.chat.id,
             "👋 سلام!\n\n"
@@ -491,6 +494,27 @@ def start_cmd(m):
             "میتونی منو به گروهت اضافه کنی یا برای راهنمایی بیشتر با پشتیبانی در تماس باشی.",
             reply_markup=kb
         )
+
+# ========= پنل مدیریتی سودو =========
+@bot.callback_query_handler(func=lambda call: call.data.startswith("sudo_panel"))
+def sudo_panel(call):
+    if not is_sudo(call.from_user.id):
+        return bot.answer_callback_query(call.id,"❌ فقط سودو می‌تونه این پنل رو ببینه",show_alert=True)
+
+    kb = types.InlineKeyboardMarkup(row_width=2)
+    kb.add(
+        types.InlineKeyboardButton("📢 ارسال همگانی", callback_data="sudo_bc"),
+        types.InlineKeyboardButton("➕ افزودن سودو", callback_data="sudo_add"),
+        types.InlineKeyboardButton("➖ حذف سودو", callback_data="sudo_del"),
+        types.InlineKeyboardButton("❌ بستن", callback_data="sudo_close")
+    )
+    bot.edit_message_text("🛠 پنل مدیریتی سودو:", call.message.chat.id, call.message.message_id, reply_markup=kb)
+
+@bot.callback_query_handler(func=lambda call: call.data=="sudo_close")
+def sudo_close(call):
+    try:
+        bot.delete_message(call.message.chat.id, call.message.message_id)
+    except: pass
 
 # ========= جواب سودو =========
 @bot.message_handler(func=lambda m: is_sudo(m.from_user.id) and cmd_text(m)=="ربات")
