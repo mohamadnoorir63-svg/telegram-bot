@@ -7,7 +7,7 @@ import pytz
 # ================== تنظیمات ==================
 TOKEN   = os.environ.get("BOT_TOKEN")   # توکن ربات از Config Vars
 SUDO_ID = int(os.environ.get("SUDO_ID", "0"))  # آیدی سودو اصلی
-SUPPORT_ID = "YourUsernameHere"  # آیدی پشتیبانی (مثلاً: DigiAntiBot)
+SUPPORT_ID = "NOORI_NOOR"  # آیدی پشتیبانی (مثلاً: @NOORI_NOOR)
 
 bot = telebot.TeleBot(TOKEN, parse_mode="HTML")
 # ============================================
@@ -73,9 +73,7 @@ def auto_del(chat_id,msg_id,delay=3):
         time.sleep(delay)
         try: bot.delete_message(chat_id,msg_id)
         except: pass
-    threading.Thread(target=_).start()
-
-# ========= ذخیره گروه‌ها =========
+    threading.Thread(target=_).start()# ========= ذخیره گروه‌ها =========
 joined_groups=set()
 @bot.my_chat_member_handler()
 def track_groups(upd):
@@ -86,47 +84,26 @@ def track_groups(upd):
     except:
         pass
 
-# ========= دستورات پایه =========
+# ========= راهنما با دکمه بستن =========
 @bot.message_handler(func=lambda m: cmd_text(m)=="راهنما")
 def help_cmd(m):
-    msg = bot.reply_to(m,HELP_TEXT)
-    auto_del(m.chat.id,msg.message_id)
+    kb = types.InlineKeyboardMarkup()
+    kb.add(types.InlineKeyboardButton("❌ بستن", callback_data=f"close:{m.chat.id}"))
+    msg = bot.reply_to(m,HELP_TEXT,reply_markup=kb)
+    # این یکی حذف نمیشه تا وقتی بستن رو بزنن
 
-@bot.message_handler(func=lambda m: cmd_text(m)=="ساعت")
-def time_cmd(m):
-    now_utc=datetime.now(pytz.utc).strftime("%Y-%m-%d %H:%M:%S")
-    now_teh=datetime.now(pytz.timezone("Asia/Tehran")).strftime("%Y-%m-%d %H:%M:%S")
-    msg = bot.reply_to(m,f"⏰ ساعت UTC: {now_utc}\n⏰ ساعت تهران: {now_teh}")
-    auto_del(m.chat.id,msg.message_id)
-
-@bot.message_handler(func=lambda m: cmd_text(m)=="ایدی")
-def id_cmd(m):
-    try:
-        photos=bot.get_user_profile_photos(m.from_user.id,limit=1)
-        caption=f"🆔 شما: <code>{m.from_user.id}</code>\n🆔 گروه: <code>{m.chat.id}</code>"
-        if photos.total_count>0:
-            msg = bot.send_photo(m.chat.id,photos.photos[0][-1].file_id,caption=caption)
-        else:
-            msg = bot.reply_to(m,caption)
-    except:
-        msg = bot.reply_to(m,f"🆔 شما: <code>{m.from_user.id}</code>\n🆔 گروه: <code>{m.chat.id}</code>")
-    auto_del(m.chat.id,msg.message_id)
-
-@bot.message_handler(func=lambda m: cmd_text(m)=="آمار")
-def stats(m):
-    try: count=bot.get_chat_member_count(m.chat.id)
-    except: count="نامشخص"
-    msg = bot.reply_to(m,f"📊 اعضای گروه: {count}")
-    auto_del(m.chat.id,msg.message_id)
-
-@bot.message_handler(func=lambda m: cmd_text(m)=="لینک")
-def group_link(m):
-    try:
-        link=bot.export_chat_invite_link(m.chat.id)
-        msg = bot.reply_to(m,f"📎 لینک گروه:\n{link}")
-    except:
-        msg = bot.reply_to(m,"❗ نتوانستم لینک بگیرم. (بات باید ادمین با مجوز دعوت باشد)")
-    auto_del(m.chat.id,msg.message_id)
+# ========= استارت توی پیوی =========
+@bot.message_handler(commands=['start'])
+def start_cmd(m):
+    if m.chat.type == "private":
+        kb = types.InlineKeyboardMarkup(row_width=2)
+        btn1 = types.InlineKeyboardButton("➕ افزودن به گروه", url=f"https://t.me/{bot.get_me().username}?startgroup=new")
+        btn2 = types.InlineKeyboardButton("📞 پشتیبانی", url=f"https://t.me/{SUPPORT_ID}")
+        kb.add(btn1, btn2)
+        bot.send_message(m.chat.id,
+            "👋 سلام!\n\nمن ربات مدیریت گروه هستم 🤖\nبرای شروع میتونی منو به گروهت اضافه کنی یا با پشتیبانی در تماس باشی.",
+            reply_markup=kb
+        )
 
 # ========= خوشامد =========
 welcome_enabled, welcome_texts, welcome_photos = {}, {}, {}
@@ -138,7 +115,8 @@ def welcome(m):
         name = u.first_name or ""
         date = datetime.now(pytz.timezone("Asia/Tehran")).strftime("%Y/%m/%d")
         time_ = datetime.now(pytz.timezone("Asia/Tehran")).strftime("%H:%M:%S")
-        txt = f"• سلام {name} به گروه {m.chat.title} خوش آمدید 🌻\n\n📆 تاریخ : {date}\n⏰ ساعت : {time_}"
+        custom = welcome_texts.get(m.chat.id, "")
+        txt = custom or f"• سلام {name} به گروه {m.chat.title} خوش آمدید 🌻\n\n📆 تاریخ : {date}\n⏰ ساعت : {time_}"
         if m.chat.id in welcome_photos:
             bot.send_photo(m.chat.id,welcome_photos[m.chat.id],caption=txt)
         else:
@@ -366,9 +344,7 @@ def get_nick(m):
         msg = bot.reply_to(m,f"🏷 لقب: {nickname}")
     else: 
         msg = bot.reply_to(m,"ℹ️ لقبی ذخیره نشده.")
-    auto_del(m.chat.id,msg.message_id)
-
-# ========= پاکسازی =========
+    auto_del(m.chat.id,msg.message_id)# ========= پاکسازی =========
 def bulk_delete(m,n):
     if not is_admin(m.chat.id,m.from_user.id): return
     d=0
@@ -439,16 +415,18 @@ def leave_cmd(m):
     if is_sudo(m.from_user.id):
         bot.send_message(m.chat.id,"به دستور سودو خارج می‌شوم 👋")
         try: bot.leave_chat(m.chat.id)
-        except: pass# ========= استارت توی پیوی =========
+        except: pass
+
+# ========= استارت توی پیوی =========
 @bot.message_handler(commands=['start'])
 def start_cmd(m):
     if m.chat.type == "private":
         kb = types.InlineKeyboardMarkup(row_width=2)
         btn1 = types.InlineKeyboardButton("➕ افزودن به گروه", url=f"https://t.me/{bot.get_me().username}?startgroup=new")
-        btn2 = types.InlineKeyboardButton("📞 پشتیبانی", url="https://t.me/YOUR_ID")  # اینجا آیدی خودتو بذار
+        btn2 = types.InlineKeyboardButton("📞 پشتیبانی", url="https://t.me/NOORI_NOOR")
         kb.add(btn1, btn2)
         bot.send_message(m.chat.id,
-            "👋 سلام!\n\nمن ربات مدیریت گروه هستم 🤖\nبرای شروع میتونی منو به گروهت اضافه کنی یا با پشتیبانی در تماس باشی.",
+            "👋 سلام!\n\nمن ربات مدیریت گروه هستم 🤖\nبرای شروع منو به گروهت اضافه کن یا با پشتیبانی در تماس باش.",
             reply_markup=kb
         )
 
@@ -470,20 +448,9 @@ def cb_close(call):
     try:
         bot.delete_message(call.message.chat.id, call.message.message_id)
     except:
-        pass
-
-# ========= حذف خودکار پیام‌های ربات =========
-import threading, time
-def auto_del(chat_id,msg_id,delay=3):
-    def _del():
-        time.sleep(delay)
-        try: bot.delete_message(chat_id,msg_id)
-        except: pass
-    threading.Thread(target=_del).start()
-
-# ========= فونت‌ساز =========
-FONTS = [
-    "ⓜⓞⓗⓐⓜⓜⓐⓓ",
+        pass# ========= فونت‌ساز =========
+FONTS_EN = [
+    "Ⓜ️ⓄⒽⒶⓂ️Ⓜ️ⒶⒹ",
     "𝐌𝐎𝐇𝐀𝐌𝐌𝐀𝐃",
     "𝑴𝑶𝑯𝑨𝑴𝑴𝑨𝑫",
     "𝗠𝗢𝗛𝗔𝗠𝗠𝗔𝗗",
@@ -492,7 +459,20 @@ FONTS = [
     "ᴍᴏʜᴀᴍᴍᴀᴅ",
     "ＭＯＨＡＭＭＡＤ",
     "🅼🅾️🅷🅰️🅼🅼🅰️🅳",
-    "🇲 🇴 🇭 🇦 🇲 🇲 🇦 🇩 "
+    "🇲 🇴 🇭 🇦 🇲 🇲 🇦 🇩"
+]
+
+FONTS_FA = [
+    "مَِــَِحَِـَِمَِــَِدَِ",
+    "مـــحــمـــدّ",
+    "مـ﹏ـحـ﹏ـمـ﹏ـد",
+    "مـؒؔ◌‌‌ࢪحــٌ۝ؔؑـެِمـؒؔ◌‌‌ࢪـ‌َد",
+    "مـ۪ٜـ۪ٜـ۪ٜـ۪ٜ‌حـ۪ٜـ۪ٜـ۪ٜـمـ۪ٜـ۪ٜـد۪ٜ",
+    "م❈ۣۣـ🍁ـح❈ۣۣـ🍁ـم❈ۣۣـ🍁ـد❈ۣۣـ🍁ـ",
+    "مـ෴ِْحـ෴ِْمـ෴ِْد",
+    "مـًٍʘًٍʘـحـًٍʘًٍʘـمـًٍʘًٍʘـدََ",
+    "مـْْـْْـْْ/ْْحْْـْْـْْـْْ/ْْمـْْـْْـْْ/ْْـْْـْْـدْْ/",
+    "مـٍ‌ــٍ‌ــٍ‌❉حـٍ‌ــٍ‌ــٍ‌❉مـٍ‌ــٍ‌ــٍ‌❉دٍ‌❉"
 ]
 
 @bot.message_handler(func=lambda m: cmd_text(m).startswith("فونت "))
@@ -502,12 +482,22 @@ def make_fonts(m):
         msg = bot.reply_to(m,"❗ اسم رو هم بنویس")
         auto_del(m.chat.id,msg.message_id)
         return
+    
+    # انتخاب فونت‌های مناسب
     res = "🎨 فونت‌های خوشگل برای اسم:\n\n"
-    for f in FONTS[:10]:
-        styled = f.replace("MOHAMMAD",name.upper()).replace("محمد",name)
-        res += styled + "\n"
+    if re.search(r'[a-zA-Z]', name):   # اگر انگلیسی بود
+        for f in FONTS_EN:
+            styled = f.replace("MOHAMMAD", name.upper())
+            res += styled + "\n"
+    else:  # اگر فارسی بود
+        for f in FONTS_FA:
+            styled = f.replace("محمد", name)
+            res += styled + "\n"
+
     msg = bot.reply_to(m,res)
-    auto_del(m.chat.id,msg.message_id,delay=10)# ========= جواب سودو =========
+    auto_del(m.chat.id,msg.message_id,delay=12)
+
+# ========= جواب سودو =========
 @bot.message_handler(func=lambda m: is_sudo(m.from_user.id) and cmd_text(m)=="ربات")
 def sudo_reply(m):
     msg = bot.reply_to(m,"جانم سودو 👑")
