@@ -1,13 +1,11 @@
 # -*- coding: utf-8 -*-
-import telebot
+import telebot, os, re
 from telebot import types
 from datetime import datetime
-import re
-import os
 
 # ================== تنظیمات ==================
-TOKEN   = os.getenv("BOT_TOKEN")   # گرفتن توکن از Config Vars
-SUDO_ID = int(os.getenv("SUDO_ID"))  # گرفتن آیدی سودو از Config Vars
+TOKEN   = os.environ.get("BOT_TOKEN")
+SUDO_ID = int(os.environ.get("SUDO_ID", "0"))
 bot = telebot.TeleBot(TOKEN, parse_mode="HTML")
 # ============================================
 
@@ -44,7 +42,7 @@ HELP_TEXT = """
 🚪 لفت بده              (فقط سودو)
 """
 
-# ========= سودو =========
+# ========= سودوها =========
 sudo_ids = {SUDO_ID}
 def is_sudo(uid): return uid in sudo_ids
 
@@ -186,16 +184,30 @@ def reset_warn(m):
 @bot.message_handler(func=lambda m: m.reply_to_message and cmd_text(m)=="مدیر")
 def promote(m):
     if is_admin(m.chat.id,m.from_user.id):
-        try: bot.promote_chat_member(m.chat.id,m.reply_to_message.from_user.id,can_manage_chat=True,can_delete_messages=True,can_restrict_members=True,can_pin_messages=True,can_invite_users=True,can_manage_video_chats=True)
-        bot.reply_to(m,"👑 مدیر شد.")
-        except: bot.reply_to(m,"❗ خطا")
+        try:
+            bot.promote_chat_member(
+                m.chat.id,m.reply_to_message.from_user.id,
+                can_manage_chat=True,can_delete_messages=True,
+                can_restrict_members=True,can_pin_messages=True,
+                can_invite_users=True,can_manage_video_chats=True
+            )
+            bot.reply_to(m,"👑 مدیر شد.")
+        except:
+            bot.reply_to(m,"❗ خطا در ارتقا")
 
 @bot.message_handler(func=lambda m: m.reply_to_message and cmd_text(m)=="حذف مدیر")
 def demote(m):
     if is_admin(m.chat.id,m.from_user.id):
-        try: bot.promote_chat_member(m.chat.id,m.reply_to_message.from_user.id,can_manage_chat=False,can_delete_messages=False,can_restrict_members=False,can_pin_messages=False,can_invite_users=False,can_manage_video_chats=False)
-        bot.reply_to(m,"❌ مدیر حذف شد.")
-        except: bot.reply_to(m,"❗ خطا")
+        try:
+            bot.promote_chat_member(
+                m.chat.id,m.reply_to_message.from_user.id,
+                can_manage_chat=False,can_delete_messages=False,
+                can_restrict_members=False,can_pin_messages=False,
+                can_invite_users=False,can_manage_video_chats=False
+            )
+            bot.reply_to(m,"❌ مدیر حذف شد.")
+        except:
+            bot.reply_to(m,"❗ خطا در حذف مدیر")
 
 # ========= پن =========
 @bot.message_handler(func=lambda m: m.reply_to_message and cmd_text(m)=="پن")
