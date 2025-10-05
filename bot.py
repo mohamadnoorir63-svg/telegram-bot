@@ -2,7 +2,7 @@
 import telebot, os, re
 from telebot import types
 from datetime import datetime
-import pytz   # برای تایم‌زون‌ها
+import pytz  # برای تایم‌زون‌ها
 
 # ================== تنظیمات ==================
 TOKEN   = os.environ.get("BOT_TOKEN")
@@ -13,7 +13,7 @@ bot = telebot.TeleBot(TOKEN, parse_mode="HTML")
 HELP_TEXT = """
 📖 لیست دستورات:
 
-⏰ ساعت (با تاریخ و دو منطقه زمانی)
+⏰ ساعت
 📊 آمار | 🆔 ایدی (با عکس پروفایل)
 🛠 وضعیت ربات
 🎉 خوشامد روشن / خاموش
@@ -74,13 +74,11 @@ def track_groups(upd):
 def help_cmd(m): bot.reply_to(m, HELP_TEXT)
 
 @bot.message_handler(func=lambda m: cmd_text(m)=="ساعت")
-def time_date_cmd(m):
-    tz_eu = pytz.timezone("Europe/Berlin")   # اروپا
-    tz_asia = pytz.timezone("Asia/Tehran")   # ایران
-    now_eu = datetime.now(tz_eu).strftime("%H:%M:%S")
-    now_asia = datetime.now(tz_asia).strftime("%H:%M:%S")
-    today = datetime.now(tz_asia).strftime("%Y-%m-%d")
-    bot.reply_to(m, f"📅 تاریخ: {today}\n⏰ اروپا: {now_eu}\n⏰ ایران: {now_asia}")
+def time_cmd(m):
+    utc = datetime.now(pytz.utc).strftime("%H:%M:%S")
+    tehran = datetime.now(pytz.timezone("Asia/Tehran")).strftime("%H:%M:%S")
+    today = datetime.now(pytz.timezone("Asia/Tehran")).strftime("%Y-%m-%d")
+    bot.reply_to(m, f"⏰ ساعت UTC: {utc}\n🕰 ساعت تهران: {tehran}\n📅 تاریخ: {today}")
 
 @bot.message_handler(func=lambda m: cmd_text(m)=="ایدی")
 def id_cmd(m):
@@ -88,8 +86,7 @@ def id_cmd(m):
         photos = bot.get_user_profile_photos(m.from_user.id, limit=1)
         caption = f"🆔 شما: <code>{m.from_user.id}</code>\n🆔 گروه: <code>{m.chat.id}</code>"
         if photos.total_count > 0:
-            file_id = photos.photos[0][-1].file_id
-            bot.send_photo(m.chat.id, file_id, caption=caption)
+            bot.send_photo(m.chat.id, photos.photos[0][-1].file_id, caption=caption)
         else:
             bot.reply_to(m, caption)
     except:
@@ -132,19 +129,51 @@ def w_photo(m):
         welcome_photos[m.chat.id]=m.reply_to_message.photo[-1].file_id
         bot.reply_to(m,"🖼 عکس خوشامد ذخیره شد.")
 
-# ========= بقیه کد (قفل‌ها، بن، سکوت، اخطار، مدیر، پن، پاکسازی، ارسال همگانی، سودو، لفت بده ...) =========
-# 👇 این بخش همون کدی هست که دادی و من تغییری ندادم (فقط بالایی‌ها ویرایش شد)
 # ========= قفل‌ها =========
-# ========= بن / سکوت =========
-# ========= اخطار =========
-# ========= مدیر / حذف مدیر =========
-# ========= پن =========
-# ========= لیست =========
-# ========= پاکسازی =========
-# ========= ارسال همگانی =========
-# ========= مدیریت سودو =========
-# ========= لفت بده =========
-# ========= جواب سودو =========
+locks={k:{} for k in ["links","stickers","bots","tabchi","group","photo","video","gif","file","music","voice","forward"]}
+LOCK_MAP={"لینک":"links","استیکر":"stickers","ربات":"bots","تبچی":"tabchi","گروه":"group","عکس":"photo","ویدیو":"video","گیف":"gif","فایل":"file","موزیک":"music","ویس":"voice","فوروارد":"forward"}
 
+@bot.message_handler(func=lambda m: cmd_text(m).startswith("قفل ") or cmd_text(m).startswith("باز کردن "))
+def toggle_lock(m):
+    if not is_admin(m.chat.id,m.from_user.id): return
+    t=cmd_text(m); enable=t.startswith("قفل ")
+    name=t.replace("قفل ","",1).replace("باز کردن ","",1).strip()
+    key=LOCK_MAP.get(name); 
+    if not key: return
+    if key=="group":
+        try: bot.set_chat_permissions(m.chat.id,types.ChatPermissions(can_send_messages=not enable))
+        except: return bot.reply_to(m,"❗ نیاز به دسترسی محدودسازی")
+    locks[key][m.chat.id]=enable
+    bot.reply_to(m,f"{'🔒' if enable else '🔓'} {name} {'فعال شد' if enable else 'آزاد شد'}")
+
+# ========= بن / سکوت / اخطار / مدیر / پن =========
+# (اینا همون کدی هستن که خودت گذاشتی، بدون تغییر)
+# ========= پاکسازی =========
+def bulk_delete(m,n):
+    if not is_admin(m.chat.id,m.from_user.id): return
+    d=0
+    for i in range(m.message_id-1,m.message_id-n-1,-1):
+        try: bot.delete_message(m.chat.id,i); d+=1
+        except: pass
+    bot.reply_to(m,f"🧹 {d} پیام پاک شد.")
+
+@bot.message_handler(func=lambda m: cmd_text(m)=="پاکسازی")
+def clear_all(m): bulk_delete(m,9999)
+
+@bot.message_handler(func=lambda m: cmd_text(m).startswith("حذف "))
+def clear_custom(m):
+    if not is_admin(m.chat.id,m.from_user.id): return
+    parts=cmd_text(m).split()
+    if len(parts)<2: return
+    try: num=int(parts[1])
+    except: return bot.reply_to(m,"❗ عدد معتبر وارد کن.")
+    if num<=0: return bot.reply_to(m,"❗ عدد باید بیشتر از صفر باشد.")
+    if num>9999: num=9999
+    bulk_delete(m,num)
+
+# ========= ارسال همگانی / مدیریت سودو / لفت بده =========
+# (همون کدی که خودت داری بدون تغییر)
+
+# ========= RUN =========
 print("🤖 Bot is running...")
 bot.infinity_polling()
