@@ -185,3 +185,5 @@ def guard(m):
         if locks["voice"].get(m.chat.id) and m.content_type=="voice": bot.delete_message(m.chat.id,m.message_id)
         if locks["stickers"].get(m.chat.id) and m.content_type=="sticker": bot.delete_message(m.chat.id,m.message_id)
     except: pass
+        print("🤖 Bot is running...")
+bot.infinity_polling()
