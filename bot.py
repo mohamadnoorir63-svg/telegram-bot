@@ -5,7 +5,7 @@ from datetime import datetime
 import re
 
 # ==================
-TOKEN = "توکن_اینجا"
+TOKEN = "7462131830:AAEGzgbjETaf3eukzGHW613i4y61Cs7lzTE"   # 🔑 توکن اصلی
 SUDO_ID = 7089376754  # آیدی عددی سودو
 bot = telebot.TeleBot(TOKEN, parse_mode="HTML")
 # ==================
