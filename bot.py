@@ -156,23 +156,102 @@ def toggle(m):
     elif t=="قفل فوروارد":lock_toggle(cid,"forward",True);bot.reply_to(m,"🔄 فوروارد قفل شد.")
     elif t=="باز کردن فوروارد":lock_toggle(cid,"forward",False);bot.reply_to(m,"🔄 فوروارد آزاد شد.")
 
-# بلاک مدیا
-@bot.message_handler(content_types=['photo','video','document','audio','voice','sticker'])
-def block_media(m):
+# ========= بن / سکوت =========
+@bot.message_handler(func=lambda m: m.reply_to_message and m.text=="بن")
+def ban_user(m):
+    if not is_admin(m.chat.id,m.from_user.id): return
     try:
-        if locks["photo"].get(m.chat.id) and m.content_type=="photo": bot.delete_message(m.chat.id,m.message_id)
-        if locks["video"].get(m.chat.id) and m.content_type=="video": bot.delete_message(m.chat.id,m.message_id)
-        if locks["file"].get(m.chat.id) and m.content_type=="document": bot.delete_message(m.chat.id,m.message_id)
-        if locks["music"].get(m.chat.id) and m.content_type=="audio": bot.delete_message(m.chat.id,m.message_id)
-        if locks["voice"].get(m.chat.id) and m.content_type=="voice": bot.delete_message(m.chat.id,m.message_id)
-        if locks["gif"].get(m.chat.id) and (m.document and m.document.mime_type=="video/mp4"): bot.delete_message(m.chat.id,m.message_id)
-        if locks["stickers"].get(m.chat.id) and m.content_type=="sticker": bot.delete_message(m.chat.id,m.message_id)
-    except: pass
+        bot.ban_chat_member(m.chat.id, m.reply_to_message.from_user.id)
+        bot.reply_to(m,"🚫 کاربر بن شد.")
+    except: bot.reply_to(m,"❗ نتوانستم بن کنم.")
 
-# ========= بن، سکوت، اخطار =========
+@bot.message_handler(func=lambda m: m.reply_to_message and m.text=="حذف بن")
+def unban_user(m):
+    if not is_admin(m.chat.id,m.from_user.id): return
+    try:
+        bot.unban_chat_member(m.chat.id, m.reply_to_message.from_user.id)
+        bot.reply_to(m,"✅ کاربر از بن خارج شد.")
+    except: bot.reply_to(m,"❗ نتوانستم حذف بن کنم.")
+
+@bot.message_handler(func=lambda m: m.reply_to_message and m.text=="سکوت")
+def mute_user(m):
+    if not is_admin(m.chat.id,m.from_user.id): return
+    try:
+        bot.restrict_chat_member(m.chat.id, m.reply_to_message.from_user.id, can_send_messages=False)
+        bot.reply_to(m,"🔕 کاربر سکوت شد.")
+    except: bot.reply_to(m,"❗ نتوانستم سکوت کنم.")
+
+@bot.message_handler(func=lambda m: m.reply_to_message and m.text=="حذف سکوت")
+def unmute_user(m):
+    if not is_admin(m.chat.id,m.from_user.id): return
+    try:
+        bot.restrict_chat_member(m.chat.id, m.reply_to_message.from_user.id,
+            can_send_messages=True, can_send_media_messages=True,
+            can_send_other_messages=True, can_add_web_page_previews=True)
+        bot.reply_to(m,"🔊 کاربر از سکوت خارج شد.")
+    except: bot.reply_to(m,"❗ نتوانستم حذف سکوت کنم.")
+
+# ========= مدیر / حذف مدیر =========
+@bot.message_handler(func=lambda m: m.reply_to_message and m.text=="مدیر")
+def promote_user(m):
+    if not is_admin(m.chat.id,m.from_user.id): return
+    try:
+        me=bot.get_chat_member(m.chat.id, bot.get_me().id)
+        if me.status!="administrator" or not getattr(me,"can_promote_members",False):
+            return bot.reply_to(m,"❗ ربات مجوز افزودن مدیر ندارد.")
+        bot.promote_chat_member(m.chat.id, m.reply_to_message.from_user.id,
+            can_manage_chat=True, can_delete_messages=True,
+            can_restrict_members=True, can_pin_messages=True,
+            can_invite_users=True, can_manage_video_chats=True,
+            can_promote_members=False)
+        bot.reply_to(m,"👑 کاربر مدیر شد.")
+    except: bot.reply_to(m,"❗ نتوانستم مدیر کنم.")
+
+@bot.message_handler(func=lambda m: m.reply_to_message and m.text=="حذف مدیر")
+def demote_user(m):
+    if not is_admin(m.chat.id,m.from_user.id): return
+    try:
+        bot.promote_chat_member(m.chat.id, m.reply_to_message.from_user.id,
+            can_manage_chat=False, can_delete_messages=False,
+            can_restrict_members=False, can_pin_messages=False,
+            can_invite_users=False, can_manage_video_chats=False,
+            can_promote_members=False)
+        bot.reply_to(m,"❌ کاربر از مدیریت حذف شد.")
+    except: bot.reply_to(m,"❗ نتوانستم حذف مدیر کنم.")
+
+# ========= پن / حذف پن =========
+@bot.message_handler(func=lambda m: m.reply_to_message and m.text=="پن")
+def pin_msg(m):
+    if not is_admin(m.chat.id,m.from_user.id): return
+    try:
+        bot.pin_chat_message(m.chat.id, m.reply_to_message.message_id, disable_notification=True)
+        bot.reply_to(m,"📌 پیام پین شد.")
+    except: bot.reply_to(m,"❗ نتوانستم پین کنم.")
+
+@bot.message_handler(func=lambda m: m.reply_to_message and m.text=="حذف پن")
+def unpin_msg(m):
+    if not is_admin(m.chat.id,m.from_user.id): return
+    try:
+        bot.unpin_chat_message(m.chat.id, m.reply_to_message.message_id)
+        bot.reply_to(m,"❌ پین پیام برداشته شد.")
+    except: bot.reply_to(m,"❗ نتوانستم حذف پین کنم.")
+
+# ========= لیست مدیران =========
+@bot.message_handler(func=lambda m: m.text=="لیست مدیران گروه")
+def list_group_admins(m):
+    try:
+        admins=bot.get_chat_administrators(m.chat.id)
+        lines=[f"• {a.user.first_name or 'بدون‌نام'} — <code>{a.user.id}</code>" for a in admins]
+        bot.reply_to(m,"📋 مدیران گروه:\n"+"\n".join(lines))
+    except: bot.reply_to(m,"❗ نتوانستم لیست مدیران را بگیرم.")
+
+@bot.message_handler(func=lambda m: m.text=="لیست مدیران ربات")
+def list_bot_admins(m):
+    bot.reply_to(m,f"📋 مدیران ربات:\n• سودو: <code>{SUDO_ID}</code>")
+
+# ========= اخطار =========
 warnings={}
-
-@bot.message_handler(func=lambda m:m.reply_to_message and m.text=="اخطار")
+@bot.message_handler(func=lambda m: m.reply_to_message and m.text=="اخطار")
 def warn(m):
     if not is_admin(m.chat.id,m.from_user.id): return
     uid=m.reply_to_message.from_user.id
@@ -182,14 +261,15 @@ def warn(m):
     if count>=3:
         try:
             bot.ban_chat_member(m.chat.id,uid)
-            bot.reply_to(m,f"🚫 کاربر با ۳ اخطار بن شد.")
+            bot.reply_to(m,"🚫 کاربر با ۳ اخطار بن شد.")
             warnings[m.chat.id][uid]=0
         except: bot.reply_to(m,"❗ نتوانستم بن کنم.")
-    else: bot.reply_to(m,f"⚠️ اخطار {count}/3 داده شد.")
+    else:
+        bot.reply_to(m,f"⚠️ اخطار {count}/3 داده شد.")
 
 # ========= فونت ساده =========
 fonts=[lambda t: " ".join(list(t)), lambda t: t.upper(), lambda t: f"★{t}★"]
-@bot.message_handler(func=lambda m:m.text and m.text.startswith("فونت"))
+@bot.message_handler(func=lambda m: m.text and m.text.startswith("فونت"))
 def font_cmd(m):
     txt=m.text.replace("فونت","",1).strip()
     if not txt: return bot.reply_to(m,"❗ متنی وارد کن")
