@@ -49,10 +49,12 @@ HELP_TEXT = """
 
 # ========= سودو / ادمین =========
 sudo_ids = {SUDO_ID}
-def is_sudo(uid): return uid in sudo_ids
+def is_sudo(uid): 
+    return uid in sudo_ids
 
 def is_admin(chat_id, user_id):
-    if is_sudo(user_id): return True
+    if is_sudo(user_id): 
+        return True
     try:
         st = bot.get_chat_member(chat_id, user_id).status
         return st in ("administrator","creator")
@@ -98,8 +100,10 @@ def id_cmd(m):
 
 @bot.message_handler(func=lambda m: cmd_text(m)=="آمار")
 def stats(m):
-    try: count=bot.get_chat_member_count(m.chat.id)
-    except: count="نامشخص"
+    try: 
+        count=bot.get_chat_member_count(m.chat.id)
+    except: 
+        count="نامشخص"
     bot.reply_to(m,f"📊 اعضای گروه: {count}")
 
 @bot.message_handler(func=lambda m: cmd_text(m)=="لینک")
@@ -108,7 +112,49 @@ def group_link(m):
         link=bot.export_chat_invite_link(m.chat.id)
         bot.reply_to(m,f"📎 لینک گروه:\n{link}")
     except:
-        bot.reply_to(m,"❗ نتوانستم لینک بگیرم. (بات باید ادمین با مجوز دعوت باشد)")# ========= قفل‌ها =========
+        bot.reply_to(m,"❗ نتوانستم لینک بگیرم. (بات باید ادمین با مجوز دعوت باشد)")
+
+# ========= خوشامد =========
+welcome_enabled, welcome_texts, welcome_photos = {}, {}, {}
+
+@bot.message_handler(content_types=['new_chat_members'])
+def welcome(m):
+    for u in m.new_chat_members:
+        if not welcome_enabled.get(m.chat.id): continue
+        name = u.first_name or ""
+        date = datetime.now(pytz.timezone("Asia/Tehran")).strftime("%Y/%m/%d")
+        time = datetime.now(pytz.timezone("Asia/Tehran")).strftime("%H:%M:%S")
+        txt = f"• سلام {name} به گروه {m.chat.title} خوش آمدید 🌻\n\n📆 تاریخ : {date}\n⏰ ساعت : {time}"
+        if m.chat.id in welcome_photos:
+            bot.send_photo(m.chat.id,welcome_photos[m.chat.id],caption=txt)
+        else:
+            bot.send_message(m.chat.id,txt)
+
+@bot.message_handler(func=lambda m: cmd_text(m)=="خوشامد روشن")
+def w_on(m):
+    if is_admin(m.chat.id,m.from_user.id):
+        welcome_enabled[m.chat.id]=True
+        bot.reply_to(m,"✅ خوشامد روشن شد.")
+
+@bot.message_handler(func=lambda m: cmd_text(m)=="خوشامد خاموش")
+def w_off(m):
+    if is_admin(m.chat.id,m.from_user.id):
+        welcome_enabled[m.chat.id]=False
+        bot.reply_to(m,"❌ خوشامد خاموش شد.")
+
+@bot.message_handler(func=lambda m: cmd_text(m).startswith("خوشامد متن"))
+def w_txt(m):
+    if is_admin(m.chat.id,m.from_user.id):
+        welcome_texts[m.chat.id]=cmd_text(m).replace("خوشامد متن","",1).strip()
+        bot.reply_to(m,"✍️ متن خوشامد ذخیره شد.")
+
+@bot.message_handler(func=lambda m: m.reply_to_message and cmd_text(m)=="ثبت عکس")
+def w_photo(m):
+    if is_admin(m.chat.id,m.from_user.id) and m.reply_to_message.photo:
+        welcome_photos[m.chat.id]=m.reply_to_message.photo[-1].file_id
+        bot.reply_to(m,"🖼 عکس خوشامد ذخیره شد.")
+
+# ========= قفل‌ها =========
 locks={k:{} for k in [
     "links","stickers","bots","tabchi","group","photo","video","gif","file","music","voice","forward"
 ]}
@@ -200,9 +246,7 @@ def reset_warn(m):
             warnings[m.chat.id][uid]=0
             bot.reply_to(m,"✅ اخطارها حذف شد.")
         else:
-            bot.reply_to(m,"ℹ️ اخطاری نیست.")
-
-# ========= مدیر / حذف مدیر =========
+            bot.reply_to(m,"ℹ️ اخطاری نیست.")# ========= مدیر / حذف مدیر =========
 @bot.message_handler(func=lambda m: m.reply_to_message and cmd_text(m)=="مدیر")
 def promote(m):
     if is_admin(m.chat.id,m.from_user.id):
