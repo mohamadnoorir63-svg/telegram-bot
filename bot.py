@@ -2,11 +2,11 @@
 import telebot
 from telebot import types
 from datetime import datetime
-import re, random
+import re
 
 # ================== تنظیمات ==================
-TOKEN   = "توکن_اینجا"
-SUDO_ID = 123456789   # آیدی سودو
+TOKEN   = "7462131830:AAEGzgbjETaf3eukzGHW613i4y61Cs7lzTE"
+SUDO_ID = 7089376754  # سودوی اولیه
 bot = telebot.TeleBot(TOKEN, parse_mode="HTML")
 # ============================================
 
@@ -14,6 +14,10 @@ HELP_TEXT = """
 📖 لیست دستورات:
 
 ⏰ ساعت | 📅 تاریخ | 📊 آمار | 🆔 ایدی
+🛠 وضعیت ربات
+🎉 خوشامد روشن / خوشامد خاموش
+✍️ خوشامد متن [متن]
+🖼 (روی عکس ریپلای کن) ثبت عکس
 🔒 قفل لینک / باز کردن لینک
 🧷 قفل استیکر / باز کردن استیکر
 🤖 قفل ربات / باز کردن ربات
@@ -26,26 +30,30 @@ HELP_TEXT = """
 🎶 قفل موزیک / باز کردن موزیک
 🎙 قفل ویس / باز کردن ویس
 🔄 قفل فوروارد / باز کردن فوروارد
-🚫 بن / ✅ حذف بن (ریپلای)
+🚫 بن / ✅ حذف بن   (ریپلای)
 🔕 سکوت / 🔊 حذف سکوت (ریپلای)
 ⚠️ اخطار / حذف اخطار (ریپلای)
 👑 مدیر / ❌ حذف مدیر (ریپلای)
-📌 پن / ❌ حذف پن (ریپلای)
+📌 پن / ❌ حذف پن    (ریپلای)
 📋 لیست مدیران گروه | 📋 لیست مدیران ربات
-🎉 خوشامد روشن / خاموش | ✍️ خوشامد متن [متن]
-🖼 ثبت عکس (ریپلای → ثبت عکس)
-🧹 پاکسازی (۵۰ پیام) | پاکسازی 9999
-🧾 ثبت اصل [متن] (فقط سودو - ریپلای) | اصل (ریپلای)
-🤣 جوک | 🔮 فال | 🧑‍💼 بیو
-➕ ثبت جوک / ثبت فال / ثبت بیو
-📢 ارسال (فقط سودو)
-🛠 وضعیت ربات
-🚪 لفت بده (فقط سودو)
+🧹 پاکسازی              (۵۰ پیام)
+🧹 پاکسازی 999         (۹۹۹ پیام)
+🧹 پاکسازی 9999        (۹۹۹۹ پیام)
+📢 ارسال                (فقط سودو؛ پیام بعدی به همه گروه‌ها)
+➕ افزودن سودو [آیدی]
+➖ حذف سودو [آیدی]
+🚪 لفت بده              (فقط سودو)
 """
+
+# ========= سودوها =========
+sudo_ids = {SUDO_ID}
+
+def is_sudo(uid:int)->bool:
+    return uid in sudo_ids
 
 # ========= کمک‌تابع‌ها =========
 def is_admin(chat_id, user_id):
-    if user_id == SUDO_ID:
+    if is_sudo(user_id):
         return True
     try:
         st = bot.get_chat_member(chat_id, user_id).status
@@ -54,6 +62,7 @@ def is_admin(chat_id, user_id):
         return False
 
 def cmd_text(m):
+    # متن دستور (برای کپشن هم جواب می‌دهد)
     return (getattr(m, "text", None) or getattr(m, "caption", None) or "").strip()
 
 # ——— ذخیره گروه‌ها برای «ارسال» ———
@@ -64,7 +73,8 @@ def track_groups(upd):
         chat = upd.chat
         if chat and chat.type in ("group","supergroup"):
             joined_groups.add(chat.id)
-    except: pass
+    except:
+        pass
 
 # ========= دستورات پایه =========
 @bot.message_handler(func=lambda m: cmd_text(m) == "راهنما", content_types=['text'])
@@ -81,11 +91,31 @@ def id_cmd(m): bot.reply_to(m, f"🆔 آیدی شما: <code>{m.from_user.id}</c
 
 @bot.message_handler(func=lambda m: cmd_text(m) == "آمار", content_types=['text'])
 def stats(m):
-    try:
-        count = bot.get_chat_member_count(m.chat.id)
-    except:
-        count = "نامشخص"
+    try: count = bot.get_chat_member_count(m.chat.id)
+    except: count = "نامشخص"
     bot.reply_to(m, f"📊 اعضای گروه: {count}")
+
+# ========= وضعیت ربات =========
+@bot.message_handler(func=lambda m: cmd_text(m) == "وضعیت ربات", content_types=['text'])
+def bot_perms(m):
+    try:
+        me_id = bot.get_me().id
+        cm = bot.get_chat_member(m.chat.id, me_id)
+        if cm.status != "administrator":
+            return bot.reply_to(m, "❗ ربات ادمین نیست.")
+        flags = {
+            "مدیریت چت": getattr(cm, "can_manage_chat", False),
+            "حذف پیام": getattr(cm, "can_delete_messages", False),
+            "محدودسازی اعضا": getattr(cm, "can_restrict_members", False),
+            "پین پیام": getattr(cm, "can_pin_messages", False),
+            "دعوت کاربر": getattr(cm, "can_invite_users", False),
+            "افزودن مدیر": getattr(cm, "can_promote_members", False),
+            "مدیریت ویدیوچت": getattr(cm, "can_manage_video_chats", False),
+        }
+        lines = [f"{'✅' if v else '❌'} {k}" for k,v in flags.items()]
+        bot.reply_to(m, "🛠 وضعیت ربات:\n" + "\n".join(lines))
+    except:
+        bot.reply_to(m, "نتوانستم وضعیت را بخوانم.")
 
 # ========= خوشامد =========
 welcome_enabled, welcome_texts, welcome_photos = {}, {}, {}
@@ -93,8 +123,9 @@ welcome_enabled, welcome_texts, welcome_photos = {}, {}, {}
 @bot.message_handler(content_types=['new_chat_members'])
 def welcome(m):
     for u in m.new_chat_members:
-        if not welcome_enabled.get(m.chat.id): continue
-        name = u.first_name or ""
+        if not welcome_enabled.get(m.chat.id):
+            continue
+        name = (u.first_name or "").strip()
         txt = welcome_texts.get(m.chat.id, "خوش آمدی 🌹").replace("{name}", name)
         if m.chat.id in welcome_photos:
             bot.send_photo(m.chat.id, welcome_photos[m.chat.id], caption=txt)
@@ -118,16 +149,17 @@ def w_txt(m):
     if not is_admin(m.chat.id, m.from_user.id): return
     txt = cmd_text(m).replace("خوشامد متن", "", 1).strip()
     welcome_texts[m.chat.id] = txt
-    bot.reply_to(m, "✍️ متن خوشامد ذخیره شد.")
+    bot.reply_to(m, "✍️ متن خوشامد ذخیره شد. (از {name} می‌تونی داخل متن استفاده کنی)")
 
 @bot.message_handler(func=lambda m: m.reply_to_message and cmd_text(m) == "ثبت عکس", content_types=['text'])
 def w_photo(m):
     if not is_admin(m.chat.id, m.from_user.id): return
     if not m.reply_to_message or not m.reply_to_message.photo:
-        return bot.reply_to(m, "❗ باید روی یک عکس ریپلای کنید.")
+        return bot.reply_to(m, "❗ باید روی یک عکس ریپلای کنی.")
     welcome_photos[m.chat.id] = m.reply_to_message.photo[-1].file_id
     bot.reply_to(m, "🖼 عکس خوشامد ذخیره شد.")
-    # ========= قفل‌ها =========
+
+# ========= قفل‌ها =========
 locks = {k:{} for k in ["links","stickers","bots","tabchi","group","photo","video","gif","file","music","voice","forward"]}
 
 LOCK_MAP = {
@@ -163,18 +195,18 @@ def toggle_lock(m):
             return bot.reply_to(m, "❗ دسترسی محدودسازی لازم است.")
 
     locks[key][m.chat.id] = enable
-    bot.reply_to(m, f"{'🔒' if enable else '🔓'} {name} {'قفل شد' if enable else 'آزاد شد'}")
+    bot.reply_to(m, f"{'🔒' if enable else '🔓'} {name} {'فعال شد' if enable else 'آزاد شد'}")
 
-# بلاک مدیا و ضد لینک/فوروارد
+# بلاک لینک/فوروارد/مدیا بر اساس قفل‌ها
 @bot.message_handler(content_types=['text','photo','video','document','audio','voice','sticker','animation'])
-def global_guard(m):
+def guard(m):
     # ضد فوروارد
     if locks["forward"].get(m.chat.id) and (m.forward_from or m.forward_from_chat or getattr(m, "forward_sender_name", None)):
         try: bot.delete_message(m.chat.id, m.message_id)
         except: pass
         return
 
-    # ضد لینک
+    # ضد لینک برای غیرادمین
     if locks["links"].get(m.chat.id) and not is_admin(m.chat.id, m.from_user.id):
         txt = cmd_text(m).lower()
         if re.search(r"(t\.me|telegram\.me|telegram\.org|https?://)", txt):
@@ -188,7 +220,7 @@ def global_guard(m):
             bot.delete_message(m.chat.id, m.message_id)
         if locks["video"].get(m.chat.id) and m.content_type == "video":
             bot.delete_message(m.chat.id, m.message_id)
-        if locks["gif"].get(m.chat.id) and (m.content_type == "animation" or (m.document and getattr(m.document,"mime_type","")=="video/mp4")):
+        if locks["gif"].get(m.chat.id) and (m.content_type == "animation" or (m.content_type == "document" and getattr(m.document, "mime_type", "") == "video/mp4")):
             bot.delete_message(m.chat.id, m.message_id)
         if locks["file"].get(m.chat.id) and m.content_type == "document":
             bot.delete_message(m.chat.id, m.message_id)
@@ -198,11 +230,8 @@ def global_guard(m):
             bot.delete_message(m.chat.id, m.message_id)
         if locks["stickers"].get(m.chat.id) and m.content_type == "sticker":
             bot.delete_message(m.chat.id, m.message_id)
-    except: pass
-
-    # جواب خاص به سودو
-    if m.content_type == "text" and m.from_user.id == SUDO_ID and cmd_text(m) == "ربات":
-        bot.reply_to(m, "جانم سودو 👑")
+    except:
+        pass
 
 # ========= بن / سکوت =========
 @bot.message_handler(func=lambda m: m.reply_to_message and cmd_text(m) == "بن", content_types=['text'])
@@ -328,7 +357,8 @@ def unpin_msg(m):
         bot.reply_to(m, "❌ پین پیام برداشته شد.")
     except:
         bot.reply_to(m, "❗ نتوانستم حذف پین کنم.")
-        # ========= لیست‌ها =========
+
+# ========= لیست‌ها =========
 @bot.message_handler(func=lambda m: cmd_text(m) == "لیست مدیران گروه", content_types=['text'])
 def list_group_admins(m):
     try:
@@ -344,95 +374,38 @@ def list_group_admins(m):
 
 @bot.message_handler(func=lambda m: cmd_text(m) == "لیست مدیران ربات", content_types=['text'])
 def list_bot_admins(m):
-    bot.reply_to(m, f"📋 مدیران ربات:\n• سودو: <code>{SUDO_ID}</code>")
-
-# ========= اصل =========
-originals_global = {}
-@bot.message_handler(func=lambda m: m.reply_to_message and cmd_text(m).startswith("ثبت اصل"), content_types=['text'])
-def set_original(m):
-    if m.from_user.id != SUDO_ID: return
-    txt = cmd_text(m).replace("ثبت اصل", "", 1).strip()
-    if not txt: return bot.reply_to(m, "❗ متن معرفی را بعد از «ثبت اصل» بنویس.")
-    uid = m.reply_to_message.from_user.id
-    originals_global[uid] = txt
-    bot.reply_to(m, f"✅ اصل برای <code>{uid}</code> ذخیره شد.")
-
-@bot.message_handler(func=lambda m: cmd_text(m) == "اصل", content_types=['text'])
-def show_original(m):
-    uid = m.reply_to_message.from_user.id if m.reply_to_message else m.from_user.id
-    if uid in originals_global:
-        bot.reply_to(m, f"🧾 اصل کاربر <code>{uid}</code>:\n{originals_global[uid]}")
-    else:
-        bot.reply_to(m, "ℹ️ اصل برای این کاربر ثبت نشده.")
-
-# ========= جوک / فال / بیو =========
-jokes_db, fortunes_db, bios_db = [], [], []
-
-def add_item_to_db(m, target_list, label, keyword):
-    if m.from_user.id != SUDO_ID: return
-    text_all = cmd_text(m)
-    if m.content_type == "text":
-        txt = text_all.replace(keyword, "", 1).strip()
-        if not txt: return bot.reply_to(m, f"❗ بعد از «{keyword}» متن بنویس.")
-        target_list.append({'type':'text','data':txt,'caption':''})
-        bot.reply_to(m, f"✅ {label} متنی ذخیره شد. مجموع: {len(target_list)}")
-    elif m.content_type == "photo":
-        cap_txt = text_all.replace(keyword, "", 1).strip() if text_all.startswith(keyword) else (text_all or "")
-        target_list.append({'type':'photo','data':m.photo[-1].file_id,'caption':cap_txt})
-        bot.reply_to(m, f"✅ {label} عکسی ذخیره شد. مجموع: {len(target_list)}")
-
-@bot.message_handler(content_types=['text','photo'], func=lambda m: cmd_text(m).startswith("ثبت جوک"))
-def add_joke(m): add_item_to_db(m, jokes_db, "جوک", "ثبت جوک")
-
-@bot.message_handler(content_types=['text','photo'], func=lambda m: cmd_text(m).startswith("ثبت فال"))
-def add_fortune(m): add_item_to_db(m, fortunes_db, "فال", "ثبت فال")
-
-@bot.message_handler(content_types=['text','photo'], func=lambda m: cmd_text(m).startswith("ثبت بیو"))
-def add_bio(m): add_item_to_db(m, bios_db, "بیو", "ثبت بیو")
-
-def send_random_from_db(m, target_list, empty_msg):
-    if not target_list: return bot.reply_to(m, empty_msg)
-    item = random.choice(target_list)
-    if item['type'] == "text":
-        bot.reply_to(m, item['data'])
-    else:
-        try: bot.send_photo(m.chat.id, item['data'], caption=item['caption'])
-        except: bot.reply_to(m, "❗ نتوانستم عکس را ارسال کنم.")
-
-@bot.message_handler(func=lambda m: cmd_text(m) == "جوک", content_types=['text'])
-def get_joke(m): send_random_from_db(m, jokes_db, "ℹ️ هنوز جوکی ثبت نشده.")
-
-@bot.message_handler(func=lambda m: cmd_text(m) == "فال", content_types=['text'])
-def get_fortune(m): send_random_from_db(m, fortunes_db, "ℹ️ هنوز فالی ثبت نشده.")
-
-@bot.message_handler(func=lambda m: cmd_text(m) == "بیو", content_types=['text'])
-def get_bio(m): send_random_from_db(m, bios_db, "ℹ️ هنوز بیویی ثبت نشده.")
+    ids = "، ".join([f"<code>{i}</code>" for i in sorted(sudo_ids)])
+    bot.reply_to(m, f"📋 مدیران ربات (سودو):\n{ids}")
 
 # ========= پاکسازی =========
-@bot.message_handler(func=lambda m: cmd_text(m) == "پاکسازی", content_types=['text'])
-def clear_50(m):
+def bulk_delete(m, n):
     if not is_admin(m.chat.id, m.from_user.id): return
-    for i in range(m.message_id-1, m.message_id-51, -1):
-        try: bot.delete_message(m.chat.id, i)
-        except: pass
-    bot.reply_to(m, "🧹 ۵۰ پیام پاک شد.")
+    deleted = 0
+    for i in range(m.message_id-1, m.message_id-n-1, -1):
+        try:
+            bot.delete_message(m.chat.id, i)
+            deleted += 1
+        except:
+            pass
+    bot.reply_to(m, f"🧹 {deleted} پیام پاک شد.")
+
+@bot.message_handler(func=lambda m: cmd_text(m) == "پاکسازی", content_types=['text'])
+def clear_50(m): bulk_delete(m, 50)
+
+@bot.message_handler(func=lambda m: cmd_text(m) == "پاکسازی 999", content_types=['text'])
+def clear_999(m): bulk_delete(m, 999)
 
 @bot.message_handler(func=lambda m: cmd_text(m) in ("پاکسازی 9999","حذف پیام 9999"), content_types=['text'])
-def clear_9999(m):
-    if not is_admin(m.chat.id, m.from_user.id): return
-    for i in range(m.message_id-1, m.message_id-10000, -1):
-        try: bot.delete_message(m.chat.id, i)
-        except: pass
-    bot.reply_to(m, "🧹 تا ۹۹۹۹ پیام اخیر حذف شد.")
+def clear_9999(m): bulk_delete(m, 9999)
 
 # ========= ارسال همگانی =========
 waiting_broadcast = {}
-@bot.message_handler(func=lambda m: m.from_user.id == SUDO_ID and cmd_text(m) == "ارسال", content_types=['text'])
+@bot.message_handler(func=lambda m: is_sudo(m.from_user.id) and cmd_text(m) == "ارسال", content_types=['text'])
 def ask_broadcast(m):
     waiting_broadcast[m.from_user.id] = True
-    bot.reply_to(m, "📢 متن یا عکس بعدی‌ات را بفرست تا به همه گروه‌ها ارسال شود.")
+    bot.reply_to(m, "📢 پیام/عکس بعدی‌ات را بفرست تا به همه گروه‌ها ارسال شود.")
 
-@bot.message_handler(func=lambda m: m.from_user.id == SUDO_ID and waiting_broadcast.get(m.from_user.id), content_types=['text','photo'])
+@bot.message_handler(func=lambda m: is_sudo(m.from_user.id) and waiting_broadcast.get(m.from_user.id), content_types=['text','photo'])
 def do_broadcast(m):
     waiting_broadcast[m.from_user.id] = False
     sent = 0
@@ -443,13 +416,42 @@ def do_broadcast(m):
             elif m.content_type == "photo":
                 bot.send_photo(gid, m.photo[-1].file_id, caption=(m.caption or ""))
             sent += 1
-        except: pass
+        except:
+            pass
     bot.reply_to(m, f"✅ به {sent} گروه ارسال شد.")
+
+# ========= مدیریت سودو =========
+@bot.message_handler(func=lambda m: cmd_text(m).startswith("افزودن سودو "), content_types=['text'])
+def add_sudo(m):
+    if not is_sudo(m.from_user.id): return
+    try:
+        uid = int(cmd_text(m).split(None, 2)[2] if len(cmd_text(m).split())>2 else cmd_text(m).split()[2])
+    except:
+        # حالت ساده‌تر: "افزودن سودو 123"
+        try: uid = int(cmd_text(m).split()[-1])
+        except: return bot.reply_to(m, "❗ آیدی نامعتبر است.")
+    sudo_ids.add(uid)
+    bot.reply_to(m, f"✅ <code>{uid}</code> به سودوها اضافه شد.")
+
+@bot.message_handler(func=lambda m: cmd_text(m).startswith("حذف سودو "), content_types=['text'])
+def del_sudo(m):
+    if not is_sudo(m.from_user.id): return
+    try:
+        uid = int(cmd_text(m).split()[-1])
+    except:
+        return bot.reply_to(m, "❗ آیدی نامعتبر است.")
+    if uid == SUDO_ID:
+        return bot.reply_to(m, "❗ سودوی اولیه را نمی‌توان حذف کرد.")
+    if uid in sudo_ids:
+        sudo_ids.remove(uid)
+        bot.reply_to(m, f"✅ <code>{uid}</code> از سودوها حذف شد.")
+    else:
+        bot.reply_to(m, "ℹ️ این آیدی در سودوها نیست.")
 
 # ========= لفت بده =========
 @bot.message_handler(func=lambda m: cmd_text(m) == "لفت بده", content_types=['text'])
 def leave_cmd(m):
-    if m.from_user.id != SUDO_ID: return
+    if not is_sudo(m.from_user.id): return
     bot.send_message(m.chat.id, "به دستور سودو خارج می‌شوم 👋")
     try: bot.leave_chat(m.chat.id)
     except: pass
