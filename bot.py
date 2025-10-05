@@ -1,91 +1,143 @@
-# ========= پین / حذف پین =========
-@bot.message_handler(func=lambda m: m.reply_to_message and m.text == "پن")
-def pin_message(m):
-    if not is_admin(m.chat.id, m.from_user.id): return
+# -*- coding: utf-8 -*-
+import telebot
+from telebot import types
+from datetime import datetime
+import re
+
+# ==================
+TOKEN = "7462131830:AAEGzgbjETaf3eukzGHW613i4y61Cs7lzTE"  # 🔑 توکن ربات
+SUDO_ID = 7089376754  # آیدی عددی سودو
+bot = telebot.TeleBot(TOKEN, parse_mode="HTML")
+# ==================
+
+HELP_TEXT = """
+📖 لیست دستورات:
+
+⏰ ساعت | 📅 تاریخ | 📊 آمار | 🆔 ایدی
+🔒 قفل لینک / باز کردن لینک
+🧷 قفل استیکر / باز کردن استیکر
+🤖 قفل ربات / باز کردن ربات
+🚫 قفل تبچی / باز کردن تبچی
+🔐 قفل گروه / باز کردن گروه
+🖼 قفل عکس / باز کردن عکس
+🎥 قفل ویدیو / باز کردن ویدیو
+🎭 قفل گیف / باز کردن گیف
+📎 قفل فایل / باز کردن فایل
+🎶 قفل موزیک / باز کردن موزیک
+🎙 قفل ویس / باز کردن ویس
+🔄 قفل فوروارد / باز کردن فوروارد
+🚫 بن / ✅ حذف بن (ریپلای)
+🔕 سکوت / 🔊 حذف سکوت (ریپلای)
+👑 مدیر / ❌ حذف مدیر (ریپلای)
+📌 پن / ❌ حذف پن (ریپلای)
+📋 لیست مدیران گروه
+📋 لیست مدیران ربات
+🎉 خوشامد روشن / خاموش
+✍️ خوشامد متن [متن دلخواه]
+🖼 ثبت عکس (ریپلای روی عکس و بفرست: ثبت عکس)
+🧹 پاکسازی (حذف ۵۰ پیام آخر)
+⚠️ اخطار (ریپلای → ۳ بار = بن)
+📢 ارسال (فقط سودو)
+🛠 وضعیت ربات
+🚪 لفت بده (فقط سودو)
+"""
+
+# ========= چک ادمین =========
+def is_admin(chat_id, user_id):
     try:
-        me = bot.get_chat_member(m.chat.id, bot.get_me().id)
-        if me.status != "administrator" or not getattr(me, "can_pin_messages", False):
-            return bot.reply_to(m, "❗ ربات مجوز پین کردن پیام ندارد.")
-        bot.pin_chat_message(m.chat.id, m.reply_to_message.message_id, disable_notification=True)
-        bot.reply_to(m, "📌 پیام پین شد.")
+        st = bot.get_chat_member(chat_id, user_id).status
+        return st in ("administrator", "creator") or user_id == SUDO_ID
     except:
-        bot.reply_to(m, "❗ نتوانستم پین کنم.")
+        return False
 
-@bot.message_handler(func=lambda m: m.reply_to_message and m.text == "حذف پن")
-def unpin_message(m):
+# ========= دستورات پایه =========
+@bot.message_handler(func=lambda m: m.text == "راهنما")
+def help_cmd(m): bot.reply_to(m, HELP_TEXT)
+
+@bot.message_handler(func=lambda m: m.text == "ساعت")
+def time_cmd(m): bot.reply_to(m, f"⏰ ساعت: {datetime.now().strftime('%H:%M:%S')}")
+
+@bot.message_handler(func=lambda m: m.text == "تاریخ")
+def date_cmd(m): bot.reply_to(m, f"📅 تاریخ: {datetime.now().strftime('%Y-%m-%d')}")
+
+@bot.message_handler(func=lambda m: m.text == "ایدی")
+def id_cmd(m): bot.reply_to(m, f"🆔 آیدی شما: <code>{m.from_user.id}</code>\n🆔 آیدی گروه: <code>{m.chat.id}</code>")
+
+@bot.message_handler(func=lambda m: m.text == "آمار")
+def stats(m):
+    try: count = bot.get_chat_member_count(m.chat.id)
+    except: count = "نامشخص"
+    bot.reply_to(m, f"📊 اعضای گروه: {count}")
+
+# ========= قفل‌ها =========
+locks = {k:{} for k in ["links","stickers","bots","tabchi","group","photo","video","gif","file","music","voice","forward"]}
+
+def lock_toggle(chat_id, lock_type, state):
+    locks[lock_type][chat_id] = state
+
+@bot.message_handler(func=lambda m: m.text in [
+    "قفل لینک","باز کردن لینک","قفل استیکر","باز کردن استیکر",
+    "قفل ربات","باز کردن ربات","قفل تبچی","باز کردن تبچی",
+    "قفل گروه","باز کردن گروه","قفل عکس","باز کردن عکس",
+    "قفل ویدیو","باز کردن ویدیو","قفل گیف","باز کردن گیف",
+    "قفل فایل","باز کردن فایل","قفل موزیک","باز کردن موزیک",
+    "قفل ویس","باز کردن ویس","قفل فوروارد","باز کردن فوروارد"
+])
+def toggle_locks(m):
     if not is_admin(m.chat.id, m.from_user.id): return
-    try:
-        me = bot.get_chat_member(m.chat.id, bot.get_me().id)
-        if me.status != "administrator" or not getattr(me, "can_pin_messages", False):
-            return bot.reply_to(m, "❗ ربات مجوز حذف پین ندارد.")
-        bot.unpin_chat_message(m.chat.id, m.reply_to_message.message_id)
-        bot.reply_to(m, "❌ پین پیام برداشته شد.")
-    except:
-        bot.reply_to(m, "❗ نتوانستم حذف پین کنم.")
+    chat_id=m.chat.id
+    t=m.text
+    if t=="قفل لینک": lock_toggle(chat_id,"links",True); bot.reply_to(m,"🔒 لینک قفل شد.")
+    elif t=="باز کردن لینک": lock_toggle(chat_id,"links",False); bot.reply_to(m,"🔓 لینک آزاد شد.")
+    elif t=="قفل استیکر": lock_toggle(chat_id,"stickers",True); bot.reply_to(m,"🧷 استیکر قفل شد.")
+    elif t=="باز کردن استیکر": lock_toggle(chat_id,"stickers",False); bot.reply_to(m,"🧷 استیکر آزاد شد.")
+    elif t=="قفل ربات": lock_toggle(chat_id,"bots",True); bot.reply_to(m,"🤖 ربات‌ها قفل شدند.")
+    elif t=="باز کردن ربات": lock_toggle(chat_id,"bots",False); bot.reply_to(m,"🤖 ربات‌ها آزاد شدند.")
+    elif t=="قفل تبچی": lock_toggle(chat_id,"tabchi",True); bot.reply_to(m,"🚫 تبچی قفل شد.")
+    elif t=="باز کردن تبچی": lock_toggle(chat_id,"tabchi",False); bot.reply_to(m,"🚫 تبچی آزاد شد.")
+    elif t=="قفل گروه": lock_toggle(chat_id,"group",True); bot.set_chat_permissions(chat_id, types.ChatPermissions(can_send_messages=False)); bot.reply_to(m,"🔐 گروه قفل شد.")
+    elif t=="باز کردن گروه": lock_toggle(chat_id,"group",False); bot.set_chat_permissions(chat_id, types.ChatPermissions(can_send_messages=True)); bot.reply_to(m,"✅ گروه باز شد.")
+    elif t=="قفل عکس": lock_toggle(chat_id,"photo",True); bot.reply_to(m,"🖼 عکس قفل شد.")
+    elif t=="باز کردن عکس": lock_toggle(chat_id,"photo",False); bot.reply_to(m,"🖼 عکس آزاد شد.")
+    elif t=="قفل ویدیو": lock_toggle(chat_id,"video",True); bot.reply_to(m,"🎥 ویدیو قفل شد.")
+    elif t=="باز کردن ویدیو": lock_toggle(chat_id,"video",False); bot.reply_to(m,"🎥 ویدیو آزاد شد.")
+    elif t=="قفل گیف": lock_toggle(chat_id,"gif",True); bot.reply_to(m,"🎭 گیف قفل شد.")
+    elif t=="باز کردن گیف": lock_toggle(chat_id,"gif",False); bot.reply_to(m,"🎭 گیف آزاد شد.")
+    elif t=="قفل فایل": lock_toggle(chat_id,"file",True); bot.reply_to(m,"📎 فایل قفل شد.")
+    elif t=="باز کردن فایل": lock_toggle(chat_id,"file",False); bot.reply_to(m,"📎 فایل آزاد شد.")
+    elif t=="قفل موزیک": lock_toggle(chat_id,"music",True); bot.reply_to(m,"🎶 موزیک قفل شد.")
+    elif t=="باز کردن موزیک": lock_toggle(chat_id,"music",False); bot.reply_to(m,"🎶 موزیک آزاد شد.")
+    elif t=="قفل ویس": lock_toggle(chat_id,"voice",True); bot.reply_to(m,"🎙 ویس قفل شد.")
+    elif t=="باز کردن ویس": lock_toggle(chat_id,"voice",False); bot.reply_to(m,"🎙 ویس آزاد شد.")
+    elif t=="قفل فوروارد": lock_toggle(chat_id,"forward",True); bot.reply_to(m,"🔄 فوروارد قفل شد.")
+    elif t=="باز کردن فوروارد": lock_toggle(chat_id,"forward",False); bot.reply_to(m,"🔄 فوروارد آزاد شد.")
 
-# ========= لیست‌ها =========
-@bot.message_handler(func=lambda m: m.text == "لیست مدیران گروه")
-def list_group_admins(m):
-    try:
-        admins = bot.get_chat_administrators(m.chat.id)
-        lines = []
-        for a in admins:
-            u = a.user
-            name = (u.first_name or "") + ((" " + u.last_name) if u.last_name else "")
-            lines.append(f"• {name.strip() or 'بدون‌نام'} — <code>{u.id}</code>")
-        bot.reply_to(m, "📋 مدیران گروه:\n" + "\n".join(lines))
-    except:
-        bot.reply_to(m, "❗ نتوانستم لیست مدیران را بگیرم.")
+# ========= فیلتر محتوا =========
+@bot.message_handler(content_types=['photo','video','document','audio','voice','sticker'])
+def block_media(m):
+    if locks["photo"].get(m.chat.id) and m.content_type=="photo": bot.delete_message(m.chat.id,m.message_id)
+    if locks["video"].get(m.chat.id) and m.content_type=="video": bot.delete_message(m.chat.id,m.message_id)
+    if locks["file"].get(m.chat.id) and m.content_type=="document": bot.delete_message(m.chat.id,m.message_id)
+    if locks["music"].get(m.chat.id) and m.content_type=="audio": bot.delete_message(m.chat.id,m.message_id)
+    if locks["voice"].get(m.chat.id) and m.content_type=="voice": bot.delete_message(m.chat.id,m.message_id)
+    if locks["gif"].get(m.chat.id) and (m.document and m.document.mime_type=="video/mp4"): bot.delete_message(m.chat.id,m.message_id)
+    if locks["stickers"].get(m.chat.id) and m.content_type=="sticker": bot.delete_message(m.chat.id,m.message_id)
 
-@bot.message_handler(func=lambda m: m.text == "لیست مدیران ربات")
-def list_bot_admins(m):
-    # فعلاً فقط سودو تعریف شده
-    bot.reply_to(m, f"📋 مدیران ربات:\n• سودو: <code>{SUDO_ID}</code>")
-
-# ========= پاکسازی =========
-@bot.message_handler(func=lambda m: m.text == "پاکسازی")
-def clear_messages(m):
-    if not is_admin(m.chat.id, m.from_user.id): return
-    for i in range(m.message_id - 1, m.message_id - 51, -1):
-        try: bot.delete_message(m.chat.id, i)
-        except: pass
-    bot.reply_to(m, "🧹 ۵۰ پیام آخر پاک شد.")
-
-# ========= ارسال پیام همگانی (فقط سودو) =========
-waiting_broadcast = {}
-
-@bot.message_handler(func=lambda m: m.from_user.id == SUDO_ID and m.text == "ارسال")
-def ask_broadcast(m):
-    waiting_broadcast[m.from_user.id] = True
-    bot.reply_to(m, "📢 متن یا عکس بعدی‌ات را بفرست تا به همهٔ گروه‌ها ارسال شود.")
-
-@bot.message_handler(func=lambda m: m.from_user.id == SUDO_ID and waiting_broadcast.get(m.from_user.id))
-def do_broadcast(m):
-    waiting_broadcast[m.from_user.id] = False
-    sent = 0
-    for gid in list(joined_groups):
-        try:
-            if m.content_type == "text":
-                bot.send_message(gid, m.text)
-            elif m.content_type == "photo":
-                bot.send_photo(gid, m.photo[-1].file_id, caption=(m.caption or ""))
-            sent += 1
-        except:
-            pass
-    bot.reply_to(m, f"✅ پیام به {sent} گروه ارسال شد.")
-
-# ========= ضد لینک + کفِ هندلر متنی =========
+# ========= ضد لینک و فوروارد =========
 @bot.message_handler(content_types=['text'])
-def text_handler(m):
-    # فقط اگر سودو بگه «ربات»
-    if m.from_user.id == SUDO_ID and m.text.strip() == "ربات":
-        return bot.reply_to(m, "جانم سودو 👑")
-
-    # حذف لینک برای غیر ادمین‌ها وقتی قفل لینک فعاله
-    if lock_links.get(m.chat.id, False) and not is_admin(m.chat.id, m.from_user.id):
-        if re.search(r"(t\.me|telegram\.me|telegram\.org|https?://)", (m.text or "").lower()):
-            try: bot.delete_message(m.chat.id, m.message_id)
+def block_links(m):
+    if m.from_user.id == SUDO_ID and m.text.strip()=="ربات":
+        return bot.reply_to(m,"جانم سودو 👑")
+    if locks["links"].get(m.chat.id) and not is_admin(m.chat.id,m.from_user.id):
+        if re.search(r"(t\.me|http)", m.text.lower()):
+            try: bot.delete_message(m.chat.id,m.message_id)
             except: pass
+
+@bot.message_handler(func=lambda m: m.forward_from or m.forward_from_chat)
+def block_forward(m):
+    if locks["forward"].get(m.chat.id):
+        try: bot.delete_message(m.chat.id,m.message_id)
+        except: pass
 
 # ========= RUN =========
 print("🤖 Bot is running...")
