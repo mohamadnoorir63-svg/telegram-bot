@@ -612,7 +612,236 @@ def sudo_links(call):
             chat=bot.get_chat(gid)
             txt+=f"▪️ {chat.title} → {link}\n"
         except: continue
-    bot.send_message(call.message.chat.id,txt)# ========= جواب سودو (تست سریع) =========
+    bot.send_message(call.message.chat.id,txt)# ========= لیست مدیران گروه =========
+@bot.message_handler(func=lambda m: cmd_text(m)=="لیست مدیران گروه")
+def admins_list(m):
+    if not is_admin(m.chat.id, m.from_user.id): return
+    try:
+        members = bot.get_chat_administrators(m.chat.id)
+        names = [f"▪️ {u.user.first_name} ({u.user.id})" for u in members]
+        txt = "👑 لیست مدیران گروه:\n\n" + "\n".join(names)
+    except:
+        txt = "❗ نتوانستم لیست مدیران گروه را بگیرم."
+    msg = bot.reply_to(m, txt)
+    auto_del(m.chat.id,msg.message_id,delay=20)
+
+# ========= لیست سودوهای ربات =========
+@bot.message_handler(func=lambda m: cmd_text(m)=="لیست سودوها")
+def sudo_list(m):
+    if not is_sudo(m.from_user.id): return
+    if not sudo_ids:
+        txt = "ℹ️ هیچ سودویی ثبت نشده."
+    else:
+        txt = "👑 لیست سودوها:\n\n" + "\n".join([f"▪️ {uid}" for uid in sudo_ids])
+    msg = bot.reply_to(m, txt)
+    auto_del(m.chat.id,msg.message_id,delay=15)# ========= ارسال هماهنگی (Broadcast) =========
+waiting_broadcast = {}
+
+@bot.callback_query_handler(func=lambda call: call.data=="sudo_bc")
+def sudo_bc(call):
+    if not is_sudo(call.from_user.id): return
+    waiting_broadcast[call.from_user.id] = True
+    bot.send_message(call.message.chat.id,"📢 پیام بعدی که بفرستی به همه گروه‌ها ارسال میشه.")
+
+@bot.message_handler(func=lambda m: is_sudo(m.from_user.id) and waiting_broadcast.get(m.from_user.id), content_types=['text','photo'])
+def do_broadcast(m):
+    waiting_broadcast[m.from_user.id] = False
+    s = 0
+    for gid in list(joined_groups):
+        try:
+            if m.content_type == "text":
+                bot.send_message(gid, m.text)
+            elif m.content_type == "photo":
+                bot.send_photo(gid, m.photo[-1].file_id, caption=(m.caption or ""))
+            s += 1
+        except:
+            continue
+    msg = bot.reply_to(m, f"✅ پیام به {s} گروه ارسال شد.")
+    auto_del(m.chat.id,msg.message_id,delay=10)# ========= متن‌های راهنما =========
+HELP_TEXT_PUBLIC = """
+📖 دستورات عمومی:
+
+⏰ ساعت  
+🆔 ایدی  
+🎭 اصل من  
+🎭 اصل (ریپلای)  
+😂 جوک  
+🔮 فال  
+فونت [اسم]
+"""
+
+HELP_TEXT_ADMIN = """
+📖 دستورات مدیران:
+
+📊 آمار  
+📎 لینک  
+🎉 خوشامد روشن / خاموش  
+✍️ خوشامد متن [متن]  
+🖼 ثبت عکس (ریپلای روی عکس)  
+🔒 قفل‌ها (با دستور یا پنل)  
+🚫 بن / ✅ حذف بن   (ریپلای)  
+🔕 سکوت / 🔊 حذف سکوت (ریپلای)  
+⚠️ اخطار / حذف اخطار (ریپلای)  
+👑 مدیر / ❌ حذف مدیر (ریپلای)  
+📌 پن  
+"""
+
+HELP_TEXT_SUDO = """
+📖 دستورات سودو:
+
+🛠 وضعیت ربات  
+📢 ارسال هماهنگی (Broadcast)  
+➕ افزودن سودو [آیدی]  
+➖ حذف سودو [آیدی]  
+🚪 لفت بده  
+📋 لیست مدیران ربات  
+📊 آمار گروه‌ها  
+🔗 لینک گروه‌ها  
+🔴 خاموش / 🟢 روشن کردن ربات
+"""
+
+# ========= دستور راهنما =========
+@bot.message_handler(func=lambda m: cmd_text(m)=="راهنما")
+def show_help(m):
+    if m.chat.type == "private" and is_sudo(m.from_user.id):
+        bot.send_message(m.chat.id, HELP_TEXT_SUDO)
+    elif is_admin(m.chat.id, m.from_user.id):
+        bot.send_message(m.chat.id, HELP_TEXT_PUBLIC + "\n" + HELP_TEXT_ADMIN)
+    else:
+        bot.send_message(m.chat.id, HELP_TEXT_PUBLIC)# ========= ذخیره گروه‌هایی که ربات عضو میشه =========
+joined_groups = set()
+
+@bot.my_chat_member_handler()
+def track_groups(upd):
+    try:
+        chat = upd.chat
+        if chat and chat.type in ("group", "supergroup"):
+            if upd.new_chat_member and upd.new_chat_member.status in ("member", "administrator"):
+                joined_groups.add(chat.id)
+            elif upd.new_chat_member and upd.new_chat_member.status == "left":
+                joined_groups.discard(chat.id)
+    except:
+        pass
+
+
+# ========= آمار گروه‌ها =========
+@bot.callback_query_handler(func=lambda call: call.data=="sudo_stats")
+def sudo_stats(call):
+    if not is_sudo(call.from_user.id): return
+    txt = f"📊 ربات هم‌اکنون در {len(joined_groups)} گروه عضو است."
+    bot.send_message(call.message.chat.id, txt)
+
+
+# ========= لینک گروه‌ها =========
+@bot.callback_query_handler(func=lambda call: call.data=="sudo_links")
+def sudo_links(call):
+    if not is_sudo(call.from_user.id): return
+    if not joined_groups:
+        return bot.send_message(call.message.chat.id,"❗ ربات در هیچ گروهی عضو نیست.")
+    
+    txt="🔗 لینک گروه‌ها:\n"
+    for gid in list(joined_groups)[:20]:  # فقط ۲۰ گروه اول
+        try:
+            link = bot.export_chat_invite_link(gid)
+            chat = bot.get_chat(gid)
+            txt += f"▪️ {chat.title} → {link}\n"
+        except:
+            continue
+    bot.send_message(call.message.chat.id, txt)# ========= لیست مدیران ربات =========
+@bot.message_handler(func=lambda m: is_sudo(m.from_user.id) and cmd_text(m)=="لیست مدیران ربات")
+def sudo_admins(m):
+    if not sudo_ids:
+        return bot.reply_to(m,"ℹ️ هیچ سودویی ثبت نشده.")
+    txt = "👑 لیست مدیران ربات:\n\n"
+    for i, uid in enumerate(sudo_ids, 1):
+        txt += f"{i}. <code>{uid}</code>\n"
+    bot.send_message(m.chat.id, txt)
+
+
+# ========= ارسال همگانی =========
+waiting_broadcast = {}
+
+@bot.message_handler(func=lambda m: is_sudo(m.from_user.id) and cmd_text(m)=="ارسال")
+def ask_bc(m):
+    waiting_broadcast[m.from_user.id] = True
+    msg = bot.reply_to(m,"📢 پیام بعدی که میفرستی به همه گروه‌ها ارسال میشه.")
+    auto_del(m.chat.id,msg.message_id,delay=10)
+
+@bot.message_handler(func=lambda m: is_sudo(m.from_user.id) and waiting_broadcast.get(m.from_user.id), content_types=['text','photo'])
+def do_bc(m):
+    waiting_broadcast[m.from_user.id] = False
+    s = 0
+    for gid in list(joined_groups):
+        try:
+            if m.content_type == "text":
+                bot.send_message(gid, m.text)
+            elif m.content_type == "photo":
+                bot.send_photo(gid, m.photo[-1].file_id, caption=(m.caption or ""))
+            s += 1
+        except:
+            continue
+    msg = bot.reply_to(m,f"✅ پیام به {s} گروه ارسال شد.")
+    auto_del(m.chat.id,msg.message_id,delay=10)# ========= راهنما =========
+HELP_TEXT_PUBLIC = """
+📖 دستورات عمومی:
+
+⏰ ساعت  
+🆔 ایدی  
+🎭 اصل من  
+🎭 اصل (ریپلای)  
+😂 جوک  
+🔮 فال  
+فونت [اسم]
+"""
+
+HELP_TEXT_ADMIN = """
+📖 دستورات مدیران:
+
+📊 آمار  
+📎 لینک  
+🎉 خوشامد روشن / خاموش  
+✍️ خوشامد متن [متن]  
+🖼 ثبت عکس (ریپلای روی عکس)  
+🔒 قفل‌ها (با دستور یا پنل)  
+🚫 بن / ✅ حذف بن   (ریپلای)  
+🔕 سکوت / 🔊 حذف سکوت (ریپلای)  
+⚠️ اخطار / حذف اخطار (ریپلای)  
+👑 مدیر / ❌ حذف مدیر (ریپلای)  
+📌 پنل قفل‌ها
+"""
+
+@bot.message_handler(func=lambda m: cmd_text(m)=="راهنما")
+def help_cmd(m):
+    if is_sudo(m.from_user.id):
+        txt = HELP_TEXT_SUDO
+    elif is_admin(m.chat.id,m.from_user.id):
+        txt = HELP_TEXT_ADMIN
+    else:
+        txt = HELP_TEXT_PUBLIC
+    msg = bot.reply_to(m, txt)
+    auto_del(m.chat.id, msg.message_id, delay=25)
+
+# ========= آمار (فقط مدیران) =========
+@bot.message_handler(func=lambda m: cmd_text(m)=="آمار")
+def group_stats(m):
+    if not is_admin(m.chat.id,m.from_user.id): return
+    try:
+        count = bot.get_chat_member_count(m.chat.id)
+    except:
+        count = "نامشخص"
+    msg = bot.reply_to(m,f"📊 تعداد اعضای گروه: {count}")
+    auto_del(m.chat.id,msg.message_id,delay=7)
+
+# ========= لینک (فقط مدیران) =========
+@bot.message_handler(func=lambda m: cmd_text(m)=="لینک")
+def group_link(m):
+    if not is_admin(m.chat.id,m.from_user.id): return
+    try:
+        link = bot.export_chat_invite_link(m.chat.id)
+        msg = bot.reply_to(m,f"📎 لینک گروه:\n{link}")
+    except:
+        msg = bot.reply_to(m,"❗ نتوانستم لینک بگیرم (بات باید ادمین با مجوز دعوت باشد).")
+    auto_del(m.chat.id,msg.message_id,delay=10)# ========= جواب سودو (تست سریع) =========
 @bot.message_handler(func=lambda m: is_sudo(m.from_user.id) and cmd_text(m)=="ربات")
 def sudo_reply(m):
     msg = bot.reply_to(m,"جانم سودو 👑")
