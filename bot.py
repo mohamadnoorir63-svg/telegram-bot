@@ -437,4 +437,52 @@ def broadcast(m):
     if not text:
         return bot.reply_to(m,"❗ متن خالی است.")
 
-    sent, failed = 
+    sent, failed = 0, 0
+    if not os.path.exists(GROUPS_FILE):
+        return bot.reply_to(m,"❗ هیچ گروهی ذخیره نشده.")
+
+    with open(GROUPS_FILE,"r") as f:
+        groups = [int(x.strip()) for x in f if x.strip()]
+
+    for gid in groups:
+        try:
+            bot.send_message(gid,text)
+            sent += 1
+        except:
+            failed += 1
+
+    bot.reply_to(m,f"📢 ارسال همگانی تمام شد.\n✅ موفق: {sent}\n❌ ناموفق: {failed}")
+
+# ================== پنل برای ممبر (پیوی) ==================
+@bot.message_handler(commands=['start'])
+def start_cmd(m):
+    if m.chat.type!="private": 
+        save_group(m.chat.id)
+        return
+
+    kb=types.InlineKeyboardMarkup(row_width=1)
+    kb.add(types.InlineKeyboardButton("➕ افزودن ربات به گروه", url=f"https://t.me/{bot.get_me().username}?startgroup=new"))
+    kb.add(types.InlineKeyboardButton("📞 پشتیبانی", url=f"https://t.me/{SUPPORT_ID}"))
+    kb.add(types.InlineKeyboardButton("ℹ️ توضیحات ربات", callback_data="about"))
+
+    txt=("👋 سلام!\n\nمن ربات مدیریت گروه هستم 🤖\n\n"
+         "از دکمه‌های زیر می‌تونی استفاده کنی 👇")
+    bot.send_message(m.chat.id,txt,reply_markup=kb)
+
+@bot.callback_query_handler(func=lambda c: c.data=="about")
+def cb_about(c):
+    txt=("ℹ️ <b>درباره ربات:</b>\n\n"
+         "📌 امکانات:\n"
+         "• خوشامدگویی\n"
+         "• قفل لینک / مدیا\n"
+         "• بن، سکوت، اخطار\n"
+         "• جوک و فال\n"
+         "• اصل کاربر\n"
+         "• مدیریت گروه\n\n"
+         "➕ منو به گروهت اضافه کن تا مدیریت آسون‌تر بشه.")
+    bot.send_message(c.message.chat.id,txt)
+    bot.answer_callback_query(c.id)
+
+# ================== اجرا ==================
+print("🤖 Bot is running with Broadcast & Member Panel...")
+bot.infinity_polling(skip_pending=True,timeout=30)
