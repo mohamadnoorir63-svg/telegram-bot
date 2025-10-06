@@ -28,8 +28,11 @@ def cmd_text(m): return (getattr(m,"text",None) or getattr(m,"caption",None) or 
 
 DELETE_DELAY = 7
 def auto_del(chat_id, msg_id, delay=DELETE_DELAY):
-    def _(): time.sleep(delay); 
-    threading.Thread(target=lambda: (time.sleep(delay), bot.delete_message(chat_id,msg_id)), daemon=True).start()
+    def _():
+        time.sleep(delay)
+        try: bot.delete_message(chat_id,msg_id)
+        except: pass
+    threading.Thread(target=_, daemon=True).start()
 
 # ================== دستورات عمومی ==================
 @bot.message_handler(func=lambda m: cmd_text(m)=="ساعت")
@@ -137,261 +140,301 @@ def cmd_fonts(m):
     for s in FONTS:
         try: res+=s(name)+"\n"
         except: pass
-    msg=bot.reply_to(m,res); auto_del(m.chat.id,msg.message_id,delay=20)
+    msg=bot.reply_to(m,res); auto_del(m.chat.id,msg.message_id,delay=20)# ================== اصل ==================
+origins = {}  # chat_id -> { user_id: text }
 
-# ================== اصل ==================
-origins={}
 @bot.message_handler(func=lambda m: m.reply_to_message and cmd_text(m).startswith("ثبت اصل "))
 def origin_set(m):
-    if not is_admin(m.chat.id,m.from_user.id): return
-    uid=m.reply_to_message.from_user.id
-    val=cmd_text(m).replace("ثبت اصل ","",1)
-    origins.setdefault(m.chat.id,{})[uid]=val
-    msg=bot.reply_to(m,f"✅ اصل ثبت شد: {val}"); auto_del(m.chat.id,msg.message_id)
+    if not is_admin(m.chat.id, m.from_user.id): return
+    uid = m.reply_to_message.from_user.id
+    val = cmd_text(m).replace("ثبت اصل ", "", 1).strip()
+    origins.setdefault(m.chat.id, {})[uid] = val
+    msg = bot.reply_to(m, f"✅ اصل برای {m.reply_to_message.from_user.first_name} ثبت شد: {val}")
+    auto_del(m.chat.id, msg.message_id)
 
-@bot.message_handler(func=lambda m: cmd_text(m)=="اصل من")
+@bot.message_handler(func=lambda m: cmd_text(m) == "اصل من")
 def origin_me(m):
-    val=origins.get(m.chat.id,{}).get(m.from_user.id)
-    msg=bot.reply_to(m,f"🧾 اصل شما: {val}" if val else "❗ ثبت نشده")
-    auto_del(m.chat.id,msg.message_id)
+    val = origins.get(m.chat.id, {}).get(m.from_user.id)
+    msg = bot.reply_to(m, f"🧾 اصل شما: {val}" if val else "ℹ️ اصل شما ثبت نشده.")
+    auto_del(m.chat.id, msg.message_id)
 
-@bot.message_handler(func=lambda m: m.reply_to_message and cmd_text(m)=="اصل")
+@bot.message_handler(func=lambda m: m.reply_to_message and cmd_text(m) == "اصل")
 def origin_get(m):
-    uid=m.reply_to_message.from_user.id
-    val=origins.get(m.chat.id,{}).get(uid)
-    msg=bot.reply_to(m,f"🧾 اصل: {val}" if val else "❗ ثبت نشده")
-    auto_del(m.chat.id,msg.message_id)
+    uid = m.reply_to_message.from_user.id
+    val = origins.get(m.chat.id, {}).get(uid)
+    msg = bot.reply_to(m, f"🧾 اصل: {val}" if val else "ℹ️ اصل ثبت نشده.")
+    auto_del(m.chat.id, msg.message_id)
 
-# ================== جوک/فال ==================
-jokes, fortunes=[],[]
-@bot.message_handler(func=lambda m: is_admin(m.chat.id,m.from_user.id) and cmd_text(m)=="ثبت جوک")
+@bot.message_handler(func=lambda m: m.reply_to_message and cmd_text(m) == "حذف اصل")
+def origin_del(m):
+    if not is_admin(m.chat.id, m.from_user.id): return
+    uid = m.reply_to_message.from_user.id
+    ok = origins.get(m.chat.id, {}).pop(uid, None)
+    msg = bot.reply_to(m, "🗑 اصل حذف شد." if ok else "ℹ️ اصلی ثبت نشده بود.")
+    auto_del(m.chat.id, msg.message_id)
+
+
+# ================== جوک ==================
+jokes = []  # list of dicts
+
+@bot.message_handler(func=lambda m: is_admin(m.chat.id, m.from_user.id) and cmd_text(m) == "ثبت جوک")
 def joke_add(m):
-    if m.reply_to_message:
-        if m.reply_to_message.text: jokes.append({"type":"text","content":m.reply_to_message.text})
-        elif m.reply_to_message.photo: jokes.append({"type":"photo","file":m.reply_to_message.photo[-1].file_id,"caption":m.reply_to_message.caption or ""})
-        msg=bot.reply_to(m,"😂 ذخیره شد"); auto_del(m.chat.id,msg.message_id)
+    if not m.reply_to_message:
+        return
+    if m.reply_to_message.text:
+        jokes.append({"type":"text", "content":m.reply_to_message.text})
+    elif m.reply_to_message.photo:
+        jokes.append({"type":"photo", "file":m.reply_to_message.photo[-1].file_id, "caption":m.reply_to_message.caption or ""})
+    msg = bot.reply_to(m, "😂 جوک ذخیره شد.")
+    auto_del(m.chat.id, msg.message_id)
 
-@bot.message_handler(func=lambda m: cmd_text(m)=="جوک")
+@bot.message_handler(func=lambda m: cmd_text(m) == "جوک")
 def joke_send(m):
-    if not jokes: return
-    j=random.choice(jokes)
-    if j["type"]=="text": bot.send_message(m.chat.id,j["content"])
-    else: bot.send_photo(m.chat.id,j["file"],caption=j.get("caption",""))
+    if not jokes:
+        return bot.reply_to(m, "ℹ️ هیچ جوکی ثبت نشده.")
+    j = random.choice(jokes)
+    if j["type"] == "text":
+        bot.send_message(m.chat.id, j["content"])
+    else:
+        bot.send_photo(m.chat.id, j["file"], caption=j.get("caption") or "")
 
-@bot.message_handler(func=lambda m: is_admin(m.chat.id,m.from_user.id) and cmd_text(m)=="ثبت فال")
+@bot.message_handler(func=lambda m: is_admin(m.chat.id, m.from_user.id) and cmd_text(m) == "لیست جوک‌ها")
+def jokes_list(m):
+    if not jokes:
+        return bot.reply_to(m, "ℹ️ هیچ جوکی ثبت نشده.")
+    start = max(0, len(jokes)-20)
+    lines = []
+    for i, j in enumerate(jokes[start:], start=1):
+        if j["type"] == "text":
+            prev = j["content"][:40] + ("…" if len(j["content"])>40 else "")
+        else:
+            prev = "[📸 عکس]" + (" — "+(j.get("caption")[:20]+"…") if j.get("caption") else "")
+        lines.append(f"{i}. {prev}")
+    msg = bot.reply_to(m, "😂 لیست جوک‌ها (۲۰ تای آخر):\n\n" + "\n".join(lines))
+    auto_del(m.chat.id, msg.message_id, delay=30)
+
+@bot.message_handler(func=lambda m: is_admin(m.chat.id, m.from_user.id) and cmd_text(m).startswith("حذف جوک "))
+def jokes_del(m):
+    try:
+        idx = int(cmd_text(m).split()[2]) - 1
+        start = max(0, len(jokes)-20)
+        real = start + idx
+        if 0 <= real < len(jokes):
+            jokes.pop(real)
+            msg = bot.reply_to(m, "✅ جوک حذف شد.")
+        else:
+            msg = bot.reply_to(m, "❗ شماره نامعتبر.")
+    except:
+        msg = bot.reply_to(m, "❗ فرمت صحیح: حذف جوک 3")
+    auto_del(m.chat.id, msg.message_id)
+
+@bot.message_handler(func=lambda m: is_admin(m.chat.id, m.from_user.id) and cmd_text(m) == "پاکسازی جوک‌ها")
+def jokes_clear(m):
+    jokes.clear()
+    msg = bot.reply_to(m, "🗑 همه جوک‌ها پاک شدند.")
+    auto_del(m.chat.id, msg.message_id)
+
+
+# ================== فال ==================
+fortunes = []
+
+@bot.message_handler(func=lambda m: is_admin(m.chat.id, m.from_user.id) and cmd_text(m) == "ثبت فال")
 def fal_add(m):
-    if m.reply_to_message:
-        if m.reply_to_message.text: fortunes.append({"type":"text","content":m.reply_to_message.text})
-        elif m.reply_to_message.photo: fortunes.append({"type":"photo","file":m.reply_to_message.photo[-1].file_id,"caption":m.reply_to_message.caption or ""})
-        msg=bot.reply_to(m,"🔮 ذخیره شد"); auto_del(m.chat.id,msg.message_id)
+    if not m.reply_to_message:
+        return
+    if m.reply_to_message.text:
+        fortunes.append({"type":"text", "content":m.reply_to_message.text})
+    elif m.reply_to_message.photo:
+        fortunes.append({"type":"photo", "file":m.reply_to_message.photo[-1].file_id, "caption":m.reply_to_message.caption or ""})
+    msg = bot.reply_to(m, "🔮 فال ذخیره شد.")
+    auto_del(m.chat.id, msg.message_id)
 
-@bot.message_handler(func=lambda m: cmd_text(m)=="فال")
+@bot.message_handler(func=lambda m: cmd_text(m) == "فال")
 def fal_send(m):
-    if not fortunes: return
-    f=random.choice(fortunes)
-    if f["type"]=="text": bot.send_message(m.chat.id,f["content"])
-    else: bot.send_photo(m.chat.id,f["file"],caption=f.get("caption",""))# ================== قفل‌ها ==================
-locks={k:{} for k in ["links","stickers","bots","tabchi","group","photo","video","gif","file","music","voice","forward"]}
-LOCK_MAP={"لینک":"links","استیکر":"stickers","ربات":"bots","تبچی":"tabchi","گروه":"group",
-          "عکس":"photo","ویدیو":"video","گیف":"gif","فایل":"file","موزیک":"music","ویس":"voice","فوروارد":"forward"}
+    if not fortunes:
+        return bot.reply_to(m, "ℹ️ هیچ فالی ثبت نشده.")
+    f = random.choice(fortunes)
+    if f["type"] == "text":
+        bot.send_message(m.chat.id, f["content"])
+    else:
+        bot.send_photo(m.chat.id, f["file"], caption=f.get("caption") or "")
 
-@bot.message_handler(func=lambda m: cmd_text(m)=="پنل")
-def locks_panel(m):
-    if not is_admin(m.chat.id,m.from_user.id): return
-    kb=types.InlineKeyboardMarkup(row_width=2)
-    for name,key in LOCK_MAP.items():
-        st="🔒" if locks[key].get(m.chat.id) else "🔓"
-        kb.add(types.InlineKeyboardButton(f"{st} {name}",callback_data=f"toggle:{key}:{m.chat.id}"))
-    kb.add(types.InlineKeyboardButton("❌ بستن",callback_data=f"close:{m.chat.id}"))
-    bot.reply_to(m,"🛠 پنل مدیریت قفل‌ها:",reply_markup=kb)
+@bot.message_handler(func=lambda m: is_admin(m.chat.id, m.from_user.id) and cmd_text(m) == "لیست فال‌ها")
+def fal_list(m):
+    if not fortunes:
+        return bot.reply_to(m, "ℹ️ هیچ فالی ثبت نشده.")
+    start = max(0, len(fortunes)-20)
+    lines = []
+    for i, f in enumerate(fortunes[start:], start=1):
+        if f["type"] == "text":
+            prev = f["content"][:40] + ("…" if len(f["content"])>40 else "")
+        else:
+            prev = "[📸 عکس]" + (" — "+(f.get("caption")[:20]+"…") if f.get("caption") else "")
+        lines.append(f"{i}. {prev}")
+    msg = bot.reply_to(m, "🔮 لیست فال‌ها (۲۰ تای آخر):\n\n" + "\n".join(lines))
+    auto_del(m.chat.id, msg.message_id, delay=30)
 
-@bot.callback_query_handler(func=lambda c: c.data.startswith("toggle:"))
-def cb_toggle(c):
-    _,key,chat_id=c.data.split(":"); chat_id=int(chat_id)
-    if not is_admin(chat_id,c.from_user.id):
-        return bot.answer_callback_query(c.id,"❌ فقط مدیران")
-    locks[key][chat_id]=not locks[key].get(chat_id,False)
-    bot.answer_callback_query(c.id,"✅ تغییر شد")
-    # بازسازی
-    kb=types.InlineKeyboardMarkup(row_width=2)
-    for name,k in LOCK_MAP.items():
-        st="🔒" if locks[k].get(chat_id) else "🔓"
-        kb.add(types.InlineKeyboardButton(f"{st} {name}",callback_data=f"toggle:{k}:{chat_id}"))
-    kb.add(types.InlineKeyboardButton("❌ بستن",callback_data=f"close:{chat_id}"))
-    bot.edit_message_reply_markup(chat_id,c.message.message_id,reply_markup=kb)
-
-@bot.callback_query_handler(func=lambda c: c.data.startswith("close:"))
-def cb_close(c):
-    try: bot.delete_message(c.message.chat.id,c.message.message_id)
-    except: pass
-
-# enforce locks
-@bot.message_handler(content_types=['text','photo','video','document','audio','voice','sticker','animation'])
-def enforce(m):
-    if is_admin(m.chat.id,m.from_user.id): return
-    txt=m.text or ""
-    if locks["links"].get(m.chat.id) and any(x in txt for x in ["http://","https://","t.me"]): bot.delete_message(m.chat.id,m.message_id)
-    if locks["stickers"].get(m.chat.id) and m.sticker: bot.delete_message(m.chat.id,m.message_id)
-    if locks["photo"].get(m.chat.id) and m.photo: bot.delete_message(m.chat.id,m.message_id)
-    if locks["video"].get(m.chat.id) and m.video: bot.delete_message(m.chat.id,m.message_id)
-    if locks["gif"].get(m.chat.id) and m.animation: bot.delete_message(m.chat.id,m.message_id)
-    if locks["file"].get(m.chat.id) and m.document: bot.delete_message(m.chat.id,m.message_id)
-    if locks["music"].get(m.chat.id) and m.audio: bot.delete_message(m.chat.id,m.message_id)
-    if locks["voice"].get(m.chat.id) and m.voice: bot.delete_message(m.chat.id,m.message_id)
-
-# قفل ربات‌ها
-@bot.message_handler(content_types=['new_chat_members'])
-def block_bots(m):
-    for u in m.new_chat_members:
-        if u.is_bot and locks["bots"].get(m.chat.id):
-            try: bot.kick_chat_member(m.chat.id,u.id)
-            except: pass
-        if "tabchi" in (u.username or "").lower() and locks["tabchi"].get(m.chat.id):
-            try: bot.kick_chat_member(m.chat.id,u.id)
-            except: pass
-
-# ================== بن / سکوت / اخطار ==================
-warnings={}; MAX_WARNINGS=3
-
-@bot.message_handler(func=lambda m: m.reply_to_message and cmd_text(m)=="بن")
-def ban(m):
-    if not is_admin(m.chat.id,m.from_user.id): return
-    try: bot.ban_chat_member(m.chat.id,m.reply_to_message.from_user.id); bot.reply_to(m,"🚫 بن شد")
-    except: bot.reply_to(m,"❗ خطا")
-
-@bot.message_handler(func=lambda m: m.reply_to_message and cmd_text(m)=="حذف بن")
-def unban(m):
-    if not is_admin(m.chat.id,m.from_user.id): return
-    try: bot.unban_chat_member(m.chat.id,m.reply_to_message.from_user.id); bot.reply_to(m,"✅ آزاد شد")
-    except: bot.reply_to(m,"❗ خطا")
-
-@bot.message_handler(func=lambda m: m.reply_to_message and cmd_text(m)=="سکوت")
-def mute(m):
-    if not is_admin(m.chat.id,m.from_user.id): return
-    try: bot.restrict_chat_member(m.chat.id,m.reply_to_message.from_user.id,can_send_messages=False); bot.reply_to(m,"🔕 سکوت شد")
-    except: bot.reply_to(m,"❗ خطا")
-
-@bot.message_handler(func=lambda m: m.reply_to_message and cmd_text(m)=="حذف سکوت")
-def unmute(m):
-    if not is_admin(m.chat.id,m.from_user.id): return
-    try: bot.restrict_chat_member(m.chat.id,m.reply_to_message.from_user.id,can_send_messages=True,can_send_media_messages=True,can_send_other_messages=True,can_add_web_page_previews=True)
-    except: pass
-    bot.reply_to(m,"🔊 سکوت برداشته شد")
-
-@bot.message_handler(func=lambda m: m.reply_to_message and cmd_text(m)=="اخطار")
-def warn(m):
-    if not is_admin(m.chat.id,m.from_user.id): return
-    uid=m.reply_to_message.from_user.id
-    warnings.setdefault(m.chat.id,{})
-    warnings[m.chat.id][uid]=warnings[m.chat.id].get(uid,0)+1
-    c=warnings[m.chat.id][uid]
-    if c>=MAX_WARNINGS:
-        try: bot.ban_chat_member(m.chat.id,uid); bot.reply_to(m,"🚫 کاربر با ۳ اخطار بن شد")
-        except: bot.reply_to(m,"❗ خطا")
-        warnings[m.chat.id][uid]=0
-    else: bot.reply_to(m,f"⚠️ اخطار {c}/{MAX_WARNINGS}")
-
-@bot.message_handler(func=lambda m: m.reply_to_message and cmd_text(m)=="حذف اخطار")
-def reset_warn(m):
-    if not is_admin(m.chat.id,m.from_user.id): return
-    warnings.get(m.chat.id,{}).pop(m.reply_to_message.from_user.id,None)
-    bot.reply_to(m,"✅ اخطارها حذف شد")
-
-# ================== مدیر / پن / پاکسازی ==================
-@bot.message_handler(func=lambda m: m.reply_to_message and cmd_text(m)=="مدیر")
-def promote(m):
-    if not is_admin(m.chat.id,m.from_user.id): return
-    try: bot.promote_chat_member(m.chat.id,m.reply_to_message.from_user.id,
-        can_manage_chat=True,can_delete_messages=True,
-        can_restrict_members=True,can_pin_messages=True,can_invite_users=True)
-    except: pass
-    bot.reply_to(m,"👑 مدیر شد")
-
-@bot.message_handler(func=lambda m: m.reply_to_message and cmd_text(m)=="حذف مدیر")
-def demote(m):
-    if not is_admin(m.chat.id,m.from_user.id): return
-    try: bot.promote_chat_member(m.chat.id,m.reply_to_message.from_user.id,
-        can_manage_chat=False,can_delete_messages=False,
-        can_restrict_members=False,can_pin_messages=False,can_invite_users=False)
-    except: pass
-    bot.reply_to(m,"❌ مدیر حذف شد")
-
-@bot.message_handler(func=lambda m: m.reply_to_message and cmd_text(m)=="پن")
-def pin(m):
-    if is_admin(m.chat.id,m.from_user.id):
-        try: bot.pin_chat_message(m.chat.id,m.reply_to_message.message_id)
-        except: pass
-        bot.reply_to(m,"📌 سنجاق شد")
-
-@bot.message_handler(func=lambda m: cmd_text(m)=="حذف پن")
-def unpin(m):
-    if is_admin(m.chat.id,m.from_user.id):
-        try: bot.unpin_chat_message(m.chat.id)
-        except: pass
-        bot.reply_to(m,"❌ سنجاق برداشته شد")
-
-@bot.message_handler(func=lambda m: is_admin(m.chat.id,m.from_user.id) and cmd_text(m).startswith("حذف "))
-def del_n(m):
+@bot.message_handler(func=lambda m: is_admin(m.chat.id, m.from_user.id) and cmd_text(m).startswith("حذف فال "))
+def fal_del(m):
     try:
-        n=int(cmd_text(m).split()[1])
+        idx = int(cmd_text(m).split()[2]) - 1
+        start = max(0, len(fortunes)-20)
+        real = start + idx
+        if 0 <= real < len(fortunes):
+            fortunes.pop(real)
+            msg = bot.reply_to(m, "✅ فال حذف شد.")
+        else:
+            msg = bot.reply_to(m, "❗ شماره نامعتبر.")
+    except:
+        msg = bot.reply_to(m, "❗ فرمت صحیح: حذف فال 2")
+    auto_del(m.chat.id, msg.message_id)
+
+@bot.message_handler(func=lambda m: is_admin(m.chat.id, m.from_user.id) and cmd_text(m) == "پاکسازی فال‌ها")
+def fal_clear(m):
+    fortunes.clear()
+    msg = bot.reply_to(m, "🗑 همه فال‌ها پاک شدند.")
+    auto_del(m.chat.id, msg.message_id)# ================== پاکسازی کلی ==================
+@bot.message_handler(func=lambda m: is_admin(m.chat.id, m.from_user.id) and cmd_text(m) == "پاکسازی")
+def clear_all(m):
+    try:
+        for i in range(1, 9999):
+            bot.delete_message(m.chat.id, m.message_id - i)
+    except:
+        pass
+    bot.reply_to(m, "🧹 پاکسازی انجام شد")
+
+# ================== لیست جوک‌ها ==================
+@bot.message_handler(func=lambda m: is_admin(m.chat.id, m.from_user.id) and cmd_text(m) == "لیست جوک‌ها")
+def list_jokes(m):
+    if not jokes:
+        return bot.reply_to(m, "ℹ️ هیچ جوکی ثبت نشده")
+    start = max(0, len(jokes) - 20)
+    lines = []
+    for i, j in enumerate(jokes[start:], start=1):
+        if j["type"] == "text":
+            prev = (j["content"][:40] + "…") if len(j["content"]) > 40 else j["content"]
+        else:
+            prev = "[📸 عکس]" + (f" — {j.get('caption')[:30]}…" if j.get("caption") else "")
+        lines.append(f"{i}. {prev}")
+    bot.reply_to(m, "😂 لیست جوک‌ها (۲۰ تای آخر):\n\n" + "\n".join(lines))
+
+# ================== لیست فال‌ها ==================
+@bot.message_handler(func=lambda m: is_admin(m.chat.id, m.from_user.id) and cmd_text(m) == "لیست فال‌ها")
+def list_fortunes(m):
+    if not fortunes:
+        return bot.reply_to(m, "ℹ️ هیچ فالی ثبت نشده")
+    start = max(0, len(fortunes) - 20)
+    lines = []
+    for i, f in enumerate(fortunes[start:], start=1):
+        if f["type"] == "text":
+            prev = (f["content"][:40] + "…") if len(f["content"]) > 40 else f["content"]
+        else:
+            prev = "[📸 عکس]" + (f" — {f.get('caption')[:30]}…" if f.get("caption") else "")
+        lines.append(f"{i}. {prev}")
+    bot.reply_to(m, "🔮 لیست فال‌ها (۲۰ تای آخر):\n\n" + "\n".join(lines))
+
+# ================== حذف جوک / فال با شماره ==================
+@bot.message_handler(func=lambda m: is_admin(m.chat.id, m.from_user.id) and cmd_text(m).startswith("حذف جوک "))
+def del_joke_num(m):
+    try:
+        idx = int(cmd_text(m).split()[2]) - 1
+        if 0 <= idx < len(jokes):
+            jokes.pop(idx)
+            bot.reply_to(m, "✅ جوک حذف شد")
+        else:
+            bot.reply_to(m, "❗ شماره نامعتبر")
+    except:
+        bot.reply_to(m, "❗ فرمت: حذف جوک [عدد]")
+
+@bot.message_handler(func=lambda m: is_admin(m.chat.id, m.from_user.id) and cmd_text(m).startswith("حذف فال "))
+def del_fal_num(m):
+    try:
+        idx = int(cmd_text(m).split()[2]) - 1
+        if 0 <= idx < len(fortunes):
+            fortunes.pop(idx)
+            bot.reply_to(m, "✅ فال حذف شد")
+        else:
+            bot.reply_to(m, "❗ شماره نامعتبر")
+    except:
+        bot.reply_to(m, "❗ فرمت: حذف فال [عدد]")
+
+# ================== حذف جوک / فال با ریپلای ==================
+@bot.message_handler(func=lambda m: is_admin(m.chat.id, m.from_user.id) and m.reply_to_message and cmd_text(m) == "حذف جوک")
+def del_joke_reply(m):
+    t = m.reply_to_message
+    removed = False
+    if t.text:
+        for i, j in enumerate(jokes):
+            if j["type"] == "text" and j["content"] == t.text:
+                jokes.pop(i); removed = True; break
+    elif t.photo:
+        fid = t.photo[-1].file_id
+        for i, j in enumerate(jokes):
+            if j["type"] == "photo" and j.get("file") == fid:
+                jokes.pop(i); removed = True; break
+    bot.reply_to(m, "✅ جوک حذف شد" if removed else "ℹ️ جوک مطابق پیدا نشد")
+
+@bot.message_handler(func=lambda m: is_admin(m.chat.id, m.from_user.id) and m.reply_to_message and cmd_text(m) == "حذف فال")
+def del_fal_reply(m):
+    t = m.reply_to_message
+    removed = False
+    if t.text:
+        for i, f in enumerate(fortunes):
+            if f["type"] == "text" and f["content"] == t.text:
+                fortunes.pop(i); removed = True; break
+    elif t.photo:
+        fid = t.photo[-1].file_id
+        for i, f in enumerate(fortunes):
+            if f["type"] == "photo" and f.get("file") == fid:
+                fortunes.pop(i); removed = True; break
+    bot.reply_to(m, "✅ فال حذف شد" if removed else "ℹ️ فال مطابق پیدا نشد")
+
+# ================== پاکسازی لیست‌ها ==================
+@bot.message_handler(func=lambda m: is_admin(m.chat.id, m.from_user.id) and cmd_text(m) == "پاکسازی جوک‌ها")
+def clear_jokes(m):
+    jokes.clear()
+    bot.reply_to(m, "🗑 همه جوک‌ها پاک شدند")
+
+@bot.message_handler(func=lambda m: is_admin(m.chat.id, m.from_user.id) and cmd_text(m) == "پاکسازی فال‌ها")
+def clear_fals(m):
+    fortunes.clear()
+    bot.reply_to(m, "🗑 همه فال‌ها پاک شدند")
+
+# ================== پاکسازی با عدد (با پیام تأیید) ==================
+@bot.message_handler(func=lambda m: is_admin(m.chat.id, m.from_user.id) and cmd_text(m).startswith("حذف "))
+def delete_n_messages(m):
+    parts = cmd_text(m).split()
+    if len(parts) < 2: return
+    try:
+        n = int(parts[1])
         for i in range(n):
-            bot.delete_message(m.chat.id,m.message_id-i)
-        bot.reply_to(m,f"🗑 {n} پیام پاک شد")
-    except: pass# ================== لیست مدیران ==================
-@bot.message_handler(func=lambda m: cmd_text(m)=="لیست مدیران گروه")
-def admins_list(m):
-    if not is_admin(m.chat.id,m.from_user.id): return
+            bot.delete_message(m.chat.id, m.message_id - i)
+        bot.reply_to(m, f"🗑 {n} پیام پاک شد")
+    except:
+        bot.reply_to(m, "❗ خطا در حذف پیام‌ها")# ================== ذخیره گروه‌ها ==================
+GROUPS_FILE = "groups.txt"
+
+def save_group(chat_id):
     try:
-        admins=bot.get_chat_administrators(m.chat.id)
-        txt="👑 مدیران گروه:\n"+"\n".join([f"▪️ {a.user.first_name} — <code>{a.user.id}</code>" for a in admins])
-    except: txt="❗ خطا"
-    bot.reply_to(m,txt)
+        groups = set()
+        if os.path.exists(GROUPS_FILE):
+            with open(GROUPS_FILE,"r") as f:
+                groups = set([int(x.strip()) for x in f if x.strip()])
+        groups.add(chat_id)
+        with open(GROUPS_FILE,"w") as f:
+            f.write("\n".join(str(x) for x in groups))
+    except: pass
 
-@bot.message_handler(func=lambda m: cmd_text(m)=="لیست مدیران ربات")
-def bot_admins_list(m):
-    if not is_sudo(m.from_user.id): return
-    txt="👑 مدیران ربات:\n"+"\n".join([str(x) for x in bot_admins])
-    bot.reply_to(m,txt)
+@bot.message_handler(content_types=['new_chat_members','text'])
+def save_groups_handler(m):
+    if m.chat.type in ["supergroup","group"]:
+        save_group(m.chat.id)
 
-@bot.message_handler(func=lambda m: cmd_text(m)=="لیست سودو")
-def sudo_list(m):
-    if not is_sudo(m.from_user.id): return
-    txt="⚡ سودوها:\n"+"\n".join([str(x) for x in sudo_ids])
-    bot.reply_to(m,txt)
+# ================== ارسال همگانی ==================
+@bot.message_handler(func=lambda m: is_sudo(m.from_user.id) and cmd_text(m).startswith("ارسال "))
+def broadcast(m):
+    text = cmd_text(m).replace("ارسال ","",1).strip()
+    if not text:
+        return bot.reply_to(m,"❗ متن خالی است.")
 
-# ================== راهنما ==================
-HELP_TEXT="""
-📖 دستورات اصلی:
-
-⏰ ساعت | 🆔 ایدی | 📊 آمار | 📎 لینک
-🎉 خوشامد روشن/خاموش | ✍️ خوشامد متن | 🖼 ثبت عکس
-🔒 قفل‌ها (لینک، عکس، ویدیو، ...)
-🚫 بن | ✅ حذف بن | 🔕 سکوت | 🔊 حذف سکوت
-⚠️ اخطار | حذف اخطار
-👑 مدیر | ❌ حذف مدیر
-📌 پن | ❌ حذف پن
-🧾 اصل / اصل من / ثبت اصل
-😂 جوک | 🔮 فال
-🧹 پاکسازی / حذف [عدد]
-📋 لیست مدیران گروه / ربات / سودو
-"""
-@bot.message_handler(func=lambda m: cmd_text(m)=="راهنما")
-def help_cmd(m):
-    if m.chat.type!="private" and not is_admin(m.chat.id,m.from_user.id): return
-    bot.reply_to(m,HELP_TEXT)
-
-# ================== استارت ==================
-@bot.message_handler(commands=['start'])
-def start_cmd(m):
-    if m.chat.type!="private": return
-    kb=types.InlineKeyboardMarkup(row_width=1)
-    kb.add(types.InlineKeyboardButton("➕ افزودن ربات به گروه", url=f"https://t.me/{bot.get_me().username}?startgroup=new"))
-    kb.add(types.InlineKeyboardButton("📞 پشتیبانی", url=f"https://t.me/{SUPPORT_ID}"))
-    txt=("👋 سلام!\n\nمن ربات مدیریت گروه هستم 🤖\n\n"
-         "📌 امکانات:\n"
-         "• قفل‌ها\n• خوشامد\n• اخطار/بن/سکوت\n• اصل\n• جوک و فال\n• ابزار مدیریتی\n\n➕ منو به گروهت اضافه کن.")
-    bot.send_message(m.chat.id,txt,reply_markup=kb)
-
-# ================== اجرا ==================
-print("🤖 Bot is running...")
-bot.infinity_polling(skip_pending=True,timeout=30)
+    sent, failed = 
