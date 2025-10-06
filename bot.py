@@ -182,5 +182,6 @@ def fal_send(m):
     if not fortunes: return bot.reply_to(m,"❗ فالی ثبت نشده")
     f=random.choice(fortunes)
     if f["type"]=="text": bot.send_message(m.chat.id,f["content"])
-    else: bot.send_photo(m.chat.id,f["file"],caption=f["caption"])print("🤖 Bot is running...")
+    else: bot.send_photo(m.chat.id,f["file"],caption=f["caption"])
+print("🤖 Bot is running...")
 bot.infinity_polling(skip_pending=True,timeout=30)
