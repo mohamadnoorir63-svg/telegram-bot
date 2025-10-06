@@ -8,8 +8,10 @@ from telebot import types
 # ================== تنظیمات ==================
 TOKEN     = os.environ.get("BOT_TOKEN")
 SUDO_ID   = int(os.environ.get("SUDO_ID", "0"))
+SUPPORT_ID = "NOORI_NOOR"
 
 bot = telebot.TeleBot(TOKEN, parse_mode="HTML")
+
 sudo_ids   = {SUDO_ID}
 bot_admins = set()
 
@@ -37,7 +39,8 @@ def auto_del(chat_id, msg_id, delay=DELETE_DELAY):
 def cmd_time(m):
     now_utc=datetime.now(pytz.utc).strftime("%Y-%m-%d %H:%M:%S")
     now_teh=datetime.now(pytz.timezone("Asia/Tehran")).strftime("%Y-%m-%d %H:%M:%S")
-    bot.reply_to(m,f"⏰ UTC: {now_utc}\n⏰ تهران: {now_teh}")
+    msg=bot.reply_to(m,f"⏰ UTC: {now_utc}\n⏰ تهران: {now_teh}")
+    auto_del(m.chat.id,msg.message_id)
 
 @bot.message_handler(func=lambda m: cmd_text(m)=="ایدی")
 def cmd_id(m):
@@ -45,35 +48,40 @@ def cmd_id(m):
     try:
         photos=bot.get_user_profile_photos(m.from_user.id,limit=1)
         if photos.total_count>0:
-            bot.send_photo(m.chat.id,photos.photos[0][-1].file_id,caption=caption)
-        else: bot.reply_to(m,caption)
-    except: bot.reply_to(m,caption)
+            msg=bot.send_photo(m.chat.id,photos.photos[0][-1].file_id,caption=caption)
+        else: msg=bot.reply_to(m,caption)
+    except: msg=bot.reply_to(m,caption)
+    auto_del(m.chat.id,msg.message_id)
 
 @bot.message_handler(func=lambda m: cmd_text(m)=="آمار")
 def cmd_stats(m):
     if not is_admin(m.chat.id,m.from_user.id): return
     try: count=bot.get_chat_member_count(m.chat.id)
     except: count="نامشخص"
-    bot.reply_to(m,f"📊 اعضای گروه: {count}")
+    msg=bot.reply_to(m,f"📊 اعضای گروه: {count}")
+    auto_del(m.chat.id,msg.message_id)
 
 @bot.message_handler(func=lambda m: cmd_text(m)=="لینک")
 def cmd_link(m):
     if not is_admin(m.chat.id,m.from_user.id): return
     try: link=bot.export_chat_invite_link(m.chat.id)
     except: link="❗ خطا در گرفتن لینک."
-    bot.reply_to(m,f"📎 {link}")
+    msg=bot.reply_to(m,f"📎 {link}")
+    auto_del(m.chat.id,msg.message_id)
 
 @bot.message_handler(func=lambda m: cmd_text(m)=="وضعیت ربات")
 def cmd_status(m):
     if not is_admin(m.chat.id,m.from_user.id): return
     now=datetime.now(pytz.timezone("Asia/Tehran")).strftime("%Y-%m-%d %H:%M:%S")
-    bot.reply_to(m,f"🤖 فعال هستم\n🕒 {now}")
+    msg=bot.reply_to(m,f"🤖 فعال هستم\n🕒 {now}")
+    auto_del(m.chat.id,msg.message_id)
 
 # جواب سودو «ربات»
 SUDO_RESPONSES=["جونم قربان 😎","در خدمتم ✌️","ربات آماده‌ست 🚀","چه خبر رئیس؟ 🤖"]
 @bot.message_handler(func=lambda m: is_sudo(m.from_user.id) and cmd_text(m)=="ربات")
 def cmd_sudo(m):
-    bot.reply_to(m,random.choice(SUDO_RESPONSES))
+    msg=bot.reply_to(m,random.choice(SUDO_RESPONSES))
+    auto_del(m.chat.id,msg.message_id)
 
 # ================== خوشامد ==================
 welcome_enabled, welcome_texts, welcome_photos = {}, {}, {}
@@ -122,7 +130,12 @@ FONTS=[
     lambda t:"".join({"a":"𝑎","b":"𝑏","c":"𝑐","d":"𝑑","e":"𝑒","f":"𝑓","g":"𝑔","h":"ℎ","i":"𝑖","j":"𝑗","k":"𝑘","l":"𝑙","m":"𝑚","n":"𝑛","o":"𝑜","p":"𝑝","q":"𝑞","r":"𝑟","s":"𝑠","t":"𝑡","u":"𝑢","v":"𝑣","w":"𝑤","x":"𝑥","y":"𝑦","z":"𝑧"}.get(ch.lower(),ch) for ch in t),
     lambda t:"".join({"a":"ⓐ","b":"ⓑ","c":"ⓒ","d":"ⓓ","e":"ⓔ","f":"ⓕ","g":"ⓖ","h":"ⓗ","i":"ⓘ","j":"ⓙ","k":"ⓚ","l":"ⓛ","m":"ⓜ","n":"ⓝ","o":"ⓞ","p":"ⓟ","q":"ⓠ","r":"ⓡ","s":"ⓢ","t":"ⓣ","u":"ⓤ","v":"ⓥ","w":"ⓦ","x":"ⓧ","y":"ⓨ","z":"ⓩ"}.get(ch.lower(),ch) for ch in t),
     lambda t:"".join({"ا":"ٱ","ب":"بٰ","ت":"تہ","ث":"ثٰ","ج":"جـ","ح":"حہ","خ":"خہ","د":"دٰ","ر":"رٰ","س":"سٰ","ش":"شٰ","ع":"عہ","غ":"غہ","ف":"فہ","ق":"قٰ","ک":"ڪ","ل":"لہ","م":"مہ","ن":"نٰ","ه":"ﮬ","و":"ۆ","ی":"ۍ"}.get(ch,ch) for ch in t),
+    lambda t:"".join({"ا":"آ","ب":"ب̍","ت":"تۛ","ث":"ثہ","ج":"ج͠","ح":"حٰ","خ":"خ̐","د":"دُ","ذ":"ذٰ","ر":"ر͜","ز":"زٰ","س":"سہ","ش":"شہ","ع":"عہ","غ":"غہ","ف":"فہ","ق":"ق͠","ک":"ڪہ","ل":"لہ","م":"مہ","ن":"نہ","ه":"ﮬ","و":"و͠","ی":"يہ"}.get(ch,ch) for ch in t),
+    lambda t:"".join({"ا":"اٰ","ب":"بـ","ت":"تـ","ث":"ثـ","ج":"ﮔ","ح":"حـ","خ":"خـ","د":"دٰ","ر":"رٰ","س":"سـ","ش":"شـ","ع":"عـ","غ":"غـ","ف":"فـ","ق":"قـ","ک":"ڪ","گ":"گـ","ل":"لـ","م":"مـ","ن":"نـ","ه":"هـ","و":"ۅ","ی":"ۍ"}.get(ch,ch) for ch in t),
+    lambda t:"".join({"ا":"ﺂ","ب":"ﺑ","ت":"ﺗ","ث":"ﺛ","ج":"ﺟ","ح":"ﺣ","خ":"ﺧ","د":"ﮄ","ر":"ﺭ","ز":"ﺯ","س":"ﺳ","ش":"ﺷ","ع":"ﻋ","غ":"ﻏ","ف":"ﻓ","ق":"ﻗ","ک":"ﮎ","ل":"ﻟ","م":"ﻣ","ن":"ﻧ","ه":"ﮬ","و":"ۆ","ی":"ﯼ"}.get(ch,ch) for ch in t),
+    lambda t:"".join({"ا":"آ","ب":"بہ","ت":"تـ","ث":"ثہ","ج":"جہ","ح":"حہ","خ":"خہ","د":"دٰ","ر":"رٰ","س":"سہ","ش":"شہ","ع":"عہ","غ":"غہ","ف":"فہ","ق":"قہ","ک":"کہ","ل":"لہ","م":"مہ","ن":"نہ","ه":"ﮬ","و":"ۅ","ی":"یے"}.get(ch,ch) for ch in t),
 ]
+
 @bot.message_handler(func=lambda m: cmd_text(m).startswith("فونت "))
 def cmd_fonts(m):
     name=cmd_text(m).replace("فونت ","",1)
@@ -154,7 +167,7 @@ def origin_get(m):
     val=origins.get(m.chat.id,{}).get(uid)
     bot.reply_to(m,f"🧾 اصل: {val}" if val else "ℹ️ ثبت نشده")
 
-# ================== جوک و فال ==================
+# ================== جوک و فال (ساده) ==================
 jokes=[]; fortunes=[]
 @bot.message_handler(func=lambda m: is_admin(m.chat.id,m.from_user.id) and cmd_text(m)=="ثبت جوک")
 def joke_add(m):
