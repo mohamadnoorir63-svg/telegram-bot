@@ -11,12 +11,15 @@ SUDO_ID   = int(os.environ.get("SUDO_ID", "0"))
 SUPPORT_ID = "NOORI_NOOR"
 
 bot = telebot.TeleBot(TOKEN, parse_mode="HTML")
-sudo_ids = {SUDO_ID}
+
+sudo_ids   = {SUDO_ID}
+bot_admins = set()
 
 # ================== کمکی‌ها ==================
 def is_sudo(uid): return uid in sudo_ids
+def is_bot_admin(uid): return uid in bot_admins or is_sudo(uid)
 def is_admin(chat_id, user_id):
-    if is_sudo(user_id): return True
+    if is_bot_admin(user_id): return True
     try: st = bot.get_chat_member(chat_id, user_id).status
     except: return False
     return st in ("administrator","creator")
@@ -66,8 +69,63 @@ def cmd_link(m):
     msg=bot.reply_to(m,f"📎 {link}")
     auto_del(m.chat.id,msg.message_id)
 
-# ================== راهنما با پل شیشه‌ای ==================
-HELP_TEXT = """
+@bot.message_handler(func=lambda m: cmd_text(m)=="وضعیت ربات")
+def cmd_status(m):
+    if not is_admin(m.chat.id,m.from_user.id): return
+    now=datetime.now(pytz.timezone("Asia/Tehran")).strftime("%Y-%m-%d %H:%M:%S")
+    msg=bot.reply_to(m,f"🤖 فعال هستم\n🕒 {now}")
+    auto_del(m.chat.id,msg.message_id)
+
+# جواب سودو «ربات»
+SUDO_RESPONSES=["جونم قربان 😎","در خدمتم ✌️","ربات آماده‌ست 🚀","چه خبر رئیس؟ 🤖"]
+@bot.message_handler(func=lambda m: is_sudo(m.from_user.id) and cmd_text(m)=="ربات")
+def cmd_sudo(m):
+    msg=bot.reply_to(m,random.choice(SUDO_RESPONSES))
+    auto_del(m.chat.id,msg.message_id)
+
+# ================== خوشامد ==================
+welcome_enabled, welcome_texts, welcome_photos = {}, {}, {}
+DEFAULT_WELCOME="• سلام {name} به گروه {title} خوش آمدی 🌹\n📆 {date}\n⏰ {time}"
+
+@bot.message_handler(content_types=['new_chat_members'])
+def welcome(m):
+    for u in m.new_chat_members:
+        if not welcome_enabled.get(m.chat.id): continue
+        txt=(welcome_texts.get(m.chat.id,DEFAULT_WELCOME)).format(
+            name=u.first_name,title=m.chat.title,
+            date=datetime.now(pytz.timezone("Asia/Tehran")).strftime("%Y/%m/%d"),
+            time=datetime.now(pytz.timezone("Asia/Tehran")).strftime("%H:%M:%S")
+        )
+        if m.chat.id in welcome_photos:
+            bot.send_photo(m.chat.id,welcome_photos[m.chat.id],caption=txt)
+        else: bot.send_message(m.chat.id,txt)
+
+@bot.message_handler(func=lambda m: cmd_text(m)=="خوشامد روشن")
+def w_on(m): 
+    if is_admin(m.chat.id,m.from_user.id):
+        welcome_enabled[m.chat.id]=True
+        bot.reply_to(m,"✅ خوشامد روشن شد")
+
+@bot.message_handler(func=lambda m: cmd_text(m)=="خوشامد خاموش")
+def w_off(m): 
+    if is_admin(m.chat.id,m.from_user.id):
+        welcome_enabled[m.chat.id]=False
+        bot.reply_to(m,"❌ خوشامد خاموش شد")
+
+@bot.message_handler(func=lambda m: cmd_text(m).startswith("خوشامد متن "))
+def w_txt(m):
+    if is_admin(m.chat.id,m.from_user.id):
+        welcome_texts[m.chat.id]=cmd_text(m).replace("خوشامد متن ","",1)
+        bot.reply_to(m,"✍️ متن خوشامد ذخیره شد")
+
+@bot.message_handler(func=lambda m: m.reply_to_message and cmd_text(m)=="ثبت عکس")
+def w_pic(m):
+    if is_admin(m.chat.id,m.from_user.id) and m.reply_to_message.photo:
+        welcome_photos[m.chat.id]=m.reply_to_message.photo[-1].file_id
+        bot.reply_to(m,"🖼 عکس خوشامد ذخیره شد")
+
+# ================== راهنما ==================
+HELP_TEXT="""
 📖 لیست دستورات:
 
 ⏰ ساعت | 🆔 ایدی 
@@ -83,42 +141,25 @@ HELP_TEXT = """
 👑 مدیر | ❌ حذف مدیر (ریپلای)
 📌 پن | ❌ حذف پن (ریپلای)
 📋 لیست مدیران
-🧹 پاکسازی
+🧹 پاکسازی | حذف [عدد]
 📢 ارسال (فقط سودو)
 ➕ افزودن/➖ حذف سودو
 🚪 لفت بده (سودو)
 🏷 اصل | اصل من
 😂 جوک | 🔮 فال
 """
-
 @bot.message_handler(func=lambda m: cmd_text(m)=="راهنما")
 def help_cmd(m):
     if m.chat.type!="private" and not is_admin(m.chat.id,m.from_user.id): return
     kb=types.InlineKeyboardMarkup()
     kb.add(types.InlineKeyboardButton("❌ بستن",callback_data="close_help"))
-    msg=bot.reply_to(m,HELP_TEXT,reply_markup=kb)
-    auto_del(m.chat.id,msg.message_id,delay=20)
+    bot.send_message(m.chat.id,HELP_TEXT,reply_markup=kb)
 
 @bot.callback_query_handler(func=lambda c: c.data=="close_help")
 def cb_close_help(c):
     try: bot.delete_message(c.message.chat.id,c.message.message_id)
     except: pass
     bot.answer_callback_query(c.id,"❌ بسته شد")
-
-# ================== وضعیت ربات ==================
-@bot.message_handler(func=lambda m: cmd_text(m)=="وضعیت ربات")
-def cmd_status(m):
-    if not is_admin(m.chat.id,m.from_user.id): return
-    now=datetime.now(pytz.timezone("Asia/Tehran")).strftime("%Y-%m-%d %H:%M:%S")
-    msg=bot.reply_to(m,f"🤖 فعال هستم\n🕒 {now}")
-    auto_del(m.chat.id,msg.message_id)
-
-# جواب سودو «ربات»
-SUDO_RESPONSES=["جونم قربان 😎","در خدمتم ✌️","ربات آماده‌ست 🚀","چه خبر رئیس؟ 🤖"]
-@bot.message_handler(func=lambda m: is_sudo(m.from_user.id) and cmd_text(m)=="ربات")
-def cmd_sudo(m):
-    msg=bot.reply_to(m,random.choice(SUDO_RESPONSES))
-    auto_del(m.chat.id,msg.message_id)
 # ================== اجرا ==================
-print("🤖 Bot v1997 is running...")
+print("🤖 Bot is running...")
 bot.infinity_polling(skip_pending=True,timeout=30)
