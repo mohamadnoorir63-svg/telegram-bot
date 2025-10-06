@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-import telebot, os, threading, time
+import telebot, os, threading, time, random
 from telebot import types
 from datetime import datetime
 import pytz
@@ -8,48 +8,49 @@ import pytz
 TOKEN   = os.environ.get("BOT_TOKEN")   # توکن ربات از Config Vars
 SUDO_ID = int(os.environ.get("SUDO_ID", "0"))  # آیدی سودو اصلی
 SUPPORT_ID = "NOORI_NOOR"  # آیدی پشتیبانی
-
 bot = telebot.TeleBot(TOKEN, parse_mode="HTML")
 # ============================================
 
-HELP_TEXT = """
-📖 لیست دستورات:
+# 📖 راهنما (برای همه / مدیران / سودو)
+HELP_TEXT_PUBLIC = """
+📖 دستورات عمومی:
 
-⏰ ساعت | 🆔 ایدی | 📊 آمار | 📎 لینک
-🛠 وضعیت ربات
-🎉 خوشامد روشن / خاموش
-✍️ خوشامد متن [متن]
-🖼 ثبت عکس (روی عکس ریپلای کن)
-🔒 قفل لینک / باز کردن لینک
-🧷 قفل استیکر / باز کردن استیکر
-🤖 قفل ربات / باز کردن ربات
-🚫 قفل تبچی / باز کردن تبچی
-🔐 قفل گروه / باز کردن گروه
-🖼 قفل عکس / باز کردن عکس
-🎥 قفل ویدیو / باز کردن ویدیو
-🎭 قفل گیف / باز کردن گیف
-📎 قفل فایل / باز کردن فایل
-🎶 قفل موزیک / باز کردن موزیک
-🎙 قفل ویس / باز کردن ویس
-🔄 قفل فوروارد / باز کردن فوروارد
-🚫 بن / ✅ حذف بن   (ریپلای)
-🔕 سکوت / 🔊 حذف سکوت (ریپلای)
-⚠️ اخطار / حذف اخطار (ریپلای)
-👑 مدیر / ❌ حذف مدیر (ریپلای)
-📌 پن / ❌ حذف پن    (ریپلای)
-📋 لیست مدیران گروه | 📋 لیست مدیران ربات
-🧹 پاکسازی              (تا ۹۹۹۹ پیام)
-🧹 حذف [عدد]           (پاکسازی تعداد مشخص)
-📢 ارسال                (فقط سودو)
-➕ افزودن سودو [آیدی]
-➖ حذف سودو [آیدی]
-🚪 لفت بده              (فقط سودو)
-🧑‍🤝‍🧑 من کیم
-🧾 این کیه (ریپلای)
-🏷 لقب [متن] (ریپلای) | لقب
-فونت [اسم] (برای نوشتن خوشگل)
+⏰ ساعت  
+🆔 ایدی  
+🎭 اصل من  
+🎭 اصل (ریپلای)  
+😂 جوک  
+🔮 فال  
+"""
 
-برای باز کردن پنل قفل‌ها: «پنل» در گروه
+HELP_TEXT_ADMIN = """
+📖 دستورات مدیران:
+
+📊 آمار  
+📎 لینک  
+🎉 خوشامد روشن / خاموش  
+✍️ خوشامد متن [متن]  
+🖼 ثبت عکس (ریپلای روی عکس)  
+🔒 قفل‌ها (با دستور یا پنل)  
+🚫 بن / ✅ حذف بن   (ریپلای)  
+🔕 سکوت / 🔊 حذف سکوت (ریپلای)  
+⚠️ اخطار / حذف اخطار (ریپلای)  
+👑 مدیر / ❌ حذف مدیر (ریپلای)  
+📌 پن  
+"""
+
+HELP_TEXT_SUDO = """
+📖 دستورات سودو:
+
+🛠 وضعیت ربات  
+📢 ارسال همگانی  
+➕ افزودن سودو [آیدی]  
+➖ حذف سودو [آیدی]  
+🚪 لفت بده  
+📋 لیست مدیران ربات  
+📊 آمار گروه‌ها  
+🔗 لینک گروه‌ها  
+🔴 خاموش / 🟢 روشن کردن ربات
 """
 
 # ========= سودو / ادمین =========
@@ -74,7 +75,29 @@ def auto_del(chat_id,msg_id,delay=7):
         time.sleep(delay)
         try: bot.delete_message(chat_id,msg_id)
         except: pass
-    threading.Thread(target=_).start()
+    threading.Thread(target=_).start()# ========= دستورات عمومی =========
+
+# ⏰ ساعت (برای همه)
+@bot.message_handler(func=lambda m: cmd_text(m)=="ساعت")
+def time_cmd(m):
+    now_utc=datetime.now(pytz.utc).strftime("%Y-%m-%d %H:%M:%S")
+    now_teh=datetime.now(pytz.timezone("Asia/Tehran")).strftime("%Y-%m-%d %H:%M:%S")
+    msg = bot.reply_to(m,f"⏰ ساعت UTC: {now_utc}\n⏰ ساعت تهران: {now_teh}")
+    auto_del(m.chat.id,msg.message_id,delay=7)
+
+# 🆔 ایدی (برای همه)
+@bot.message_handler(func=lambda m: cmd_text(m)=="ایدی")
+def id_cmd(m):
+    try:
+        photos=bot.get_user_profile_photos(m.from_user.id,limit=1)
+        caption=f"🆔 شما: <code>{m.from_user.id}</code>\n🆔 گروه: <code>{m.chat.id}</code>"
+        if photos.total_count>0:
+            msg = bot.send_photo(m.chat.id,photos.photos[0][-1].file_id,caption=caption)
+        else:
+            msg = bot.reply_to(m,caption)
+    except:
+        msg = bot.reply_to(m,f"🆔 شما: <code>{m.from_user.id}</code>\n🆔 گروه: <code>{m.chat.id}</code>")
+    auto_del(m.chat.id,msg.message_id,delay=7)
 
 # ========= فونت‌ساز =========
 FONTS = [
@@ -90,12 +113,18 @@ FONTS = [
                          "q":"𝓆","r":"𝓇","s":"𝓈","t":"𝓉","u":"𝓊","v":"𝓋","w":"𝓌","x":"𝓍",
                          "y":"𝓎","z":"𝓏"}.get(ch.lower(),ch) for ch in txt),
 
-    # فارسی — حالت تزئینی
+    # فارسی — حالت تزئینی ۱
     lambda txt: "".join({"ا":"آ","ب":"ب̍","ت":"تۛ","ث":"ثہ","ج":"ج͠","ح":"حٰٰ","خ":"خ̐",
                          "د":"دُ","ذ":"ذٰ","ر":"ر͜","ز":"زٰ","س":"سہ","ش":"شہ","ص":"صہ",
                          "ض":"ضہ","ط":"طہ","ظ":"ظہ","ع":"عہ","غ":"غہ","ف":"فہ","ق":"ق͠",
                          "ک":"ڪہ","گ":"گہ","ل":"لہ","م":"مہ","ن":"نہ","ه":"ﮬ","و":"و͠",
                          "ی":"يہ"}.get(ch, ch) for ch in txt),
+
+    # فارسی — حالت تزئینی ۲
+    lambda txt: "".join({"ا":"ٱ","ب":"بۚ","ت":"تہ","ث":"ﺙ","ج":"جۛ","ح":"ﺣ","خ":"خہ",
+                         "د":"د","ذ":"ذہ","ر":"رۘ","ز":"زۛ","س":"سۜ","ش":"ﺷ","ص":"صۛ",
+                         "ض":"ﺿ","ط":"طۛ","ظ":"ظۛ","ع":"عۚ","غ":"غۛ","ف":"فۛ","ق":"قۛ",
+                         "ک":"ﮎ","گ":"گۛ","ل":"لۛ","م":"ﻣ","ن":"نۛ","ه":"ﮬ","و":"و","ی":"ۍ"}.get(ch, ch) for ch in txt),
 ]
 
 @bot.message_handler(func=lambda m: cmd_text(m).startswith("فونت "))
@@ -158,6 +187,7 @@ def w_photo(m):
         msg = bot.reply_to(m,"🖼 عکس خوشامد ذخیره شد.")
         auto_del(m.chat.id,msg.message_id)
 
+
 # ========= قفل‌ها =========
 locks={k:{} for k in [
     "links","stickers","bots","tabchi","group","photo","video","gif","file","music","voice","forward"
@@ -184,6 +214,7 @@ def toggle_lock(m):
     locks[key][m.chat.id]=enable
     msg = bot.reply_to(m,f"{'🔒' if enable else '🔓'} {name} {'فعال شد' if enable else 'آزاد شد'}")
     auto_del(m.chat.id,msg.message_id)
+
 
 # ========= پنل شیشه‌ای =========
 @bot.message_handler(func=lambda m: cmd_text(m)=="پنل")
@@ -223,50 +254,7 @@ def cb_toggle(call):
 def cb_close(call):
     try:
         bot.delete_message(call.message.chat.id, call.message.message_id)
-    except: pass# ========= دستورات عمومی =========
-# ⏰ ساعت → برای همه
-@bot.message_handler(func=lambda m: cmd_text(m)=="ساعت")
-def time_cmd(m):
-    now_utc=datetime.now(pytz.utc).strftime("%Y-%m-%d %H:%M:%S")
-    now_teh=datetime.now(pytz.timezone("Asia/Tehran")).strftime("%Y-%m-%d %H:%M:%S")
-    msg = bot.reply_to(m,f"⏰ ساعت UTC: {now_utc}\n⏰ ساعت تهران: {now_teh}")
-    auto_del(m.chat.id,msg.message_id,delay=7)
-
-# 🆔 ایدی → برای همه
-@bot.message_handler(func=lambda m: cmd_text(m)=="ایدی")
-def id_cmd(m):
-    try:
-        photos=bot.get_user_profile_photos(m.from_user.id,limit=1)
-        caption=f"🆔 شما: <code>{m.from_user.id}</code>\n🆔 گروه: <code>{m.chat.id}</code>"
-        if photos.total_count>0:
-            msg = bot.send_photo(m.chat.id,photos.photos[0][-1].file_id,caption=caption)
-        else:
-            msg = bot.reply_to(m,caption)
-    except:
-        msg = bot.reply_to(m,f"🆔 شما: <code>{m.from_user.id}</code>\n🆔 گروه: <code>{m.chat.id}</code>")
-    auto_del(m.chat.id,msg.message_id,delay=7)
-
-# 📊 آمار → فقط مدیران
-@bot.message_handler(func=lambda m: cmd_text(m)=="آمار")
-def stats(m):
-    if not is_admin(m.chat.id,m.from_user.id): return
-    try: count=bot.get_chat_member_count(m.chat.id)
-    except: count="نامشخص"
-    msg = bot.reply_to(m,f"📊 اعضای گروه: {count}")
-    auto_del(m.chat.id,msg.message_id,delay=7)
-
-# 📎 لینک → فقط مدیران
-@bot.message_handler(func=lambda m: cmd_text(m)=="لینک")
-def group_link(m):
-    if not is_admin(m.chat.id,m.from_user.id): return
-    try:
-        link=bot.export_chat_invite_link(m.chat.id)
-        msg = bot.reply_to(m,f"📎 لینک گروه:\n{link}")
-    except:
-        msg = bot.reply_to(m,"❗ نتوانستم لینک بگیرم. (بات باید ادمین با مجوز دعوت باشد)")
-    auto_del(m.chat.id,msg.message_id,delay=7)
-
-# ========= بن / سکوت =========
+    except: pass# ========= بن / سکوت =========
 @bot.message_handler(func=lambda m: m.reply_to_message and cmd_text(m)=="بن")
 def ban_user(m):
     if is_admin(m.chat.id,m.from_user.id):
@@ -311,6 +299,7 @@ def unmute_user(m):
             msg = bot.reply_to(m,"❗ خطا در حذف سکوت.")
         auto_del(m.chat.id,msg.message_id,delay=7)
 
+
 # ========= اخطار =========
 warnings={}; MAX_WARNINGS=3
 
@@ -338,7 +327,10 @@ def reset_warn(m):
         uid = m.reply_to_message.from_user.id
         warnings.get(m.chat.id,{}).pop(uid,None)
         msg = bot.reply_to(m,"✅ اخطارها حذف شد.")
-        auto_del(m.chat.id,msg.message_id,delay=7)# ========= مدیر / حذف مدیر =========
+        auto_del(m.chat.id,msg.message_id,delay=7)
+
+
+# ========= مدیر / حذف مدیر =========
 @bot.message_handler(func=lambda m: m.reply_to_message and cmd_text(m)=="مدیر")
 def promote(m):
     if is_admin(m.chat.id,m.from_user.id):
@@ -369,52 +361,40 @@ def demote(m):
             msg = bot.reply_to(m,"❗ خطا در حذف مدیر.")
         auto_del(m.chat.id,msg.message_id,delay=7)
 
-# ========= لقب و نقش =========
-nicknames={}  # chat_id -> { user_id: nickname }
 
-@bot.message_handler(func=lambda m: cmd_text(m)=="من کیم")
-def whoami(m):
-    role="عضو معمولی"
-    if is_sudo(m.from_user.id): role="سودو 👑"
-    elif is_admin(m.chat.id,m.from_user.id): role="مدیر 🛡"
-    msg = bot.reply_to(m,f"شما {role} هستید.")
-    auto_del(m.chat.id,msg.message_id,delay=7)
+# ========= سیستم اصل =========
+origins={}  # chat_id -> { user_id: اصل }
 
-@bot.message_handler(func=lambda m: m.reply_to_message and cmd_text(m)=="این کیه")
-def whois(m):
-    uid = m.reply_to_message.from_user.id
-    role="عضو معمولی"
-    if is_sudo(uid): role="سودو 👑"
-    elif is_admin(m.chat.id,uid): role="مدیر 🛡"
-    nick = nicknames.get(m.chat.id,{}).get(uid)
-    extra = f"\n🏷 لقب: {nick}" if nick else ""
-    msg = bot.reply_to(m,f"این فرد {role} است.{extra}")
-    auto_del(m.chat.id,msg.message_id,delay=7)
-
-@bot.message_handler(func=lambda m: m.reply_to_message and cmd_text(m).startswith("لقب "))
-def set_nick(m):
+@bot.message_handler(func=lambda m: m.reply_to_message and cmd_text(m).startswith("ثبت اصل "))
+def set_origin(m):
     if not is_admin(m.chat.id,m.from_user.id): return
     uid = m.reply_to_message.from_user.id
-    nickname = cmd_text(m).replace("لقب ","",1).strip()
-    if not nickname:
+    val = cmd_text(m).replace("ثبت اصل ","",1).strip()
+    if not val:
         msg = bot.reply_to(m,"❗ متنی وارد کن.")
     else:
-        nicknames.setdefault(m.chat.id,{})[uid] = nickname
-        msg = bot.reply_to(m,f"✅ لقب ذخیره شد: {nickname}")
+        origins.setdefault(m.chat.id,{})[uid] = val
+        msg = bot.reply_to(m,f"✅ اصل ثبت شد: {val}")
     auto_del(m.chat.id,msg.message_id,delay=7)
 
-@bot.message_handler(func=lambda m: m.reply_to_message and cmd_text(m)=="لقب")
-def get_nick(m):
+@bot.message_handler(func=lambda m: m.reply_to_message and cmd_text(m)=="اصل")
+def get_origin(m):
     uid = m.reply_to_message.from_user.id
-    nickname = nicknames.get(m.chat.id,{}).get(uid)
-    msg = bot.reply_to(m,f"🏷 لقب: {nickname}" if nickname else "ℹ️ لقبی ذخیره نشده.")
+    val = origins.get(m.chat.id,{}).get(uid)
+    msg = bot.reply_to(m,f"🧾 اصل: {val}" if val else "ℹ️ اصل ثبت نشده.")
+    auto_del(m.chat.id,msg.message_id,delay=7)
+
+@bot.message_handler(func=lambda m: cmd_text(m)=="اصل من")
+def my_origin(m):
+    val = origins.get(m.chat.id,{}).get(m.from_user.id)
+    msg = bot.reply_to(m,f"🧾 اصل شما: {val}" if val else "ℹ️ اصل شما ثبت نشده.")
     auto_del(m.chat.id,msg.message_id,delay=7)# ========= مدیریت سودو =========
 @bot.message_handler(func=lambda m: cmd_text(m).startswith("افزودن سودو "))
 def add_sudo(m):
     if not is_sudo(m.from_user.id): return
-    try: 
+    try:
         uid=int(cmd_text(m).split()[-1])
-    except: 
+    except:
         msg = bot.reply_to(m,"❗ آیدی نامعتبر")
         auto_del(m.chat.id,msg.message_id,delay=7)
         return
@@ -425,9 +405,9 @@ def add_sudo(m):
 @bot.message_handler(func=lambda m: cmd_text(m).startswith("حذف سودو "))
 def del_sudo(m):
     if not is_sudo(m.from_user.id): return
-    try: 
+    try:
         uid=int(cmd_text(m).split()[-1])
-    except: 
+    except:
         msg = bot.reply_to(m,"❗ آیدی نامعتبر")
         auto_del(m.chat.id,msg.message_id,delay=7)
         return
@@ -439,6 +419,7 @@ def del_sudo(m):
     else:
         msg = bot.reply_to(m,"ℹ️ این آیدی در سودوها نیست.")
     auto_del(m.chat.id,msg.message_id,delay=7)
+
 
 # ========= ارسال همگانی (فقط سودو) =========
 joined_groups=set()
@@ -469,23 +450,25 @@ def do_bc(m):
             elif m.content_type=="photo":
                 bot.send_photo(gid,m.photo[-1].file_id,caption=(m.caption or ""))
             s+=1
-        except: 
+        except:
             pass
     msg = bot.reply_to(m,f"✅ به {s} گروه ارسال شد.")
-    auto_del(m.chat.id,msg.message_id,delay=10)# ========= استارت در پیوی =========
+    auto_del(m.chat.id,msg.message_id,delay=10)
+
+
+# ========= استارت در پیوی (پنل سودو) =========
 @bot.message_handler(commands=['start'])
 def start_cmd(m):
     if m.chat.type == "private":
         kb = types.InlineKeyboardMarkup(row_width=2)
-        # افزودن به گروه
         btn1 = types.InlineKeyboardButton("➕ افزودن به گروه", url=f"https://t.me/{bot.get_me().username}?startgroup=new")
-        # پشتیبانی
         btn2 = types.InlineKeyboardButton("📞 پشتیبانی", url=f"https://t.me/{SUPPORT_ID}")
         kb.add(btn1, btn2)
 
-        if is_sudo(m.from_user.id):  # اگر سودو باشد، پنل مدیریتی هم ببیند
-            btn3 = types.InlineKeyboardButton("🛠 پنل مدیریتی", callback_data=f"sudo_panel:{m.chat.id}")
-            kb.add(btn3)
+        if is_sudo(m.from_user.id):  
+            btn3 = types.InlineKeyboardButton("🛠 پنل مدیریتی سودو", callback_data=f"sudo_panel:{m.chat.id}")
+            btn4 = types.InlineKeyboardButton("📖 راهنمای سودو", callback_data=f"sudo_help:{m.chat.id}")
+            kb.add(btn3, btn4)
 
         bot.send_message(
             m.chat.id,
@@ -495,6 +478,7 @@ def start_cmd(m):
             reply_markup=kb
         )
 
+
 # ========= پنل مدیریتی سودو =========
 @bot.callback_query_handler(func=lambda call: call.data.startswith("sudo_panel"))
 def sudo_panel(call):
@@ -503,12 +487,17 @@ def sudo_panel(call):
 
     kb = types.InlineKeyboardMarkup(row_width=2)
     kb.add(
+        types.InlineKeyboardButton("📊 آمار گروه‌ها", callback_data="sudo_stats"),
+        types.InlineKeyboardButton("🛠 وضعیت ربات", callback_data="sudo_status"),
         types.InlineKeyboardButton("📢 ارسال همگانی", callback_data="sudo_bc"),
         types.InlineKeyboardButton("➕ افزودن سودو", callback_data="sudo_add"),
         types.InlineKeyboardButton("➖ حذف سودو", callback_data="sudo_del"),
+        types.InlineKeyboardButton("📎 لینک گروه‌ها", callback_data="sudo_links"),
+        types.InlineKeyboardButton("🚫 خاموش/روشن کردن", callback_data="sudo_toggle"),
         types.InlineKeyboardButton("❌ بستن", callback_data="sudo_close")
     )
     bot.edit_message_text("🛠 پنل مدیریتی سودو:", call.message.chat.id, call.message.message_id, reply_markup=kb)
+
 
 @bot.callback_query_handler(func=lambda call: call.data=="sudo_close")
 def sudo_close(call):
@@ -516,11 +505,103 @@ def sudo_close(call):
         bot.delete_message(call.message.chat.id, call.message.message_id)
     except: pass
 
-# ========= جواب سودو =========
-@bot.message_handler(func=lambda m: is_sudo(m.from_user.id) and cmd_text(m)=="ربات")
-def sudo_reply(m):
-    msg = bot.reply_to(m,"جانم سودو 👑")
-    auto_del(m.chat.id,msg.message_id,delay=7)
+
+# ========= راهنمای سودو =========
+@bot.callback_query_handler(func=lambda call: call.data.startswith("sudo_help"))
+def sudo_help(call):
+    if not is_sudo(call.from_user.id):
+        return
+    txt = """
+📖 راهنمای سودو:
+
+🔹 افزودن/حذف سودو
+🔹 ارسال همگانی
+🔹 وضعیت ربات
+🔹 آمار گروه‌ها
+🔹 لینک گروه‌های فعال
+🔹 خاموش/روشن کردن ربات
+"""
+    bot.send_message(call.message.chat.id, txt)# ========= جوک و فال =========
+jokes = []
+fortunes = []
+
+@bot.message_handler(func=lambda m: is_admin(m.chat.id,m.from_user.id) and cmd_text(m).startswith("ثبت جوک"))
+def save_joke(m):
+    if m.reply_to_message:
+        if m.reply_to_message.text:
+            jokes.append({"type":"text","content":m.reply_to_message.text})
+        elif m.reply_to_message.photo:
+            jokes.append({"type":"photo","file":m.reply_to_message.photo[-1].file_id,"caption":m.reply_to_message.caption or ""})
+        msg = bot.reply_to(m,"😂 جوک ذخیره شد.")
+        auto_del(m.chat.id,msg.message_id)
+    else:
+        msg = bot.reply_to(m,"❗ روی پیام جوک ریپلای کن.")
+        auto_del(m.chat.id,msg.message_id)
+
+@bot.message_handler(func=lambda m: cmd_text(m)=="جوک")
+def send_joke(m):
+    if not jokes:
+        return bot.reply_to(m,"❗ هیچ جوکی ذخیره نشده.")
+    import random
+    joke = random.choice(jokes)
+    if joke["type"]=="text":
+        bot.send_message(m.chat.id, joke["content"])
+    else:
+        bot.send_photo(m.chat.id, joke["file"], caption=joke["caption"])
+
+
+@bot.message_handler(func=lambda m: is_admin(m.chat.id,m.from_user.id) and cmd_text(m).startswith("ثبت فال"))
+def save_fal(m):
+    if m.reply_to_message:
+        if m.reply_to_message.text:
+            fortunes.append({"type":"text","content":m.reply_to_message.text})
+        elif m.reply_to_message.photo:
+            fortunes.append({"type":"photo","file":m.reply_to_message.photo[-1].file_id,"caption":m.reply_to_message.caption or ""})
+        msg = bot.reply_to(m,"🔮 فال ذخیره شد.")
+        auto_del(m.chat.id,msg.message_id)
+    else:
+        msg = bot.reply_to(m,"❗ روی پیام فال ریپلای کن.")
+        auto_del(m.chat.id,msg.message_id)
+
+@bot.message_handler(func=lambda m: cmd_text(m)=="فال")
+def send_fal(m):
+    if not fortunes:
+        return bot.reply_to(m,"❗ هیچ فالی ذخیره نشده.")
+    import random
+    fal = random.choice(fortunes)
+    if fal["type"]=="text":
+        bot.send_message(m.chat.id, fal["content"])
+    else:
+        bot.send_photo(m.chat.id, fal["file"], caption=fal["caption"])
+
+
+# ========= فونت‌های بیشتر =========
+FONTS = [
+    # انگلیسی – Bold
+    lambda txt: "".join({"a":"𝗮","b":"𝗯","c":"𝗰","d":"𝗱","e":"𝗲","f":"𝗳","g":"𝗴","h":"𝗵",
+                         "i":"𝗶","j":"𝗷","k":"𝗸","l":"𝗹","m":"𝗺","n":"𝗻","o":"𝗼","p":"𝗽",
+                         "q":"𝗾","r":"𝗿","s":"𝘀","t":"𝘁","u":"𝘂","v":"𝘃","w":"𝘄","x":"𝘅",
+                         "y":"𝘆","z":"𝘇"}.get(ch.lower(),ch) for ch in txt),
+
+    # انگلیسی – Italic
+    lambda txt: "".join({"a":"𝑎","b":"𝑏","c":"𝑐","d":"𝑑","e":"𝑒","f":"𝑓","g":"𝑔","h":"ℎ",
+                         "i":"𝑖","j":"𝑗","k":"𝑘","l":"𝑙","m":"𝑚","n":"𝑛","o":"𝑜","p":"𝑝",
+                         "q":"𝑞","r":"𝑟","s":"𝑠","t":"𝑡","u":"𝑢","v":"𝑣","w":"𝑤","x":"𝑥",
+                         "y":"𝑦","z":"𝑧"}.get(ch.lower(),ch) for ch in txt),
+
+    # فارسی – استایل اول
+    lambda txt: "".join({"ا":"ٱ","ب":"بٰ","ت":"تہ","ث":"ثٰ","ج":"جـ","ح":"حہ","خ":"خہ",
+                         "د":"دٰ","ذ":"ذٰ","ر":"رٰ","ز":"زٰ","س":"سٰ","ش":"شٰ","ص":"صٰ",
+                         "ض":"ضٰ","ط":"طٰ","ظ":"ظٰ","ع":"عہ","غ":"غہ","ف":"فہ","ق":"قٰ",
+                         "ک":"ڪ","گ":"گٰ","ل":"لہ","م":"مہ","ن":"نٰ","ه":"ﮬ","و":"ۆ","ی":"ۍ"}.get(ch,ch) for ch in txt),
+
+    # فارسی – استایل دوم
+    lambda txt: "".join({"ا":"آ","ب":"ب̍","ت":"تۛ","ث":"ثہ","ج":"ج͠","ح":"حٰٰ","خ":"خ̐",
+                         "د":"دُ","ذ":"ذٰ","ر":"ر͜","ز":"زٰ","س":"سہ","ش":"شہ","ص":"صہ",
+                         "ض":"ضہ","ط":"طہ","ظ":"ظہ","ع":"عہ","غ":"غہ","ف":"فہ","ق":"ق͠",
+                         "ک":"ڪہ","گ":"گہ","ل":"لہ","م":"مہ","ن":"نہ","ه":"ﮬ","و":"و͠",
+                         "ی":"يہ"}.get(ch,ch) for ch in txt),
+]
 
 # ========= RUN =========
 print("🤖 Bot is running...")
