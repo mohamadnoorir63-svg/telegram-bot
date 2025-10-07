@@ -285,7 +285,7 @@ def enforce(m):
             bot.delete_message(m.chat.id,m.message_id)
         if locks["voice"].get(m.chat.id) and m.voice:
             bot.delete_message(m.chat.id,m.message_id)
-        if locks["forward"].get(m.chat.id) and (m.forward_from or m.forward_from_ch:
+        if locks["forward"].get(m.chat.id) and (m.forward_from or m.forward_from_chat):
             bot.delete_message(m.chat.id,m.message_id)
     except: pass
 print("🤖 Bot is running...")
