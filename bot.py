@@ -1,13 +1,13 @@
 # -*- coding: utf-8 -*-
-import os, random, threading, time
+import os, random
 from datetime import datetime
 import pytz
 import telebot
-from telebot import types
 
 # ================== تنظیمات ==================
 TOKEN   = os.environ.get("BOT_TOKEN")
 SUDO_ID = int(os.environ.get("SUDO_ID", "0"))
+
 bot = telebot.TeleBot(TOKEN, parse_mode="HTML")
 sudo_ids = {SUDO_ID}
 
@@ -18,6 +18,7 @@ def is_admin(chat_id, user_id):
         st = bot.get_chat_member(chat_id, user_id).status
         return st in ("administrator","creator")
     except: return False
+
 def cmd_text(m): return (getattr(m,"text",None) or "").strip()
 
 # ================== دستورات عمومی ==================
@@ -49,38 +50,9 @@ SUDO_RESPONSES=["جونم قربان 😎","در خدمتم ✌️","ربات آ
 @bot.message_handler(func=lambda m: is_sudo(m.from_user.id) and cmd_text(m)=="ربات")
 def cmd_sudo(m): bot.reply_to(m,random.choice(SUDO_RESPONSES))
 
-# ================== خوشامدگویی ==================
-welcome_enabled = {}
-welcome_text = {}
-
-@bot.message_handler(func=lambda m: cmd_text(m)=="خوشامد روشن")
-def welcome_on(m):
-    if not (is_admin(m.chat.id,m.from_user.id) or is_sudo(m.from_user.id)): return
-    welcome_enabled[m.chat.id] = True
-    bot.reply_to(m,"🎉 خوشامدگویی فعال شد")
-
-@bot.message_handler(func=lambda m: cmd_text(m)=="خوشامد خاموش")
-def welcome_off(m):
-    if not (is_admin(m.chat.id,m.from_user.id) or is_sudo(m.from_user.id)): return
-    welcome_enabled[m.chat.id] = False
-    bot.reply_to(m,"❌ خوشامدگویی غیرفعال شد")
-
-@bot.message_handler(func=lambda m: cmd_text(m).startswith("خوشامد متن "))
-def welcome_set(m):
-    if not (is_admin(m.chat.id,m.from_user.id) or is_sudo(m.from_user.id)): return
-    text = cmd_text(m).replace("خوشامد متن ","",1)
-    welcome_text[m.chat.id] = text
-    bot.reply_to(m,"✅ متن خوشامد تنظیم شد")
-
-@bot.message_handler(content_types=["new_chat_members"])
-def welcome_new(m):
-    if not welcome_enabled.get(m.chat.id): return
-    txt = welcome_text.get(m.chat.id,"🎉 خوش اومدی!")
-    for u in m.new_chat_members:
-        bot.send_message(m.chat.id,f"{txt}\n👤 {u.first_name}")
-
 # ================== جوک و فال ==================
 jokes=[]; fortunes=[]
+
 def save_item(arr,m):
     if m.reply_to_message:
         if m.reply_to_message.text:
@@ -88,6 +60,7 @@ def save_item(arr,m):
         elif m.reply_to_message.photo:
             arr.append({"type":"photo","file":m.reply_to_message.photo[-1].file_id,"caption":m.reply_to_message.caption or ""})
 
+# جوک
 @bot.message_handler(func=lambda m: is_sudo(m.from_user.id) and cmd_text(m)=="ثبت جوک")
 def add_joke(m): save_item(jokes,m); bot.reply_to(m,"😂 جوک ذخیره شد")
 
@@ -135,89 +108,9 @@ def del_fal(m):
         idx=int(cmd_text(m).split()[2])-1
         if 0<=idx<len(fortunes): fortunes.pop(idx); bot.reply_to(m,"✅ فال حذف شد")
         else: bot.reply_to(m,"❗ شماره نامعتبر")
-    except: bot.reply_to(m,"❗ فرمت: حذف فال 2")# ================== قفل‌ها ==================
-locks={k:{} for k in ["text","links","photo","video","gif","stickers","file","voice","music","forward","group"]}
-LOCK_MAP={
-    "متن":"text","لینک":"links","عکس":"photo","ویدیو":"video",
-    "گیف":"gif","استیکر":"stickers","فایل":"file","ویس":"voice",
-    "موزیک":"music","فوروارد":"forward","گروه":"group"
-}
+    except: bot.reply_to(m,"❗ فرمت: حذف فال 2")
 
-@bot.message_handler(func=lambda m: cmd_text(m).startswith("قفل "))
-def lock(m):
-    if not (is_admin(m.chat.id,m.from_user.id) or is_sudo(m.from_user.id)): return
-    key_fa=cmd_text(m).replace("قفل ","",1)
-    key=LOCK_MAP.get(key_fa)
-    if key:
-        locks[key][m.chat.id]=True
-        if key=="group":
-            bot.reply_to(m,"🔒 گروه به دستور مدیر یا سودو تا اطلاع ثانویه بسته شد")
-        else:
-            bot.reply_to(m,f"🔒 قفل {key_fa} فعال شد")
-
-@bot.message_handler(func=lambda m: cmd_text(m).startswith("باز کردن "))
-def unlock(m):
-    if not (is_admin(m.chat.id,m.from_user.id) or is_sudo(m.from_user.id)): return
-    key_fa=cmd_text(m).replace("باز کردن ","",1)
-    key=LOCK_MAP.get(key_fa)
-    if key:
-        locks[key][m.chat.id]=False
-        if key=="group":
-            bot.reply_to(m,"🔓 گروه باز شد")
-        else:
-            bot.reply_to(m,f"🔓 قفل {key_fa} باز شد")
-
-# enforce locks
-@bot.message_handler(content_types=['text','photo','video','document','audio','voice','sticker','animation'])
-def enforce(m):
-    if is_admin(m.chat.id,m.from_user.id) or is_sudo(m.from_user.id): return
-    txt=m.text or ""
-    if locks["group"].get(m.chat.id): 
-        return bot.delete_message(m.chat.id,m.message_id)
-    if locks["text"].get(m.chat.id) and m.text: 
-        return bot.delete_message(m.chat.id,m.message_id)
-    if locks["links"].get(m.chat.id) and any(x in txt for x in ["http://","https://","t.me"]):
-        return bot.delete_message(m.chat.id,m.message_id)
-    if locks["photo"].get(m.chat.id) and m.photo: bot.delete_message(m.chat.id,m.message_id)
-    if locks["video"].get(m.chat.id) and m.video: bot.delete_message(m.chat.id,m.message_id)
-    if locks["gif"].get(m.chat.id) and m.animation: bot.delete_message(m.chat.id,m.message_id)
-    if locks["stickers"].get(m.chat.id) and m.sticker: bot.delete_message(m.chat.id,m.message_id)
-    if locks["file"].get(m.chat.id) and m.document: bot.delete_message(m.chat.id,m.message_id)
-    if locks["music"].get(m.chat.id) and m.audio: bot.delete_message(m.chat.id,m.message_id)
-    if locks["voice"].get(m.chat.id) and m.voice: bot.delete_message(m.chat.id,m.message_id)
-    if locks["forward"].get(m.chat.id) and (m.forward_from or m.forward_from_chat): bot.delete_message(m.chat.id,m.message_id)
-
-# ================== قفل خودکار گروه ==================
-auto_lock={}
-@bot.message_handler(func=lambda m: cmd_text(m).startswith("تنظیم قفل خودکار "))
-def set_auto_lock(m):
-    if not (is_admin(m.chat.id,m.from_user.id) or is_sudo(m.from_user.id)): return
-    try:
-        parts=cmd_text(m).split()
-        start,end=int(parts[2]),int(parts[3])
-        auto_lock[m.chat.id]={"start":start,"end":end,"enabled":True}
-        bot.reply_to(m,f"⏰ قفل خودکار تنظیم شد از {start}:00 تا {end}:00")
-    except: bot.reply_to(m,"❗ فرمت درست: تنظیم قفل خودکار 23 07")
-
-@bot.message_handler(func=lambda m: cmd_text(m)=="قفل خودکار خاموش")
-def disable_auto_lock(m):
-    if m.chat.id in auto_lock: auto_lock[m.chat.id]["enabled"]=False
-    bot.reply_to(m,"❌ قفل خودکار خاموش شد")
-
-def auto_lock_checker():
-    while True:
-        now=datetime.now(pytz.timezone("Asia/Tehran")).hour
-        for chat_id,conf in list(auto_lock.items()):
-            if not conf.get("enabled"): continue
-            start,end=conf["start"],conf["end"]
-            if start<end: inside=(start<=now<end)
-            else: inside=(now>=start or now<end)
-            locks["group"][chat_id]=inside
-        import time; time.sleep(60)
-
-threading.Thread(target=auto_lock_checker,daemon=True).start()
-
-# ================== مدیریت کاربران ==================
+# ================== بن / سکوت / اخطار ==================
 banned = {}
 muted = {}
 warnings = {}
@@ -235,11 +128,11 @@ def protect_user(chat_id, uid):
 @bot.message_handler(func=lambda m: m.reply_to_message and cmd_text(m)=="بن")
 def ban(m):
     if not (is_admin(m.chat.id,m.from_user.id) or is_sudo(m.from_user.id)): return
-    uid=m.reply_to_message.from_user.id
+    uid = m.reply_to_message.from_user.id
     protect=protect_user(m.chat.id,uid)
     if protect: return bot.reply_to(m,protect)
     try:
-        bot.ban_chat_member(m.chat.id,uid)
+        bot.ban_chat_member(m.chat.id, uid)
         banned.setdefault(m.chat.id,set()).add(uid)
         bot.reply_to(m,"🚫 کاربر بن شد")
     except: bot.reply_to(m,"❗ خطا در بن")
@@ -247,9 +140,9 @@ def ban(m):
 @bot.message_handler(func=lambda m: m.reply_to_message and cmd_text(m)=="حذف بن")
 def unban(m):
     if not (is_admin(m.chat.id,m.from_user.id) or is_sudo(m.from_user.id)): return
-    uid=m.reply_to_message.from_user.id
+    uid = m.reply_to_message.from_user.id
     try:
-        bot.unban_chat_member(m.chat.id,uid)
+        bot.unban_chat_member(m.chat.id, uid)
         banned.get(m.chat.id,set()).discard(uid)
         bot.reply_to(m,"✅ بن حذف شد")
     except: bot.reply_to(m,"❗ خطا در حذف بن")
@@ -279,8 +172,7 @@ def unmute(m):
     if not (is_admin(m.chat.id,m.from_user.id) or is_sudo(m.from_user.id)): return
     uid=m.reply_to_message.from_user.id
     try:
-        bot.restrict_chat_member(
-            m.chat.id,uid,
+        bot.restrict_chat_member(m.chat.id,uid,
             can_send_messages=True,can_send_media_messages=True,
             can_send_other_messages=True,can_add_web_page_previews=True)
         muted.get(m.chat.id,set()).discard(uid)
@@ -346,7 +238,101 @@ def delete_n(m):
             bot.delete_message(m.chat.id,m.message_id-i)
             deleted+=1
         bot.reply_to(m,f"🗑 {deleted} پیام پاک شد")
-    except: bot.reply_to(m,"❗ فرمت درست: حذف 10")
+    except: bot.reply_to(m,"❗ فرمت درست: حذف 10")# ================== قفل‌ها ==================
+locks={k:{} for k in ["links","stickers","bots","photo","video","gif","file","music","voice","forward"]}
+LOCK_MAP={
+    "لینک":"links","استیکر":"stickers","ربات":"bots","عکس":"photo","ویدیو":"video",
+    "گیف":"gif","فایل":"file","موزیک":"music","ویس":"voice","فوروارد":"forward"
+}
+
+@bot.message_handler(func=lambda m: cmd_text(m).startswith("قفل "))
+def lock(m):
+    if not (is_admin(m.chat.id,m.from_user.id) or is_sudo(m.from_user.id)): return
+    key_fa=cmd_text(m).replace("قفل ","",1)
+    key=LOCK_MAP.get(key_fa)
+    if key:
+        locks[key][m.chat.id]=True
+        bot.reply_to(m,f"🔒 قفل {key_fa} فعال شد")
+
+@bot.message_handler(func=lambda m: cmd_text(m).startswith("باز کردن "))
+def unlock(m):
+    if not (is_admin(m.chat.id,m.from_user.id) or is_sudo(m.from_user.id)): return
+    key_fa=cmd_text(m).replace("باز کردن ","",1)
+    key=LOCK_MAP.get(key_fa)
+    if key:
+        locks[key][m.chat.id]=False
+        bot.reply_to(m,f"🔓 قفل {key_fa} باز شد")
+
+# enforce locks
+@bot.message_handler(content_types=['text','photo','video','document','audio','voice','sticker','animation'])
+def enforce(m):
+    if is_admin(m.chat.id,m.from_user.id) or is_sudo(m.from_user.id): return
+    txt=m.text or ""
+    try:
+        if locks["links"].get(m.chat.id) and any(x in txt for x in ["http://","https://","t.me"]):
+            bot.delete_message(m.chat.id,m.message_id)
+        if locks["stickers"].get(m.chat.id) and m.sticker:
+            bot.delete_message(m.chat.id,m.message_id)
+        if locks["photo"].get(m.chat.id) and m.photo:
+            bot.delete_message(m.chat.id,m.message_id)
+        if locks["video"].get(m.chat.id) and m.video:
+            bot.delete_message(m.chat.id,m.message_id)
+        if locks["gif"].get(m.chat.id) and m.animation:
+            bot.delete_message(m.chat.id,m.message_id)
+        if locks["file"].get(m.chat.id) and m.document:
+            bot.delete_message(m.chat.id,m.message_id)
+        if locks["music"].get(m.chat.id) and m.audio:
+            bot.delete_message(m.chat.id,m.message_id)
+        if locks["voice"].get(m.chat.id) and m.voice:
+            bot.delete_message(m.chat.id,m.message_id)
+        if locks["forward"].get(m.chat.id) and (m.forward_from or m.forward_from_chat):
+            bot.delete_message(m.chat.id,m.message_id)
+    except: pass# ================== خوشامدگویی خودکار ==================
+from khayyam import JalaliDatetime
+
+welcome_enabled = {}
+welcome_text = {}
+welcome_photo = {}
+
+@bot.message_handler(func=lambda m: cmd_text(m)=="خوشامد روشن")
+def welcome_on(m):
+    if not (is_admin(m.chat.id,m.from_user.id) or is_sudo(m.from_user.id)): return
+    welcome_enabled[m.chat.id] = True
+    bot.reply_to(m,"🎉 خوشامدگویی فعال شد")
+
+@bot.message_handler(func=lambda m: cmd_text(m)=="خوشامد خاموش")
+def welcome_off(m):
+    if not (is_admin(m.chat.id,m.from_user.id) or is_sudo(m.from_user.id)): return
+    welcome_enabled[m.chat.id] = False
+    bot.reply_to(m,"❌ خوشامدگویی غیرفعال شد")
+
+@bot.message_handler(func=lambda m: cmd_text(m).startswith("خوشامد متن "))
+def welcome_set(m):
+    if not (is_admin(m.chat.id,m.from_user.id) or is_sudo(m.from_user.id)): return
+    text = cmd_text(m).replace("خوشامد متن ","",1)
+    welcome_text[m.chat.id] = text
+    bot.reply_to(m,"✅ متن خوشامد تنظیم شد")
+
+@bot.message_handler(content_types=["photo"], func=lambda m: cmd_text(m)=="خوشامد عکس")
+def welcome_set_photo(m):
+    if not (is_admin(m.chat.id,m.from_user.id) or is_sudo(m.from_user.id)): return
+    welcome_photo[m.chat.id] = m.photo[-1].file_id
+    bot.reply_to(m,"🖼 عکس خوشامد ذخیره شد")
+
+@bot.message_handler(content_types=["new_chat_members"])
+def welcome_new(m):
+    if not welcome_enabled.get(m.chat.id): return
+    now = datetime.now(pytz.timezone("Asia/Tehran"))
+    jalali = JalaliDatetime(now)
+    time_str = now.strftime("%H:%M")
+    date_str = f"{jalali.strftime('%A %d %B %Y')}"
+    txt = welcome_text.get(m.chat.id,"🎉 خوش اومدی!")
+    for u in m.new_chat_members:
+        msg = f"سلام {u.first_name} عزیز 🌹\n{txt}\n\n⏰ ساعت ›› {time_str} ( {date_str} )"
+        if welcome_photo.get(m.chat.id):
+            bot.send_photo(m.chat.id, welcome_photo[m.chat.id], caption=msg)
+        else:
+            bot.send_message(m.chat.id, msg)
 # ================== اجرای ربات ==================
 print("🤖 Bot is running...")
 bot.infinity_polling(skip_pending=True, timeout=30)
