@@ -242,9 +242,7 @@ def cb_admins(c):
     bot.send_message(c.message.chat.id, "👮 لیست مدیران:\n" + txt)
 
 # ================= پایان مرحله ۱ =================
-print("✅ مرحله ۱ (bot_part1.py) آماده است — بدون اجرای ربات.")
-# -*- coding: utf-8 -*-
-from bot_part1 import bot
+
 
 print("🤖 Bot is running...")
 bot.infinity_polling(skip_pending=True, timeout=30)
