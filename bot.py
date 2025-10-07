@@ -287,52 +287,7 @@ def enforce(m):
             bot.delete_message(m.chat.id,m.message_id)
         if locks["forward"].get(m.chat.id) and (m.forward_from or m.forward_from_chat):
             bot.delete_message(m.chat.id,m.message_id)
-    except: pass# ================== خوشامدگویی خودکار ==================
-from khayyam import JalaliDatetime
-
-welcome_enabled = {}
-welcome_text = {}
-welcome_photo = {}
-
-@bot.message_handler(func=lambda m: cmd_text(m)=="خوشامد روشن")
-def welcome_on(m):
-    if not (is_admin(m.chat.id,m.from_user.id) or is_sudo(m.from_user.id)): return
-    welcome_enabled[m.chat.id] = True
-    bot.reply_to(m,"🎉 خوشامدگویی فعال شد")
-
-@bot.message_handler(func=lambda m: cmd_text(m)=="خوشامد خاموش")
-def welcome_off(m):
-    if not (is_admin(m.chat.id,m.from_user.id) or is_sudo(m.from_user.id)): return
-    welcome_enabled[m.chat.id] = False
-    bot.reply_to(m,"❌ خوشامدگویی غیرفعال شد")
-
-@bot.message_handler(func=lambda m: cmd_text(m).startswith("خوشامد متن "))
-def welcome_set(m):
-    if not (is_admin(m.chat.id,m.from_user.id) or is_sudo(m.from_user.id)): return
-    text = cmd_text(m).replace("خوشامد متن ","",1)
-    welcome_text[m.chat.id] = text
-    bot.reply_to(m,"✅ متن خوشامد تنظیم شد")
-
-@bot.message_handler(content_types=["photo"], func=lambda m: cmd_text(m)=="خوشامد عکس")
-def welcome_set_photo(m):
-    if not (is_admin(m.chat.id,m.from_user.id) or is_sudo(m.from_user.id)): return
-    welcome_photo[m.chat.id] = m.photo[-1].file_id
-    bot.reply_to(m,"🖼 عکس خوشامد ذخیره شد")
-
-@bot.message_handler(content_types=["new_chat_members"])
-def welcome_new(m):
-    if not welcome_enabled.get(m.chat.id): return
-    now = datetime.now(pytz.timezone("Asia/Tehran"))
-    jalali = JalaliDatetime(now)
-    time_str = now.strftime("%H:%M")
-    date_str = f"{jalali.strftime('%A %d %B %Y')}"
-    txt = welcome_text.get(m.chat.id,"🎉 خوش اومدی!")
-    for u in m.new_chat_members:
-        msg = f"سلام {u.first_name} عزیز 🌹\n{txt}\n\n⏰ ساعت ›› {time_str} ( {date_str} )"
-        if welcome_photo.get(m.chat.id):
-            bot.send_photo(m.chat.id, welcome_photo[m.chat.id], caption=msg)
-        else:
-            bot.send_message(m.chat.id, msg)
+    except: pass
 # ================== اجرای ربات ==================
 print("🤖 Bot is running...")
 bot.infinity_polling(skip_pending=True, timeout=30)
