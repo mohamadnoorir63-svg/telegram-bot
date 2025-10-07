@@ -536,4 +536,58 @@ def cb_welcome(c):
 def cb_pin(c):
     bot.answer_callback_query(c.id, "برای پین کردن پیام، به آن پیام ریپلای کن و دستور «پن» را بفرست.", show_alert=True)
 
-@bot.callback_query_handler(func=lambda c: c
+@bot.callback_query_handler(func=lambda c: c.data == "panel_admins")
+def cb_admins(c):
+    fake = SimpleNamespace(chat=c.message.chat, from_user=c.from_user, text="لیست مدیران")
+    list_admins(fake)
+
+# ================== اعمال قفل‌ها و ثبت گروه در هر پیام ==================
+@bot.message_handler(content_types=['text', 'photo', 'video', 'document', 'audio', 'voice', 'sticker', 'animation'])
+def enforce_all(m):
+    # هر پیامی که در گروه ارسال شد، گروه رو ثبت کن
+    try:
+        register_group(m.chat.id)
+    except:
+        pass
+
+    if is_admin(m.chat.id, m.from_user.id) or is_sudo(m.from_user.id):
+        return
+
+    txt = m.text or ""
+
+    # قفل کل گروه
+    if group_lock.get(m.chat.id):
+        try:
+            bot.delete_message(m.chat.id, m.message_id)
+        except:
+            pass
+        return
+
+    # سایر قفل‌ها
+    try:
+        if locks["links"].get(m.chat.id) and any(x in txt for x in ["http://", "https://", "t.me"]):
+            bot.delete_message(m.chat.id, m.message_id)
+            return
+        if locks["stickers"].get(m.chat.id) and hasattr(m, "sticker") and m.sticker:
+            bot.delete_message(m.chat.id, m.message_id); return
+        if locks["photo"].get(m.chat.id) and hasattr(m, "photo") and m.photo:
+            bot.delete_message(m.chat.id, m.message_id); return
+        if locks["video"].get(m.chat.id) and hasattr(m, "video") and m.video:
+            bot.delete_message(m.chat.id, m.message_id); return
+        if locks["gif"].get(m.chat.id) and hasattr(m, "animation") and m.animation:
+            bot.delete_message(m.chat.id, m.message_id); return
+        if locks["file"].get(m.chat.id) and hasattr(m, "document") and m.document:
+            bot.delete_message(m.chat.id, m.message_id); return
+        if locks["music"].get(m.chat.id) and hasattr(m, "audio") and m.audio:
+            bot.delete_message(m.chat.id, m.message_id); return
+        if locks["voice"].get(m.chat.id) and hasattr(m, "voice") and m.voice:
+            bot.delete_message(m.chat.id, m.message_id); return
+        if locks["forward"].get(m.chat.id) and (getattr(m, "forward_from", None) or getattr(m, "forward_from_chat", None)):
+            bot.delete_message(m.chat.id, m.message_id); return
+    except:
+        pass
+
+# ================== شروع ربات ==================
+if __name__ == "__main__":
+    print("🤖 Bot is running...")
+    bot.infinity_polling(skip_pending=True, timeout=30)
