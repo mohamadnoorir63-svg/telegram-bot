@@ -330,6 +330,7 @@ def enforce_all(m):
 
 # ====== پایان مرحله ۱ (بدون اجرای ربات). اجرای نهایی در مرحله ۲ اضافه می‌شود. ======import json
 from telebot import types
+import os
 
 # ================== 🗂 فایل داده ==================
 DATA_FILE = "data.json"
@@ -508,6 +509,9 @@ def list_sudos(m):
 def panel_menu(m):
     if not (is_admin(m.chat.id,m.from_user.id) or is_sudo(m.from_user.id)): return
     markup = types.InlineKeyboardMarkup()
-    markup.add(types.InlineKeyboardButton("🎉 خوشامد", callback_data="panel_welcome"),
-               types.InlineKeyboardButton("📎 لینک", callback_data="panel_link"))
-    markup.add(types.InlineKeyboar         
+    markup.add(
+        types.InlineKeyboardButton("🎉 خوشامد", callback_data="panel_welcome"),
+        types.InlineKeyboardButton("📎 لینک", callback_data="panel_link")
+    )
+    markup.add(
+ 
