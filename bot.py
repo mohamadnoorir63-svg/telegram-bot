@@ -5,8 +5,8 @@ import pytz
 import telebot
 
 # ================== تنظیمات ==================
-TOKEN   = os.environ.get("BOT_TOKEN")
-SUDO_ID = int(os.environ.get("SUDO_ID", "0"))
+TOKEN   = os.environ.get("BOT_TOKEN")  # توکن ربات
+SUDO_ID = int(os.environ.get("SUDO_ID", "0"))  # آی‌دی سودو (صاحب ربات)
 
 bot = telebot.TeleBot(TOKEN, parse_mode="HTML")
 sudo_ids = {SUDO_ID}
@@ -238,24 +238,63 @@ def delete_n(m):
             bot.delete_message(m.chat.id,m.message_id-i)
             deleted+=1
         bot.reply_to(m,f"🗑 {deleted} پیام پاک شد")
-    except: bot.reply_to(m,"❗ فرمت درست: حذف 10")# ================== enforce همه قفل‌ها (گروه + بقیه) ==================
+    except: bot.reply_to(m,"❗ فرمت درست: حذف 10") 
+
+# ================== قفل‌ها ==================
+locks = {k:{} for k in ["links","stickers","bots","photo","video","gif","file","music","voice","forward"]}
+LOCK_MAP = {
+    "لینک":"links","استیکر":"stickers","ربات":"bots","عکس":"photo","ویدیو":"video",
+    "گیف":"gif","فایل":"file","موزیک":"music","ویس":"voice","فوروارد":"forward"
+}
+
+@bot.message_handler(func=lambda m: cmd_text(m).startswith("قفل "))
+def lock(m):
+    if not (is_admin(m.chat.id,m.from_user.id) or is_sudo(m.from_user.id)): return
+    key_fa = cmd_text(m).replace("قفل ","",1)
+    key = LOCK_MAP.get(key_fa)
+    if key:
+        locks[key][m.chat.id] = True
+        bot.reply_to(m,f"🔒 قفل {key_fa} فعال شد")
+
+@bot.message_handler(func=lambda m: cmd_text(m).startswith("باز کردن "))
+def unlock(m):
+    if not (is_admin(m.chat.id,m.from_user.id) or is_sudo(m.from_user.id)): return
+    key_fa = cmd_text(m).replace("باز کردن ","",1)
+    key = LOCK_MAP.get(key_fa)
+    if key:
+        locks[key][m.chat.id] = False
+        bot.reply_to(m,f"🔓 قفل {key_fa} باز شد")
+
+# ================== قفل کل گروه ==================
+group_lock = {}
+
+@bot.message_handler(func=lambda m: cmd_text(m)=="قفل گروه")
+def lock_group(m):
+    if not (is_admin(m.chat.id, m.from_user.id) or is_sudo(m.from_user.id)): return
+    group_lock[m.chat.id] = True
+    bot.send_message(m.chat.id, "🔒 گروه به دستور مدیریت بسته شد.\n🚫 کاربران اجازه ارسال پیام ندارند.")
+
+@bot.message_handler(func=lambda m: cmd_text(m)=="باز کردن گروه")
+def unlock_group(m):
+    if not (is_admin(m.chat.id, m.from_user.id) or is_sudo(m.from_user.id)): return
+    group_lock[m.chat.id] = False
+    bot.send_message(m.chat.id, "🔓 گروه باز شد.\n✅ کاربران می‌توانند پیام ارسال کنند.")
+
+# ================== enforce همه قفل‌ها ==================
 @bot.message_handler(content_types=['text','photo','video','document','audio','voice','sticker','animation'])
 def enforce_all(m):
-    # ادمین و سودو آزاد هستند
     if is_admin(m.chat.id, m.from_user.id) or is_sudo(m.from_user.id):
         return
 
     txt = m.text or ""
 
-    # --- قفل گروه ---
+    # قفل کل گروه
     if group_lock.get(m.chat.id):
-        try:
-            bot.delete_message(m.chat.id, m.message_id)
-        except:
-            pass
-        return  # وقتی گروه قفله، دیگه لازم نیست بقیه بررسی بشه
+        try: bot.delete_message(m.chat.id, m.message_id)
+        except: pass
+        return
 
-    # --- قفل‌های معمولی ---
+    # قفل‌های معمولی
     try:
         if locks["links"].get(m.chat.id) and any(x in txt for x in ["http://","https://","t.me"]):
             bot.delete_message(m.chat.id, m.message_id)
@@ -275,8 +314,8 @@ def enforce_all(m):
             bot.delete_message(m.chat.id, m.message_id)
         if locks["forward"].get(m.chat.id) and (m.forward_from or m.forward_from_chat):
             bot.delete_message(m.chat.id, m.message_id)
-    except:
-        pass
+    except: pass
+
 # ================== اجرای ربات ==================
 print("🤖 Bot is running...")
 bot.infinity_polling(skip_pending=True, timeout=30)
