@@ -172,7 +172,8 @@ def protect_user(chat_id, uid):
 # --- بن
 @bot.message_handler(func=lambda m: m.reply_to_message and cmd_text(m)=="بن")
 def ban(m):
-    if not (is_admin(m.chat.id,m.from_user.id) or is_sudo(m.from_user.id)): return
+    if not (is_admin(m.chat.id,m.from_user.id) or is_sudo(m.from_user.id)):
+        return bot.reply_to(m,"❗ فقط مدیر یا سودو می‌تواند بن کند")
     uid = m.reply_to_message.from_user.id
 
     protect = protect_user(m.chat.id, uid)
@@ -182,19 +183,20 @@ def ban(m):
         bot.ban_chat_member(m.chat.id, uid)
         banned.setdefault(m.chat.id,set()).add(uid)
         bot.reply_to(m,"🚫 کاربر بن شد")
-    except:
-        bot.reply_to(m,"❗ خطا در بن")
+    except Exception as e:
+        bot.reply_to(m,f"❗ خطا در بن: {str(e)}")
 
 @bot.message_handler(func=lambda m: m.reply_to_message and cmd_text(m)=="حذف بن")
 def unban(m):
-    if not (is_admin(m.chat.id,m.from_user.id) or is_sudo(m.from_user.id)): return
+    if not (is_admin(m.chat.id,m.from_user.id) or is_sudo(m.from_user.id)):
+        return bot.reply_to(m,"❗ فقط مدیر یا سودو می‌تواند بن را حذف کند")
     uid = m.reply_to_message.from_user.id
     try:
         bot.unban_chat_member(m.chat.id, uid)
         banned.get(m.chat.id,set()).discard(uid)
         bot.reply_to(m,"✅ بن حذف شد")
-    except:
-        bot.reply_to(m,"❗ خطا در حذف بن")
+    except Exception as e:
+        bot.reply_to(m,f"❗ خطا در حذف بن: {str(e)}")
 
 @bot.message_handler(func=lambda m: cmd_text(m)=="لیست بن")
 def list_ban(m):
@@ -206,7 +208,8 @@ def list_ban(m):
 # --- سکوت
 @bot.message_handler(func=lambda m: m.reply_to_message and cmd_text(m)=="سکوت")
 def mute(m):
-    if not (is_admin(m.chat.id,m.from_user.id) or is_sudo(m.from_user.id)): return
+    if not (is_admin(m.chat.id,m.from_user.id) or is_sudo(m.from_user.id)):
+        return bot.reply_to(m,"❗ فقط مدیر یا سودو می‌تواند سکوت بدهد")
     uid = m.reply_to_message.from_user.id
 
     protect = protect_user(m.chat.id, uid)
@@ -216,12 +219,13 @@ def mute(m):
         bot.restrict_chat_member(m.chat.id, uid, can_send_messages=False)
         muted.setdefault(m.chat.id,set()).add(uid)
         bot.reply_to(m,"🔕 کاربر در سکوت قرار گرفت")
-    except:
-        bot.reply_to(m,"❗ خطا در سکوت")
+    except Exception as e:
+        bot.reply_to(m,f"❗ خطا در سکوت: {str(e)}")
 
 @bot.message_handler(func=lambda m: m.reply_to_message and cmd_text(m)=="حذف سکوت")
 def unmute(m):
-    if not (is_admin(m.chat.id,m.from_user.id) or is_sudo(m.from_user.id)): return
+    if not (is_admin(m.chat.id,m.from_user.id) or is_sudo(m.from_user.id)):
+        return bot.reply_to(m,"❗ فقط مدیر یا سودو می‌تواند سکوت را حذف کند")
     uid = m.reply_to_message.from_user.id
     try:
         bot.restrict_chat_member(
@@ -231,8 +235,8 @@ def unmute(m):
         )
         muted.get(m.chat.id,set()).discard(uid)
         bot.reply_to(m,"🔊 سکوت حذف شد")
-    except:
-        bot.reply_to(m,"❗ خطا در حذف سکوت")
+    except Exception as e:
+        bot.reply_to(m,f"❗ خطا در حذف سکوت: {str(e)}")
 
 @bot.message_handler(func=lambda m: cmd_text(m)=="لیست سکوت")
 def list_mute(m):
@@ -244,7 +248,8 @@ def list_mute(m):
 # --- اخطار
 @bot.message_handler(func=lambda m: m.reply_to_message and cmd_text(m)=="اخطار")
 def warn(m):
-    if not (is_admin(m.chat.id,m.from_user.id) or is_sudo(m.from_user.id)): return
+    if not (is_admin(m.chat.id,m.from_user.id) or is_sudo(m.from_user.id)):
+        return bot.reply_to(m,"❗ فقط مدیر یا سودو می‌تواند اخطار بدهد")
     uid = m.reply_to_message.from_user.id
 
     protect = protect_user(m.chat.id, uid)
@@ -258,14 +263,15 @@ def warn(m):
             bot.ban_chat_member(m.chat.id, uid)
             warnings[m.chat.id][uid] = 0
             bot.reply_to(m,"🚫 کاربر با ۳ اخطار بن شد")
-        except:
-            bot.reply_to(m,"❗ خطا در بن با اخطار")
+        except Exception as e:
+            bot.reply_to(m,f"❗ خطا در بن با اخطار: {str(e)}")
     else:
         bot.reply_to(m,f"⚠️ اخطار {c}/{MAX_WARNINGS}")
 
 @bot.message_handler(func=lambda m: m.reply_to_message and cmd_text(m)=="حذف اخطار")
 def reset_warn(m):
-    if not (is_admin(m.chat.id,m.from_user.id) or is_sudo(m.from_user.id)): return
+    if not (is_admin(m.chat.id,m.from_user.id) or is_sudo(m.from_user.id)):
+        return bot.reply_to(m,"❗ فقط مدیر یا سودو می‌تواند اخطار حذف کند")
     uid = m.reply_to_message.from_user.id
     warnings.get(m.chat.id,{}).pop(uid,None)
     bot.reply_to(m,"✅ اخطارها حذف شد")
@@ -285,7 +291,8 @@ def clear_all(m):
         for i in range(1,201):
             bot.delete_message(m.chat.id, m.message_id - i)
             deleted += 1
-    except: pass
+    except Exception as e:
+        return bot.reply_to(m,f"❗ خطا در پاکسازی: {str(e)}")
     bot.reply_to(m, f"🧹 {deleted} پیام پاک شد")
 
 @bot.message_handler(func=lambda m: (is_admin(m.chat.id,m.from_user.id) or is_sudo(m.from_user.id)) and cmd_text(m).startswith("حذف "))
@@ -297,8 +304,8 @@ def delete_n(m):
             bot.delete_message(m.chat.id, m.message_id - i)
             deleted += 1
         bot.reply_to(m, f"🗑 {deleted} پیام پاک شد")
-    except:
-        bot.reply_to(m,"❗ فرمت درست: حذف 10")
+    except Exception as e:
+        bot.reply_to(m,f"❗ خطا در حذف عددی: {str(e)}")
 # ================== اجرا ==================
 print("🤖 Bot is running...")
-bot.infinity_polling(skip_pending=True, timeout=30)
+bot.infinity_polling(skip_pending=True, timeout=20)
