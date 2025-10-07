@@ -323,6 +323,6 @@ def cb_help(c):
 def cb_close(c):
     try: bot.delete_message(c.message.chat.id, c.message.message_id)
     except: pass
-    bot.answer_callback_query(c.id,"❌ پنل بسته شد")
+bot.answer_callback_query(c.id,"❌ پنل بسته شد")
 print("🤖 Bot is running...")
 bot.infinity_polling(skip_pending=True, timeout=20)
