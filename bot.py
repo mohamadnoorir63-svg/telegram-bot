@@ -514,4 +514,49 @@ def panel_menu(m):
         types.InlineKeyboardButton("📎 لینک", callback_data="panel_link")
     )
     markup.add(
- 
+        types.InlineKeyboardButton("✉️ ارسال همگانی", callback_data="panel_broadcast"),
+        types.InlineKeyboardButton("👮 مدیریت", callback_data="panel_admins")
+    )
+    markup.add(types.InlineKeyboardButton("📘 راهنما", callback_data="panel_help"))
+    bot.send_message(m.chat.id, "🧭 پنل مدیریت:", reply_markup=markup)
+
+@bot.callback_query_handler(func=lambda c: c.data=="panel_help")
+def cb_help(c):
+    text = ("📘 <b>راهنمای دستورات:</b>\n\n"
+            "👮 <b>مدیریتی:</b>\n"
+            "بن / حذف بن / سکوت / حذف سکوت / اخطار / حذف اخطار / پاکسازی / حذف [عدد]\n\n"
+            "🔒 <b>قفل‌ها:</b>\n"
+            "قفل لینک / استیکر / گیف / ویدیو / باز کردن ... / قفل گروه\n\n"
+            "🎉 <b>خوشامد:</b>\n"
+            "خوشامد روشن / خاموش / تنظیم خوشامد متن / تنظیم خوشامد عکس\n\n"
+            "😂 <b>تفریحی:</b>\n"
+            "جوک / فال\n\n"
+            "⚙️ <b>سودو:</b>\n"
+            "ارسال همگانی / افزودن مدیر / حذف مدیر / افزودن سودو / حذف سودو / لیست‌ها\n")
+    bot.edit_message_text(text, c.message.chat.id, c.message.message_id, parse_mode="HTML")
+
+@bot.callback_query_handler(func=lambda c: c.data=="panel_link")
+def cb_link(c):
+    fake = types.SimpleNamespace(chat=c.message.chat, from_user=c.from_user)
+    fake.text = "لینک"
+    get_link(fake)
+
+@bot.callback_query_handler(func=lambda c: c.data=="panel_broadcast")
+def cb_broadcast(c):
+    fake = types.SimpleNamespace(chat=c.message.chat, from_user=c.from_user)
+    fake.text = "ارسال همگانی"
+    ask_broadcast(fake)
+
+@bot.callback_query_handler(func=lambda c: c.data=="panel_welcome")
+def cb_welcome(c):
+    bot.answer_callback_query(c.id, "برای تنظیم خوشامد از دستورات:\n«تنظیم خوشامد متن» یا «تنظیم خوشامد عکس» استفاده کن.", show_alert=True)
+
+@bot.callback_query_handler(func=lambda c: c.data=="panel_admins")
+def cb_admins(c):
+    fake = types.SimpleNamespace(chat=c.message.chat, from_user=c.from_user)
+    fake.text = "لیست مدیران"
+    list_admins(fake)
+
+# ================== 🚀 اجرای ربات ==================
+print("🤖 Bot is running...")
+bot.infinity_polling(skip_pending=True, timeout=30)
