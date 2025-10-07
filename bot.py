@@ -109,7 +109,8 @@ def protect_user(chat_id, uid):
     try:
         member = bot.get_chat_member(chat_id, uid)
         if member.status == "creator": return "❗ صاحب گروه قابل مدیریت نیست"
-    except: pass
+    except: 
+        pass
     return None
 
 # --- بن
@@ -195,7 +196,8 @@ def clear_all(m):
         for i in range(1, 201):
             bot.delete_message(m.chat.id, m.message_id - i)
             deleted += 1
-    except: pass
+    except: 
+        pass
     bot.reply_to(m, f"🧹 {deleted} پیام پاک شد")
 
 @bot.message_handler(func=lambda m: (is_admin(m.chat.id,m.from_user.id) or is_sudo(m.from_user.id)) and cmd_text(m).startswith("حذف "))
@@ -218,7 +220,8 @@ def enforce_all(m):
     # قفل کل گروه
     if group_lock.get(m.chat.id):
         try: bot.delete_message(m.chat.id, m.message_id)
-        except: pass
+        except: 
+            pass
         return
     # سایر قفل‌ها
     try:
@@ -320,7 +323,8 @@ def do_broadcast(m):
         try:
             bot.send_message(int(chat_id), text)
             sent += 1
-        except: pass
+        except: 
+            pass
     bot.reply_to(m, f"📨 پیام به {sent} گروه ارسال شد.")
 
 # ================== 👑 مدیریت مدیران و سودو ==================
