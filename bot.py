@@ -287,6 +287,42 @@ def enforce(m):
             bot.delete_message(m.chat.id,m.message_id)
         if locks["forward"].get(m.chat.id) and (m.forward_from or m.forward_from_chat):
             bot.delete_message(m.chat.id,m.message_id)
+    except: passfrom telebot import types
+
+@bot.message_handler(func=lambda m: cmd_text(m)=="پنل")
+def panel(m):
+    if not (is_admin(m.chat.id,m.from_user.id) or is_sudo(m.from_user.id)): return
+    kb = types.InlineKeyboardMarkup(row_width=2)
+    for name,key in LOCK_MAP.items():
+        st = "🔒" if locks[key].get(m.chat.id) else "🔓"
+        kb.add(types.InlineKeyboardButton(f"{st} {name}", callback_data=f"toggle:{key}:{m.chat.id}"))
+    kb.add(
+        types.InlineKeyboardButton("ℹ️ راهنما", callback_data=f"help:{m.chat.id}"),
+        types.InlineKeyboardButton("❌ بستن", callback_data=f"close:{m.chat.id}")
+    )
+    bot.reply_to(m,"🛠 پنل مدیریت:",reply_markup=kb)
+
+@bot.callback_query_handler(func=lambda c: c.data.startswith("toggle:"))
+def cb_toggle(c):
+    _,key,chat_id = c.data.split(":"); chat_id=int(chat_id)
+    if not (is_admin(chat_id,c.from_user.id) or is_sudo(c.from_user.id)): return
+    locks[key][chat_id] = not locks[key].get(chat_id,False)
+    st = "فعال شد 🔒" if locks[key][chat_id] else "باز شد 🔓"
+    bot.answer_callback_query(c.id, f"قفل {st}")
+
+@bot.callback_query_handler(func=lambda c: c.data.startswith("help:"))
+def cb_help(c):
+    txt = ("📖 راهنما:\n\n"
+           "⏰ ساعت\n📊 آمار\n🆔 ایدی\n😂 جوک / 🔮 فال\n"
+           "🚫 بن / سکوت / اخطار\n🧹 پاکسازی / حذف 10\n"
+           "🔒 قفل‌ها (لینک، عکس، ویدیو ...)\n")
+    bot.send_message(c.message.chat.id, txt)
+    bot.answer_callback_query(c.id)
+
+@bot.callback_query_handler(func=lambda c: c.data.startswith("close:"))
+def cb_close(c):
+    try: bot.delete_message(c.message.chat.id, c.message.message_id)
     except: pass
+    bot.answer_callback_query(c.id,"❌ پنل بسته شد")
 print("🤖 Bot is running...")
 bot.infinity_polling(skip_pending=True, timeout=20)
