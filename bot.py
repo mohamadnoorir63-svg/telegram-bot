@@ -328,6 +328,186 @@ def enforce_all(m):
     except:
         pass
 
-# ====== پایان مرحله ۱ (بدون اجرای ربات). اجرای نهایی در مرحله ۲ اضافه می‌شود. ======
-print("🤖 Bot is running...")
-bot.infinity_polling(skip_pending=True, timeout=30)
+# ====== پایان مرحله ۱ (بدون اجرای ربات). اجرای نهایی در مرحله ۲ اضافه می‌شود. ======import json
+from telebot import types
+
+# ================== 🗂 فایل داده ==================
+DATA_FILE = "data.json"
+
+# اگر فایل وجود نداشت، بساز
+if not os.path.exists(DATA_FILE):
+    data = {"admins": [], "sudos": list(sudo_ids), "groups": {}, "welcome": {}}
+    with open(DATA_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
+def load_data():
+    with open(DATA_FILE, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+def save_data(data):
+    with open(DATA_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
+# ================== 🎉 خوشامدگویی ==================
+@bot.message_handler(content_types=["new_chat_members"])
+def welcome_new_member(m):
+    data = load_data()
+    group_settings = data["welcome"].get(str(m.chat.id), {"enabled": True, "type": "text", "content": "👋 خوش آمدی {name} به گروه!"})
+    if not group_settings.get("enabled", True):
+        return
+
+    name = m.new_chat_members[0].first_name
+    text = group_settings["content"].replace("{name}", name)
+
+    if group_settings["type"] == "text":
+        bot.send_message(m.chat.id, text)
+    elif group_settings["type"] == "photo":
+        try:
+            bot.send_photo(m.chat.id, group_settings["file_id"], caption=text)
+        except:
+            bot.send_message(m.chat.id, text)
+
+@bot.message_handler(func=lambda m: cmd_text(m) in ["خوشامد روشن", "خوشامد خاموش"])
+def toggle_welcome(m):
+    if not (is_admin(m.chat.id, m.from_user.id) or is_sudo(m.from_user.id)): return
+    data = load_data()
+    group = str(m.chat.id)
+    enabled = (cmd_text(m) == "خوشامد روشن")
+    data["welcome"][group] = data["welcome"].get(group, {"enabled": True, "type": "text", "content": "👋 خوش آمدی {name} به گروه!"})
+    data["welcome"][group]["enabled"] = enabled
+    save_data(data)
+    bot.reply_to(m, "✅ خوشامد فعال شد" if enabled else "🚫 خوشامد غیرفعال شد")
+
+@bot.message_handler(func=lambda m: cmd_text(m) == "تنظیم خوشامد متن" and m.reply_to_message)
+def set_welcome_text(m):
+    if not (is_admin(m.chat.id, m.from_user.id) or is_sudo(m.from_user.id)): return
+    data = load_data()
+    group = str(m.chat.id)
+    text = m.reply_to_message.text or ""
+    data["welcome"][group] = {"enabled": True, "type": "text", "content": text}
+    save_data(data)
+    bot.reply_to(m, "✅ متن خوشامد تنظیم شد")
+
+@bot.message_handler(func=lambda m: cmd_text(m) == "تنظیم خوشامد عکس" and m.reply_to_message and m.reply_to_message.photo)
+def set_welcome_photo(m):
+    if not (is_admin(m.chat.id, m.from_user.id) or is_sudo(m.from_user.id)): return
+    data = load_data()
+    group = str(m.chat.id)
+    file_id = m.reply_to_message.photo[-1].file_id
+    caption = m.reply_to_message.caption or "👋 خوش آمدی {name}"
+    data["welcome"][group] = {"enabled": True, "type": "photo", "file_id": file_id, "content": caption}
+    save_data(data)
+    bot.reply_to(m, "🖼 خوشامد تصویری تنظیم شد")
+
+# ================== 📎 لینک گروه ==================
+@bot.message_handler(func=lambda m: cmd_text(m) == "لینک")
+def get_link(m):
+    if not (is_admin(m.chat.id, m.from_user.id) or is_sudo(m.from_user.id)): return
+    try:
+        link = bot.export_chat_invite_link(m.chat.id)
+        bot.reply_to(m, f"🔗 لینک گروه:\n{link}")
+    except:
+        bot.reply_to(m, "❗ نتونستم لینک گروه رو بگیرم. مطمئن شو من ادمینم و دسترسی دارم.")
+
+# ================== ✉️ ارسال همگانی ==================
+waiting_for_broadcast = {}
+
+@bot.message_handler(func=lambda m: cmd_text(m) == "ارسال همگانی")
+def ask_broadcast(m):
+    if not is_sudo(m.from_user.id): return
+    waiting_for_broadcast[m.from_user.id] = True
+    bot.reply_to(m, "📝 لطفاً متن پیام همگانی رو بفرست:")
+
+@bot.message_handler(func=lambda m: m.from_user.id in waiting_for_broadcast)
+def send_broadcast(m):
+    if not is_sudo(m.from_user.id): return
+    text = m.text
+    waiting_for_broadcast.pop(m.from_user.id, None)
+    data = load_data()
+    groups = data.get("groups", {})
+    sent = 0
+    for gid in groups.keys():
+        try:
+            bot.send_message(int(gid), f"📢 پیام همگانی:\n{text}")
+            sent += 1
+        except:
+            pass
+    bot.reply_to(m, f"✅ پیام به {sent} گروه ارسال شد.")
+
+# ================== 👮 مدیریت مدیران و سودو ==================
+@bot.message_handler(func=lambda m: m.reply_to_message and cmd_text(m)=="افزودن مدیر")
+def add_admin(m):
+    if not is_sudo(m.from_user.id): return
+    data = load_data()
+    uid = m.reply_to_message.from_user.id
+    if uid not in data["admins"]:
+        data["admins"].append(uid)
+        save_data(data)
+        bot.reply_to(m, "👮 مدیر جدید اضافه شد.")
+    else:
+        bot.reply_to(m, "❗ این کاربر قبلاً مدیر بود.")
+
+@bot.message_handler(func=lambda m: m.reply_to_message and cmd_text(m)=="حذف مدیر")
+def del_admin(m):
+    if not is_sudo(m.from_user.id): return
+    data = load_data()
+    uid = m.reply_to_message.from_user.id
+    if uid in data["admins"]:
+        data["admins"].remove(uid)
+        save_data(data)
+        bot.reply_to(m, "🚫 مدیر حذف شد.")
+    else:
+        bot.reply_to(m, "❗ این کاربر مدیر نیست.")
+
+@bot.message_handler(func=lambda m: cmd_text(m)=="لیست مدیران")
+def list_admins(m):
+    if not is_sudo(m.from_user.id): return
+    data = load_data()
+    if not data["admins"]:
+        return bot.reply_to(m, "❗ هیچ مدیری ثبت نشده.")
+    txt = "\n".join([f"▪️ {uid}" for uid in data["admins"]])
+    bot.reply_to(m, "👮 لیست مدیران:\n"+txt)
+
+@bot.message_handler(func=lambda m: m.reply_to_message and cmd_text(m)=="افزودن سودو")
+def add_sudo(m):
+    if not is_sudo(m.from_user.id): return
+    data = load_data()
+    uid = m.reply_to_message.from_user.id
+    if uid not in data["sudos"]:
+        data["sudos"].append(uid)
+        save_data(data)
+        sudo_ids.add(uid)
+        bot.reply_to(m, "⚡ سودو جدید اضافه شد.")
+    else:
+        bot.reply_to(m, "❗ این کاربر سودو است.")
+
+@bot.message_handler(func=lambda m: m.reply_to_message and cmd_text(m)=="حذف سودو")
+def del_sudo(m):
+    if not is_sudo(m.from_user.id): return
+    data = load_data()
+    uid = m.reply_to_message.from_user.id
+    if uid in data["sudos"]:
+        data["sudos"].remove(uid)
+        save_data(data)
+        sudo_ids.discard(uid)
+        bot.reply_to(m, "🚫 سودو حذف شد.")
+    else:
+        bot.reply_to(m, "❗ این کاربر سودو نیست.")
+
+@bot.message_handler(func=lambda m: cmd_text(m)=="لیست سودو")
+def list_sudos(m):
+    if not is_sudo(m.from_user.id): return
+    data = load_data()
+    if not data["sudos"]:
+        return bot.reply_to(m, "❗ سودویی ثبت نشده.")
+    txt = "\n".join([f"▪️ {uid}" for uid in data["sudos"]])
+    bot.reply_to(m, "⚡ لیست سودوها:\n"+txt)
+
+# ================== 🧭 پنل مدیریت (کیبورد اینلاین) ==================
+@bot.message_handler(func=lambda m: cmd_text(m)=="پنل")
+def panel_menu(m):
+    if not (is_admin(m.chat.id,m.from_user.id) or is_sudo(m.from_user.id)): return
+    markup = types.InlineKeyboardMarkup()
+    markup.add(types.InlineKeyboardButton("🎉 خوشامد", callback_data="panel_welcome"),
+               types.InlineKeyboardButton("📎 لینک", callback_data="panel_link"))
+    markup.add(types.InlineKeyboar         
