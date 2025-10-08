@@ -1,5 +1,12 @@
 {
-  "groups": {},
-  "sudo": [],
-  "bot_admins": []
+  "welcome": {},
+  "locks": {},
+  "admins": {},
+  "sudo_list": [],
+  "banned": {},
+  "muted": {},
+  "warns": {},
+  "users": [],
+  "jokes": [],
+  "falls": []
 }
