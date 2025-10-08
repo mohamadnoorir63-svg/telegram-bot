@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
-# Persian Lux Panel V16 Ultimate – Part 1/2
+# Persian Lux Panel V16 Ultimate Final – Part 1/2
 # Designed for Mohammad 👑
 
-import os, json, random, time, logging, requests
+import os, json, random, time, logging
 from datetime import datetime
 import pytz, jdatetime
 import telebot
@@ -80,21 +80,24 @@ def show_id(m):
     user = m.from_user
     name = user.first_name or ""
     uid = user.id
-    profile_photos = bot.get_user_profile_photos(uid)
     caption = (
-        f"🧾 <b>مشخصات کاربر:</b>\n"
+        f"🧾 <b>مشخصات کاربر</b>\n"
         f"👤 نام: {name}\n"
         f"🆔 آیدی عددی: <code>{uid}</code>\n"
         f"📅 تاریخ: {shamsi_date()}\n"
         f"⏰ ساعت: {shamsi_time()}"
     )
-    if profile_photos.total_count > 0:
-        file_id = profile_photos.photos[0][-1].file_id
-        bot.send_photo(m.chat.id, file_id, caption=caption)
-    else:
+    try:
+        photos = bot.get_user_profile_photos(uid)
+        if photos.total_count > 0:
+            file_id = photos.photos[0][-1].file_id
+            bot.send_photo(m.chat.id, file_id, caption=caption)
+        else:
+            bot.reply_to(m, caption)
+    except:
         bot.reply_to(m, caption)
 
-# ================= ⏰ ساعت =================
+# ================= ⏰ ساعت / تاریخ =================
 @bot.message_handler(func=lambda m: cmd_text(m) == "ساعت")
 def show_time(m):
     bot.reply_to(m, f"⏰ ساعت: {shamsi_time()}\n📅 تاریخ: {shamsi_date()}")
@@ -173,12 +176,12 @@ def toggle_lock(m):
 
     if lock_type == "group":
         if en:
-            bot.send_message(m.chat.id, "🚫 گروه موقتاً بسته شد ❌\n🔒 فقط مدیران می‌توانند پیام ارسال کنند.")
+            bot.send_message(m.chat.id, "🚫 گروه موقتاً <b>بسته شد</b> ❌\n🔒 فقط مدیران می‌توانند پیام ارسال کنند.\n⏰ " + shamsi_time())
         else:
-            bot.send_message(m.chat.id, "✅ گروه باز شد 🌸\n💬 حالا همه می‌تونن گفتگو کنن!")
+            bot.send_message(m.chat.id, "✅ گروه <b>باز شد</b> 🌸\n💬 حالا همه می‌تونن گفتگو کنن!\n⏰ " + shamsi_time())
     else:
-        bot.reply_to(m, f"{'🔒' if en else '🔓'} قفل {key_fa} {'فعال' if en else 'غیرفعال'} شد.")# Persian Lux Panel V16 Ultimate – Part 2/2
-# ادامه از پارت اول
+        bot.reply_to(m, f"{'🔒' if en else '🔓'} قفل {key_fa} {'فعال' if en else 'غیرفعال'} شد.")# Persian Lux Panel V16 Ultimate Final – Part 2/2
+# ادامه از پارت ۱
 
 # ================= 👑 مدیر و سودو =================
 @bot.message_handler(func=lambda m: m.reply_to_message and cmd_text(m) == "افزودن مدیر")
@@ -228,6 +231,15 @@ def ban_user(m):
         bot.reply_to(m, f"🚫 کاربر <a href='tg://user?id={uid}'>بن</a> شد.")
     except Exception as e:
         bot.reply_to(m, f"❗ خطا در بن کاربر: {e}")
+
+@bot.message_handler(func=lambda m: m.reply_to_message and cmd_text(m) == "حذف بن")
+def unban_user(m):
+    if not is_admin(m.chat.id, m.from_user.id): return
+    try:
+        bot.unban_chat_member(m.chat.id, m.reply_to_message.from_user.id, only_if_banned=True)
+        bot.reply_to(m, "✅ کاربر از بن خارج شد.")
+    except:
+        bot.reply_to(m, "❗ خطا در حذف بن.")
 
 @bot.message_handler(func=lambda m: m.reply_to_message and cmd_text(m) == "سکوت")
 def mute_user(m):
@@ -349,6 +361,22 @@ def broadcast(m):
         except: continue
     bot.reply_to(m, f"📢 پیام برای {total} کاربر ارسال شد.")
 
+# ================= ℹ️ راهنما =================
+@bot.message_handler(func=lambda m: cmd_text(m) == "راهنما")
+def show_help(m):
+    txt = (
+        "📘 <b>راهنمای Persian Lux Panel V16</b>\n\n"
+        "🆔 آیدی | ساعت | آمار | لینک ربات/گروه\n"
+        "👋 خوشامد | تنظیم | روشن/خاموش\n"
+        "🔒 قفل‌ها (لینک | عکس | فیلم | گیف...)\n"
+        "🚫 بن | 🔇 سکوت | ⚠️ اخطار (۳=اخراج)\n"
+        "😂 جوک | 🔮 فال | 🧹 حذف N پیام\n"
+        "📢 ارسال همگانی (فقط سودو)\n"
+        "📊 فعالیت امروز (آمار زنده)\n\n"
+        "👑 سازنده: محمد | Persian Lux Panel"
+    )
+    bot.reply_to(m, txt)
+
 # ================= 🤖 پاسخ سودو =================
 @bot.message_handler(func=lambda m: is_sudo(m.from_user.id) and cmd_text(m).lower() in ["سلام","ربات","هی","bot"])
 def sudo_reply(m):
@@ -366,9 +394,9 @@ def start_cmd(m):
     uid = str(m.from_user.id)
     if uid not in d["users"]:
         d["users"].append(uid); save_data(d)
-    bot.reply_to(m, "👋 سلام! ربات مدیریتی Persian Lux Panel V16 فعال است.\nبرای راهنما بنویس: «فعالیت امروز» یا «راهنما»")
+    bot.reply_to(m, "👋 سلام! ربات مدیریتی Persian Lux Panel فعال است.\nبرای راهنما بنویس: «راهنما» یا «فعالیت امروز»")
 
-print("🤖 Persian Lux Panel V16 Ultimate is running...")
+print("🤖 Persian Lux Panel V16 Ultimate Final is running...")
 while True:
     try:
         bot.infinity_polling(timeout=60, long_polling_timeout=30)
