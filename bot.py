@@ -238,7 +238,161 @@ def delete_n(m):
             bot.delete_message(m.chat.id,m.message_id-i)
             deleted+=1
         bot.reply_to(m,f"🗑 {deleted} پیام پاک شد")
-    except: bot.reply_to(m,"❗ فرمت درست: حذف 10")
+    except: bot.reply_to(m,"❗ فرمت درست: حذف 10")# ================== 🔐 ماژول قفل‌ها و خوشامد ==================
+import jdatetime
+
+# ========== تنظیمات اولیه فایل داده‌ها ==========
+DATA_FILE = "data.json"
+
+if not os.path.exists(DATA_FILE):
+    data = {"groups": {}, "welcome": {}, "autolock": {}}
+    with open(DATA_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
+# ========== توابع کمکی ==========
+def load_data():
+    with open(DATA_FILE, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+def save_data(data):
+    with open(DATA_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
+def register_group(chat_id):
+    data = load_data()
+    if str(chat_id) not in data["groups"]:
+        data["groups"][str(chat_id)] = True
+        save_data(data)
+
+def now_time():
+    return jdatetime.datetime.now().strftime("%H:%M  ( %A %d %B %Y )")
+
+# ================== 🎉 خوشامد ==================
+@bot.message_handler(content_types=["new_chat_members"])
+def welcome_new_member(m):
+    try:
+        register_group(m.chat.id)
+        data = load_data()
+        group = str(m.chat.id)
+        settings = data["welcome"].get(group, {"enabled": True, "type": "text", "content": None})
+        if not settings.get("enabled", True):
+            return
+
+        name = m.new_chat_members[0].first_name
+        time_str = now_time()
+
+        # پیام پیش‌فرض خوشامد
+        default_text = (
+            f"سلام 𓄂ꪴꪰ🅜‌‌‌‌‌🅞‌‌‌‌‌‌🅗‌‌‌‌‌🅐‌‌‌‌‌‌🅜‌‌‌‌‌🅜‌‌‌‌‌‌🅐‌‌‌‌‌🅓‌‌‌‌‌‌❳𓆃 عزیز\n"
+            f"به گروه 𝙎𝙩𝙖𝙧𝙧𝙮𝙉𝙞𝙜𝙝𝙩 ☾꙳⋆ خوش آمدید 😎\n\n"
+            f"ساعت ›› {time_str}"
+        )
+
+        text = settings.get("content") or default_text
+        text = text.replace("{name}", name).replace("{time}", time_str)
+
+        if settings.get("type") == "photo" and settings.get("file_id"):
+            msg = bot.send_photo(m.chat.id, settings["file_id"], caption=text)
+        else:
+            msg = bot.send_message(m.chat.id, text)
+
+        # اگر خواستی پین خودکار هم بشه این خط رو فعال کن:
+        # bot.pin_chat_message(m.chat.id, msg.message_id)
+
+    except Exception as e:
+        print("welcome error:", e)
+
+@bot.message_handler(func=lambda m: cmd_text(m) in ["خوشامد روشن", "خوشامد خاموش"])
+def toggle_welcome(m):
+    if not (is_admin(m.chat.id, m.from_user.id) or is_sudo(m.from_user.id)):
+        return
+    data = load_data()
+    group = str(m.chat.id)
+    en = (cmd_text(m) == "خوشامد روشن")
+    data["welcome"].setdefault(group, {"enabled": True})
+    data["welcome"][group]["enabled"] = en
+    save_data(data)
+    bot.reply_to(m, "✅ خوشامد روشن شد" if en else "🚫 خوشامد خاموش شد")
+
+@bot.message_handler(func=lambda m: cmd_text(m) == "تنظیم خوشامد متن" and m.reply_to_message)
+def set_welcome_text(m):
+    if not (is_admin(m.chat.id, m.from_user.id) or is_sudo(m.from_user.id)): return
+    data = load_data()
+    group = str(m.chat.id)
+    txt = m.reply_to_message.text or ""
+    data["welcome"][group] = {"enabled": True, "type": "text", "content": txt}
+    save_data(data)
+    bot.reply_to(m, "📝 متن خوشامد تنظیم شد. از {name} و {time} می‌تونی استفاده کنی.")
+
+# ================== 🔒 قفل‌ها ==================
+locks = {k: {} for k in ["links", "stickers", "photo", "video", "gif", "file", "music", "voice", "forward"]}
+LOCK_MAP = {
+    "لینک": "links", "استیکر": "stickers", "عکس": "photo", "ویدیو": "video",
+    "گیف": "gif", "فایل": "file", "موزیک": "music", "ویس": "voice", "فوروارد": "forward"
+}
+group_lock = {}
+
+@bot.message_handler(func=lambda m: cmd_text(m).startswith("قفل "))
+def cmd_lock(m):
+    if not (is_admin(m.chat.id, m.from_user.id) or is_sudo(m.from_user.id)): return
+    k = cmd_text(m).replace("قفل ", "", 1)
+    if k == "گروه":
+        group_lock[m.chat.id] = True
+        return bot.reply_to(m, "🔒 گروه بسته شد — کاربران عادی نمی‌توانند پیام ارسال کنند.")
+    key = LOCK_MAP.get(k)
+    if key:
+        locks[key][m.chat.id] = True
+        bot.reply_to(m, f"🔒 قفل {k} فعال شد.")
+    else:
+        bot.reply_to(m, "❗ نوع قفل نامشخص است.")
+
+@bot.message_handler(func=lambda m: cmd_text(m).startswith("باز کردن "))
+def cmd_unlock(m):
+    if not (is_admin(m.chat.id, m.from_user.id) or is_sudo(m.from_user.id)): return
+    k = cmd_text(m).replace("باز کردن ", "", 1)
+    if k == "گروه":
+        group_lock[m.chat.id] = False
+        return bot.reply_to(m, "🔓 گروه باز شد.")
+    key = LOCK_MAP.get(k)
+    if key:
+        locks[key][m.chat.id] = False
+        bot.reply_to(m, f"🔓 قفل {k} باز شد.")
+    else:
+        bot.reply_to(m, "❗ نوع قفل نامشخص است.")
+
+# کنترل پیام‌ها برای قفل‌ها
+@bot.message_handler(content_types=['text','photo','video','document','audio','voice','sticker','animation'])
+def enforce_locks(m):
+    register_group(m.chat.id)
+    if is_admin(m.chat.id, m.from_user.id) or is_sudo(m.from_user.id): return
+
+    txt = m.text or ""
+    if group_lock.get(m.chat.id):
+        try: bot.delete_message(m.chat.id, m.message_id)
+        except: pass
+        return
+
+    try:
+        if locks["links"].get(m.chat.id) and any(x in txt for x in ["http://","https://","t.me","telegram.me"]):
+            bot.delete_message(m.chat.id, m.message_id)
+        if locks["stickers"].get(m.chat.id) and m.sticker:
+            bot.delete_message(m.chat.id, m.message_id)
+        if locks["photo"].get(m.chat.id) and m.photo:
+            bot.delete_message(m.chat.id, m.message_id)
+        if locks["video"].get(m.chat.id) and m.video:
+            bot.delete_message(m.chat.id, m.message_id)
+        if locks["gif"].get(m.chat.id) and m.animation:
+            bot.delete_message(m.chat.id, m.message_id)
+        if locks["file"].get(m.chat.id) and m.document:
+            bot.delete_message(m.chat.id, m.message_id)
+        if locks["music"].get(m.chat.id) and m.audio:
+            bot.delete_message(m.chat.id, m.message_id)
+        if locks["voice"].get(m.chat.id) and m.voice:
+            bot.delete_message(m.chat.id, m.message_id)
+        if locks["forward"].get(m.chat.id) and (m.forward_from or m.forward_from_chat):
+            bot.delete_message(m.chat.id, m.message_id)
+    except:
+        pass
 if __name__ == "__main__":
     print("🤖 Bot is running...")
     bot.infinity_polling(skip_pending=True, timeout=30)
