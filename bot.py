@@ -338,7 +338,7 @@ def del_num(m):
 # ================= 👑 پاسخ ربات به سودو =================
 @bot.message_handler(func=lambda m: is_sudo(m.from_user.id) and cmd_text(m).lower() in ["سلام", "ربات"])
 def sudo_greet(m):
-    bot.reply_to(mbot.reply_to(m, f"👑 سلام {m.from_user.first_name}!\nربات در خدمت سودوی عزیز است ✨")
+    bot.reply_to(m, f"👑 سلام {m.from_user.first_name}!\nربات در خدمت سودوی عزیز است ✨")
 
 # ================= 📊 آمار روزانه =================
 @bot.message_handler(func=lambda m: cmd_text(m) == "آمار")
