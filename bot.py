@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Persian Lux Panel V15 – Fixed Full (Updated ID)
+# Persian Lux Panel V15 – Full Rewrite (ID + Joke Updated)
 # Designed for Mohammad 👑
 
 import os, json, random, time, logging
@@ -122,7 +122,9 @@ def group_link(m):
         link = bot.export_chat_invite_link(m.chat.id)
         bot.reply_to(m, f"🔗 لینک گروه:\n{link}")
     except:
-        bot.reply_to(m, "⚠️ دسترسی ساخت لینک ندارم.")# ================= 👋 خوشامد =================
+        bot.reply_to(m, "⚠️ دسترسی ساخت لینک ندارم.")
+
+# ================= 👋 خوشامد =================
 @bot.message_handler(content_types=["new_chat_members"])
 def welcome_new(m):
     register_group(m.chat.id)
@@ -157,9 +159,7 @@ def toggle_welcome(m):
     data["welcome"].setdefault(gid, {"enabled": True})
     data["welcome"][gid]["enabled"] = en
     save_data(data)
-    bot.reply_to(m, "🟢 خوشامد روشن شد." if en else "🔴 خوشامد خاموش شد.")
-
-# ================= 🔒 قفل‌ها =================
+    bot.reply_to(m, "🟢 خوشامد روشن شد." if en else "🔴 خوشامد خاموش شد.")# ================= 🔒 قفل‌ها =================
 LOCK_MAP = {
     "لینک":"link","گروه":"group","عکس":"photo","ویدیو":"video",
     "استیکر":"sticker","گیف":"gif","فایل":"file","موزیک":"music",
@@ -180,7 +180,10 @@ def toggle_lock(m):
         return bot.reply_to(m, "⚠️ این قفل همین حالا هم در همین حالت است.")
     d["locks"][gid][lock_type] = en; save_data(d)
     if lock_type == "group":
-        bot.send_message(m.chat.id, "🔒 گروه بسته شد." if en else "🔓 گروه باز شد.")
+        if en:
+            bot.send_message(m.chat.id, "🚫 گروه موقتاً <b>بسته شد</b> ❌\n🔒 فقط مدیران می‌توانند پیام ارسال کنند.\n⏰ " + shamsi_time())
+        else:
+            bot.send_message(m.chat.id, "✅ گروه <b>باز شد</b> 🌸\n💬 حالا همه می‌تونن گفتگو کنن!\n⏰ " + shamsi_time())
     else:
         bot.reply_to(m, f"{'🔒' if en else '🔓'} قفل {key_fa} {'فعال' if en else 'غیرفعال'} شد.")
 
@@ -249,6 +252,15 @@ def mute_user(m):
     d = load_data(); d["muted"][uid] = True; save_data(d)
     bot.reply_to(m, f"🔇 کاربر <a href='tg://user?id={uid}'>ساکت</a> شد.")
 
+@bot.message_handler(func=lambda m: m.reply_to_message and cmd_text(m) == "حذف سکوت")
+def unmute_user(m):
+    if not is_admin(m.chat.id, m.from_user.id): return
+    uid = str(m.reply_to_message.from_user.id)
+    d = load_data()
+    if uid in d["muted"]: d["muted"].pop(uid)
+    save_data(d)
+    bot.reply_to(m, f"🔊 سکوت کاربر <a href='tg://user?id={uid}'>برداشته</a> شد.")
+
 @bot.message_handler(func=lambda m: m.reply_to_message and cmd_text(m) == "اخطار")
 def warn_user(m):
     if not is_admin(m.chat.id, m.from_user.id): return
@@ -268,69 +280,72 @@ def del_warn(m):
     d = load_data()
     if uid in d["warns"]: d["warns"].pop(uid)
     save_data(d)
-    bot.reply_to(m, "✅ تمام اخطارهای کاربر پاک شد.")
-
-# ================= 😂 جوک و 🔮 فال =================
+    bot.reply_to(m, "✅ تمام اخطارهای کاربر پاک شد.")# ================= 😂 جوک‌های جدید و 🔮 فال =================
 @bot.message_handler(func=lambda m: is_admin(m.chat.id, m.from_user.id) and m.reply_to_message and cmd_text(m) == "ثبت جوک")
 def add_joke(m):
     d = load_data()
     txt = (m.reply_to_message.text or "").strip()
-    if not txt: return bot.reply_to(m, "⚠️ لطفاً روی پیام متنی ریپلای کن.")
-    d["jokes"].append(txt); save_data(d)
-    bot.reply_to(m, "😂 جوک ذخیره شد.")@bot.message_handler(func=lambda m: cmd_text(m) == "جوک")
+    if not txt:
+        return bot.reply_to(m, "⚠️ لطفاً روی پیام متنی ریپلای کن تا ذخیره کنم.")
+    if txt in d["jokes"]:
+        return bot.reply_to(m, "⚠️ این جوک قبلاً ثبت شده بود.")
+    d["jokes"].append(txt)
+    save_data(d)
+    bot.reply_to(m, f"😂 جوک جدید با موفقیت ذخیره شد!\n\n«{txt[:60]}...»")
+
+@bot.message_handler(func=lambda m: cmd_text(m) == "جوک")
 def random_joke(m):
-    d = load_data(); jokes = d.get("jokes", [])
-    bot.reply_to(m, f"😂 {random.choice(jokes)}" if jokes else "😅 هنوز جوکی ثبت نشده.")
+    d = load_data()
+    jokes = d.get("jokes", [])
+    if not jokes:
+        return bot.reply_to(m, "😅 هنوز هیچ جوکی ثبت نشده!\nبا دستور «ثبت جوک» اضافه کن.")
+    joke = random.choice(jokes)
+    bot.reply_to(m, f"😂 <b>جوک امروز:</b>\n{joke}")
 
 @bot.message_handler(func=lambda m: cmd_text(m) == "لیست جوک")
 def list_jokes(m):
-    d = load_data(); jokes = d.get("jokes", [])
-    if not jokes: return bot.reply_to(m, "❗ هیچ جوکی ثبت نشده.")
-    txt = "\n".join([f"{i+1}. {j}" for i,j in enumerate(jokes)])
-    bot.reply_to(m, f"📜 لیست جوک‌ها:\n{txt}")
+    d = load_data()
+    jokes = d.get("jokes", [])
+    if not jokes:
+        return bot.reply_to(m, "❗ هیچ جوکی ثبت نشده.")
+    text = "\n".join([f"{i+1}. {j}" for i, j in enumerate(jokes)])
+    bot.reply_to(m, f"📜 <b>لیست جوک‌های ذخیره‌شده:</b>\n{text}")
 
 @bot.message_handler(func=lambda m: cmd_text(m).startswith("حذف جوک "))
 def del_joke(m):
-    d = load_data(); jokes = d.get("jokes", [])
+    d = load_data()
+    jokes = d.get("jokes", [])
     try:
-        idx = int(cmd_text(m).split()[2]) - 1
-        if idx < 0 or idx >= len(jokes): raise ValueError
-        removed = jokes.pop(idx); save_data(d)
-        bot.reply_to(m, f"🗑 جوک حذف شد:\n{removed}")
-    except:
-        bot.reply_to(m, "❗ شماره‌ی جوک نامعتبر است.")
+        parts = cmd_text(m).split()
+        if len(parts) < 3:
+            return bot.reply_to(m, "⚠️ فرمت درست دستور: حذف جوک 1")
+        idx = int(parts[2]) - 1
+        if idx < 0 or idx >= len(jokes):
+            raise ValueError
+        removed = jokes.pop(idx)
+        save_data(d)
+        bot.reply_to(m, f"🗑 جوک شماره {idx+1} حذف شد:\n«{removed}»")
+    except Exception as e:
+        bot.reply_to(m, "❗ شماره‌ی جوک نامعتبر است یا خطایی رخ داده.")
 
 # ==== فال ====
 @bot.message_handler(func=lambda m: is_admin(m.chat.id, m.from_user.id) and m.reply_to_message and cmd_text(m) == "ثبت فال")
 def add_fal(m):
     d = load_data()
     txt = (m.reply_to_message.text or "").strip()
-    if not txt: return bot.reply_to(m, "⚠️ لطفاً روی پیام متنی ریپلای کن.")
-    d["falls"].append(txt); save_data(d)
+    if not txt:
+        return bot.reply_to(m, "⚠️ لطفاً روی پیام متنی ریپلای کن.")
+    d["falls"].append(txt)
+    save_data(d)
     bot.reply_to(m, "🔮 فال ذخیره شد.")
 
 @bot.message_handler(func=lambda m: cmd_text(m) == "فال")
 def random_fal(m):
-    d = load_data(); f = d.get("falls", [])
-    bot.reply_to(m, f"🔮 {random.choice(f)}" if f else "😅 هنوز فالی ثبت نشده.")
-
-@bot.message_handler(func=lambda m: cmd_text(m) == "لیست فال")
-def list_fal(m):
-    d = load_data(); f = d.get("falls", [])
-    if not f: return bot.reply_to(m, "❗ هیچ فالی ثبت نشده.")
-    txt = "\n".join([f"{i+1}. {x}" for i,x in enumerate(f)])
-    bot.reply_to(m, f"📜 لیست فال‌ها:\n{txt}")
-
-@bot.message_handler(func=lambda m: cmd_text(m).startswith("حذف فال "))
-def del_fal(m):
-    d = load_data(); f = d.get("falls", [])
-    try:
-        idx = int(cmd_text(m).split()[2]) - 1
-        if idx < 0 or idx >= len(f): raise ValueError
-        removed = f.pop(idx); save_data(d)
-        bot.reply_to(m, f"🗑 فال حذف شد:\n{removed}")
-    except:
-        bot.reply_to(m, "❗ شماره‌ی فال نامعتبر است.")
+    d = load_data()
+    f = d.get("falls", [])
+    if not f:
+        return bot.reply_to(m, "😅 هنوز هیچ فالی ثبت نشده!")
+    bot.reply_to(m, f"🔮 <b>فال امروز:</b>\n{random.choice(f)}")
 
 # ================= 🧹 پاکسازی =================
 @bot.message_handler(func=lambda m: is_admin(m.chat.id, m.from_user.id) and cmd_text(m).startswith("حذف "))
@@ -340,8 +355,10 @@ def del_msgs(m):
     except:
         return bot.reply_to(m, "❗ فرمت درست: حذف 20")
     for i in range(1, n+1):
-        try: bot.delete_message(m.chat.id, m.message_id - i)
-        except: pass
+        try:
+            bot.delete_message(m.chat.id, m.message_id - i)
+        except:
+            pass
     bot.send_message(m.chat.id, f"🧹 {n} پیام پاک شد.", disable_notification=True)
 
 # ================= 📢 ارسال همگانی =================
@@ -359,20 +376,22 @@ def broadcast(m):
             elif msg.photo:
                 bot.send_photo(uid, msg.photo[-1].file_id, caption=msg.caption or "")
             total += 1
-        except: continue
+        except:
+            continue
     bot.reply_to(m, f"📢 پیام برای {total} کاربر ارسال شد.")
 
 # ================= ℹ️ راهنما =================
 @bot.message_handler(func=lambda m: cmd_text(m) == "راهنما")
 def show_help(m):
     txt = (
-        "📘 <b>راهنمای Persian Lux Panel V15 (ID Updated)</b>\n\n"
+        "📘 <b>راهنمای Persian Lux Panel V15 (Updated)</b>\n\n"
         "🆔 آیدی لوکس | ساعت | آمار | لینک ربات/گروه\n"
         "👋 خوشامد | تنظیم | روشن/خاموش\n"
         "🔒 قفل‌ها (لینک | عکس | فیلم | گیف...)\n"
         "🚫 بن | 🔇 سکوت | ⚠️ اخطار (۳=اخراج)\n"
-        "😂 جوک | 🔮 فال | 🧹 حذف N پیام\n"
-        "📢 ارسال همگانی (فقط سودو)\n\n"
+        "😂 جوک‌ها: ثبت جوک | جوک | لیست جوک | حذف جوک N\n"
+        "🔮 فال‌ها: ثبت فال | فال\n"
+        "🧹 حذف N پیام | 📢 ارسال همگانی (فقط سودو)\n\n"
         "👑 سازنده: محمد | Persian Lux Panel"
     )
     bot.reply_to(m, txt)
@@ -397,7 +416,7 @@ def start_cmd(m):
         save_data(d)
     bot.reply_to(m, "👋 سلام! ربات مدیریتی Persian Lux Panel فعال است.\nبرای راهنما بنویس: «راهنما»")
 
-print("🤖 Persian Lux Panel V15 (ID Updated) در حال اجراست...")
+print("🤖 Persian Lux Panel V15 (Joke Updated) در حال اجراست...")
 while True:
     try:
         bot.infinity_polling(timeout=60, long_polling_timeout=30)
