@@ -34,15 +34,15 @@ def load_data():
     save_data(data)
     return data
 
-
 def save_data(d):
     with open(DATA_FILE, "w", encoding="utf-8") as f:
         json.dump(d, f, ensure_ascii=False, indent=2)
 
-
 def register_group(gid):
     data = load_data()
     gid = str(gid)
+    if "welcome" not in data: data["welcome"] = {}
+    if "locks" not in data: data["locks"] = {}
     data["welcome"].setdefault(gid, {"enabled": True, "type": "text", "content": None})
     data["locks"].setdefault(gid, {"link": False})
     save_data(data)
@@ -83,29 +83,6 @@ def cmd_id(m):
     except:
         bot.reply_to(m, caption)
 
-# ================== 🚫 قفل لینک ==================
-@bot.message_handler(func=lambda m: True, content_types=["text"])
-def anti_link(m):
-    if "t.me/" in m.text or "https://" in m.text or "http://" in m.text:
-        data = load_data()
-        gid = str(m.chat.id)
-        if data["locks"].get(gid, {}).get("link", False):
-            try:
-                bot.delete_message(m.chat.id, m.message_id)
-                bot.send_message(m.chat.id, "🚫 ارسال لینک ممنوع است!", reply_to_message_id=m.message_id)
-            except: pass
-
-@bot.message_handler(func=lambda m: cmd_text(m) in ["قفل لینک", "بازکردن لینک"])
-def lock_link(m):
-    if not (is_admin(m.chat.id, m.from_user.id) or is_sudo(m.from_user.id)):
-        return
-    data = load_data()
-    gid = str(m.chat.id)
-    en = (cmd_text(m) == "قفل لینک")
-    data["locks"].setdefault(gid, {})["link"] = en
-    save_data(data)
-    bot.reply_to(m, "🔒 قفل لینک فعال شد" if en else "🔓 قفل لینک غیرفعال شد")
-
 # ================== 🎉 خوشامد ==================
 def now_time():
     return jdatetime.datetime.now().strftime("%H:%M  (%A %d %B %Y)")
@@ -133,6 +110,7 @@ def welcome(m):
 def toggle_welcome(m):
     if not (is_admin(m.chat.id, m.from_user.id) or is_sudo(m.from_user.id)): return
     data = load_data(); gid = str(m.chat.id)
+    if "welcome" not in data: data["welcome"] = {}
     data["welcome"].setdefault(gid, {"enabled": True})
     data["welcome"][gid]["enabled"] = (cmd_text(m) == "خوشامد روشن")
     save_data(data)
@@ -142,6 +120,7 @@ def toggle_welcome(m):
 def set_welcome(m):
     if not (is_admin(m.chat.id, m.from_user.id) or is_sudo(m.from_user.id)): return
     data = load_data(); gid = str(m.chat.id)
+    if "welcome" not in data: data["welcome"] = {}
     txt = m.reply_to_message.text or ""
     data["welcome"][gid] = {"enabled": True, "type": "text", "content": txt}
     save_data(data)
@@ -212,10 +191,35 @@ def clear(m):
     deleted=0
     try:
         for i in range(1,101):
-            bot.delete_message(m.chat.id,m.message_id-i)
-            deleted+=1
+            try:
+                bot.delete_message(m.chat.id,m.message_id-i)
+                deleted+=1
+            except: continue
     except: pass
     bot.reply_to(m,f"🧹 {deleted} پیام پاک شد")
+
+# ================== 🚫 قفل لینک ==================
+@bot.message_handler(func=lambda m: True, content_types=["text"])
+def anti_link(m):
+    data = load_data()
+    gid = str(m.chat.id)
+    if data["locks"].get(gid, {}).get("link", False):
+        if "t.me/" in m.text or "http" in m.text:
+            try:
+                bot.delete_message(m.chat.id, m.message_id)
+                bot.send_message(m.chat.id, "🚫 ارسال لینک ممنوع است!", reply_to_message_id=m.message_id)
+            except: pass
+
+@bot.message_handler(func=lambda m: cmd_text(m) in ["قفل لینک", "بازکردن لینک"])
+def lock_link(m):
+    if not (is_admin(m.chat.id, m.from_user.id) or is_sudo(m.from_user.id)):
+        return
+    data = load_data()
+    gid = str(m.chat.id)
+    en = (cmd_text(m) == "قفل لینک")
+    data["locks"].setdefault(gid, {})["link"] = en
+    save_data(data)
+    bot.reply_to(m, "🔒 قفل لینک فعال شد" if en else "🔓 قفل لینک غیرفعال شد")
 
 # ================== 🚀 اجرای ربات ==================
 print("🤖 Bot is running...")
