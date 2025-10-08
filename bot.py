@@ -244,7 +244,92 @@ def cb_panel(call):
         elif call.data == "main":
             bot.edit_message_text("🎛 منوی اصلی:", call.message.chat.id, call.message.message_id, reply_markup=main_panel())
     except Exception as e:
-        logging.error(f"callback error: {e}")# ================ 😂 جوک و 🔮 فال =================
+        logging.error(f"callback error: {e}")# ================ 🆔 آیدی و ساعت =================
+@bot.message_handler(func=lambda m: cmd_text(m) in ["آیدی", "ایدی"])
+def show_id(m):
+    try:
+        user = m.from_user
+        photos = bot.get_user_profile_photos(user.id, limit=1)
+        caption = (
+            f"🧾 <b>نام:</b> {user.first_name}\n"
+            f"🆔 <b>آیدی شما:</b> <code>{user.id}</code>\n"
+            f"💬 <b>آیدی گروه:</b> <code>{m.chat.id}</code>\n"
+            f"⏰ {shamsi_time()} | 📅 {shamsi_date()}"
+        )
+        if photos.total_count > 0:
+            bot.send_photo(m.chat.id, photos.photos[0][-1].file_id, caption=caption)
+        else:
+            bot.reply_to(m, caption)
+    except Exception as e:
+        logging.error(f"id handler error: {e}")
+        bot.reply_to(m, f"🆔 <code>{m.from_user.id}</code> | ⏰ {shamsi_time()}")
+
+# ================ 🔗 لینک گروه و ربات =================
+@bot.message_handler(func=lambda m: cmd_text(m) == "لینک گروه")
+def group_link(m):
+    if not is_admin(m.chat.id, m.from_user.id):
+        return bot.reply_to(m, "🔒 فقط مدیران می‌توانند لینک را بگیرند.")
+    try:
+        link = bot.export_chat_invite_link(m.chat.id)
+        bot.reply_to(m, f"🔗 لینک گروه:\n{link}")
+    except Exception as e:
+        logging.error(f"group link error: {e}")
+        bot.reply_to(m, "⚠️ مجوز 'Invite Users' را برای ربات فعال کن.")
+
+@bot.message_handler(func=lambda m: cmd_text(m) == "لینک ربات")
+def bot_link(m):
+    try:
+        bot_user = bot.get_me()
+        bot.reply_to(m, f"🤖 لینک ربات:\nhttps://t.me/{bot_user.username}")
+    except Exception as e:
+        logging.error(f"bot link error: {e}")
+        bot.reply_to(m, "❗ خطا در دریافت لینک ربات.")
+
+# ================ 🧭 پنل شیشه‌ای فارسی =================
+@bot.message_handler(func=lambda m: cmd_text(m) in ["پنل", "/panel"])
+def open_panel(m):
+    if not (is_admin(m.chat.id, m.from_user.id) or is_sudo(m.from_user.id)):
+        return bot.reply_to(m, "🔐 فقط مدیران به پنل دسترسی دارند.")
+    kb = types.InlineKeyboardMarkup(row_width=2)
+    kb.add(
+        types.InlineKeyboardButton("🔒 قفل‌ها", callback_data="locks"),
+        types.InlineKeyboardButton("👋 خوشامد", callback_data="welcome"),
+        types.InlineKeyboardButton("😂 جوک و فال", callback_data="fun"),
+        types.InlineKeyboardButton("🚫 بن / سکوت / اخطار", callback_data="manage"),
+        types.InlineKeyboardButton("📊 آمار", callback_data="stats"),
+        types.InlineKeyboardButton("👑 مدیران و سودوها", callback_data="admins"),
+        types.InlineKeyboardButton("ℹ️ راهنما", callback_data="help"),
+        types.InlineKeyboardButton("❌ بستن پنل", callback_data="close")
+    )
+    bot.send_message(m.chat.id, "🎛️ <b>پنل مدیریتی لوکس باز شد</b>\nاز دکمه‌های زیر استفاده کن 👇", reply_markup=kb)
+
+@bot.callback_query_handler(func=lambda call: True)
+def cb(call):
+    data = call.data
+    if data == "close":
+        try:
+            bot.delete_message(call.message.chat.id, call.message.message_id)
+        except: pass
+    elif data == "help":
+        txt = (
+            "📘 <b>راهنمای کامل ربات مدیریتی Persian Lux Panel</b>\n\n"
+            "🆔 آیدی – ساعت – آمار – لینک گروه – لینک ربات\n"
+            "👋 خوشامد: تنظیم، روشن/خاموش، عکس یا متن دلخواه\n"
+            "🔒 قفل‌ها: لینک، عکس، فیلم، گیف، فایل، موزیک، ویس، فوروارد، گروه\n"
+            "🚫 بن، 🔇 سکوت، ⚠️ اخطار (۳ اخطار = اخراج)\n"
+            "😂 ثبت جوک / فال، حذف عددی، لیست جوک، لیست فال\n"
+            "📢 ارسال همگانی (فقط سودو)\n"
+            "🧹 حذف N پیام یا پاکسازی ۱۰۰ پیام آخر\n"
+            "👑 افزودن / حذف مدیر و سودو، مشاهده لیست‌ها\n"
+            "\n💎 توسعه داده‌شده توسط سودو محترم <b>محمد</b> 👑"
+        )
+        kb = types.InlineKeyboardMarkup()
+        kb.add(types.InlineKeyboardButton("🔙 بازگشت", callback_data="main"))
+        try:
+            bot.edit_message_text(txt, call.message.chat.id, call.message.message_id, reply_markup=kb)
+        except: pass
+    elif data == "main":
+        open_panel(call.message)# ================ 😂 جوک و 🔮 فال =================
 @bot.message_handler(func=lambda m: is_admin(m.chat.id, m.from_user.id) and m.reply_to_message and cmd_text(m) == "ثبت جوک")
 def add_joke(m):
     d = load_data()
@@ -401,45 +486,4 @@ def del_msgs(m):
 # ================ 📢 ارسال همگانی =================
 @bot.message_handler(func=lambda m: is_sudo(m.from_user.id) and m.reply_to_message and cmd_text(m) == "ارسال")
 def broadcast(m):
-    d = load_data()
-    users = list(set(d.get("users", [])))
-    groups = [int(g) for g in d["welcome"].keys()]
-    msg = m.reply_to_message
-    total = 0
-    for uid in users + groups:
-        try:
-            if msg.text:
-                bot.send_message(uid, msg.text)
-            elif msg.photo:
-                bot.send_photo(uid, msg.photo[-1].file_id, caption=msg.caption or "")
-            total += 1
-        except: continue
-    bot.reply_to(m, f"📢 پیام برای {total} مخاطب ارسال شد.")
-
-# ================ 🤖 پاسخ سودو =================
-@bot.message_handler(func=lambda m: is_sudo(m.from_user.id) and cmd_text(m).lower() in ["سلام","ربات","هی","bot"])
-def sudo_reply(m):
-    replies = [
-        f"👑 جانم {m.from_user.first_name}، در خدمتتم 💎",
-        f"✨ سلام {m.from_user.first_name}! آماده‌ام 💪",
-        f"🤖 بله {m.from_user.first_name}، گوش به فرمانم 🔥"
-    ]
-    bot.reply_to(m, random.choice(replies))
-
-# ================ 🚀 اجرای نهایی =================
-@bot.message_handler(commands=["start"])
-def start_cmd(m):
-    d = load_data()
-    uid = str(m.from_user.id)
-    if uid not in d["users"]:
-        d["users"].append(uid); save_data(d)
-    bot.reply_to(m, "✨ ربات مدیریتی Persian Lux Panel فعال است.\nبرای دسترسی به امکانات بنویس: «پنل» یا /panel")
-
-if __name__ == "__main__":
-    print("🤖 Persian Lux Panel V15 is running...")
-    while True:
-        try:
-            bot.infinity_polling(timeout=60, long_polling_timeout=30)
-        except Exception as e:
-            logging.error(f"polling crash: {e}")
-            time.sleep(5)
+    d = load_data(
