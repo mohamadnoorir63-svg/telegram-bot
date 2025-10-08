@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
-# Persian Lux Panel V15 – Fixed Full Part 1/2
+# Persian Lux Panel V16 Ultimate – Part 1/2
 # Designed for Mohammad 👑
 
-import os, json, random, time, logging
+import os, json, random, time, logging, requests
 from datetime import datetime
 import pytz, jdatetime
 import telebot
@@ -15,7 +15,6 @@ bot     = telebot.TeleBot(TOKEN, parse_mode="HTML")
 
 DATA_FILE = "data.json"
 LOG_FILE  = "error.log"
-
 logging.basicConfig(filename=LOG_FILE, level=logging.ERROR,
                     format="%(asctime)s - %(levelname)s - %(message)s")
 
@@ -24,7 +23,7 @@ def base_data():
     return {
         "welcome": {}, "locks": {}, "admins": {}, "sudo_list": [],
         "banned": {}, "muted": {}, "warns": {}, "users": [],
-        "jokes": [], "falls": []
+        "jokes": [], "falls": [], "stats": {}
     }
 
 def load_data():
@@ -33,7 +32,7 @@ def load_data():
     try:
         with open(DATA_FILE, "r", encoding="utf-8") as f:
             data = json.load(f)
-    except Exception:
+    except:
         data = base_data()
     for k in base_data():
         if k not in data:
@@ -53,9 +52,14 @@ def register_group(gid):
     save_data(data)
 
 # ================= 🧩 ابزارها =================
-def shamsi_date(): return jdatetime.datetime.now().strftime("%A %d %B %Y")
-def shamsi_time(): return jdatetime.datetime.now().strftime("%H:%M:%S")
-def cmd_text(m): return (getattr(m, "text", None) or "").strip()
+def shamsi_date():
+    return jdatetime.datetime.now().strftime("%A %d %B %Y")
+
+def shamsi_time():
+    return jdatetime.datetime.now().strftime("%H:%M:%S")
+
+def cmd_text(m):
+    return (getattr(m, "text", None) or "").strip()
 
 def is_sudo(uid):
     d = load_data()
@@ -70,26 +74,32 @@ def is_admin(chat_id, uid):
         return st in ("administrator", "creator")
     except: return False
 
-# ================= 🕒 آمار / آیدی / ساعت =================
-@bot.message_handler(func=lambda m: cmd_text(m) == "آمار")
-def show_stats(m):
-    if not (is_admin(m.chat.id, m.from_user.id) or is_sudo(m.from_user.id)): return
-    data = load_data()
-    users = len(set(data.get("users", [])))
-    groups = len(data.get("welcome", {}))
-    bot.reply_to(m,
-        f"📊 <b>آمار ربات Persian Lux Panel</b>\n"
-        f"👤 کاربران: {users}\n👥 گروه‌ها: {groups}\n"
-        f"📅 {shamsi_date()} | ⏰ {shamsi_time()}")
-
-@bot.message_handler(func=lambda m: cmd_text(m) in ["آیدی","ایدی"])
+# ================= 🆔 آیدی لوکس =================
+@bot.message_handler(func=lambda m: cmd_text(m) in ["آیدی", "ایدی"])
 def show_id(m):
-    bot.reply_to(m, f"🧾 آیدی شما: <code>{m.from_user.id}</code>\n💬 آیدی گروه: <code>{m.chat.id}</code>")
+    user = m.from_user
+    name = user.first_name or ""
+    uid = user.id
+    profile_photos = bot.get_user_profile_photos(uid)
+    caption = (
+        f"🧾 <b>مشخصات کاربر:</b>\n"
+        f"👤 نام: {name}\n"
+        f"🆔 آیدی عددی: <code>{uid}</code>\n"
+        f"📅 تاریخ: {shamsi_date()}\n"
+        f"⏰ ساعت: {shamsi_time()}"
+    )
+    if profile_photos.total_count > 0:
+        file_id = profile_photos.photos[0][-1].file_id
+        bot.send_photo(m.chat.id, file_id, caption=caption)
+    else:
+        bot.reply_to(m, caption)
 
+# ================= ⏰ ساعت =================
 @bot.message_handler(func=lambda m: cmd_text(m) == "ساعت")
 def show_time(m):
-    bot.reply_to(m, f"⏰ {shamsi_time()} | 📅 {shamsi_date()}")
+    bot.reply_to(m, f"⏰ ساعت: {shamsi_time()}\n📅 تاریخ: {shamsi_date()}")
 
+# ================= 🔗 لینک‌ها =================
 @bot.message_handler(func=lambda m: cmd_text(m) == "لینک ربات")
 def bot_link(m):
     bot.reply_to(m, f"🤖 لینک ربات:\nhttps://t.me/{bot.get_me().username}")
@@ -131,7 +141,7 @@ def set_welcome(m):
     save_data(data)
     bot.reply_to(m, "✅ پیام خوشامد جدید تنظیم شد.\nاز {name} و {time} در متن می‌تونی استفاده کنی.")
 
-@bot.message_handler(func=lambda m: is_admin(m.chat.id, m.from_user.id) and cmd_text(m) in ["خوشامد روشن","خوشامد خاموش"])
+@bot.message_handler(func=lambda m: is_admin(m.chat.id, m.from_user.id) and cmd_text(m) in ["خوشامد روشن", "خوشامد خاموش"])
 def toggle_welcome(m):
     data = load_data(); gid = str(m.chat.id)
     en = cmd_text(m) == "خوشامد روشن"
@@ -142,9 +152,9 @@ def toggle_welcome(m):
 
 # ================= 🔒 قفل‌ها =================
 LOCK_MAP = {
-    "لینک":"link","گروه":"group","عکس":"photo","ویدیو":"video",
-    "استیکر":"sticker","گیف":"gif","فایل":"file","موزیک":"music",
-    "ویس":"voice","فوروارد":"forward"
+    "لینک": "link", "گروه": "group", "عکس": "photo", "ویدیو": "video",
+    "استیکر": "sticker", "گیف": "gif", "فایل": "file",
+    "موزیک": "music", "ویس": "voice", "فوروارد": "forward"
 }
 
 @bot.message_handler(func=lambda m: cmd_text(m).startswith("قفل ") or cmd_text(m).startswith("بازکردن "))
@@ -160,10 +170,15 @@ def toggle_lock(m):
     if d["locks"][gid][lock_type] == en:
         return bot.reply_to(m, "⚠️ این قفل همین حالا هم در همین حالت است.")
     d["locks"][gid][lock_type] = en; save_data(d)
+
     if lock_type == "group":
-        bot.send_message(m.chat.id, "🔒 گروه بسته شد." if en else "🔓 گروه باز شد.")
+        if en:
+            bot.send_message(m.chat.id, "🚫 گروه موقتاً بسته شد ❌\n🔒 فقط مدیران می‌توانند پیام ارسال کنند.")
+        else:
+            bot.send_message(m.chat.id, "✅ گروه باز شد 🌸\n💬 حالا همه می‌تونن گفتگو کنن!")
     else:
-        bot.reply_to(m, f"{'🔒' if en else '🔓'} قفل {key_fa} {'فعال' if en else 'غیرفعال'} شد.")
+        bot.reply_to(m, f"{'🔒' if en else '🔓'} قفل {key_fa} {'فعال' if en else 'غیرفعال'} شد.")# Persian Lux Panel V16 Ultimate – Part 2/2
+# ادامه از پارت اول
 
 # ================= 👑 مدیر و سودو =================
 @bot.message_handler(func=lambda m: m.reply_to_message and cmd_text(m) == "افزودن مدیر")
@@ -200,8 +215,7 @@ def list_sudos(m):
     d = load_data(); s = d.get("sudo_list", [])
     if not s: return bot.reply_to(m, "❗ هیچ سودویی ثبت نشده.")
     txt = "👑 لیست سودوها:\n" + "\n".join([f"• <a href='tg://user?id={x}'>کاربر {x}</a>" for x in s])
-    bot.reply_to(m, txt)# Persian Lux Panel V15 – Fixed Full Part 2/2
-# ادامه‌ی کد
+    bot.reply_to(m, txt)
 
 # ================= 🚫 بن / سکوت / اخطار =================
 @bot.message_handler(func=lambda m: m.reply_to_message and cmd_text(m) == "بن")
@@ -215,30 +229,12 @@ def ban_user(m):
     except Exception as e:
         bot.reply_to(m, f"❗ خطا در بن کاربر: {e}")
 
-@bot.message_handler(func=lambda m: m.reply_to_message and cmd_text(m) == "حذف بن")
-def unban_user(m):
-    if not is_admin(m.chat.id, m.from_user.id): return
-    try:
-        bot.unban_chat_member(m.chat.id, m.reply_to_message.from_user.id, only_if_banned=True)
-        bot.reply_to(m, "✅ کاربر از بن خارج شد.")
-    except:
-        bot.reply_to(m, "❗ خطا در حذف بن.")
-
 @bot.message_handler(func=lambda m: m.reply_to_message and cmd_text(m) == "سکوت")
 def mute_user(m):
     if not is_admin(m.chat.id, m.from_user.id): return
     uid = str(m.reply_to_message.from_user.id)
     d = load_data(); d["muted"][uid] = True; save_data(d)
     bot.reply_to(m, f"🔇 کاربر <a href='tg://user?id={uid}'>ساکت</a> شد.")
-
-@bot.message_handler(func=lambda m: m.reply_to_message and cmd_text(m) == "حذف سکوت")
-def unmute_user(m):
-    if not is_admin(m.chat.id, m.from_user.id): return
-    uid = str(m.reply_to_message.from_user.id)
-    d = load_data()
-    if uid in d["muted"]: d["muted"].pop(uid)
-    save_data(d)
-    bot.reply_to(m, f"🔊 سکوت کاربر <a href='tg://user?id={uid}'>برداشته</a> شد.")
 
 @bot.message_handler(func=lambda m: m.reply_to_message and cmd_text(m) == "اخطار")
 def warn_user(m):
@@ -252,20 +248,10 @@ def warn_user(m):
         msg += "\n🚫 چون ۳ اخطار گرفت، از گروه اخراج شد."
     bot.reply_to(m, msg)
 
-@bot.message_handler(func=lambda m: m.reply_to_message and cmd_text(m) == "حذف اخطار")
-def del_warn(m):
-    if not is_admin(m.chat.id, m.from_user.id): return
-    uid = str(m.reply_to_message.from_user.id)
-    d = load_data()
-    if uid in d["warns"]: d["warns"].pop(uid)
-    save_data(d)
-    bot.reply_to(m, "✅ تمام اخطارهای کاربر پاک شد.")
-
 # ================= 😂 جوک و 🔮 فال =================
 @bot.message_handler(func=lambda m: is_admin(m.chat.id, m.from_user.id) and m.reply_to_message and cmd_text(m) == "ثبت جوک")
 def add_joke(m):
-    d = load_data()
-    txt = (m.reply_to_message.text or "").strip()
+    d = load_data(); txt = (m.reply_to_message.text or "").strip()
     if not txt: return bot.reply_to(m, "⚠️ لطفاً روی پیام متنی ریپلای کن.")
     d["jokes"].append(txt); save_data(d)
     bot.reply_to(m, "😂 جوک ذخیره شد.")
@@ -282,22 +268,10 @@ def list_jokes(m):
     txt = "\n".join([f"{i+1}. {j}" for i,j in enumerate(jokes)])
     bot.reply_to(m, f"📜 لیست جوک‌ها:\n{txt}")
 
-@bot.message_handler(func=lambda m: cmd_text(m).startswith("حذف جوک "))
-def del_joke(m):
-    d = load_data(); jokes = d.get("jokes", [])
-    try:
-        idx = int(cmd_text(m).split()[2]) - 1
-        if idx < 0 or idx >= len(jokes): raise ValueError
-        removed = jokes.pop(idx); save_data(d)
-        bot.reply_to(m, f"🗑 جوک حذف شد:\n{removed}")
-    except:
-        bot.reply_to(m, "❗ شماره‌ی جوک نامعتبر است.")
-
 # ==== فال ====
 @bot.message_handler(func=lambda m: is_admin(m.chat.id, m.from_user.id) and m.reply_to_message and cmd_text(m) == "ثبت فال")
 def add_fal(m):
-    d = load_data()
-    txt = (m.reply_to_message.text or "").strip()
+    d = load_data(); txt = (m.reply_to_message.text or "").strip()
     if not txt: return bot.reply_to(m, "⚠️ لطفاً روی پیام متنی ریپلای کن.")
     d["falls"].append(txt); save_data(d)
     bot.reply_to(m, "🔮 فال ذخیره شد.")
@@ -307,35 +281,55 @@ def random_fal(m):
     d = load_data(); f = d.get("falls", [])
     bot.reply_to(m, f"🔮 {random.choice(f)}" if f else "😅 هنوز فالی ثبت نشده.")
 
-@bot.message_handler(func=lambda m: cmd_text(m) == "لیست فال")
-def list_fal(m):
-    d = load_data(); f = d.get("falls", [])
-    if not f: return bot.reply_to(m, "❗ هیچ فالی ثبت نشده.")
-    txt = "\n".join([f"{i+1}. {x}" for i,x in enumerate(f)])
-    bot.reply_to(m, f"📜 لیست فال‌ها:\n{txt}")
+# ================= 📊 فعالیت امروز =================
+@bot.message_handler(func=lambda m: cmd_text(m) == "فعالیت امروز")
+def daily_stats(m):
+    d = load_data()
+    gid = str(m.chat.id)
+    today = datetime.now().strftime("%Y-%m-%d")
+    group_stats = d["stats"].get(gid, {}).get(today, {
+        "total": 0, "forward": 0, "video": 0, "voice": 0,
+        "photo": 0, "sticker": 0, "gif": 0, "audio": 0
+    })
 
-@bot.message_handler(func=lambda m: cmd_text(m).startswith("حذف فال "))
-def del_fal(m):
-    d = load_data(); f = d.get("falls", [])
-    try:
-        idx = int(cmd_text(m).split()[2]) - 1
-        if idx < 0 or idx >= len(f): raise ValueError
-        removed = f.pop(idx); save_data(d)
-        bot.reply_to(m, f"🗑 فال حذف شد:\n{removed}")
-    except:
-        bot.reply_to(m, "❗ شماره‌ی فال نامعتبر است.")
+    msg = (
+        f"♡ فعالیت های امروز تا این لحظه :\n\n"
+        f"➲ تاریخ : {shamsi_date()}\n"
+        f"➲ ساعت : {shamsi_time()}\n\n"
+        f"✛ کل پیام ها : {group_stats['total']}\n"
+        f"✛ پیام فورواردی : {group_stats['forward']}\n"
+        f"✛ فیلم : {group_stats['video']}\n"
+        f"✛ ویس : {group_stats['voice']}\n"
+        f"✛ عکس : {group_stats['photo']}\n"
+        f"✛ گیف : {group_stats['gif']}\n"
+        f"✛ استیکر : {group_stats['sticker']}\n"
+        f"✛ آهنگ : {group_stats['audio']}\n"
+        f"\n✶ فعال ترین اعضای گروه:\n"
+        f"• (در نسخه‌ی بعدی نمایش کاربران فعال اضافه می‌شود)\n\n"
+        f"✧ Persian Lux Panel V16 👑"
+    )
+    bot.reply_to(m, msg)
 
-# ================= 🧹 پاکسازی =================
-@bot.message_handler(func=lambda m: is_admin(m.chat.id, m.from_user.id) and cmd_text(m).startswith("حذف "))
-def del_msgs(m):
-    try:
-        n = int(cmd_text(m).split()[1])
-    except:
-        return bot.reply_to(m, "❗ فرمت درست: حذف 20")
-    for i in range(1, n+1):
-        try: bot.delete_message(m.chat.id, m.message_id - i)
-        except: pass
-    bot.send_message(m.chat.id, f"🧹 {n} پیام پاک شد.", disable_notification=True)
+# شمارش خودکار پیام‌ها
+@bot.message_handler(content_types=["text", "photo", "video", "sticker", "voice", "audio", "document"])
+def count_messages(m):
+    d = load_data(); gid = str(m.chat.id)
+    today = datetime.now().strftime("%Y-%m-%d")
+    d["stats"].setdefault(gid, {})
+    d["stats"][gid].setdefault(today, {
+        "total": 0, "forward": 0, "video": 0, "voice": 0,
+        "photo": 0, "sticker": 0, "gif": 0, "audio": 0
+    })
+    s = d["stats"][gid][today]
+    s["total"] += 1
+    if m.forward_from: s["forward"] += 1
+    if m.content_type == "photo": s["photo"] += 1
+    if m.content_type == "video": s["video"] += 1
+    if m.content_type == "voice": s["voice"] += 1
+    if m.content_type == "sticker": s["sticker"] += 1
+    if m.content_type == "animation": s["gif"] += 1
+    if m.content_type == "audio": s["audio"] += 1
+    save_data(d)
 
 # ================= 📢 ارسال همگانی =================
 @bot.message_handler(func=lambda m: is_sudo(m.from_user.id) and m.reply_to_message and cmd_text(m) == "ارسال")
@@ -355,21 +349,6 @@ def broadcast(m):
         except: continue
     bot.reply_to(m, f"📢 پیام برای {total} کاربر ارسال شد.")
 
-# ================= ℹ️ راهنما =================
-@bot.message_handler(func=lambda m: cmd_text(m) == "راهنما")
-def show_help(m):
-    txt = (
-        "📘 <b>راهنمای Persian Lux Panel V15</b>\n\n"
-        "🆔 آیدی | ساعت | آمار | لینک ربات/گروه\n"
-        "👋 خوشامد | تنظیم | روشن/خاموش\n"
-        "🔒 قفل‌ها (لینک | عکس | فیلم | گیف...)\n"
-        "🚫 بن | 🔇 سکوت | ⚠️ اخطار (۳=اخراج)\n"
-        "😂 جوک | 🔮 فال | 🧹 حذف N پیام\n"
-        "📢 ارسال همگانی (فقط سودو)\n\n"
-        "👑 سازنده: محمد | Persian Lux Panel"
-    )
-    bot.reply_to(m, txt)
-
 # ================= 🤖 پاسخ سودو =================
 @bot.message_handler(func=lambda m: is_sudo(m.from_user.id) and cmd_text(m).lower() in ["سلام","ربات","هی","bot"])
 def sudo_reply(m):
@@ -386,11 +365,10 @@ def start_cmd(m):
     d = load_data()
     uid = str(m.from_user.id)
     if uid not in d["users"]:
-        d["users"].append(uid)
-        save_data(d)
-    bot.reply_to(m, "👋 سلام! ربات مدیریتی Persian Lux Panel فعال است.\nبرای راهنما بنویس: «راهنما»")
+        d["users"].append(uid); save_data(d)
+    bot.reply_to(m, "👋 سلام! ربات مدیریتی Persian Lux Panel V16 فعال است.\nبرای راهنما بنویس: «فعالیت امروز» یا «راهنما»")
 
-print("🤖 Persian Lux Panel V15 (Fixed Full) در حال اجراست...")
+print("🤖 Persian Lux Panel V16 Ultimate is running...")
 while True:
     try:
         bot.infinity_polling(timeout=60, long_polling_timeout=30)
