@@ -16,6 +16,13 @@ LOG_FILE = "error.log"
 logging.basicConfig(filename=LOG_FILE, level=logging.ERROR,
                     format="%(asctime)s - %(levelname)s - %(message)s")
 
+# ================= 🔒 قفل‌ها (باید قبل از register_group باشد) =================
+LOCK_MAP = {
+    "لینک": "link", "گروه": "group", "عکس": "photo", "ویدیو": "video",
+    "استیکر": "sticker", "گیف": "gif", "فایل": "file",
+    "موزیک": "music", "ویس": "voice", "فوروارد": "forward"
+}
+
 # ================= 📂 داده‌ها =================
 def base_data():
     return {
@@ -169,77 +176,7 @@ def callback_handler(call):
         kb.add(types.InlineKeyboardButton("🔙 برگشت", callback_data="back"))
         bot.edit_message_text(text, call.message.chat.id, call.message.message_id, reply_markup=kb)
     elif data == "back":
-        bot.edit_message_text("🎛️ بازگشت به منوی اصلی:", call.message.chat.id, call.message.message_id, reply_markup=main_panel())# ================= 🔒 قفل‌ها =================
-LOCK_MAP = {
-    "لینک": "link", "گروه": "group", "عکس": "photo", "ویدیو": "video",
-    "استیکر": "sticker", "گیف": "gif", "فایل": "file",
-    "موزیک": "music", "ویس": "voice", "فوروارد": "forward"
-}
-
-@bot.message_handler(func=lambda m: cmd_text(m).startswith("قفل ") or cmd_text(m).startswith("بازکردن "))
-def toggle_lock(m):
-    if not is_admin(m.chat.id, m.from_user.id): return
-    data = load_data(); gid = str(m.chat.id)
-    part = cmd_text(m).split(" ")
-    if len(part) < 2: return
-    key_fa = part[1]
-    lock_type = LOCK_MAP.get(key_fa)
-    if not lock_type: return bot.reply_to(m, "❌ نوع قفل نامعتبر است.")
-    en = cmd_text(m).startswith("قفل ")
-    data["locks"].setdefault(gid, {k: False for k in LOCK_MAP.values()})
-    if data["locks"][gid][lock_type] == en:
-        msg = "⚠️ این مورد از قبل قفل بود." if en else "⚠️ این مورد از قبل باز بود."
-        return bot.reply_to(m, msg)
-    data["locks"][gid][lock_type] = en
-    save_data(data)
-    if lock_type == "group":
-        bot.send_message(m.chat.id, "🔒 گروه به دستور مدیر بسته شد." if en else "🔓 گروه توسط مدیر باز شد.")
-    else:
-        bot.reply_to(m, f"🔒 قفل {key_fa} فعال شد" if en else f"🔓 قفل {key_fa} غیرفعال شد")
-
-# ================= 🚧 اجرای قفل‌ها و آمار =================
-@bot.message_handler(content_types=['text','photo','video','document','audio','voice','sticker','animation','video_note'])
-def enforce(m):
-    try:
-        register_group(m.chat.id)
-        if is_admin(m.chat.id, m.from_user.id): return
-        data = load_data(); gid = str(m.chat.id)
-        locks = data["locks"].get(gid, {})
-        txt = (m.text or "") + " " + (getattr(m, "caption", "") or "")
-        if locks.get("group"): return bot.delete_message(m.chat.id, m.message_id)
-        if locks.get("link") and any(x in txt for x in ["http://","https://","t.me","telegram.me"]):
-            return bot.delete_message(m.chat.id, m.message_id)
-        if locks.get("photo") and m.photo: bot.delete_message(m.chat.id, m.message_id)
-        if locks.get("video") and m.video: bot.delete_message(m.chat.id, m.message_id)
-        if locks.get("sticker") and m.sticker: bot.delete_message(m.chat.id, m.message_id)
-        if locks.get("gif") and m.animation: bot.delete_message(m.chat.id, m.message_id)
-        if locks.get("file") and m.document: bot.delete_message(m.chat.id, m.message_id)
-        if locks.get("music") and m.audio: bot.delete_message(m.chat.id, m.message_id)
-        if locks.get("voice") and m.voice: bot.delete_message(m.chat.id, m.message_id)
-        if locks.get("forward") and (m.forward_from or m.forward_from_chat): bot.delete_message(m.chat.id, m.message_id)
-
-        # ✅ ثبت آمار
-        d = load_data()
-        today = str(datetime.now().date())
-        if d["stats"][gid]["date"] != today:
-            d["stats"][gid]["date"] = today
-            d["stats"][gid]["users"] = {}
-            d["stats"][gid]["counts"] = {k:0 for k in d["stats"][gid]["counts"]}
-        st = d["stats"][gid]
-        uid = str(m.from_user.id)
-        st["users"].setdefault(uid, 0)
-        st["users"][uid] += 1
-        if m.photo: st["counts"]["photo"] += 1
-        elif m.video: st["counts"]["video"] += 1
-        elif m.voice: st["counts"]["voice"] += 1
-        elif m.audio: st["counts"]["music"] += 1
-        elif m.sticker: st["counts"]["sticker"] += 1
-        elif m.animation: st["counts"]["gif"] += 1
-        elif m.forward_from or m.forward_from_chat: st["counts"]["fwd"] += 1
-        else: st["counts"]["msg"] += 1
-        save_data(d)
-    except Exception as e:
-        logging.error(f"enforce error: {e}")
+        bot.edit_message_text("🎛️ بازگشت به منوی اصلی:", call.message.chat.id, call.message.message_id, reply_markup=main_panel())
 
 # ================= 💬 آمار روزانه =================
 @bot.message_handler(func=lambda m: cmd_text(m) == "آمار")
@@ -270,10 +207,8 @@ def group_stats(m):
 ✛ عکس: {st['counts']['photo']}
 ✛ گیف: {st['counts']['gif']}
 ✛ استیکر: {st['counts']['sticker']}
-
 ✶ فعال‌ترین اعضای گروه:
 {top_user}
-
 📆 آخرین بروز رسانی: {now_teh().strftime('%Y-%m-%d %H:%M:%S')}
 """
     bot.reply_to(m, msg)
@@ -295,9 +230,8 @@ def welcome(m):
     else:
         bot.send_message(m.chat.id, text)
 
-@bot.message_handler(func=lambda m: cmd_text(m) == "تنظیم خوشامد" and m.reply_to_message)
+@bot.message_handler(func=lambda m: is_admin(m.chat.id, m.from_user.id) and cmd_text(m) == "تنظیم خوشامد" and m.reply_to_message)
 def set_welcome(m):
-    if not is_admin(m.chat.id, m.from_user.id): return
     data = load_data(); gid = str(m.chat.id)
     msg = m.reply_to_message
     if msg.photo:
@@ -309,9 +243,8 @@ def set_welcome(m):
     save_data(data)
     bot.reply_to(m, "✅ پیام خوشامد جدید تنظیم شد.")
 
-@bot.message_handler(func=lambda m: cmd_text(m) in ["خوشامد روشن", "خوشامد خاموش"])
+@bot.message_handler(func=lambda m: is_admin(m.chat.id, m.from_user.id) and cmd_text(m) in ["خوشامد روشن", "خوشامد خاموش"])
 def toggle_welcome(m):
-    if not is_admin(m.chat.id, m.from_user.id): return
     data = load_data(); gid = str(m.chat.id)
     en = cmd_text(m) == "خوشامد روشن"
     data["welcome"].setdefault(gid, {"enabled": True})
@@ -320,7 +253,7 @@ def toggle_welcome(m):
     bot.reply_to(m, "✅ خوشامد روشن شد" if en else "🚫 خوشامد خاموش شد")
 
 # ================= 😂 جوک و 🔮 فال =================
-@bot.message_handler(func=lambda m: is_admin(m.from_user.id) and cmd_text(m) == "ثبت جوک" and m.reply_to_message)
+@bot.message_handler(func=lambda m: is_admin(m.chat.id, m.from_user.id) and cmd_text(m) == "ثبت جوک" and m.reply_to_message)
 def add_joke(m):
     data = load_data()
     data["jokes"].append(m.reply_to_message.text)
@@ -333,7 +266,7 @@ def send_joke(m):
     if not jokes: return bot.reply_to(m, "❗ جوکی ثبت نشده.")
     bot.reply_to(m, random.choice(jokes))
 
-@bot.message_handler(func=lambda m: is_admin(m.from_user.id) and cmd_text(m) == "ثبت فال" and m.reply_to_message)
+@bot.message_handler(func=lambda m: is_admin(m.chat.id, m.from_user.id) and cmd_text(m) == "ثبت فال" and m.reply_to_message)
 def add_fal(m):
     data = load_data()
     data["falls"].append(m.reply_to_message.text)
@@ -346,14 +279,14 @@ def send_fal(m):
     if not falls: return bot.reply_to(m, "❗ فالی ثبت نشده.")
     bot.reply_to(m, random.choice(falls))
 
-@bot.message_handler(func=lambda m: is_admin(m.from_user.id) and cmd_text(m) == "لیست جوک‌ها")
+@bot.message_handler(func=lambda m: is_admin(m.chat.id, m.from_user.id) and cmd_text(m) == "لیست جوک‌ها")
 def list_jokes(m):
     data = load_data(); jokes = data.get("jokes", [])
     if not jokes: return bot.reply_to(m, "❗ جوکی ثبت نشده.")
     txt = "\n".join([f"{i+1}. {t}" for i, t in enumerate(jokes)])
     bot.reply_to(m, "📜 لیست جوک‌ها:\n" + txt)
 
-@bot.message_handler(func=lambda m: is_admin(m.from_user.id) and cmd_text(m) == "لیست فال‌ها")
+@bot.message_handler(func=lambda m: is_admin(m.chat.id, m.from_user.id) and cmd_text(m) == "لیست فال‌ها")
 def list_fals(m):
     data = load_data(); falls = data.get("falls", [])
     if not falls: return bot.reply_to(m, "❗ فالی ثبت نشده.")
@@ -366,5 +299,6 @@ def sudo_reply(m):
     bot.reply_to(m, f"سلام 👑 {m.from_user.first_name}!\nدر خدمتتم سودوی عزیز 🤖")
 
 # ================= 🚀 اجرای ربات =================
-print("🤖 ربات مدیریتی V12.2 ProPanel با موفقیت فعال شد!")
-bot.infinity_polling(timeout=60, long_polling_timeout=30)
+if __name__ == "__main__":
+    print("🤖 ربات مدیریتی V12.3 ProPanel با موفقیت فعال شد!")
+    bot.infinity_polling(timeout=60, long_polling_timeout=30)
