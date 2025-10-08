@@ -292,7 +292,35 @@ def leave_group(m):
         time.sleep(1.5)
         bot.leave_chat(m.chat.id)
     except Exception as e:
-        bot.reply_to(m, f"❗ خطا در خروج از گروه:\n<code>{e}</code>")# ================= 😂 جوک‌های جدید و 🔮 فال =================
+        bot.reply_to(m, f"❗ خطا در خروج از گروه:\n<code>{e}</code>")# ================= 🚀 شروع ربات با دکمه‌های شیشه‌ای =================
+@bot.message_handler(commands=["start"])
+def start_cmd(m):
+    d = load_data()
+    uid = str(m.from_user.id)
+    if uid not in d["users"]:
+        d["users"].append(uid)
+        save_data(d)
+
+    # متن معرفی ربات ✨
+    caption = (
+        "👋 سلام دوست عزیز!\n\n"
+        "به ربات مدیریتی Persian Lux Panel خوش اومدی 💎\n\n"
+        "این ربات برای مدیریت حرفه‌ای گروه‌ها طراحی شده:\n"
+        "🔹 قفل لینک، گیف، عکس و ویدیو\n"
+        "🔹 خوشامدگویی خودکار با عکس یا متن\n"
+        "🔹 اخطار، بن، سکوت و آمار دقیق فعالیت\n"
+        "🔹 ثبت جوک و فال روزانه 😂🔮\n\n"
+        "برای استفاده، یکی از گزینه‌های زیر رو انتخاب کن 👇"
+    )
+
+    # دکمه‌های شیشه‌ای
+    keyboard = types.InlineKeyboardMarkup()
+    add_btn = types.InlineKeyboardButton("➕ افزودن ربات به گروه", url="https://t.me/Noorir63_Bot?startgroup=true")
+    support_btn = types.InlineKeyboardButton("💬 پشتیبانی", url="https://t.me/NOORI_NOOR")
+    keyboard.add(add_btn)
+    keyboard.add(support_btn)
+
+    bot.send_message(m.chat.id, caption, reply_markup=keyboard)# ================= 😂 جوک‌های جدید و 🔮 فال =================
 @bot.message_handler(func=lambda m: is_admin(m.chat.id, m.from_user.id) and m.reply_to_message and cmd_text(m) == "ثبت جوک")
 def add_joke(m):
     d = load_data()
