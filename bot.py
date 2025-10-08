@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 import os, json, random
-from datetime import datetime
+from datetime import datetime, timedelta
 import pytz, jdatetime
 import telebot
 from telebot import types
@@ -45,20 +45,23 @@ def save_data(d):
     with open(DATA_FILE, "w", encoding="utf-8") as f:
         json.dump(d, f, ensure_ascii=False, indent=2)
 
+def now_teh(): return datetime.now(pytz.timezone("Asia/Tehran"))
+def shamsi_date(): return jdatetime.datetime.now().strftime("%A %d %B %Y")
+def shamsi_time(): return jdatetime.datetime.now().strftime("%H:%M:%S")
+
 def register_group(gid):
     data = load_data()
     gid = str(gid)
     data["welcome"].setdefault(gid, {"enabled": True, "type": "text", "content": None, "file_id": None})
     data["locks"].setdefault(gid, {k: False for k in LOCK_MAP.values()})
-    data["stats"].setdefault(gid, {
-        "msg":0,"photo":0,"video":0,"voice":0,"music":0,"sticker":0,"gif":0,"fwd":0
-    })
+    if gid not in data["stats"]:
+        data["stats"][gid] = {"date": str(datetime.now().date()), "users": {}, "counts": {
+            "msg":0,"photo":0,"video":0,"voice":0,"music":0,"sticker":0,"gif":0,"fwd":0
+        }}
     save_data(data)
 
 # ================= 🧩 ابزارها =================
 def cmd_text(m): return (getattr(m, "text", None) or "").strip()
-def now_teh(): return datetime.now(pytz.timezone("Asia/Tehran"))
-def shamsi_date(): return jdatetime.datetime.now().strftime("%A %d %B %Y - %H:%M:%S")
 
 def is_sudo(uid):
     d = load_data()
@@ -122,35 +125,113 @@ def enforce(m):
     if locks.get("voice") and m.voice: bot.delete_message(m.chat.id, m.message_id)
     if locks.get("forward") and (m.forward_from or m.forward_from_chat): bot.delete_message(m.chat.id, m.message_id)
 
-# ================= 🎉 خوشامد =================
+    # ✅ ثبت آمار
+    gid = str(m.chat.id)
+    uid = str(m.from_user.id)
+    register_group(m.chat.id)
+    d = load_data()
+    today = str(datetime.now().date())
+    if d["stats"][gid]["date"] != today:
+        d["stats"][gid]["date"] = today
+        d["stats"][gid]["users"] = {}
+        d["stats"][gid]["counts"] = {k:0 for k in d["stats"][gid]["counts"]}
+    st = d["stats"][gid]
+    st["users"].setdefault(uid, 0)
+    st["users"][uid] += 1
+    if m.photo: st["counts"]["photo"] += 1
+    elif m.video: st["counts"]["video"] += 1
+    elif m.voice: st["counts"]["voice"] += 1
+    elif m.audio: st["counts"]["music"] += 1
+    elif m.sticker: st["counts"]["sticker"] += 1
+    elif m.animation: st["counts"]["gif"] += 1
+    elif m.forward_from or m.forward_from_chat: st["counts"]["fwd"] += 1
+    else: st["counts"]["msg"] += 1
+    save_data(d)
+
+# ================= 💬 آمار روزانه =================
+@bot.message_handler(func=lambda m: cmd_text(m) == "آمار")
+def group_stats(m):
+    if not (is_admin(m.chat.id, m.from_user.id) or is_sudo(m.from_user.id)): return
+    d = load_data(); gid = str(m.chat.id)
+    register_group(gid)
+    st = d["stats"][gid]
+    today = shamsi_date(); hour = shamsi_time()
+    total = sum(st["counts"].values())
+    top_user = None
+    if st["users"]:
+        top_user_id = max(st["users"], key=st["users"].get)
+        try:
+            user = bot.get_chat_member(m.chat.id, int(top_user_id)).user.first_name
+        except:
+            user = f"{top_user_id}"
+        top_user = f"• نفر اول🥇 : ({st['users'][top_user_id]} پیام | {user})"
+    else:
+        top_user = "هیچ فعالیتی ثبت نشده است!"
+    msg = f"""♡ فعالیت های امروز تا این لحظه :
+➲ تاریخ : {today}
+➲ ساعت : {hour}
+✛ کل پیام ها : {total}
+✛ پیام فورواردی : {st['counts']['fwd']}
+✛ فیلم : {st['counts']['video']}
+✛ آهنگ : {st['counts']['music']}
+✛ ویس : {st['counts']['voice']}
+✛ عکس : {st['counts']['photo']}
+✛ گیف : {st['counts']['gif']}
+✛ استیکر : {st['counts']['sticker']}
+✶ فعال ترین اعضای گروه :
+{top_user}
+✶ کاربران برتر در افزودن عضو :
+هیچ فعالیتی ثبت نشده است!
+✧ اعضای وارد شده با لینک : ۰
+✧ اعضای اد شده : ۰
+✧ کل اعضای وارد شده : ۰
+✧ اعضای اخراج شده : ۰
+✧ اعضای سکوت شده : ۰
+✧ اعضای لفت داده : ۰
+"""
+    bot.reply_to(m, msg)
+
+# ادامه در پارت بعد (پایان کد 👇)# ================= 👋 خوشامد =================
 @bot.message_handler(content_types=["new_chat_members"])
 def welcome(m):
     register_group(m.chat.id)
     data = load_data(); gid = str(m.chat.id)
-    s = data["welcome"][gid]
+    s = data["welcome"].get(gid, {"enabled": True, "type": "text", "content": None, "file_id": None})
     if not s.get("enabled", True): return
-    name = m.new_chat_members[0].first_name or "دوست جدید"
-    t = shamsi_date()
-    txt = s["content"] or f"سلام {name} 🌸 خوش اومدی به گروه {m.chat.title} 💬"
-    txt = txt.replace("{name}", name).replace("{time}", t)
+    user = m.new_chat_members[0]
+    name = user.first_name or "دوست جدید"
+    t = shamsi_time()
+    text = s.get("content") or f"سلام {name} 🌙\nبه گروه {m.chat.title} خوش اومدی 😎\n⏰ {t}"
     if s.get("file_id"):
-        bot.send_photo(m.chat.id, s["file_id"], caption=txt)
+        bot.send_photo(m.chat.id, s["file_id"], caption=text)
     else:
-        bot.send_message(m.chat.id, txt)
+        bot.send_message(m.chat.id, text)
 
 @bot.message_handler(func=lambda m: cmd_text(m) == "تنظیم خوشامد" and m.reply_to_message)
 def set_welcome(m):
     if not is_admin(m.chat.id, m.from_user.id): return
-    d = load_data(); gid = str(m.chat.id)
+    data = load_data(); gid = str(m.chat.id)
     msg = m.reply_to_message
     if msg.photo:
-        d["welcome"][gid] = {"enabled": True, "type": "photo", "content": msg.caption or None, "file_id": msg.photo[-1].file_id}
-    else:
-        d["welcome"][gid] = {"enabled": True, "type": "text", "content": msg.text or None, "file_id": None}
-    save_data(d)
-    bot.reply_to(m, "✅ پیام خوشامد تنظیم شد.")
+        fid = msg.photo[-1].file_id
+        caption = msg.caption or " "
+        data["welcome"][gid] = {"enabled": True, "type": "photo", "content": caption, "file_id": fid}
+    elif msg.text:
+        data["welcome"][gid] = {"enabled": True, "type": "text", "content": msg.text, "file_id": None}
+    save_data(data)
+    bot.reply_to(m, "✅ پیام خوشامد جدید تنظیم شد.")
 
-# ================= 🚫 بن، سکوت، اخطار =================
+@bot.message_handler(func=lambda m: cmd_text(m) in ["خوشامد روشن", "خوشامد خاموش"])
+def toggle_welcome(m):
+    if not is_admin(m.chat.id, m.from_user.id): return
+    data = load_data(); gid = str(m.chat.id)
+    en = cmd_text(m) == "خوشامد روشن"
+    data["welcome"].setdefault(gid, {"enabled": True})
+    data["welcome"][gid]["enabled"] = en
+    save_data(data)
+    bot.reply_to(m, "✅ خوشامد روشن شد" if en else "🚫 خوشامد خاموش شد")
+
+# ================= 🚫 بن و اخطار =================
 @bot.message_handler(func=lambda m: m.reply_to_message and cmd_text(m) == "بن")
 def ban_user(m):
     if not is_admin(m.chat.id, m.from_user.id): return
@@ -159,110 +240,118 @@ def ban_user(m):
     try:
         bot.ban_chat_member(m.chat.id, uid)
         bot.reply_to(m, f"🚫 کاربر {uid} بن شد.")
-    except: bot.reply_to(m, "❗ خطا در بن کاربر.")
+    except:
+        bot.reply_to(m, "❗ خطا در انجام عملیات بن.")
 
 @bot.message_handler(func=lambda m: m.reply_to_message and cmd_text(m) == "اخطار")
 def warn_user(m):
     if not is_admin(m.chat.id, m.from_user.id): return
     uid = str(m.reply_to_message.from_user.id)
-    d = load_data(); gid = str(m.chat.id)
-    d["warns"].setdefault(gid, {}).setdefault(uid, 0)
-    d["warns"][gid][uid] += 1
-    save_data(d)
-    if d["warns"][gid][uid] >= 3:
+    gid = str(m.chat.id)
+    data = load_data()
+    data["warns"].setdefault(gid, {})
+    data["warns"][gid][uid] = data["warns"][gid].get(uid, 0) + 1
+    count = data["warns"][gid][uid]
+    save_data(data)
+    if count >= 3:
         try:
             bot.ban_chat_member(m.chat.id, int(uid))
-            bot.reply_to(m, f"🚫 کاربر {uid} پس از 3 اخطار بن شد.")
-            d["warns"][gid][uid] = 0
-            save_data(d)
-        except: pass
+            bot.reply_to(m, f"🚫 کاربر {uid} به دلیل ۳ اخطار بن شد.")
+            data["warns"][gid][uid] = 0
+            save_data(data)
+        except:
+            bot.reply_to(m, "❗ خطا در بن کاربر.")
     else:
-        bot.reply_to(m, f"⚠️ اخطار {d['warns'][gid][uid]} برای کاربر {uid}")
-
-# ================= 🧹 پاکسازی =================
-@bot.message_handler(func=lambda m: is_admin(m.chat.id, m.from_user.id) and cmd_text(m) == "پاکسازی")
-def clear(m):
-    for i in range(1, 101):
-        try: bot.delete_message(m.chat.id, m.message_id - i)
-        except: continue
-    bot.reply_to(m, "🧹 پیام‌ها پاک شدند.")
-
-@bot.message_handler(func=lambda m: is_admin(m.chat.id, m.from_user.id) and cmd_text(m).startswith("حذف "))
-def delete_n(m):
-    try: n = int(cmd_text(m).split()[1])
-    except: return bot.reply_to(m, "❗ فرمت درست: حذف 10")
-    for i in range(1, n + 1):
-        try: bot.delete_message(m.chat.id, m.message_id - i)
-        except: continue
-    bot.reply_to(m, f"🗑 {n} پیام پاک شد.")
-
-# ================= 👑 مدیران و سودو =================
-@bot.message_handler(func=lambda m: m.reply_to_message and cmd_text(m) == "افزودن مدیر")
-def add_admin(m):
-    if not is_sudo(m.from_user.id): return
-    d = load_data(); gid = str(m.chat.id)
-    uid = str(m.reply_to_message.from_user.id)
-    d["admins"].setdefault(gid, [])
-    if uid not in d["admins"][gid]:
-        d["admins"][gid].append(uid)
-        save_data(d)
-        bot.reply_to(m, f"✅ {uid} به لیست مدیران افزوده شد.")
-    else: bot.reply_to(m, "⚠️ این کاربر از قبل مدیر است.")
-
-@bot.message_handler(func=lambda m: cmd_text(m) == "لیست مدیران")
-def list_admins(m):
-    d = load_data(); gid = str(m.chat.id)
-    lst = d["admins"].get(gid, [])
-    if not lst: return bot.reply_to(m, "❗ مدیری ثبت نشده.")
-    bot.reply_to(m, "👑 مدیران:\n" + "\n".join([f"• {i}" for i in lst]))
-
-@bot.message_handler(func=lambda m: m.reply_to_message and cmd_text(m) == "افزودن سودو")
-def add_sudo(m):
-    if m.from_user.id != SUDO_ID: return
-    d = load_data(); uid = str(m.reply_to_message.from_user.id)
-    if uid in d["sudo_list"]: return bot.reply_to(m, "⚠️ این کاربر سودو است.")
-    d["sudo_list"].append(uid); save_data(d)
-    bot.reply_to(m, f"✅ سودو {uid} افزوده شد.")
-
-@bot.message_handler(func=lambda m: cmd_text(m) == "لیست سودوها")
-def list_sudo(m):
-    if not is_sudo(m.from_user.id): return
-    d = load_data(); lst = d["sudo_list"]
-    if not lst: return bot.reply_to(m, "❗ سودوی اضافی ثبت نشده.")
-    bot.reply_to(m, "👑 لیست سودوها:\n" + "\n".join(lst))
+        bot.reply_to(m, f"⚠️ کاربر {uid} اخطار {count}/3 دریافت کرد.")
 
 # ================= 😂 جوک و 🔮 فال =================
+@bot.message_handler(func=lambda m: is_sudo(m.from_user.id) and cmd_text(m) == "ثبت جوک" and m.reply_to_message)
+def add_joke(m):
+    data = load_data()
+    data["jokes"].append(m.reply_to_message.text)
+    save_data(data)
+    bot.reply_to(m, "😂 جوک ذخیره شد.")
+
 @bot.message_handler(func=lambda m: cmd_text(m) == "جوک")
 def send_joke(m):
-    d = load_data(); jokes = d["jokes"]
+    data = load_data(); jokes = data.get("jokes", [])
     if not jokes: return bot.reply_to(m, "❗ جوکی ثبت نشده.")
     bot.reply_to(m, random.choice(jokes))
 
+@bot.message_handler(func=lambda m: is_sudo(m.from_user.id) and cmd_text(m) == "لیست جوک‌ها")
+def list_jokes(m):
+    data = load_data(); jokes = data.get("jokes", [])
+    if not jokes: return bot.reply_to(m, "❗ جوکی ثبت نشده.")
+    txt = "\n".join([f"{i+1}. {t}" for i, t in enumerate(jokes)])
+    bot.reply_to(m, "📜 لیست جوک‌ها:\n" + txt)
+
+@bot.message_handler(func=lambda m: is_sudo(m.from_user.id) and cmd_text(m).startswith("حذف جوک "))
+def del_joke(m):
+    data = load_data(); jokes = data.get("jokes", [])
+    try:
+        idx = int(cmd_text(m).split()[2]) - 1
+        jokes.pop(idx)
+        data["jokes"] = jokes
+        save_data(data)
+        bot.reply_to(m, "🗑 جوک حذف شد.")
+    except:
+        bot.reply_to(m, "❗ شماره جوک نامعتبر است.")
+
+@bot.message_handler(func=lambda m: is_sudo(m.from_user.id) and cmd_text(m) == "ثبت فال" and m.reply_to_message)
+def add_fal(m):
+    data = load_data()
+    data["falls"].append(m.reply_to_message.text)
+    save_data(data)
+    bot.reply_to(m, "🔮 فال ذخیره شد.")
+
 @bot.message_handler(func=lambda m: cmd_text(m) == "فال")
 def send_fal(m):
-    d = load_data(); falls = d["falls"]
+    data = load_data(); falls = data.get("falls", [])
     if not falls: return bot.reply_to(m, "❗ فالی ثبت نشده.")
     bot.reply_to(m, random.choice(falls))
+
+@bot.message_handler(func=lambda m: is_sudo(m.from_user.id) and cmd_text(m) == "لیست فال‌ها")
+def list_fals(m):
+    data = load_data(); falls = data.get("falls", [])
+    if not falls: return bot.reply_to(m, "❗ فالی ثبت نشده.")
+    txt = "\n".join([f"{i+1}. {t}" for i, t in enumerate(falls)])
+    bot.reply_to(m, "📜 لیست فال‌ها:\n" + txt)
+
+@bot.message_handler(func=lambda m: is_sudo(m.from_user.id) and cmd_text(m).startswith("حذف فال "))
+def del_fal(m):
+    data = load_data(); falls = data.get("falls", [])
+    try:
+        idx = int(cmd_text(m).split()[2]) - 1
+        falls.pop(idx)
+        data["falls"] = falls
+        save_data(data)
+        bot.reply_to(m, "🗑 فال حذف شد.")
+    except:
+        bot.reply_to(m, "❗ شماره فال نامعتبر است.")
 
 # ================= 📢 ارسال همگانی =================
 @bot.message_handler(func=lambda m: is_sudo(m.from_user.id) and cmd_text(m) == "ارسال" and m.reply_to_message)
 def broadcast(m):
-    d = load_data(); msg = m.reply_to_message
-    targets = list(set(d["users"])) + [int(g) for g in d["welcome"]]
+    data = load_data()
+    users = list(set(data.get("users", [])))
+    groups = [int(g) for g in data.get("welcome", {}).keys()]
     total = 0
-    for uid in targets:
+    msg = m.reply_to_message
+    for uid in users + groups:
         try:
-            if msg.text: bot.send_message(uid, msg.text)
-            elif msg.photo: bot.send_photo(uid, msg.photo[-1].file_id, caption=msg.caption or "")
+            if msg.text:
+                bot.send_message(uid, msg.text)
+            elif msg.photo:
+                bot.send_photo(uid, msg.photo[-1].file_id, caption=msg.caption or "")
             total += 1
-        except: continue
+        except:
+            continue
     bot.reply_to(m, f"📢 پیام به {total} کاربر ارسال شد.")
 
-# ================= 👑 پاسخ سودو =================
-@bot.message_handler(func=lambda m: is_sudo(m.from_user.id))
-def sudo_chat(m):
-    if any(x in cmd_text(m) for x in ["سلام","ربات","چطوری"]):
-        bot.reply_to(m, random.choice(["👑 سلام قربان!","💬 در خدمت شما هستم","⚡ بله قربان!"]))
+# ================= 👑 پاسخ ربات به سودو =================
+@bot.message_handler(func=lambda m: is_sudo(m.from_user.id) and cmd_text(m).lower() == "سلام")
+def sudo_reply(m):
+    bot.reply_to(m, f"سلام 👑 {m.from_user.first_name}\nخوش اومدی سودوی عزیز!")
 
 # ================= 🚀 اجرای ربات =================
 print("🤖 Bot is running...")
