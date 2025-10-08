@@ -510,82 +510,120 @@ def del_fal(m):
     try:
         id# Persian Lux Panel V16.2 – Full & Stable (Part 2/2)
 # ================= 🚧 اعمال قفل‌ها + آمار روزانه =================
-@bot.message_handler(content_types=['text','photo','video','document','audio','voice','sticker','animation','video_note'])
+@bot.message_handler(content_types=['text', 'photo', 'video', 'document', 'audio', 'voice', 'sticker', 'animation', 'video_note'])
 def enforce_and_stats(m):
     try:
         register_group(m.chat.id)
-        d = load_data(); gid = str(m.chat.id)
+        d = load_data()
+        gid = str(m.chat.id)
 
-        # --- اعمال قفل‌ها برای غیرمدیرها/غیرسودوها ---
+        # --- اعمال قفل‌ها برای کاربران عادی ---
         if not is_admin(m.chat.id, m.from_user.id):
             locks = d["locks"].get(gid, {})
             txt = (m.text or "") + " " + (getattr(m, "caption", "") or "")
 
-            # قفل گروه (سکوت کامل اعضا)
+            # قفل گروه
             if locks.get("group"):
-                try: bot.delete_message(m.chat.id, m.message_id)
-                except Exception: pass
+                bot.delete_message(m.chat.id, m.message_id)
                 return
 
             # قفل لینک
-            if locks.get("link") and any(x in txt for x in ["http://","https://","t.me/","telegram.me/","www."]):
-                try: bot.delete_message(m.chat.id, m.message_id)
-                except Exception: pass
-                else: bot.send_message(m.chat.id, "🚫 ارسال لینک مجاز نیست.", disable_notification=True)
+            if locks.get("link") and any(x in txt for x in ["http://", "https://", "t.me/", "telegram.me/", "www."]):
+                bot.delete_message(m.chat.id, m.message_id)
+                bot.send_message(m.chat.id, "🚫 ارسال لینک مجاز نیست.", disable_notification=True)
                 return
 
-            # قفل‌های دیگر
-            if locks.get("photo")   and m.photo:     _del_notice(m, "🖼 ارسال عکس ممنوع است.");     return
-            if locks.get("video")   and m.video:     _del_notice(m, "🎬 ارسال ویدیو مجاز نیست.");   return
-            if locks.get("sticker") and m.sticker:   _del_notice(m, "😜 ارسال استیکر ممنوع است.");  return
-            if locks.get("gif")     and m.animation: _del_notice(m, "🎞 ارسال گیف مجاز نیست.");     return
-            if locks.get("file")    and m.document:  _del_notice(m, "📎 ارسال فایل بسته است.");     return
-            if locks.get("music")   and m.audio:     _del_notice(m, "🎵 ارسال موزیک مجاز نیست.");   return
-            if locks.get("voice")   and m.voice:     _del_notice(m, "🎙 ارسال ویس بسته است.");       return
-            if locks.get("forward") and (m.forward_from or m.forward_from_chat):
-                _del_notice(m, "⚠️ فوروارد در این گروه ممنوع است."); return
+            # قفل عکس
+            if locks.get("photo") and m.photo:
+                bot.delete_message(m.chat.id, m.message_id)
+                bot.send_message(m.chat.id, "🖼 ارسال عکس ممنوع است.", disable_notification=True)
+                return
 
-        # --- آمار روزانه (فعالیت امروز) ---
+            # قفل ویدیو
+            if locks.get("video") and m.video:
+                bot.delete_message(m.chat.id, m.message_id)
+                bot.send_message(m.chat.id, "🎬 ارسال ویدیو مجاز نیست.", disable_notification=True)
+                return
+
+            # قفل استیکر
+            if locks.get("sticker") and m.sticker:
+                bot.delete_message(m.chat.id, m.message_id)
+                bot.send_message(m.chat.id, "😜 ارسال استیکر ممنوع است.", disable_notification=True)
+                return
+
+            # قفل گیف
+            if locks.get("gif") and m.animation:
+                bot.delete_message(m.chat.id, m.message_id)
+                bot.send_message(m.chat.id, "🎞 ارسال گیف مجاز نیست.", disable_notification=True)
+                return
+
+            # قفل فایل
+            if locks.get("file") and m.document:
+                bot.delete_message(m.chat.id, m.message_id)
+                bot.send_message(m.chat.id, "📎 ارسال فایل بسته است.", disable_notification=True)
+                return
+
+            # قفل موزیک
+            if locks.get("music") and m.audio:
+                bot.delete_message(m.chat.id, m.message_id)
+                bot.send_message(m.chat.id, "🎵 ارسال موزیک مجاز نیست.", disable_notification=True)
+                return
+
+            # قفل ویس
+            if locks.get("voice") and m.voice:
+                bot.delete_message(m.chat.id, m.message_id)
+                bot.send_message(m.chat.id, "🎙 ارسال ویس بسته است.", disable_notification=True)
+                return
+
+            # قفل فوروارد
+            if locks.get("forward") and (m.forward_from or m.forward_from_chat):
+                bot.delete_message(m.chat.id, m.message_id)
+                bot.send_message(m.chat.id, "⚠️ فوروارد در این گروه ممنوع است.", disable_notification=True)
+                return
+
+        # --- ثبت آمار فعالیت امروز ---
         today = datetime.now().strftime("%Y-%m-%d")
         d["stats"].setdefault(gid, {})
         d["stats"][gid].setdefault(today, {
             "total": 0, "forward": 0, "video": 0, "voice": 0,
-            "photo": 0, "sticker": 0, "gif": 0, "audio": 0,
-            "by_user": {}
+            "photo": 0, "sticker": 0, "gif": 0, "audio": 0, "by_user": {}
         })
         s = d["stats"][gid][today]
         s["total"] += 1
         uid = str(m.from_user.id)
         s["by_user"][uid] = s["by_user"].get(uid, 0) + 1
 
-        if m.forward_from or m.forward_from_chat: s["forward"] += 1
-        if m.photo:     s["photo"]   += 1
-        elif m.video:   s["video"]   += 1
-        elif m.voice:   s["voice"]   += 1
-        elif m.audio:   s["audio"]   += 1
-        elif m.sticker: s["sticker"] += 1
-        elif m.animation: s["gif"]   += 1
+        if m.forward_from or m.forward_from_chat:
+            s["forward"] += 1
+        if m.photo:
+            s["photo"] += 1
+        if m.video:
+            s["video"] += 1
+        if m.voice:
+            s["voice"] += 1
+        if m.audio:
+            s["audio"] += 1
+        if m.sticker:
+            s["sticker"] += 1
+        if m.animation:
+            s["gif"] += 1
 
         save_data(d)
     except Exception as e:
-        logging.error(f"enforce_and_stats: {e}")
+        logging.error(f"enforce_and_stats error: {e}")
 
-def _del_notice(m, text):
-    try: bot.delete_message(m.chat.id, m.message_id)
-    except Exception: pass
-    else: bot.send_message(m.chat.id, text, disable_notification=True)
-
-# ================= 📊 فعالیت امروز (خروجی زیبا) =================
+# ================= 📊 فعالیت امروز =================
 @bot.message_handler(func=lambda m: cmd_text(m) == "فعالیت امروز")
 def daily_stats(m):
-    d = load_data(); gid = str(m.chat.id)
+    d = load_data()
+    gid = str(m.chat.id)
     today = datetime.now().strftime("%Y-%m-%d")
     s = d["stats"].get(gid, {}).get(today, {
         "total": 0, "forward": 0, "video": 0, "voice": 0,
         "photo": 0, "sticker": 0, "gif": 0, "audio": 0, "by_user": {}
     })
 
-    # نفر اول امروز
+    # پیدا کردن فعال‌ترین کاربر
     if s["by_user"]:
         top_uid = max(s["by_user"], key=lambda u: s["by_user"][u])
         try:
@@ -597,7 +635,7 @@ def daily_stats(m):
         top_line = "هیچ فعالیتی ثبت نشده است!"
 
     msg = (
-        f"♡ فعالیت‌های امروز تا این لحظه\n\n"
+        f"♡ فعالیت های امروز تا این لحظه :\n\n"
         f"➲ تاریخ : {shamsi_date()}\n"
         f"➲ ساعت : {shamsi_time()}\n\n"
         f"✛ کل پیام‌ها : {s['total']}\n"
