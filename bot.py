@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Persian Lux Panel V15 – نسخه بدون پنل
+# Persian Lux Panel V15 – Fixed Full Part 1/2
 # Designed for Mohammad 👑
 
 import os, json, random, time, logging
@@ -15,6 +15,7 @@ bot     = telebot.TeleBot(TOKEN, parse_mode="HTML")
 
 DATA_FILE = "data.json"
 LOG_FILE  = "error.log"
+
 logging.basicConfig(filename=LOG_FILE, level=logging.ERROR,
                     format="%(asctime)s - %(levelname)s - %(message)s")
 
@@ -35,7 +36,8 @@ def load_data():
     except Exception:
         data = base_data()
     for k in base_data():
-        if k not in data: data[k] = base_data()[k]
+        if k not in data:
+            data[k] = base_data()[k]
     save_data(data)
     return data
 
@@ -67,6 +69,39 @@ def is_admin(chat_id, uid):
         st = bot.get_chat_member(chat_id, uid).status
         return st in ("administrator", "creator")
     except: return False
+
+# ================= 🕒 آمار / آیدی / ساعت =================
+@bot.message_handler(func=lambda m: cmd_text(m) == "آمار")
+def show_stats(m):
+    if not (is_admin(m.chat.id, m.from_user.id) or is_sudo(m.from_user.id)): return
+    data = load_data()
+    users = len(set(data.get("users", [])))
+    groups = len(data.get("welcome", {}))
+    bot.reply_to(m,
+        f"📊 <b>آمار ربات Persian Lux Panel</b>\n"
+        f"👤 کاربران: {users}\n👥 گروه‌ها: {groups}\n"
+        f"📅 {shamsi_date()} | ⏰ {shamsi_time()}")
+
+@bot.message_handler(func=lambda m: cmd_text(m) in ["آیدی","ایدی"])
+def show_id(m):
+    bot.reply_to(m, f"🧾 آیدی شما: <code>{m.from_user.id}</code>\n💬 آیدی گروه: <code>{m.chat.id}</code>")
+
+@bot.message_handler(func=lambda m: cmd_text(m) == "ساعت")
+def show_time(m):
+    bot.reply_to(m, f"⏰ {shamsi_time()} | 📅 {shamsi_date()}")
+
+@bot.message_handler(func=lambda m: cmd_text(m) == "لینک ربات")
+def bot_link(m):
+    bot.reply_to(m, f"🤖 لینک ربات:\nhttps://t.me/{bot.get_me().username}")
+
+@bot.message_handler(func=lambda m: cmd_text(m) == "لینک گروه")
+def group_link(m):
+    if not is_admin(m.chat.id, m.from_user.id): return
+    try:
+        link = bot.export_chat_invite_link(m.chat.id)
+        bot.reply_to(m, f"🔗 لینک گروه:\n{link}")
+    except:
+        bot.reply_to(m, "⚠️ دسترسی ساخت لینک ندارم.")
 
 # ================= 👋 خوشامد =================
 @bot.message_handler(content_types=["new_chat_members"])
@@ -130,44 +165,43 @@ def toggle_lock(m):
     else:
         bot.reply_to(m, f"{'🔒' if en else '🔓'} قفل {key_fa} {'فعال' if en else 'غیرفعال'} شد.")
 
-# ================= 😂 جوک و 🔮 فال =================
-@bot.message_handler(func=lambda m: is_admin(m.chat.id, m.from_user.id) and m.reply_to_message and cmd_text(m) == "ثبت جوک")
-def add_joke(m):
-    d = load_data(); txt = (m.reply_to_message.text or "").strip()
-    if not txt: return bot.reply_to(m, "⚠️ لطفاً روی پیام متنی ریپلای کن.")
-    d["jokes"].append(txt); save_data(d)
-    bot.reply_to(m, "😂 جوک ذخیره شد.")
+# ================= 👑 مدیر و سودو =================
+@bot.message_handler(func=lambda m: m.reply_to_message and cmd_text(m) == "افزودن مدیر")
+def add_admin(m):
+    if not is_sudo(m.from_user.id): return
+    data = load_data(); gid = str(m.chat.id)
+    uid = str(m.reply_to_message.from_user.id)
+    data["admins"].setdefault(gid, [])
+    if uid in data["admins"][gid]:
+        return bot.reply_to(m, "⚠️ این کاربر از قبل مدیر است.")
+    data["admins"][gid].append(uid)
+    save_data(data)
+    bot.reply_to(m, f"✅ <a href='tg://user?id={uid}'>کاربر</a> به مدیران افزوده شد.")
 
-@bot.message_handler(func=lambda m: cmd_text(m) == "جوک")
-def random_joke(m):
-    d = load_data(); j = d.get("jokes", [])
-    bot.reply_to(m, random.choice(j) if j else "😅 هنوز جوکی ثبت نشده.")
+@bot.message_handler(func=lambda m: cmd_text(m) == "لیست مدیران")
+def list_admins(m):
+    data = load_data(); gid = str(m.chat.id)
+    lst = data["admins"].get(gid, [])
+    if not lst: return bot.reply_to(m, "📋 هیچ مدیری ثبت نشده.")
+    msg = "👑 لیست مدیران:\n" + "\n".join([f"• <a href='tg://user?id={a}'>کاربر {a}</a>" for a in lst])
+    bot.reply_to(m, msg)
 
-@bot.message_handler(func=lambda m: cmd_text(m) == "لیست جوک")
-def list_jokes(m):
-    d = load_data(); j = d.get("jokes", [])
-    if not j: return bot.reply_to(m, "❗ هیچ جوکی ثبت نشده.")
-    txt = "\n".join([f"{i+1}. {t}" for i,t in enumerate(j)])
-    bot.reply_to(m, f"📜 لیست جوک‌ها:\n{txt}")
+@bot.message_handler(func=lambda m: m.reply_to_message and cmd_text(m) == "افزودن سودو")
+def add_sudo(m):
+    if m.from_user.id != SUDO_ID: return
+    d = load_data(); uid = str(m.reply_to_message.from_user.id)
+    if uid in d["sudo_list"]: return bot.reply_to(m, "⚠️ این کاربر از قبل سودو است.")
+    d["sudo_list"].append(uid); save_data(d)
+    bot.reply_to(m, f"✅ <a href='tg://user?id={uid}'>کاربر</a> به سودوها افزوده شد.")
 
-@bot.message_handler(func=lambda m: is_admin(m.chat.id, m.from_user.id) and m.reply_to_message and cmd_text(m) == "ثبت فال")
-def add_fal(m):
-    d = load_data(); txt = (m.reply_to_message.text or "").strip()
-    if not txt: return bot.reply_to(m, "⚠️ لطفاً روی پیام متنی ریپلای کن.")
-    d["falls"].append(txt); save_data(d)
-    bot.reply_to(m, "🔮 فال ذخیره شد.")
-
-@bot.message_handler(func=lambda m: cmd_text(m) == "فال")
-def random_fal(m):
-    d = load_data(); f = d.get("falls", [])
-    bot.reply_to(m, random.choice(f) if f else "🔮 هنوز فالی ثبت نشده.")
-
-@bot.message_handler(func=lambda m: cmd_text(m) == "لیست فال")
-def list_fal(m):
-    d = load_data(); f = d.get("falls", [])
-    if not f: return bot.reply_to(m, "❗ هیچ فالی ثبت نشده.")
-    txt = "\n".join([f"{i+1}. {t}" for i,t in enumerate(f)])
-    bot.reply_to(m, f"📜 لیست فال‌ها:\n{txt}")
+@bot.message_handler(func=lambda m: cmd_text(m) == "لیست سودو")
+def list_sudos(m):
+    if not is_sudo(m.from_user.id): return
+    d = load_data(); s = d.get("sudo_list", [])
+    if not s: return bot.reply_to(m, "❗ هیچ سودویی ثبت نشده.")
+    txt = "👑 لیست سودوها:\n" + "\n".join([f"• <a href='tg://user?id={x}'>کاربر {x}</a>" for x in s])
+    bot.reply_to(m, txt)# Persian Lux Panel V15 – Fixed Full Part 2/2
+# ادامه‌ی کد
 
 # ================= 🚫 بن / سکوت / اخطار =================
 @bot.message_handler(func=lambda m: m.reply_to_message and cmd_text(m) == "بن")
@@ -178,7 +212,17 @@ def ban_user(m):
     try:
         bot.ban_chat_member(m.chat.id, uid)
         bot.reply_to(m, f"🚫 کاربر <a href='tg://user?id={uid}'>بن</a> شد.")
-    except: bot.reply_to(m, "❗ خطا در بن کاربر.")
+    except Exception as e:
+        bot.reply_to(m, f"❗ خطا در بن کاربر: {e}")
+
+@bot.message_handler(func=lambda m: m.reply_to_message and cmd_text(m) == "حذف بن")
+def unban_user(m):
+    if not is_admin(m.chat.id, m.from_user.id): return
+    try:
+        bot.unban_chat_member(m.chat.id, m.reply_to_message.from_user.id, only_if_banned=True)
+        bot.reply_to(m, "✅ کاربر از بن خارج شد.")
+    except:
+        bot.reply_to(m, "❗ خطا در حذف بن.")
 
 @bot.message_handler(func=lambda m: m.reply_to_message and cmd_text(m) == "سکوت")
 def mute_user(m):
@@ -186,6 +230,15 @@ def mute_user(m):
     uid = str(m.reply_to_message.from_user.id)
     d = load_data(); d["muted"][uid] = True; save_data(d)
     bot.reply_to(m, f"🔇 کاربر <a href='tg://user?id={uid}'>ساکت</a> شد.")
+
+@bot.message_handler(func=lambda m: m.reply_to_message and cmd_text(m) == "حذف سکوت")
+def unmute_user(m):
+    if not is_admin(m.chat.id, m.from_user.id): return
+    uid = str(m.reply_to_message.from_user.id)
+    d = load_data()
+    if uid in d["muted"]: d["muted"].pop(uid)
+    save_data(d)
+    bot.reply_to(m, f"🔊 سکوت کاربر <a href='tg://user?id={uid}'>برداشته</a> شد.")
 
 @bot.message_handler(func=lambda m: m.reply_to_message and cmd_text(m) == "اخطار")
 def warn_user(m):
@@ -199,18 +252,121 @@ def warn_user(m):
         msg += "\n🚫 چون ۳ اخطار گرفت، از گروه اخراج شد."
     bot.reply_to(m, msg)
 
+@bot.message_handler(func=lambda m: m.reply_to_message and cmd_text(m) == "حذف اخطار")
+def del_warn(m):
+    if not is_admin(m.chat.id, m.from_user.id): return
+    uid = str(m.reply_to_message.from_user.id)
+    d = load_data()
+    if uid in d["warns"]: d["warns"].pop(uid)
+    save_data(d)
+    bot.reply_to(m, "✅ تمام اخطارهای کاربر پاک شد.")
+
+# ================= 😂 جوک و 🔮 فال =================
+@bot.message_handler(func=lambda m: is_admin(m.chat.id, m.from_user.id) and m.reply_to_message and cmd_text(m) == "ثبت جوک")
+def add_joke(m):
+    d = load_data()
+    txt = (m.reply_to_message.text or "").strip()
+    if not txt: return bot.reply_to(m, "⚠️ لطفاً روی پیام متنی ریپلای کن.")
+    d["jokes"].append(txt); save_data(d)
+    bot.reply_to(m, "😂 جوک ذخیره شد.")
+
+@bot.message_handler(func=lambda m: cmd_text(m) == "جوک")
+def random_joke(m):
+    d = load_data(); jokes = d.get("jokes", [])
+    bot.reply_to(m, f"😂 {random.choice(jokes)}" if jokes else "😅 هنوز جوکی ثبت نشده.")
+
+@bot.message_handler(func=lambda m: cmd_text(m) == "لیست جوک")
+def list_jokes(m):
+    d = load_data(); jokes = d.get("jokes", [])
+    if not jokes: return bot.reply_to(m, "❗ هیچ جوکی ثبت نشده.")
+    txt = "\n".join([f"{i+1}. {j}" for i,j in enumerate(jokes)])
+    bot.reply_to(m, f"📜 لیست جوک‌ها:\n{txt}")
+
+@bot.message_handler(func=lambda m: cmd_text(m).startswith("حذف جوک "))
+def del_joke(m):
+    d = load_data(); jokes = d.get("jokes", [])
+    try:
+        idx = int(cmd_text(m).split()[2]) - 1
+        if idx < 0 or idx >= len(jokes): raise ValueError
+        removed = jokes.pop(idx); save_data(d)
+        bot.reply_to(m, f"🗑 جوک حذف شد:\n{removed}")
+    except:
+        bot.reply_to(m, "❗ شماره‌ی جوک نامعتبر است.")
+
+# ==== فال ====
+@bot.message_handler(func=lambda m: is_admin(m.chat.id, m.from_user.id) and m.reply_to_message and cmd_text(m) == "ثبت فال")
+def add_fal(m):
+    d = load_data()
+    txt = (m.reply_to_message.text or "").strip()
+    if not txt: return bot.reply_to(m, "⚠️ لطفاً روی پیام متنی ریپلای کن.")
+    d["falls"].append(txt); save_data(d)
+    bot.reply_to(m, "🔮 فال ذخیره شد.")
+
+@bot.message_handler(func=lambda m: cmd_text(m) == "فال")
+def random_fal(m):
+    d = load_data(); f = d.get("falls", [])
+    bot.reply_to(m, f"🔮 {random.choice(f)}" if f else "😅 هنوز فالی ثبت نشده.")
+
+@bot.message_handler(func=lambda m: cmd_text(m) == "لیست فال")
+def list_fal(m):
+    d = load_data(); f = d.get("falls", [])
+    if not f: return bot.reply_to(m, "❗ هیچ فالی ثبت نشده.")
+    txt = "\n".join([f"{i+1}. {x}" for i,x in enumerate(f)])
+    bot.reply_to(m, f"📜 لیست فال‌ها:\n{txt}")
+
+@bot.message_handler(func=lambda m: cmd_text(m).startswith("حذف فال "))
+def del_fal(m):
+    d = load_data(); f = d.get("falls", [])
+    try:
+        idx = int(cmd_text(m).split()[2]) - 1
+        if idx < 0 or idx >= len(f): raise ValueError
+        removed = f.pop(idx); save_data(d)
+        bot.reply_to(m, f"🗑 فال حذف شد:\n{removed}")
+    except:
+        bot.reply_to(m, "❗ شماره‌ی فال نامعتبر است.")
+
+# ================= 🧹 پاکسازی =================
+@bot.message_handler(func=lambda m: is_admin(m.chat.id, m.from_user.id) and cmd_text(m).startswith("حذف "))
+def del_msgs(m):
+    try:
+        n = int(cmd_text(m).split()[1])
+    except:
+        return bot.reply_to(m, "❗ فرمت درست: حذف 20")
+    for i in range(1, n+1):
+        try: bot.delete_message(m.chat.id, m.message_id - i)
+        except: pass
+    bot.send_message(m.chat.id, f"🧹 {n} پیام پاک شد.", disable_notification=True)
+
+# ================= 📢 ارسال همگانی =================
+@bot.message_handler(func=lambda m: is_sudo(m.from_user.id) and m.reply_to_message and cmd_text(m) == "ارسال")
+def broadcast(m):
+    d = load_data()
+    users = list(set(d.get("users", [])))
+    groups = [int(g) for g in d["welcome"].keys()]
+    msg = m.reply_to_message
+    total = 0
+    for uid in users + groups:
+        try:
+            if msg.text:
+                bot.send_message(uid, msg.text)
+            elif msg.photo:
+                bot.send_photo(uid, msg.photo[-1].file_id, caption=msg.caption or "")
+            total += 1
+        except: continue
+    bot.reply_to(m, f"📢 پیام برای {total} کاربر ارسال شد.")
+
 # ================= ℹ️ راهنما =================
 @bot.message_handler(func=lambda m: cmd_text(m) == "راهنما")
 def show_help(m):
     txt = (
         "📘 <b>راهنمای Persian Lux Panel V15</b>\n\n"
-        "🆔 آیدی – ساعت – آمار – لینک گروه / ربات\n"
-        "👋 خوشامد: تنظیم، روشن/خاموش، متن یا عکس\n"
-        "🔒 قفل‌ها: لینک، عکس، فیلم، گیف، فایل، ویس...\n"
-        "🚫 بن، 🔇 سکوت، ⚠️ اخطار (۳ اخطار = اخراج)\n"
-        "😂 ثبت جوک / فال – لیست جوک / فال\n"
-        "🧹 حذف N پیام – ارسال همگانی (سودو)\n\n"
-        "👑 توسعه توسط سودو محترم محمد"
+        "🆔 آیدی | ساعت | آمار | لینک ربات/گروه\n"
+        "👋 خوشامد | تنظیم | روشن/خاموش\n"
+        "🔒 قفل‌ها (لینک | عکس | فیلم | گیف...)\n"
+        "🚫 بن | 🔇 سکوت | ⚠️ اخطار (۳=اخراج)\n"
+        "😂 جوک | 🔮 فال | 🧹 حذف N پیام\n"
+        "📢 ارسال همگانی (فقط سودو)\n\n"
+        "👑 سازنده: محمد | Persian Lux Panel"
     )
     bot.reply_to(m, txt)
 
@@ -224,15 +380,17 @@ def sudo_reply(m):
     ]
     bot.reply_to(m, random.choice(replies))
 
-# ================= 🚀 اجرای ربات =================
+# ================= 🚀 اجرای نهایی =================
 @bot.message_handler(commands=["start"])
 def start_cmd(m):
     d = load_data()
     uid = str(m.from_user.id)
-    if uid not in d["users"]: d["users"].append(uid); save_data(d)
+    if uid not in d["users"]:
+        d["users"].append(uid)
+        save_data(d)
     bot.reply_to(m, "👋 سلام! ربات مدیریتی Persian Lux Panel فعال است.\nبرای راهنما بنویس: «راهنما»")
 
-print("🤖 Persian Lux Panel V15 running…")
+print("🤖 Persian Lux Panel V15 (Fixed Full) در حال اجراست...")
 while True:
     try:
         bot.infinity_polling(timeout=60, long_polling_timeout=30)
