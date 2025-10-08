@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-import os, random, json
+import os, json, random
 from datetime import datetime
 import pytz, jdatetime
 import telebot
@@ -15,15 +15,30 @@ DATA_FILE = "data.json"
 
 # ================== 📂 فایل دیتا ==================
 def load_data():
+    base = {"welcome": {}, "locks": {}, "banned": {}, "muted": {}, "warns": {}}
     if not os.path.exists(DATA_FILE):
         with open(DATA_FILE, "w", encoding="utf-8") as f:
-            json.dump({"welcome": {}, "locks": {}}, f, ensure_ascii=False, indent=2)
-    with open(DATA_FILE, "r", encoding="utf-8") as f:
-        return json.load(f)
+            json.dump(base, f, ensure_ascii=False, indent=2)
+        return base
+
+    try:
+        with open(DATA_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    except json.JSONDecodeError:
+        data = base
+
+    for k in base:
+        if k not in data:
+            data[k] = base[k]
+
+    save_data(data)
+    return data
+
 
 def save_data(d):
     with open(DATA_FILE, "w", encoding="utf-8") as f:
         json.dump(d, f, ensure_ascii=False, indent=2)
+
 
 def register_group(gid):
     data = load_data()
