@@ -1,65 +1,50 @@
 # -*- coding: utf-8 -*-
-# Persian Lux Panel V17 – English Commands + Persian Responses
-# Designed for Mohammad 👑
+# 🤖 محافظ V1.0 (Funny Mode)
+# Designed with ❤️ by Mohammad & ChatGPT
 
-import os, json, time, logging, jdatetime, telebot
+import os
+import json
+import time
+import jdatetime
+import telebot
 from telebot import types
 
-# ================= ⚙️ CONFIG =================
+# ================= ⚙️ تنظیمات پایه =================
 TOKEN = os.environ.get("BOT_TOKEN")
 SUDO_ID = int(os.environ.get("SUDO_ID", "0"))
+
 bot = telebot.TeleBot(TOKEN, parse_mode="HTML")
-
 DATA_FILE = "data.json"
-LOG_FILE = "error.log"
 
-logging.basicConfig(filename=LOG_FILE, level=logging.ERROR,
-                    format="%(asctime)s - %(levelname)s - %(message)s")
 
-# ================= 💾 DATA HANDLER =================
+# ================= 💾 فایل داده =================
 def base_data():
     return {
-        "welcome": {}, "locks": {}, "admins": {}, "sudo_list": [],
-        "banned": {}, "muted": {}, "warns": {}, "users": [],
-        "filters": {}
+        "admins": {},
+        "sudo_list": [],
+        "banned": {},
+        "muted": {},
+        "warns": {},
+        "filters": {},
+        "welcome": {}
     }
+
 
 def load_data():
     if not os.path.exists(DATA_FILE):
         save_data(base_data())
-    try:
-        with open(DATA_FILE, "r", encoding="utf-8") as f:
-            data = json.load(f)
-    except Exception:
-        data = base_data()
-    for k in base_data():
-        if k not in data:
-            data[k] = base_data()[k]
-    save_data(data)
-    return data
+    with open(DATA_FILE, "r", encoding="utf-8") as f:
+        return json.load(f)
+
 
 def save_data(d):
     with open(DATA_FILE, "w", encoding="utf-8") as f:
         json.dump(d, f, ensure_ascii=False, indent=2)
 
-def register_group(gid):
-    data = load_data()
-    gid = str(gid)
-    data["welcome"].setdefault(gid, {"enabled": True, "type": "text",
-                                     "content": None, "file_id": None})
-    data["locks"].setdefault(gid,
-        {k: False for k in ["link","group","photo","video","sticker",
-                            "gif","file","music","voice","forward","text"]})
-    save_data(data)
 
-# ================= 🧩 UTILS =================
-def shamsi_date():
-    return jdatetime.datetime.now().strftime("%A %d %B %Y")
-
-def shamsi_time():
-    return jdatetime.datetime.now().strftime("%H:%M:%S")
-
-def cmd_text(m): return (getattr(m, "text", None) or "").strip()
+# ================= 🧩 ابزارها =================
+def cmd(m):
+    return (getattr(m, "text", "") or "").strip()
 
 def is_sudo(uid):
     d = load_data()
@@ -68,219 +53,179 @@ def is_sudo(uid):
 def is_admin(chat_id, uid):
     d = load_data()
     gid = str(chat_id)
-    if is_sudo(uid): return True
-    if str(uid) in d["admins"].get(gid, []): return True
+    if is_sudo(uid):
+        return True
+    if str(uid) in d["admins"].get(gid, []):
+        return True
     try:
         st = bot.get_chat_member(chat_id, uid).status
         return st in ("administrator", "creator")
-    except: return False
-
-print("✅ [1] Config & Data Loaded")
-
-# ================= 🆔 INFO / TIME / LINK =================
-@bot.message_handler(commands=["id"])
-def cmd_id(m):
-    try:
-        user = m.from_user
-        txt = (f"🧾 مشخصات شما:\n"
-               f"👤 نام: {user.first_name}\n"
-               f"🆔 آیدی: <code>{user.id}</code>\n"
-               f"💬 چت: <code>{m.chat.id}</code>\n"
-               f"📅 {shamsi_date()} | ⏰ {shamsi_time()}")
-        bot.reply_to(m, txt)
-    except Exception as e:
-        logging.error(e)
-        bot.reply_to(m, str(user.id))
-
-@bot.message_handler(commands=["time"])
-def cmd_time(m):
-    bot.reply_to(m, f"⏰ {shamsi_time()} | 📅 {shamsi_date()}")
-
-@bot.message_handler(commands=["botlink"])
-def bot_link(m):
-    bot.reply_to(m, f"https://t.me/{bot.get_me().username}")
-
-@bot.message_handler(commands=["grouplink"])
-def group_link(m):
-    if not is_admin(m.chat.id, m.from_user.id): return
-    try:
-        link = bot.export_chat_invite_link(m.chat.id)
-        bot.reply_to(m, f"🔗 {link}")
     except:
-        bot.reply_to(m, "⚠️ دسترسی ساخت لینک ندارم.")
-print("✅ [2] Info Commands Loaded")
+        return False
 
-# ================= 🔒 LOCK SYSTEM =================
-LOCK_MAP = {
-    "link": "link", "group": "group", "photo": "photo",
-    "video": "video", "sticker": "sticker", "gif": "gif",
-    "file": "file", "music": "music", "voice": "voice",
-    "forward": "forward", "text": "text"
-}
+def time_fa():
+    return jdatetime.datetime.now().strftime("%H:%M:%S")
 
-@bot.message_handler(commands=["lock","unlock"])
-def toggle_lock(m):
-    if not is_admin(m.chat.id, m.from_user.id): return
-    d = load_data(); gid = str(m.chat.id)
-    parts = cmd_text(m).split(" ",1)
-    if len(parts)<2: return bot.reply_to(m,"⚠️ Example: /lock link")
-    key = parts[1].lower()
-    lock_type = LOCK_MAP.get(key)
-    if not lock_type: return bot.reply_to(m,"❌ Invalid lock type.")
-    enable = m.text.startswith("/lock")
-    d["locks"].setdefault(gid,{k:False for k in LOCK_MAP.values()})
-    d["locks"][gid][lock_type] = enable; save_data(d)
-    if lock_type=="group":
-        try:
-            perms=types.ChatPermissions(can_send_messages=not enable)
-            bot.set_chat_permissions(m.chat.id,perms)
-        except Exception as e:
-            logging.error(e)
-    bot.reply_to(m,f"{'🔒' if enable else '🔓'} {key} {'enabled' if enable else 'disabled'}.")
+def date_fa():
+    return jdatetime.datetime.now().strftime("%A %d %B %Y")
 
-@bot.message_handler(content_types=["text","photo","video","sticker",
-                                   "animation","document","audio","voice"])
-def lock_filter_system(m):
-    d=load_data(); gid=str(m.chat.id)
-    locks=d.get("locks",{}).get(gid,{})
-    if not locks: return
-    def warn_delete(reason):
-        if is_admin(m.chat.id,m.from_user.id): return
-        try: bot.delete_message(m.chat.id,m.id)
-        except: pass
-        msg=bot.send_message(m.chat.id,
-            f"🚨 <b>اخطار:</b> {reason}\n👤 {m.from_user.first_name}",
-            parse_mode="HTML")
-        time.sleep(3)
-        try: bot.delete_message(m.chat.id,msg.id)
-        except: pass
-    if locks.get("link") and m.text and any(x in m.text.lower() for x in ["http","t.me/"]):
-        return warn_delete("ارسال لینک مجاز نیست")
-    if locks.get("photo") and m.content_type=="photo": return warn_delete("عکس ممنوع")
-    if locks.get("video") and m.content_type=="video": return warn_delete("ویدیو مجاز نیست")
-    if locks.get("sticker") and m.content_type=="sticker": return warn_delete("استیکر ممنوع")
-print("✅ [3] Lock System Loaded")
+# ================= 👋 خوشامد =================
+@bot.message_handler(content_types=["new_chat_members"])
+def welcome_new(m):
+    d = load_data()
+    gid = str(m.chat.id)
+    s = d["welcome"].get(gid, {"enabled": True, "msg": None})
 
-# ================= 👮 ADMIN / SUDO =================
-@bot.message_handler(commands=["addsudo"])
-def addsudo(m):
-    if not is_sudo(m.from_user.id): return
-    target = m.reply_to_message.from_user.id if m.reply_to_message else None
-    if not target: return bot.reply_to(m,"Reply to user")
-    d=load_data()
-    if str(target) not in d["sudo_list"]:
-        d["sudo_list"].append(str(target)); save_data(d)
-        bot.reply_to(m,"👑 سودو اضافه شد")
-    else: bot.reply_to(m,"ℹ️ از قبل سودو بود")
+    if not s.get("enabled", True):
+        return
 
-@bot.message_handler(commands=["addadmin"])
-def addadmin(m):
-    if not is_admin(m.chat.id,m.from_user.id): return
-    target = m.reply_to_message.from_user.id if m.reply_to_message else None
-    if not target: return bot.reply_to(m,"Reply to user")
-    d=load_data(); gid=str(m.chat.id)
-    d["admins"].setdefault(gid,[])
-    if str(target) in d["admins"][gid]: return bot.reply_to(m,"قبلاً مدیر بود")
-    d["admins"][gid].append(str(target)); save_data(d)
-    bot.reply_to(m,"👮 مدیر اضافه شد")
+    for user in m.new_chat_members:
+        name = user.first_name or "رفیق جدید"
+        msg = s.get("msg") or f"🌸 خوش اومدی {name}!\nخونه خودته 😄"
+        bot.send_message(m.chat.id, msg)
 
-@bot.message_handler(commands=["admins"])
-def list_admins(m):
-    d=load_data(); lst=d.get("admins",{}).get(str(m.chat.id),[])
-    bot.reply_to(m,"👮 لیست مدیران:\n"+"\n".join(lst) if lst else "نداریم")
-print("✅ [4] Admin & Sudo Loaded")
+@bot.message_handler(func=lambda m: is_admin(m.chat.id, m.from_user.id) and cmd(m) == "خوشامد روشن")
+def enable_welcome(m):
+    d = load_data()
+    gid = str(m.chat.id)
+    d["welcome"].setdefault(gid, {})["enabled"] = True
+    save_data(d)
+    bot.reply_to(m, "✅ خوشامد فعال شد! از این به بعد با آغوش باز 😄")
 
-# ================= 🚫 BAN / MUTE / WARN =================
-def bot_can_restrict(m):
-    try:
-        me=bot.get_me()
-        st=bot.get_chat_member(m.chat.id,me.id)
-        return st.status in ("administrator","creator")
-    except: return False
+@bot.message_handler(func=lambda m: is_admin(m.chat.id, m.from_user.id) and cmd(m) == "خوشامد خاموش")
+def disable_welcome(m):
+    d = load_data()
+    gid = str(m.chat.id)
+    d["welcome"].setdefault(gid, {})["enabled"] = False
+    save_data(d)
+    bot.reply_to(m, "🚫 خوشامد خاموش شد. دیگه خبری از احوال‌پرسی نیست 😅")
 
+@bot.message_handler(func=lambda m: is_admin(m.chat.id, m.from_user.id) and m.reply_to_message and cmd(m) == "تنظیم خوشامد")
+def set_welcome(m):
+    txt = (m.reply_to_message.text or "").strip()
+    if not txt:
+        return bot.reply_to(m, "⚠️ لطفاً روی یه پیام متنی ریپلای کن 😁")
+    d = load_data()
+    gid = str(m.chat.id)
+    d["welcome"][gid] = {"enabled": True, "msg": txt}
+    save_data(d)
+    bot.reply_to(m, "✅ پیام خوشامد با موفقیت تنظیم شد 🌸")
+
+
+# ================= 🚫 بن / سکوت / اخطار =================
 def target_user(m):
-    if m.reply_to_message: return m.reply_to_message.from_user.id
-    p=cmd_text(m).split()
-    if len(p)>1 and p[1].isdigit(): return int(p[1])
+    if m.reply_to_message:
+        return m.reply_to_message.from_user.id
+    parts = cmd(m).split()
+    if len(parts) > 1 and parts[1].isdigit():
+        return int(parts[1])
     return None
 
-@bot.message_handler(commands=["ban"])
+def bot_can(m):
+    try:
+        me = bot.get_me()
+        perms = bot.get_chat_member(m.chat.id, me.id)
+        return perms.status in ("administrator", "creator") and getattr(perms, "can_restrict_members", True)
+    except:
+        bot.reply_to(m, "⚠️ من دسترسی محدودسازی ندارم 😢")
+        return False
+
+
+# 🚫 بن
+@bot.message_handler(func=lambda m: cmd(m).startswith("بن "))
 def ban_user(m):
-    if not is_admin(m.chat.id,m.from_user.id) or not bot_can_restrict(m): return
-    t=target_user(m)
-    if not t: return bot.reply_to(m,"Reply or ID")
-    if is_admin(m.chat.id,t) or is_sudo(t): return
-    d=load_data(); gid=str(m.chat.id)
-    d["banned"].setdefault(gid,[]); d["banned"][gid].append(t); save_data(d)
-    try: bot.ban_chat_member(m.chat.id,t)
-    except: pass
-    bot.send_message(m.chat.id,f"🚫 کاربر {t} بن شد")
+    if not is_admin(m.chat.id, m.from_user.id) or not bot_can(m):
+        return
+    target = target_user(m)
+    if not target:
+        return bot.reply_to(m, "⚠️ ریپلای کن رو پیام کسی که می‌خوای بن شه 😅")
+    if is_admin(m.chat.id, target) or is_sudo(target):
+        return bot.reply_to(m, "😎 من با رئیس در نمی‌افتم! اون مدیر یا سودوئه.")
 
-@bot.message_handler(commands=["mute"])
+    try:
+        bot.ban_chat_member(m.chat.id, target)
+        bot.send_message(m.chat.id, f"🚫 کاربر <a href='tg://user?id={target}'>بن شد!</a>\nرفیق، دفعه بعد رعایت کن 😅", parse_mode="HTML")
+    except:
+        bot.reply_to(m, "⚠️ نتونستم بنش کنم، شاید دسترسی ندارم!")
+
+
+# 🔇 سکوت
+@bot.message_handler(func=lambda m: cmd(m).startswith("سکوت "))
 def mute_user(m):
-    if not is_admin(m.chat.id,m.from_user.id) or not bot_can_restrict(m): return
-    t=target_user(m)
-    if not t: return bot.reply_to(m,"Reply or ID")
-    if is_admin(m.chat.id,t) or is_sudo(t): return
-    bot.restrict_chat_member(m.chat.id,t,permissions=types.ChatPermissions(can_send_messages=False))
-    bot.reply_to(m,"🔇 کاربر ساکت شد")
+    if not is_admin(m.chat.id, m.from_user.id) or not bot_can(m):
+        return
+    target = target_user(m)
+    if not target:
+        return bot.reply_to(m, "⚠️ ریپلای کن رو پیام کسی که می‌خوای ساکت شه 😅")
+    if is_admin(m.chat.id, target) or is_sudo(target):
+        return bot.reply_to(m, "😂 مدیر یا سودو رو نمی‌تونم ساکت کنم.")
 
-@bot.message_handler(commands=["warn"])
+    bot.restrict_chat_member(m.chat.id, target, permissions=types.ChatPermissions(can_send_messages=False))
+    bot.send_message(m.chat.id, f"🔇 کاربر <a href='tg://user?id={target}'>ساکت شد!</a>\nبی‌صدا ولی همچنان نازنین 😎", parse_mode="HTML")
+
+
+# ⚠️ اخطار
+@bot.message_handler(func=lambda m: cmd(m).startswith("اخطار "))
 def warn_user(m):
-    if not is_admin(m.chat.id,m.from_user.id): return
-    t=target_user(m)
-    if not t: return bot.reply_to(m,"Reply or ID")
-    d=load_data(); gid=str(m.chat.id)
-    d["warns"].setdefault(gid,{})
-    d["warns"][gid][str(t)]=d["warns"][gid].get(str(t),0)+1
-    if d["warns"][gid][str(t)]>=3:
-        try: bot.ban_chat_member(m.chat.id,t)
-        except: pass
-        d["warns"][gid][str(t)]=0
+    if not is_admin(m.chat.id, m.from_user.id):
+        return
+    target = target_user(m)
+    if not target:
+        return bot.reply_to(m, "⚠️ ریپلای کن رو پیامش 😅")
+    if is_admin(m.chat.id, target) or is_sudo(target):
+        return bot.reply_to(m, "🤓 به رئیس اخطار نمی‌دن برادر!")
+
+    d = load_data()
+    gid = str(m.chat.id)
+    d["warns"].setdefault(gid, {})
+    d["warns"][gid][str(target)] = d["warns"][gid].get(str(target), 0) + 1
     save_data(d)
-    bot.reply_to(m,f"⚠️ اخطار {d['warns'][gid][str(t)]}")
-print("✅ [5] Ban / Mute / Warn Loaded")
 
-# ================= 🚫 FILTER =================
-@bot.message_handler(commands=["addfilter"])
-def addfilter(m):
-    if not is_admin(m.chat.id,m.from_user.id): return
-    parts=cmd_text(m).split(" ",1)
-    if len(parts)<2: return bot.reply_to(m,"Usage: /addfilter word")
-    word=parts[1].lower(); d=load_data(); gid=str(m.chat.id)
-    d["filters"].setdefault(gid,[])
-    if word in d["filters"][gid]: return
-    d["filters"][gid].append(word); save_data(d)
-    bot.reply_to(m,f"🚫 فیلتر شد: {word}")
+    count = d["warns"][gid][str(target)]
+    if count >= 3:
+        bot.ban_chat_member(m.chat.id, target)
+        d["warns"][gid][str(target)] = 0
+        save_data(d)
+        bot.send_message(m.chat.id, f"🚫 <a href='tg://user?id={target}'>بعد از ۳ اخطار بن شد!</a> 😅", parse_mode="HTML")
+    else:
+        bot.send_message(m.chat.id, f"⚠️ <a href='tg://user?id={target}'>اخطار شماره {count}</a> گرفت!\nمواظب باش، تا ۳ بشه می‌پرم 😆", parse_mode="HTML")
 
-@bot.message_handler(commands=["filters"])
-def list_filters(m):
-    d=load_data(); lst=d.get("filters",{}).get(str(m.chat.id),[])
-    bot.reply_to(m,"\n".join(lst) if lst else "فیلتر خالی است")
+
+# ================= 🧾 فیلتر کلمات =================
+@bot.message_handler(func=lambda m: is_admin(m.chat.id, m.from_user.id) and cmd(m).startswith("افزودن فیلتر "))
+def add_filter(m):
+    gid = str(m.chat.id)
+    d = load_data()
+    word = cmd(m).split(" ", 2)[2].strip().lower()
+    d["filters"].setdefault(gid, [])
+    if word in d["filters"][gid]:
+        return bot.reply_to(m, "😅 این کلمه از قبل فیلتره!")
+    d["filters"][gid].append(word)
+    save_data(d)
+    bot.reply_to(m, f"🚫 کلمه «{word}» فیلتر شد! دیگه کسی حق نداره بگه 😎")
 
 @bot.message_handler(content_types=["text"])
-def check_filter(m):
-    d=load_data(); gid=str(m.chat.id)
-    fs=d.get("filters",{}).get(gid,[])
-    if not fs or is_admin(m.chat.id,m.from_user.id): return
-    for w in fs:
+def filter_check(m):
+    d = load_data()
+    gid = str(m.chat.id)
+    filters = d.get("filters", {}).get(gid, [])
+    if not filters or is_admin(m.chat.id, m.from_user.id):
+        return
+    for w in filters:
         if w in m.text.lower():
-            try:
-                bot.delete_message(m.chat.id,m.id)
-                msg=bot.send_message(m.chat.id,
-                    f"🚫 {w} فیلتر شده است.",parse_mode="HTML")
-                time.sleep(2); bot.delete_message(m.chat.id,msg.id)
-            except Exception as e:
-                logging.error(e)
+            bot.delete_message(m.chat.id, m.id)
+            msg = bot.send_message(m.chat.id, f"🚫 اون کلمه فیلتره رفیق 😅 رعایت کن!", parse_mode="HTML")
+            time.sleep(3)
+            bot.delete_message(m.chat.id, msg.id)
             break
-print("✅ [6] Filter Loaded")
 
-# ================= 🚀 RUN =================
+
+# ================= 🚀 اجرا =================
 if __name__ == "__main__":
-    print("🤖 Persian Lux Panel V17 Running...")
+    print("🤖 محافظ V1.0 در حال اجراست...")
     while True:
         try:
-            bot.infinity_polling(timeout=60,long_polling_timeout=40,skip_pending=True)
+            bot.infinity_polling(timeout=60, long_polling_timeout=40, skip_pending=True)
         except Exception as e:
-            logging.error(f"Polling Error: {e}")
+            print("⚠️ خطا:", e)
             time.sleep(5)
