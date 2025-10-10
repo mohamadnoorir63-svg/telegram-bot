@@ -1,29 +1,59 @@
-import os
-import time
 import telebot
+import requests
+import time
+import json
+import os
 
-# توکن از متغیر محیطی
-TOKEN = os.getenv("BOT_TOKEN")
-if not TOKEN:
-    raise ValueError("❌ BOT_TOKEN پیدا نشد! لطفاً در تنظیمات Render اضافه‌اش کن.")
+# 📌 توکن خودت را از متغیر محیطی یا مستقیم وارد کن
+TOKEN = os.getenv("BOT_TOKEN", "7850694628:AAEhddVGq-19haxezAy9PheqG1jkm8vcZ7w")
 
 bot = telebot.TeleBot(TOKEN)
 
-# حذف وبهوک برای جلوگیری از خطای 409
-bot.remove_webhook()
-
-@bot.message_handler(commands=['start'])
-def start(m):
-    bot.reply_to(m, "✅ ربات با موفقیت فعاله و آماده به کاره!")
-
-@bot.message_handler(func=lambda m: True)
-def echo(m):
-    bot.reply_to(m, f"📩 پیامت دریافت شد:\n{m.text}")
-
-while True:
+# 🧹 حذف خودکار Webhook در شروع
+def delete_webhook():
+    url = f"https://api.telegram.org/bot{TOKEN}/deleteWebhook"
     try:
-        print("🤖 ربات در حال اجراست...")
-        bot.polling(non_stop=True, interval=2)
+        response = requests.get(url, timeout=10)
+        result = response.json()
+        if result.get("ok"):
+            print("✅ Webhook removed successfully.")
+        else:
+            print("⚠️ Webhook remove failed:", result)
     except Exception as e:
-        print("⚠️ خطا:", e)
-        time.sleep(5)
+        print("⚠️ Error deleting webhook:", e)
+
+# 📁 بارگذاری داده‌ها
+def load_data():
+    if not os.path.exists("data.json"):
+        return {"users": []}
+    with open("data.json", "r") as f:
+        return json.load(f)
+
+# 💾 ذخیره داده‌ها
+def save_data(data):
+    with open("data.json", "w") as f:
+        json.dump(data, f, indent=2)
+
+# 🧍‍♂️ افزودن کاربر جدید
+def add_user(user_id):
+    data = load_data()
+    if user_id not in data["users"]:
+        data["users"].append(user_id)
+        save_data(data)
+        print(f"👤 User {user_id} added.")
+    else:
+        print(f"ℹ️ User {user_id} already exists.")
+
+# 🎯 هندلر برای /start
+@bot.message_handler(commands=['start'])
+def send_welcome(message):
+    add_user(message.chat.id)
+    bot.reply_to(message, "سلام 👋 ربات با موفقیت فعاله و آماده کاره ✅")
+
+# 🔁 اجرای ربات
+if __name__ == "__main__":
+    print("🧹 Deleting webhook before starting polling...")
+    delete_webhook()
+    time.sleep(2)
+    print("🤖 Bot is running and webhook removed successfully!")
+    bot.infinity_polling()
