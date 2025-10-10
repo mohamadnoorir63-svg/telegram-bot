@@ -160,57 +160,70 @@ def toggle_welcome(m):
     data["welcome"][gid]["enabled"] = en
     save_data(data)
     bot.reply_to(m, "🟢 خوشامد روشن شد." if en else "🔴 خوشامد خاموش شد.")# ================= 🔒 قفل‌ها =================
+
 LOCK_MAP = {
-    "لینک":"link","گروه":"group","عکس":"photo","ویدیو":"video",
-    "استیکر":"sticker","گیف":"gif","فایل":"file","موزیک":"music",
-    "ویس":"voice","فوروارد":"forward"
+    "لینک": "link", "گروه": "group", "عکس": "photo", "ویدیو": "video",
+    "استیکر": "sticker", "گیف": "gif", "فایل": "file", "موزیک": "music",
+    "ویس": "voice", "فوروارد": "forward"
 }
 
 @bot.message_handler(func=lambda m: cmd_text(m).startswith("قفل ") or cmd_text(m).startswith("بازکردن "))
 def toggle_lock(m):
-    if not is_admin(m.chat.id, m.from_user.id): return
-    d = load_data(); gid = str(m.chat.id)
+    if not is_admin(m.chat.id, m.from_user.id):
+        return
+
+    d = load_data()
+    gid = str(m.chat.id)
     part = cmd_text(m).split(" ")
-    if len(part) < 2: return
-    key_fa = part[1]; lock_type = LOCK_MAP.get(key_fa)
-    if not lock_type: return bot.reply_to(m, "❌ نوع قفل نامعتبر است.")
+    if len(part) < 2:
+        return
+
+    key_fa = part[1]
+    lock_type = LOCK_MAP.get(key_fa)
+    if not lock_type:
+        return bot.reply_to(m, "❌ نوع قفل نامعتبر است.")
+
     en = cmd_text(m).startswith("قفل ")
     d["locks"].setdefault(gid, {k: False for k in LOCK_MAP.values()})
+
     if d["locks"][gid][lock_type] == en:
         return bot.reply_to(m, "⚠️ این قفل همین حالا هم در همین حالت است.")
-    d["locks"][gid][lock_type] = en; save_data(d)# 🔒 قفل واقعی گروه
-if lock_type == "group":
-    try:
-        # اگر قفل فعال شود، فقط مدیران اجازه ارسال دارند
-        perms = types.ChatPermissions(can_send_messages=not en)
-        bot.set_chat_permissions(m.chat.id, perms)
 
-        if en:
-            bot.send_message(
-                m.chat.id,
-                "🚫 گروه موقتاً <b>بسته شد</b> ❌\n🔒 فقط مدیران می‌تونن پیام بفرستن.\n⏰ " + shamsi_time()
-            )
-        else:
-            bot.send_message(
-                m.chat.id,
-                "✅ گروه <b>باز شد</b> 🌸\n💬 حالا همه می‌تونن چت کنن!\n⏰ " + shamsi_time()
-            )
-    except Exception as e:
-        bot.reply_to(m, f"❗ خطا در تغییر وضعیت گروه:\n<code>{e}</code>")
-    return
+    d["locks"][gid][lock_type] = en
+    save_data(d)
+
+    # 🔒 قفل واقعی گروه
     if lock_type == "group":
-        if en:
-            bot.send_message(m.chat.id, "🚫 گروه موقتاً <b>بسته شد</b> ❌\n🔒 فقط مدیران می‌توانند پیام ارسال کنند.\n⏰ " + shamsi_time())
-        else:
-            bot.send_message(m.chat.id, "✅ گروه <b>باز شد</b> 🌸\n💬 حالا همه می‌تونن گفتگو کنن!\n⏰ " + shamsi_time())
-    else:
-        bot.reply_to(m, f"{'🔒' if en else '🔓'} قفل {key_fa} {'فعال' if en else 'غیرفعال'} شد.")
+        try:
+            perms = types.ChatPermissions(can_send_messages=not en)
+            bot.set_chat_permissions(m.chat.id, perms)
+
+            if en:
+                bot.send_message(
+                    m.chat.id,
+                    "🚫 گروه موقتاً <b>بسته شد</b> ❌\n🔒 فقط مدیران می‌تونن پیام بفرستن.\n⏰ " + shamsi_time()
+                )
+            else:
+                bot.send_message(
+                    m.chat.id,
+                    "✅ گروه <b>باز شد</b> 🌸\n💬 حالا همه می‌تونن چت کنن!\n⏰ " + shamsi_time()
+                )
+        except Exception as e:
+            bot.reply_to(m, f"❗ خطا در تغییر وضعیت گروه:\n<code>{e}</code>")
+        return
+
+    # 🔐 سایر قفل‌ها
+    bot.reply_to(m, f"{'🔒' if en else '🔓'} قفل {key_fa} {'فعال' if en else 'غیرفعال'} شد.")
+
 
 # ================= 👑 مدیر و سودو =================
+
 @bot.message_handler(func=lambda m: m.reply_to_message and cmd_text(m) == "افزودن مدیر")
 def add_admin(m):
-    if not is_sudo(m.from_user.id): return
-    data = load_data(); gid = str(m.chat.id)
+    if not is_sudo(m.from_user.id):
+        return
+    data = load_data()
+    gid = str(m.chat.id)
     uid = str(m.reply_to_message.from_user.id)
     data["admins"].setdefault(gid, [])
     if uid in data["admins"][gid]:
@@ -219,87 +232,199 @@ def add_admin(m):
     save_data(data)
     bot.reply_to(m, f"✅ <a href='tg://user?id={uid}'>کاربر</a> به مدیران افزوده شد.")
 
+
 @bot.message_handler(func=lambda m: cmd_text(m) == "لیست مدیران")
 def list_admins(m):
-    data = load_data(); gid = str(m.chat.id)
+    data = load_data()
+    gid = str(m.chat.id)
     lst = data["admins"].get(gid, [])
-    if not lst: return bot.reply_to(m, "📋 هیچ مدیری ثبت نشده.")
-    msg = "👑 لیست مدیران:\n" + "\n".join([f"• <a href='tg://user?id={a}'>کاربر {a}</a>" for a in lst])
+    if not lst:
+        return bot.reply_to(m, "📋 هیچ مدیری ثبت نشده.")
+    msg = "👑 لیست مدیران:\n" + "\n".join([f"• کاربر {a}" for a in lst])
     bot.reply_to(m, msg)
+
 
 @bot.message_handler(func=lambda m: m.reply_to_message and cmd_text(m) == "افزودن سودو")
 def add_sudo(m):
-    if m.from_user.id != SUDO_ID: return
-    d = load_data(); uid = str(m.reply_to_message.from_user.id)
-    if uid in d["sudo_list"]: return bot.reply_to(m, "⚠️ این کاربر از قبل سودو است.")
-    d["sudo_list"].append(uid); save_data(d)
-    bot.reply_to(m, f"✅ <a href='tg://user?id={uid}'>کاربر</a> به سودوها افزوده شد.")
+    if m.from_user.id != SUDO_ID:
+        return
+    d = load_data()
+    uid = str(m.reply_to_message.from_user.id)
+    if uid in d["sudo_list"]:
+        return bot.reply_to(m, "⚠️ این کاربر از قبل سودو است.")
+    d["sudo_list"].append(uid)
+    save_data(d)
+    bot.reply_to(m, f"✅ کاربر به سودوها افزوده شد.")
+
 
 @bot.message_handler(func=lambda m: cmd_text(m) == "لیست سودو")
 def list_sudos(m):
-    if not is_sudo(m.from_user.id): return
-    d = load_data(); s = d.get("sudo_list", [])
-    if not s: return bot.reply_to(m, "❗ هیچ سودویی ثبت نشده.")
-    txt = "👑 لیست سودوها:\n" + "\n".join([f"• <a href='tg://user?id={x}'>کاربر {x}</a>" for x in s])
+    if not is_sudo(m.from_user.id):
+        return
+    d = load_data()
+    s = d.get("sudo_list", [])
+    if not s:
+        return bot.reply_to(m, "❗ هیچ سودویی ثبت نشده.")
+    txt = "👑 لیست سودوها:\n" + "\n".join([f"• کاربر {x}" for x in s])
     bot.reply_to(m, txt)
 
+
 # ================= 🚫 بن / سکوت / اخطار =================
+
 @bot.message_handler(func=lambda m: m.reply_to_message and cmd_text(m) == "بن")
 def ban_user(m):
-    if not is_admin(m.chat.id, m.from_user.id): return
+    if not is_admin(m.chat.id, m.from_user.id):
+        return
     uid = m.reply_to_message.from_user.id
-    if is_sudo(uid): return bot.reply_to(m, "⚡ نمی‌توان سودو را بن کرد.")
+    if is_sudo(uid):
+        return bot.reply_to(m, "⚡ نمی‌توان سودو را بن کرد.")
     try:
         bot.ban_chat_member(m.chat.id, uid)
-        bot.reply_to(m, f"🚫 کاربر <a href='tg://user?id={uid}'>بن</a> شد.")
+        bot.reply_to(m, f"🚫 کاربر بن شد.")
     except Exception as e:
         bot.reply_to(m, f"❗ خطا در بن کاربر: {e}")
 
+
 @bot.message_handler(func=lambda m: m.reply_to_message and cmd_text(m) == "حذف بن")
 def unban_user(m):
-    if not is_admin(m.chat.id, m.from_user.id): return
+    if not is_admin(m.chat.id, m.from_user.id):
+        return
     try:
         bot.unban_chat_member(m.chat.id, m.reply_to_message.from_user.id, only_if_banned=True)
         bot.reply_to(m, "✅ کاربر از بن خارج شد.")
     except:
         bot.reply_to(m, "❗ خطا در حذف بن.")
 
+
 @bot.message_handler(func=lambda m: m.reply_to_message and cmd_text(m) == "سکوت")
 def mute_user(m):
-    if not is_admin(m.chat.id, m.from_user.id): return
+    if not is_admin(m.chat.id, m.from_user.id):
+        return
     uid = str(m.reply_to_message.from_user.id)
-    d = load_data(); d["muted"][uid] = True; save_data(d)
-    bot.reply_to(m, f"🔇 کاربر <a href='tg://user?id={uid}'>ساکت</a> شد.")
+    d = load_data()
+    d["muted"][uid] = True
+    save_data(d)
+    bot.reply_to(m, f"🔇 کاربر ساکت شد.")
+
 
 @bot.message_handler(func=lambda m: m.reply_to_message and cmd_text(m) == "حذف سکوت")
 def unmute_user(m):
-    if not is_admin(m.chat.id, m.from_user.id): return
+    if not is_admin(m.chat.id, m.from_user.id):
+        return
     uid = str(m.reply_to_message.from_user.id)
     d = load_data()
-    if uid in d["muted"]: d["muted"].pop(uid)
+    if uid in d["muted"]:
+        d["muted"].pop(uid)
     save_data(d)
-    bot.reply_to(m, f"🔊 سکوت کاربر <a href='tg://user?id={uid}'>برداشته</a> شد.")
+    bot.reply_to(m, f"🔊 سکوت کاربر برداشته شد.")
+
 
 @bot.message_handler(func=lambda m: m.reply_to_message and cmd_text(m) == "اخطار")
 def warn_user(m):
-    if not is_admin(m.chat.id, m.from_user.id): return
+    if not is_admin(m.chat.id, m.from_user.id):
+        return
     uid = str(m.reply_to_message.from_user.id)
-    d = load_data(); d["warns"][uid] = d["warns"].get(uid, 0) + 1; save_data(d)
+    d = load_data()
+    d["warns"][uid] = d["warns"].get(uid, 0) + 1
+    save_data(d)
     count = d["warns"][uid]
-    msg = f"⚠️ کاربر <a href='tg://user?id={uid}'>اخطار {count}</a> گرفت."
+    msg = f"⚠️ کاربر اخطار {count} گرفت."
     if count >= 3:
         bot.ban_chat_member(m.chat.id, int(uid))
         msg += "\n🚫 چون ۳ اخطار گرفت، از گروه اخراج شد."
     bot.reply_to(m, msg)
 
+
 @bot.message_handler(func=lambda m: m.reply_to_message and cmd_text(m) == "حذف اخطار")
 def del_warn(m):
-    if not is_admin(m.chat.id, m.from_user.id): return
+    if not is_admin(m.chat.id, m.from_user.id):
+        return
     uid = str(m.reply_to_message.from_user.id)
     d = load_data()
-    if uid in d["warns"]: d["warns"].pop(uid)
+    if uid in d["warns"]:
+        d["warns"].pop(uid)
     save_data(d)
-    bot.reply_to(m, "✅ تمام اخطارهای کاربر پاک شد.")# ================= 🚪 خروج از گروه =================
+    bot.reply_to(m, "✅ تمام اخطارهای کاربر پاک شد.")
+
+
+# ================= 🚫 کنترل خودکار قفل‌ها (حذف و هشدار) =================
+import time
+
+@bot.message_handler(content_types=[
+    "text", "photo", "video", "sticker", "animation", "document", "audio", "voice"
+])
+def handle_locks(m):
+    d = load_data()
+    gid = str(m.chat.id)
+    locks = d.get("locks", {}).get(gid, {})
+
+    if not locks:
+        return
+
+    # تابع حذف و هشدار
+    def delete_and_warn(reason):
+        if is_admin(m.chat.id, m.from_user.id):
+            return
+        try:
+            bot.delete_message(m.chat.id, m.id)
+        except:
+            pass
+        try:
+            warn = bot.send_message(
+                m.chat.id,
+                f"🚫 <b>{reason}</b>\n👤 <a href='tg://user?id={m.from_user.id}'>{m.from_user.first_name}</a> لطفاً قوانین گروه رو رعایت کن ❤️",
+                parse_mode="HTML"
+            )
+            time.sleep(3)
+            bot.delete_message(m.chat.id, warn.id)
+        except:
+            pass
+
+    # 🔗 لینک
+    if locks.get("link"):
+        if m.text and ("http" in m.text or "t.me/" in m.text or "www." in m.text):
+            delete_and_warn("ارسال لینک در این گروه ممنوع است ❌")
+            return
+
+    # 🖼️ عکس
+    if locks.get("photo") and m.content_type == "photo":
+        delete_and_warn("ارسال عکس در این گروه مجاز نیست 📸")
+        return
+
+    # 🎥 ویدیو
+    if locks.get("video") and m.content_type == "video":
+        delete_and_warn("ارسال ویدیو در این گروه مجاز نیست 🎬")
+        return
+
+    # 🧸 استیکر
+    if locks.get("sticker") and m.content_type == "sticker":
+        delete_and_warn("استفاده از استیکر در این گروه بسته است 🧸")
+        return
+
+    # 🎞️ گیف
+    if locks.get("gif") and m.content_type == "animation":
+        delete_and_warn("ارسال گیف در این گروه مجاز نیست 🎞️")
+        return
+
+    # 📁 فایل
+    if locks.get("file") and m.content_type == "document":
+        delete_and_warn("ارسال فایل در این گروه ممنوع است 📁")
+        return
+
+    # 🎵 موزیک
+    if locks.get("music") and m.content_type == "audio":
+        delete_and_warn("ارسال موزیک در این گروه بسته است 🎵")
+        return
+
+    # 🎤 ویس
+    if locks.get("voice") and m.content_type == "voice":
+        delete_and_warn("ارسال ویس در این گروه مجاز نیست 🎤")
+        return
+
+    # 🔁 فوروارد
+    if locks.get("forward") and (m.forward_from or m.forward_from_chat):
+        delete_and_warn("ارسال فوروارد در این گروه ممنوع است 🔁")
+        return# ================= 🚪 خروج از گروه =================
 @bot.message_handler(func=lambda m: cmd_text(m) in ["لفت بده", "ترک گروه", "خارج شو"])
 def leave_group(m):
     # فقط سودو می‌تواند دستور لفت بدهد
@@ -441,16 +566,4 @@ def sudo_reply(m):
 @bot.message_handler(commands=["start"])
 def start_cmd(m):
     d = load_data()
-    uid = str(m.from_user.id)
-    if uid not in d["users"]:
-        d["users"].append(uid)
-        save_data(d)
-    bot.reply_to(m, "👋 سلام! ربات مدیریتی Persian Lux Panel فعال است.\nبرای راهنما بنویس: «راهنما»")
-
-print("🤖 Persian Lux Panel V15 (Joke Updated) در حال اجراست...")
-while True:
-    try:
-        bot.infinity_polling(timeout=60, long_polling_timeout=30)
-    except Exception as e:
-        logging.error(f"polling crash: {e}")
-        time.sleep(5)
+   
