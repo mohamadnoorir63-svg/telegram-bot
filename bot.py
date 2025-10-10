@@ -394,5 +394,151 @@ def lock_filter_system(m):
     if locks.get("forward") and (m.forward_from or m.forward_from_chat):
         return warn_and_delete("ارسال پیام فورواردی در این گروه بسته شده است 🔁")
 
-print("✅ بخش ۴ (سیستم قفل‌ها) با موفقیت لود شد.")
+print("✅ بخش ۴ (سیستم قفل‌ها) با موفقیت لود شد.")# ================= 🚫 مدیریت کاربران (بن، سکوت، اخطار) =================
+
+# 🚫 بن کاربر
+@bot.message_handler(func=lambda m: m.reply_to_message and cmd_text(m) == "بن")
+def ban_user(m):
+    if not is_admin(m.chat.id, m.from_user.id):
+        return
+    uid = m.reply_to_message.from_user.id
+    if is_sudo(uid):
+        return bot.reply_to(m, "⚡ نمی‌توان سودو را بن کرد 😅")
+    try:
+        bot.ban_chat_member(m.chat.id, uid)
+        d = load_data()
+        gid = str(m.chat.id)
+        d.setdefault("banned", {}).setdefault(gid, [])
+        if uid not in d["banned"][gid]:
+            d["banned"][gid].append(uid)
+            save_data(d)
+        bot.reply_to(m, f"🚫 کاربر <a href='tg://user?id={uid}'>بن شد</a> و از گروه خارج گردید.", parse_mode="HTML")
+    except Exception as e:
+        bot.reply_to(m, f"❗ خطا در بن:\n<code>{e}</code>")
+
+# ♻️ حذف بن
+@bot.message_handler(func=lambda m: m.reply_to_message and cmd_text(m) == "حذف بن")
+def unban_user(m):
+    if not is_admin(m.chat.id, m.from_user.id):
+        return
+    uid = m.reply_to_message.from_user.id
+    try:
+        bot.unban_chat_member(m.chat.id, uid)
+        d = load_data()
+        gid = str(m.chat.id)
+        if gid in d.get("banned", {}) and uid in d["banned"][gid]:
+            d["banned"][gid].remove(uid)
+            save_data(d)
+        bot.reply_to(m, f"✅ بن <a href='tg://user?id={uid}'>برداشته شد</a>.", parse_mode="HTML")
+    except:
+        bot.reply_to(m, "⚠️ نتوانستم بن را حذف کنم.")
+
+# 🔇 سکوت
+@bot.message_handler(func=lambda m: m.reply_to_message and cmd_text(m) == "سکوت")
+def mute_user(m):
+    if not is_admin(m.chat.id, m.from_user.id):
+        return
+    uid = str(m.reply_to_message.from_user.id)
+    d = load_data()
+    gid = str(m.chat.id)
+    d.setdefault("muted", {}).setdefault(gid, [])
+    if uid in d["muted"][gid]:
+        return bot.reply_to(m, "ℹ️ این کاربر از قبل در حالت سکوت است.")
+    d["muted"][gid].append(uid)
+    save_data(d)
+    bot.reply_to(m, f"🔇 کاربر <a href='tg://user?id={uid}'>ساکت شد</a>.", parse_mode="HTML")
+
+# 🔊 حذف سکوت
+@bot.message_handler(func=lambda m: m.reply_to_message and cmd_text(m) == "حذف سکوت")
+def unmute_user(m):
+    if not is_admin(m.chat.id, m.from_user.id):
+        return
+    uid = str(m.reply_to_message.from_user.id)
+    d = load_data()
+    gid = str(m.chat.id)
+    if uid in d.get("muted", {}).get(gid, []):
+        d["muted"][gid].remove(uid)
+        save_data(d)
+        bot.reply_to(m, f"🔊 سکوت <a href='tg://user?id={uid}'>برداشته شد</a>.", parse_mode="HTML")
+    else:
+        bot.reply_to(m, "ℹ️ این کاربر در حالت سکوت نبود.")
+
+# ⚠️ اخطار
+@bot.message_handler(func=lambda m: m.reply_to_message and cmd_text(m) == "اخطار")
+def warn_user(m):
+    if not is_admin(m.chat.id, m.from_user.id):
+        return
+    uid = str(m.reply_to_message.from_user.id)
+    d = load_data()
+    gid = str(m.chat.id)
+    d.setdefault("warns", {}).setdefault(gid, {})
+    d["warns"][gid][uid] = d["warns"][gid].get(uid, 0) + 1
+    save_data(d)
+
+    count = d["warns"][gid][uid]
+    msg = f"⚠️ کاربر <a href='tg://user?id={uid}'>اخطار شماره {count}</a> دریافت کرد."
+    if count >= 3:
+        try:
+            bot.ban_chat_member(m.chat.id, int(uid))
+            msg += "\n🚫 چون ۳ اخطار گرفت، از گروه اخراج شد."
+        except:
+            msg += "\n⚠️ نتوانستم اخراجش کنم، دسترسی محدود است."
+    bot.reply_to(m, msg, parse_mode="HTML")
+
+# 🧹 حذف اخطار
+@bot.message_handler(func=lambda m: m.reply_to_message and cmd_text(m) == "حذف اخطار")
+def del_warns(m):
+    if not is_admin(m.chat.id, m.from_user.id):
+        return
+    uid = str(m.reply_to_message.from_user.id)
+    d = load_data()
+    gid = str(m.chat.id)
+    if uid in d.get("warns", {}).get(gid, {}):
+        d["warns"][gid].pop(uid)
+        save_data(d)
+    bot.reply_to(m, f"✅ اخطارهای <a href='tg://user?id={uid}'>کاربر</a> پاک شد.", parse_mode="HTML")
+
+# ================= 📋 لیست‌ها =================
+
+@bot.message_handler(func=lambda m: cmd_text(m) == "لیست بن")
+def list_banned(m):
+    d = load_data()
+    gid = str(m.chat.id)
+    lst = d.get("banned", {}).get(gid, [])
+    if not lst:
+        return bot.reply_to(m, "📋 هیچ کاربری بن نشده است.")
+    text = "\n".join([f"• <a href='tg://user?id={x}'>کاربر {x}</a>" for x in lst])
+    bot.reply_to(m, f"🚫 <b>لیست کاربران بن‌شده:</b>\n\n{text}", parse_mode="HTML")
+
+@bot.message_handler(func=lambda m: cmd_text(m) == "لیست سکوت")
+def list_muted(m):
+    d = load_data()
+    gid = str(m.chat.id)
+    lst = d.get("muted", {}).get(gid, [])
+    if not lst:
+        return bot.reply_to(m, "🔇 هیچ کاربری در حالت سکوت نیست.")
+    text = "\n".join([f"• <a href='tg://user?id={x}'>کاربر {x}</a>" for x in lst])
+    bot.reply_to(m, f"🔇 <b>لیست کاربران ساکت:</b>\n\n{text}", parse_mode="HTML")
+
+@bot.message_handler(func=lambda m: cmd_text(m) == "لیست اخطار")
+def list_warns(m):
+    d = load_data()
+    gid = str(m.chat.id)
+    warns = d.get("warns", {}).get(gid, {})
+    if not warns:
+        return bot.reply_to(m, "⚠️ هیچ اخطاری ثبت نشده است.")
+    text = "\n".join([f"• <a href='tg://user?id={x}'>کاربر {x}</a> — {warns[x]} اخطار" for x in warns])
+    bot.reply_to(m, f"⚠️ <b>لیست اخطارها:</b>\n\n{text}", parse_mode="HTML")
+
+# کنترل خودکار کاربران ساکت
+@bot.message_handler(content_types=["text", "photo", "video", "sticker", "animation", "document", "audio", "voice"])
+def check_mute(m):
+    d = load_data()
+    gid = str(m.chat.id)
+    uid = str(m.from_user.id)
+    if uid in d.get("muted", {}).get(gid, []):
+        try:
+            bot.delete_message(m.chat.id, m.id)
+        except:
+            pass
 bot.infinity_polling(timeout=60, long_polling_timeout=40)
