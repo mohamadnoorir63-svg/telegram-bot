@@ -1,19 +1,10 @@
 {
-  "welcome": {
-    "-4890092905": {
-      "enabled": true,
-      "type": "text",
-      "content": "✨ سلام {name}! به گروه {title} خوش اومدی 🌸\n⏰ {time}",
-      "file_id": null
-    }
-  },
+  "welcome": {},
   "locks": {},
   "admins": {},
   "sudo_list": [],
   "banned": {},
   "muted": {},
   "warns": {},
-  "users": [],
-  "jokes": [],
-  "falls": []
+  "users": []
 }
