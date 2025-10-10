@@ -572,4 +572,16 @@ def block_muted(m):
             bot.delete_message(m.chat.id, m.id)
         except:
             pass
-bot.infinity_polling(timeout=60, long_polling_timeout=30
+# ================= 🚀 اجرای نهایی =================
+if __name__ == "__main__":
+    print("🤖 Persian Lux Panel V15 در حال اجراست...")
+
+    while True:
+        try:
+            bot.infinity_polling(
+                timeout=60,
+                long_polling_timeout=40,
+                skip_pending=True
+            )
+        except Exception as e:
+            logging.error(f"
