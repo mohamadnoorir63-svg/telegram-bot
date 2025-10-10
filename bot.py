@@ -1,20 +1,34 @@
 # -*- coding: utf-8 -*-
-# Persian Lux Panel V15 – Base Setup
+# Persian Lux Panel V17 – Final Pro (Only Groups)
 # Designed for Mohammad 👑
 
 import os
 import json
-import random
 import time
 import logging
-import jdatetime
+from datetime import datetime
 import telebot
 from telebot import types
 
+# -------------------- Optional Jalali (no-crash fallback) --------------------
+try:
+    import jdatetime
+    def shamsi_date():
+        return jdatetime.datetime.now().strftime("%A %d %B %Y")
+    def shamsi_time():
+        return jdatetime.datetime.now().strftime("%H:%M:%S")
+    JALALI_OK = True
+except Exception:
+    # اگر jdatetime نصب نبود، با میلادی ادامه می‌دهیم تا برنامه کرش نکند
+    def shamsi_date():
+        return datetime.now().strftime("%A %d %B %Y")
+    def shamsi_time():
+        return datetime.now().strftime("%H:%M:%S")
+    JALALI_OK = False
+
 # ================= ⚙️ تنظیمات پایه =================
-# توکن و آیدی سودو از تنظیمات هاست (Heroku Config Vars) خوانده می‌شوند
-TOKEN = os.environ.get("BOT_TOKEN")
-SUDO_ID = int(os.environ.get("SUDO_ID", "0"))
+TOKEN = os.environ.get("BOT_TOKEN")  # حتماً در Config Vars تنظیم کن
+SUDO_ID = int(os.environ.get("SUDO_ID", "0"))  # آیدی عددی اصلی شما
 
 bot = telebot.TeleBot(TOKEN, parse_mode="HTML")
 
@@ -23,24 +37,22 @@ LOG_FILE = "error.log"
 
 logging.basicConfig(
     filename=LOG_FILE,
-    level=logging.ERROR,
+    level=logging.INFO,
     format="%(asctime)s - %(levelname)s - %(message)s"
 )
 
-# ================= 💾 فایل داده =================
+# ================= 💾 دیتا =================
 def base_data():
     return {
-        "welcome": {},
-        "locks": {},
-        "admins": {},
-        "sudo_list": [],
-        "banned": {},
-        "muted": {},
-        "warns": {},
-        "users": [],
-        "jokes": [],
-        "falls": [],
-        "filters": {}  # 👈 بخش فیلترها هم از همینجا تعریف میشه
+        "welcome": {},      # per-group: {gid: {enabled, type, content, file_id}}
+        "locks": {},        # per-group: {gid: {lock_key: bool}}
+        "admins": {},       # per-group: {gid: [user_ids]}
+        "sudo_list": [],    # global extra sudo user ids (as str)
+        "banned": {},       # per-group: {gid: [user_ids]}
+        "muted": {},        # per-group: {gid: [user_ids]}
+        "warns": {},        # per-group: {gid: {uid(str): count}}
+        "filters": {},      # per-group: {gid: [words]}
+        "users": []         # global users seen
     }
 
 def load_data():
@@ -51,9 +63,11 @@ def load_data():
             data = json.load(f)
     except Exception:
         data = base_data()
-    for k in base_data():
+    # ensure keys
+    template = base_data()
+    for k in template:
         if k not in data:
-            data[k] = base_data()[k]
+            data[k] = template[k]
     save_data(data)
     return data
 
@@ -61,348 +75,66 @@ def save_data(d):
     with open(DATA_FILE, "w", encoding="utf-8") as f:
         json.dump(d, f, ensure_ascii=False, indent=2)
 
-def register_group(gid):
-    data = load_data()
+def ensure_group_struct(gid):
+    d = load_data()
     gid = str(gid)
-    data["welcome"].setdefault(gid, {"enabled": True, "type": "text", "content": None, "file_id": None})
-    data["locks"].setdefault(
-        gid, {k: False for k in ["link", "group", "photo", "video", "sticker", "gif", "file", "music", "voice", "forward"]}
-    )
-    save_data(data)
+    d["welcome"].setdefault(gid, {"enabled": True, "type": "text", "content": None, "file_id": None})
+    d["locks"].setdefault(gid, {
+        k: False for k in ["link","group","photo","video","sticker","gif","file","music","voice","forward","text"]
+    })
+    d["admins"].setdefault(gid, [])
+    d["banned"].setdefault(gid, [])
+    d["muted"].setdefault(gid, [])
+    d["warns"].setdefault(gid, {})
+    d["filters"].setdefault(gid, [])
+    save_data(d)
 
-# ================= 🧩 ابزارها =================
-def shamsi_date():
-    return jdatetime.datetime.now().strftime("%A %d %B %Y")
-
-def shamsi_time():
-    return jdatetime.datetime.now().strftime("%H:%M:%S")
-
+# ================= 🧰 ابزارها =================
 def cmd_text(m):
     return (getattr(m, "text", None) or "").strip()
+
+def first_word(m):
+    t = cmd_text(m)
+    return t.split()[0] if t else ""
+
+def in_group(m):
+    # فقط در گروه‌ها کار کنه
+    return getattr(m.chat, "type", "") in ("group", "supergroup")
 
 def is_sudo(uid):
     d = load_data()
     return str(uid) in [str(SUDO_ID)] + d.get("sudo_list", [])
 
 def is_admin(chat_id, uid):
-    d = load_data()
-    gid = str(chat_id)
+    # سودو یا مدیر تلگرام یا مدیر سفارشی گروه
     if is_sudo(uid):
         return True
-    if str(uid) in d["admins"].get(gid, []):
-        return True
     try:
-        st = bot.get_chat_member(chat_id, uid).status
-        return st in ("administrator", "creator")
+        st = bot.get_chat_member(chat_id, uid)
+        if st.status in ("administrator", "creator"):
+            return True
     except:
-        return False
+        pass
+    d = load_data()
+    return str(uid) in list(map(str, d["admins"].get(str(chat_id), [])))
 
-print("✅ بخش ۱ (تنظیمات پایه + دیتا + ابزارها) با موفقیت لود شد.")# ================= 🆔 آیدی / آمار / ساعت / لینک =================
-
-@bot.message_handler(func=lambda m: cmd_text(m) in ["آیدی", "ایدی"])
-def show_id(m):
-    """نمایش اطلاعات کاربر"""
+def bot_admin_perms(chat_id):
+    """بررسی دسترسی‌های ربات در گروه (برای بن/سکوت/بازکردن چت و …)"""
     try:
-        user = m.from_user
-        name = user.first_name or ""
-        uid = user.id
-        caption = (
-            f"🧾 <b>مشخصات کاربر</b>\n"
-            f"👤 نام: {name}\n"
-            f"🆔 آیدی عددی: <code>{uid}</code>\n"
-            f"💬 آیدی گروه: <code>{m.chat.id}</code>\n"
-            f"📅 تاریخ: {shamsi_date()}\n"
-            f"⏰ ساعت: {shamsi_time()}"
-        )
-
-        photos = bot.get_user_profile_photos(uid)
-        if photos.total_count > 0:
-            file_id = photos.photos[0][-1].file_id
-            bot.send_photo(m.chat.id, file_id, caption=caption)
-        else:
-            bot.reply_to(m, caption)
-    except Exception as e:
-        bot.reply_to(m, f"🆔 <code>{m.from_user.id}</code>\n⏰ {shamsi_time()}")
-
-# ==== آمار ====
-@bot.message_handler(func=lambda m: cmd_text(m) == "آمار")
-def show_stats(m):
-    if not (is_admin(m.chat.id, m.from_user.id) or is_sudo(m.from_user.id)):
-        return
-    data = load_data()
-    users = len(set(data.get("users", [])))
-    groups = len(data.get("welcome", {}))
-    bot.reply_to(
-        m,
-        f"📊 <b>آمار ربات Persian Lux Panel</b>\n"
-        f"👤 کاربران: {users}\n👥 گروه‌ها: {groups}\n"
-        f"📅 {shamsi_date()} | ⏰ {shamsi_time()}"
-    )
-
-# ==== ساعت ====
-@bot.message_handler(func=lambda m: cmd_text(m) == "ساعت")
-def show_time(m):
-    bot.reply_to(m, f"⏰ {shamsi_time()} | 📅 {shamsi_date()}")
-
-# ==== لینک ربات ====
-@bot.message_handler(func=lambda m: cmd_text(m) == "لینک ربات")
-def bot_link(m):
-    bot.reply_to(m, f"🤖 لینک ربات:\nhttps://t.me/{bot.get_me().username}")
-
-# ==== لینک گروه ====
-@bot.message_handler(func=lambda m: cmd_text(m) == "لینک گروه")
-def group_link(m):
-    if not is_admin(m.chat.id, m.from_user.id):
-        return
-    try:
-        link = bot.export_chat_invite_link(m.chat.id)
-        bot.reply_to(m, f"🔗 لینک گروه:\n{link}")
+        me = bot.get_me()
+        cm = bot.get_chat_member(chat_id, me.id)
+        perms = {
+            "is_admin": cm.status in ("administrator", "creator"),
+            "can_restrict": getattr(cm, "can_restrict_members", True),
+            "can_delete": getattr(cm, "can_delete_messages", True),
+            "can_invite": getattr(cm, "can_invite_users", True),
+            "can_change_info": getattr(cm, "can_change_info", True),
+            "can_manage_chat": getattr(cm, "can_manage_chat", True)
+        }
+        return perms
     except:
-        bot.reply_to(m, "⚠️ دسترسی ساخت لینک ندارم.")
-
-print("✅ بخش ۲ (آیدی، آمار، ساعت و لینک‌ها) با موفقیت لود شد.")# ================= 👋 سیستم خوشامد حرفه‌ای =================
-
-@bot.message_handler(content_types=["new_chat_members"])
-def welcome_new(m):
-    """ارسال پیام خوشامد برای اعضای جدید"""
-    register_group(m.chat.id)
-    data = load_data()
-    gid = str(m.chat.id)
-    settings = data["welcome"].get(gid, {"enabled": True, "type": "text", "content": None, "file_id": None})
-
-    if not settings.get("enabled", True):
-        return  # خوشامد خاموش است
-
-    user = m.new_chat_members[0]
-    name = user.first_name or "دوست جدید"
-    group_name = m.chat.title or "گروه"
-    text = settings.get("content") or f"✨ سلام {name}!\nبه <b>{group_name}</b> خوش اومدی 🌸\n⏰ {shamsi_time()}"
-
-    # جایگزینی تگ‌ها در متن
-    text = text.replace("{name}", name).replace("{group}", group_name).replace("{time}", shamsi_time()).replace("{date}", shamsi_date())
-
-    # اگر خوشامد از نوع عکس بود
-    if settings.get("type") == "photo" and settings.get("file_id"):
-        bot.send_photo(m.chat.id, settings["file_id"], caption=text)
-    else:
-        bot.send_message(m.chat.id, text)
-
-
-# ================= ⚙️ تنظیمات خوشامد =================
-
-@bot.message_handler(func=lambda m: is_admin(m.chat.id, m.from_user.id) and cmd_text(m) == "خوشامد روشن")
-def enable_welcome(m):
-    data = load_data()
-    gid = str(m.chat.id)
-    data["welcome"].setdefault(gid, {})["enabled"] = True
-    save_data(data)
-    bot.reply_to(m, "✅ پیام خوشامد برای اعضای جدید فعال شد.")
-
-@bot.message_handler(func=lambda m: is_admin(m.chat.id, m.from_user.id) and cmd_text(m) == "خوشامد خاموش")
-def disable_welcome(m):
-    data = load_data()
-    gid = str(m.chat.id)
-    data["welcome"].setdefault(gid, {})["enabled"] = False
-    save_data(data)
-    bot.reply_to(m, "🚫 پیام خوشامد برای اعضای جدید غیرفعال شد.")
-
-# ✏️ تنظیم خوشامد متنی
-@bot.message_handler(func=lambda m: is_admin(m.chat.id, m.from_user.id) and m.reply_to_message and cmd_text(m) == "تنظیم خوشامد")
-def set_welcome_text(m):
-    txt = (m.reply_to_message.text or "").strip()
-    if not txt:
-        return bot.reply_to(m, "⚠️ لطفاً روی یک پیام متنی ریپلای کن تا به عنوان خوشامد ذخیره شود.")
-    data = load_data()
-    gid = str(m.chat.id)
-    data["welcome"][gid] = {"enabled": True, "type": "text", "content": txt, "file_id": None}
-    save_data(data)
-    bot.reply_to(m, "✅ پیام خوشامد متنی با موفقیت تنظیم شد.")
-
-# 🖼️ تنظیم خوشامد تصویری
-@bot.message_handler(func=lambda m: is_admin(m.chat.id, m.from_user.id) and m.reply_to_message and cmd_text(m) == "تنظیم خوشامد عکس")
-def set_welcome_photo(m):
-    if not m.reply_to_message.photo:
-        return bot.reply_to(m, "⚠️ لطفاً روی یک پیام دارای عکس ریپلای کن.")
-    file_id = m.reply_to_message.photo[-1].file_id
-    caption = (m.reply_to_message.caption or "✨ خوش اومدی {name} به {group} 🌸").strip()
-    data = load_data()
-    gid = str(m.chat.id)
-    data["welcome"][gid] = {"enabled": True, "type": "photo", "content": caption, "file_id": file_id}
-    save_data(data)
-    bot.reply_to(m, "🖼️ پیام خوشامد تصویری با موفقیت تنظیم شد.")
-
-# 🔍 مشاهده پیام خوشامد فعلی
-@bot.message_handler(func=lambda m: cmd_text(m) == "خوشامد")
-def show_current_welcome(m):
-    data = load_data()
-    gid = str(m.chat.id)
-    s = data["welcome"].get(gid, None)
-    if not s:
-        return bot.reply_to(m, "ℹ️ هنوز هیچ خوشامدی تنظیم نشده.")
-    status = "✅ فعال" if s.get("enabled", True) else "🚫 غیرفعال"
-    typ = "🖼️ تصویری" if s.get("type") == "photo" else "💬 متنی"
-    msg = s.get("content") or "(خالی)"
-    bot.reply_to(
-        m,
-        f"📋 <b>وضعیت خوشامد</b>\n"
-        f"وضعیت: {status}\n"
-        f"نوع: {typ}\n\n"
-        f"📄 متن:\n{msg}"
-    )
-
-print("✅ بخش ۳ (خوشامد حرفه‌ای) با موفقیت لود شد.")# ================= 🔒 سیستم قفل‌ها (Lock System Pro) =================
-
-# نوع قفل‌ها
-LOCK_MAP = {
-    "لینک": "link",
-    "گروه": "group",
-    "عکس": "photo",
-    "ویدیو": "video",
-    "استیکر": "sticker",
-    "گیف": "gif",
-    "فایل": "file",
-    "موزیک": "music",
-    "ویس": "voice",
-    "فوروارد": "forward",
-    "متن": "text"
-}
-
-# 📌 فعال / غیرفعال کردن قفل‌ها
-@bot.message_handler(func=lambda m: cmd_text(m).startswith("قفل ") or cmd_text(m).startswith("بازکردن "))
-def toggle_lock(m):
-    if not is_admin(m.chat.id, m.from_user.id):
-        return
-
-    d = load_data()
-    gid = str(m.chat.id)
-    parts = cmd_text(m).split(" ", 1)
-    if len(parts) < 2:
-        return bot.reply_to(m, "⚠️ دستور نادرست است.\nمثال: قفل لینک")
-
-    key_fa = parts[1]
-    lock_type = LOCK_MAP.get(key_fa)
-    if not lock_type:
-        return bot.reply_to(m, "❌ نوع قفل معتبر نیست.")
-
-    enable = cmd_text(m).startswith("قفل ")
-    d["locks"].setdefault(gid, {k: False for k in LOCK_MAP.values()})
-
-    if d["locks"][gid][lock_type] == enable:
-        return bot.reply_to(m, f"ℹ️ قفل {key_fa} از قبل {'فعال' if enable else 'غیرفعال'} بوده است.")
-
-    d["locks"][gid][lock_type] = enable
-    save_data(d)
-
-    # قفل گروه (بستن چت)
-    if lock_type == "group":
-        try:
-            perms = types.ChatPermissions(can_send_messages=not enable)
-            bot.set_chat_permissions(m.chat.id, perms)
-            msg = (
-                "🚫 گروه هم‌اکنون <b>بسته شد</b> ❌\n"
-                "💬 ارسال پیام فقط برای مدیران فعال است.\n"
-                f"⏰ {shamsi_time()}"
-            ) if enable else (
-                "✅ گروه <b>باز شد</b> 🌸\n"
-                "💬 حالا همه می‌تونن دوباره چت کنن!\n"
-                f"⏰ {shamsi_time()}"
-            )
-            bot.send_message(m.chat.id, msg)
-        except Exception as e:
-            bot.reply_to(m, f"⚠️ خطا در تغییر وضعیت گروه:\n<code>{e}</code>")
-        return
-
-    # پیام زیبای فعال/غیرفعال شدن
-    msg = (
-        f"🔒 قفل <b>{key_fa}</b> با موفقیت فعال شد.\n"
-        f"🚫 از این پس ارسال این نوع پیام ممنوع است."
-        if enable
-        else f"🔓 قفل <b>{key_fa}</b> غیرفعال شد.\n💬 کاربران می‌توانند دوباره از آن استفاده کنند."
-    )
-    bot.reply_to(m, msg)
-
-
-# ================= 🚫 کنترل خودکار پیام‌های ممنوعه =================
-
-@bot.message_handler(content_types=["text", "photo", "video", "sticker", "animation", "document", "audio", "voice", "forward"])
-def lock_filter_system(m):
-    d = load_data()
-    gid = str(m.chat.id)
-    locks = d.get("locks", {}).get(gid, {})
-
-    if not locks:
-        return  # هیچ قفلی تنظیم نشده
-
-    def warn_and_delete(reason):
-        """حذف پیام و اخطار زیبا به کاربر"""
-        if is_admin(m.chat.id, m.from_user.id):
-            return  # مدیران استثنا هستند
-        try:
-            bot.delete_message(m.chat.id, m.id)
-        except:
-            pass
-
-        warn_text = (
-            f"🚨 <b>اخطار!</b>\n"
-            f"{reason}\n"
-            f"👤 <a href='tg://user?id={m.from_user.id}'>{m.from_user.first_name}</a> لطفاً قوانین گروه را رعایت کن 🌸"
-        )
-        msg = bot.send_message(m.chat.id, warn_text, parse_mode="HTML")
-        time.sleep(3)
-        try:
-            bot.delete_message(m.chat.id, msg.id)
-        except:
-            pass
-
-    # 🔗 قفل لینک
-    if locks.get("link") and m.text and any(x in m.text.lower() for x in ["http", "www.", "t.me/", "telegram.me/"]):
-        return warn_and_delete("ارسال لینک در این گروه مجاز نیست ❌")
-
-    # 💬 قفل متن
-    if locks.get("text") and m.text:
-        return warn_and_delete("ارسال پیام متنی در این گروه بسته است 💬")
-
-    # 🖼️ قفل عکس
-    if locks.get("photo") and m.content_type == "photo":
-        return warn_and_delete("ارسال عکس در این گروه ممنوع است 🖼️")
-
-    # 🎥 قفل ویدیو
-    if locks.get("video") and m.content_type == "video":
-        return warn_and_delete("ارسال ویدیو در این گروه مجاز نیست 🎬")
-
-    # 🧸 قفل استیکر
-    if locks.get("sticker") and m.content_type == "sticker":
-        return warn_and_delete("استفاده از استیکر در این گروه ممنوع است 🧸")
-
-    # 🎞️ قفل گیف
-    if locks.get("gif") and m.content_type == "animation":
-        return warn_and_delete("ارسال گیف در این گروه بسته است 🎞️")
-
-    # 📁 قفل فایل
-    if locks.get("file") and m.content_type == "document":
-        return warn_and_delete("ارسال فایل در این گروه مجاز نیست 📁")
-
-    # 🎵 قفل موزیک
-    if locks.get("music") and m.content_type == "audio":
-        return warn_and_delete("ارسال موزیک در این گروه ممنوع است 🎵")
-
-    # 🎤 قفل ویس
-    if locks.get("voice") and m.content_type == "voice":
-        return warn_and_delete("ارسال ویس در این گروه مجاز نیست 🎤")
-
-    # 🔁 قفل فوروارد
-    if locks.get("forward") and (m.forward_from or m.forward_from_chat):
-        return warn_and_delete("ارسال پیام فورواردی در این گروه بسته شده است 🔁")
-
-print("✅ بخش ۴ (سیستم قفل‌ها) با موفقیت لود شد.")# ================= 🚫 مدیریت کاربران (بن / سکوت / اخطار) [نسخه دیباگ] =================
-
-def ensure_data_keys():
-    d = load_data()
-    for key in ["banned", "muted", "warns"]:
-        if key not in d:
-            d[key] = {}
-    save_data(d)
-
+        return {"is_admin": False, "can_restrict": False, "can_delete": False,
+                "can_invite": False, "can_change_info": False, "can_manage_chat": False}
 
 def get_target_id(m):
     parts = cmd_text(m).split()
@@ -412,134 +144,389 @@ def get_target_id(m):
         return int(parts[1])
     return None
 
+def short_name(u):
+    return (u.first_name or "کاربر").strip()
 
-# 🚫 بن کاربر
-@bot.message_handler(func=lambda m: cmd_text(m).startswith("بن"))
-def ban_user(m):
-    print("🚀 دستور بن تشخیص داده شد")
-    if not is_admin(m.chat.id, m.from_user.id):
-        print("❌ کاربر ادمین نیست، رد شد")
-        return
-    target = get_target_id(m)
-    print(f"🎯 هدف بن: {target}")
-    if not target:
-        return bot.reply_to(m, "⚠️ لطفاً ریپلای کن یا آیدی بده.\nمثال: بن 123456789")
-    if is_sudo(target):
-        print("❌ کاربر سودو است، بن نشد")
-        return bot.reply_to(m, "😅 نمی‌تونم سودو رو بن کنم!")
-
-    gid = str(m.chat.id)
-    ensure_data_keys()
-    d = load_data()
-    d["banned"].setdefault(gid, [])
-    if target not in d["banned"][gid]:
-        d["banned"][gid].append(target)
-        save_data(d)
-        print("✅ به لیست بن اضافه شد")
-
+# ================= 🆔 آیدی / آمار / ساعت / لینک‌ها =================
+@bot.message_handler(func=lambda m: in_group(m) and cmd_text(m) in ["آیدی", "ایدی"])
+def show_id(m):
     try:
-        bot.ban_chat_member(m.chat.id, target)
-        print("✅ بن در گروه انجام شد")
-    except Exception as e:
-        print(f"⚠️ خطا در بن: {e}")
+        user = m.from_user
+        caption = (
+            f"🧾 <b>مشخصات</b>\n"
+            f"👤 نام: {short_name(user)}\n"
+            f"🆔 آیدی: <code>{user.id}</code>\n"
+            f"💬 آیدی گروه: <code>{m.chat.id}</code>\n"
+            f"📅 {shamsi_date()} | ⏰ {shamsi_time()}"
+        )
+        photos = bot.get_user_profile_photos(user.id)
+        if getattr(photos, "total_count", 0) > 0:
+            file_id = photos.photos[0][-1].file_id
+            bot.send_photo(m.chat.id, file_id, caption=caption)
+        else:
+            bot.reply_to(m, caption)
+    except:
+        bot.reply_to(m, f"🆔 <code>{m.from_user.id}</code>")
 
-    bot.reply_to(m, f"🚫 <a href='tg://user?id={target}'>کاربر</a> بن شد.", parse_mode="HTML")
-
-
-# 🔓 حذف بن
-@bot.message_handler(func=lambda m: cmd_text(m).startswith("حذف بن"))
-def unban_user(m):
-    print("🚀 دستور حذف بن تشخیص داده شد")
+@bot.message_handler(func=lambda m: in_group(m) and cmd_text(m) == "آمار")
+def stats(m):
     if not is_admin(m.chat.id, m.from_user.id):
         return
-    target = get_target_id(m)
-    print(f"🎯 هدف حذف بن: {target}")
-    if not target:
-        return bot.reply_to(m, "⚠️ ریپلای کن یا آیدی بده.")
-    gid = str(m.chat.id)
-    ensure_data_keys()
     d = load_data()
-    if target in d.get("banned", {}).get(gid, []):
-        d["banned"][gid].remove(target)
-        save_data(d)
-        print("✅ از لیست بن حذف شد")
+    users = len(set(d.get("users", [])))
+    groups = len(d.get("welcome", {}))
+    bot.reply_to(m, f"📊 <b>آمار</b>\n👥 گروه‌ها: {groups}\n👤 کاربران: {users}\n⏰ {shamsi_time()}")
+
+@bot.message_handler(func=lambda m: in_group(m) and cmd_text(m) == "ساعت")
+def show_time(m):
+    bot.reply_to(m, f"⏰ {shamsi_time()} | 📅 {shamsi_date()}")
+
+@bot.message_handler(func=lambda m: in_group(m) and cmd_text(m) == "لینک ربات")
+def bot_link(m):
     try:
-        bot.unban_chat_member(m.chat.id, target)
-        print("✅ آنبن در گروه انجام شد")
-    except Exception as e:
-        print(f"⚠️ خطا در حذف بن: {e}")
-    bot.reply_to(m, f"✅ <a href='tg://user?id={target}'>کاربر</a> آزاد شد 🌿", parse_mode="HTML")
+        bot.reply_to(m, f"🤖 https://t.me/{bot.get_me().username}")
+    except:
+        bot.reply_to(m, "⚠️ نتونستم یوزرنیم خودمو بگیرم.")
 
-
-# 🔇 سکوت
-@bot.message_handler(func=lambda m: cmd_text(m).startswith("سکوت"))
-def mute_user(m):
-    print("🚀 دستور سکوت تشخیص داده شد")
+@bot.message_handler(func=lambda m: in_group(m) and cmd_text(m) == "لینک گروه")
+def group_link(m):
     if not is_admin(m.chat.id, m.from_user.id):
-        print("❌ کاربر ادمین نیست")
         return
-    target = get_target_id(m)
-    print(f"🎯 هدف سکوت: {target}")
-    if not target:
-        return bot.reply_to(m, "⚠️ لطفاً ریپلای کن یا آیدی بده.")
-    gid = str(m.chat.id)
-    ensure_data_keys()
+    if not bot_admin_perms(m.chat.id)["is_admin"]:
+        return bot.reply_to(m, "⚠️ من ادمین گروه نیستم تا لینک بسازم.")
+    try:
+        link = bot.export_chat_invite_link(m.chat.id)
+        bot.reply_to(m, f"🔗 لینک گروه:\n{link}")
+    except Exception as e:
+        bot.reply_to(m, f"⚠️ دسترسی ساخت لینک ندارم.\n<code>{e}</code>")
+
+# ================= 📖 راهنما =================
+HELP_TEXT = (
+    "📖 <b>راهنما</b>\n"
+    "— فقط در گروه فعال است —\n\n"
+    "🆔 اطلاعات: آیدی | آمار | ساعت | لینک ربات | لینک گروه\n"
+    "👋 خوشامد: خوشامد روشن / خاموش | تنظیم خوشامد (ریپلای) | تنظیم خوشامد عکس (ریپلای) | خوشامد\n"
+    "🔒 قفل‌ها: قفل لینک/عکس/ویدیو/استیکر/گیف/فایل/موزیک/ویس/متن/فوروارد/گروه\n"
+    "           بازکردن لینک/…/گروه\n"
+    "🚫 مدیریت: بن (ریپلای/آیدی) | حذف بن | سکوت | حذف سکوت | اخطار | حذف اخطار\n"
+    "📋 لیست‌ها: لیست بن | لیست سکوت | لیست اخطار | لیست فیلتر | لیست مدیر\n"
+    "🧩 فیلتر کلمه: افزودن فیلتر <کلمه> | حذف فیلتر <کلمه>\n"
+    "🛡️ مدیریت مدیرها: افزودن مدیر (ریپلای/آیدی) | حذف مدیر | لیست مدیر\n"
+    "👑 مدیریت سودو (فقط صاحب ربات): افزودن سودو (ریپلای/آیدی) | حذف سودو | لیست سودو\n"
+)
+
+@bot.message_handler(func=lambda m: in_group(m) and cmd_text(m) in ["راهنما","help","Help"])
+def help_cmd(m):
+    bot.reply_to(m, HELP_TEXT)
+
+# ================= 👋 خوشامد =================
+@bot.message_handler(content_types=["new_chat_members"])
+def welcome_new(m):
+    if not in_group(m): 
+        return
+    ensure_group_struct(m.chat.id)
     d = load_data()
-    d["muted"].setdefault(gid, [])
-    if target in d["muted"][gid]:
-        return bot.reply_to(m, "ℹ️ این کاربر قبلاً ساکت شده.")
-    d["muted"][gid].append(target)
+    s = d["welcome"][str(m.chat.id)]
+    if not s.get("enabled", True):
+        return
+    user = m.new_chat_members[0]
+    name = user.first_name or "دوست جدید"
+    group_name = m.chat.title or "گروه"
+    text = s.get("content") or f"✨ سلام {name}!\nبه <b>{group_name}</b> خوش اومدی 🌸"
+    text = (text.replace("{name}", name)
+                .replace("{group}", group_name)
+                .replace("{time}", shamsi_time())
+                .replace("{date}", shamsi_date()))
+    if s.get("type") == "photo" and s.get("file_id"):
+        bot.send_photo(m.chat.id, s["file_id"], caption=text)
+    else:
+        bot.send_message(m.chat.id, text)
+
+@bot.message_handler(func=lambda m: in_group(m) and is_admin(m.chat.id, m.from_user.id) and cmd_text(m) == "خوشامد روشن")
+def enable_welcome(m):
+    ensure_group_struct(m.chat.id)
+    d = load_data()
+    d["welcome"][str(m.chat.id)]["enabled"] = True
     save_data(d)
-    try:
-        perms = types.ChatPermissions(can_send_messages=False)
-        bot.restrict_chat_member(m.chat.id, target, permissions=perms)
-        print("✅ سکوت در گروه انجام شد")
-    except Exception as e:
-        print(f"⚠️ خطا در سکوت: {e}")
-    bot.reply_to(m, f"🔇 <a href='tg://user?id={target}'>کاربر</a> ساکت شد 😶", parse_mode="HTML")
+    bot.reply_to(m, "✅ خوشامد فعال شد.")
 
+@bot.message_handler(func=lambda m: in_group(m) and is_admin(m.chat.id, m.from_user.id) and cmd_text(m) == "خوشامد خاموش")
+def disable_welcome(m):
+    ensure_group_struct(m.chat.id)
+    d = load_data()
+    d["welcome"][str(m.chat.id)]["enabled"] = False
+    save_data(d)
+    bot.reply_to(m, "🚫 خوشامد خاموش شد.")
 
-# 🔊 حذف سکوت
-@bot.message_handler(func=lambda m: cmd_text(m).startswith("حذف سکوت"))
-def unmute_user(m):
-    print("🚀 دستور حذف سکوت تشخیص داده شد")
+@bot.message_handler(func=lambda m: in_group(m) and is_admin(m.chat.id, m.from_user.id) and m.reply_to_message and cmd_text(m) == "تنظیم خوشامد")
+def set_welcome_text(m):
+    txt = (m.reply_to_message.text or "").strip()
+    if not txt:
+        return bot.reply_to(m, "⚠️ روی یک پیام متنی ریپلای کن.")
+    ensure_group_struct(m.chat.id)
+    d = load_data()
+    d["welcome"][str(m.chat.id)] = {"enabled": True, "type": "text", "content": txt, "file_id": None}
+    save_data(d)
+    bot.reply_to(m, "💬 پیام خوشامد متنی تنظیم شد.")
+
+@bot.message_handler(func=lambda m: in_group(m) and is_admin(m.chat.id, m.from_user.id) and m.reply_to_message and cmd_text(m) == "تنظیم خوشامد عکس")
+def set_welcome_photo(m):
+    if not m.reply_to_message.photo:
+        return bot.reply_to(m, "⚠️ روی یک پیامِ دارای عکس ریپلای کن.")
+    file_id = m.reply_to_message.photo[-1].file_id
+    caption = (m.reply_to_message.caption or "🌸 خوش اومدی {name} به {group}").strip()
+    ensure_group_struct(m.chat.id)
+    d = load_data()
+    d["welcome"][str(m.chat.id)] = {"enabled": True, "type": "photo", "content": caption, "file_id": file_id}
+    save_data(d)
+    bot.reply_to(m, "🖼️ خوشامد تصویری تنظیم شد.")
+
+@bot.message_handler(func=lambda m: in_group(m) and cmd_text(m) == "خوشامد")
+def show_welcome(m):
+    ensure_group_struct(m.chat.id)
+    d = load_data()
+    s = d["welcome"][str(m.chat.id)]
+    status = "✅ روشن" if s.get("enabled", True) else "🚫 خاموش"
+    typ = "🖼️ تصویری" if s.get("type") == "photo" else "💬 متنی"
+    msg = s.get("content") or "(خالی)"
+    bot.reply_to(m, f"📋 <b>وضعیت خوشامد</b>\nوضعیت: {status}\nنوع: {typ}\n\n📄 متن:\n{msg}")
+
+# ================= 🛡️ مدیریت مدیرها و سودو =================
+@bot.message_handler(func=lambda m: in_group(m) and is_admin(m.chat.id, m.from_user.id) and first_word(m) == "افزودن" and "مدیر" in cmd_text(m))
+def add_admin(m):
+    ensure_group_struct(m.chat.id)
+    target = get_target_id(m)
+    if not target:
+        return bot.reply_to(m, "⚠️ روی پیام شخص ریپلای کن یا آیدی بنویس.")
+    d = load_data()
+    arr = d["admins"].setdefault(str(m.chat.id), [])
+    if target in arr:
+        return bot.reply_to(m, "ℹ️ این کاربر از قبل مدیر سفارشی است.")
+    arr.append(target)
+    save_data(d)
+    bot.reply_to(m, "✅ مدیر اضافه شد.")
+
+@bot.message_handler(func=lambda m: in_group(m) and is_admin(m.chat.id, m.from_user.id) and first_word(m) == "حذف" and "مدیر" in cmd_text(m))
+def del_admin(m):
+    ensure_group_struct(m.chat.id)
+    target = get_target_id(m)
+    if not target:
+        return bot.reply_to(m, "⚠️ ریپلای یا آیدی بده.")
+    d = load_data()
+    arr = d["admins"].setdefault(str(m.chat.id), [])
+    if target in arr:
+        arr.remove(target)
+        save_data(d)
+        return bot.reply_to(m, "✅ مدیر حذف شد.")
+    bot.reply_to(m, "ℹ️ این کاربر مدیر سفارشی نبود.")
+
+@bot.message_handler(func=lambda m: in_group(m) and cmd_text(m) == "لیست مدیر")
+def list_admins(m):
+    d = load_data()
+    lst = d["admins"].get(str(m.chat.id), [])
+    if not lst:
+        return bot.reply_to(m, "ℹ️ هیچ مدیر سفارشی ثبت نشده.")
+    text = "\n".join([f"• <a href='tg://user?id={x}'>کاربر {x}</a>" for x in lst])
+    bot.reply_to(m, f"🛡️ <b>لیست مدیرهای سفارشی:</b>\n{text}", parse_mode="HTML")
+
+@bot.message_handler(func=lambda m: in_group(m) and is_sudo(m.from_user.id) and first_word(m) == "افزودن" and "سودو" in cmd_text(m))
+def add_sudo(m):
+    d = load_data()
+    target = get_target_id(m)
+    if not target:
+        return bot.reply_to(m, "⚠️ ریپلای/آیدی بده.")
+    arr = set(map(str, d.get("sudo_list", [])))
+    arr.add(str(target))
+    d["sudo_list"] = list(arr)
+    save_data(d)
+    bot.reply_to(m, "👑 سودو اضافه شد.")
+
+@bot.message_handler(func=lambda m: in_group(m) and is_sudo(m.from_user.id) and first_word(m) == "حذف" and "سودو" in cmd_text(m))
+def del_sudo(m):
+    d = load_data()
+    target = get_target_id(m)
+    if not target:
+        return bot.reply_to(m, "⚠️ ریپلای/آیدی بده.")
+    arr = list(map(str, d.get("sudo_list", [])))
+    if str(target) in arr:
+        arr.remove(str(target))
+        d["sudo_list"] = arr
+        save_data(d)
+        return bot.reply_to(m, "✅ سودو حذف شد.")
+    bot.reply_to(m, "ℹ️ این کاربر در لیست سودو نبود.")
+
+@bot.message_handler(func=lambda m: in_group(m) and is_sudo(m.from_user.id) and cmd_text(m) == "لیست سودو")
+def list_sudo(m):
+    d = load_data()
+    arr = d.get("sudo_list", [])
+    if not arr:
+        return bot.reply_to(m, "ℹ️ هیچ سودویی ثبت نشده.")
+    text = "\n".join([f"• <a href='tg://user?id={x}'>کاربر {x}</a>" for x in arr])
+    bot.reply_to(m, f"👑 <b>لیست سودو:</b>\n{text}", parse_mode="HTML")
+
+# ================= 🔒 قفل‌ها =================
+LOCK_MAP = {
+    "لینک": "link",
+    "عکس": "photo",
+    "ویدیو": "video",
+    "استیکر": "sticker",
+    "گیف": "gif",
+    "فایل": "file",
+    "موزیک": "music",
+    "ویس": "voice",
+    "فوروارد": "forward",
+    "متن": "text",
+    "گروه": "group",
+}
+
+@bot.message_handler(func=lambda m: in_group(m) and (cmd_text(m).startswith("قفل ") or cmd_text(m).startswith("بازکردن ")))
+def toggle_lock(m):
     if not is_admin(m.chat.id, m.from_user.id):
         return
-    target = get_target_id(m)
-    print(f"🎯 هدف حذف سکوت: {target}")
-    if not target:
-        return bot.reply_to(m, "⚠️ لطفاً ریپلای کن یا آیدی بده.")
-    gid = str(m.chat.id)
-    ensure_data_keys()
+    ensure_group_struct(m.chat.id)
     d = load_data()
-    if target in d["muted"].get(gid, []):
-        d["muted"][gid].remove(target)
-        save_data(d)
-        print("✅ از لیست سکوت حذف شد")
-    try:
-        perms = types.ChatPermissions(can_send_messages=True)
-        bot.restrict_chat_member(m.chat.id, target, permissions=perms)
-        print("✅ کاربر از حالت سکوت خارج شد")
-    except Exception as e:
-        print(f"⚠️ خطا در حذف سکوت: {e}")
-    bot.reply_to(m, f"🔊 <a href='tg://user?id={target}'>کاربر</a> از سکوت خارج شد 😄", parse_mode="HTML")# ================= 🧪 دیباگ و اجرای نهایی =================
-@bot.message_handler(func=lambda m: True)
-def debug_all(m):
-    text = cmd_text(m)
-    print(f"📥 پیام دریافت شد: {text}")
-    if text.startswith("بن"):
-        bot.reply_to(m, "✅ دستور بن شناسایی شد (دیباگ).")
-    elif text.startswith("سکوت"):
-        bot.reply_to(m, "✅ دستور سکوت شناسایی شد (دیباگ).")
-    elif text.startswith("اخطار"):
-        bot.reply_to(m, "✅ دستور اخطار شناسایی شد (دیباگ).")
+    gid = str(m.chat.id)
+    parts = cmd_text(m).split(" ", 1)
+    if len(parts) < 2:
+        return bot.reply_to(m, "⚠️ مثال: قفل لینک / بازکردن لینک")
+    key_fa = parts[1].strip()
+    lock_key = LOCK_MAP.get(key_fa)
+    if not lock_key:
+        return bot.reply_to(m, "❌ نوع قفل نامعتبر است.")
+    enable = cmd_text(m).startswith("قفل ")
+    d["locks"][gid][lock_key] = enable
+    save_data(d)
 
-if __name__ == "__main__":
-    print("🤖 Persian Lux Panel V16 در حال اجراست...")
-    while True:
+    # بستن/بازکردن چت
+    if lock_key == "group":
+        perms = bot_admin_perms(m.chat.id)
+        if not perms["is_admin"]:
+            return bot.reply_to(m, "⚠️ من ادمین نیستم که گروه رو ببندم/باز کنم.")
         try:
-            bot.infinity_polling(timeout=60, long_polling_timeout=40, skip_pending=True)
+            p = types.ChatPermissions(can_send_messages=not enable)
+            bot.set_chat_permissions(m.chat.id, p)
+            if enable:
+                bot.send_message(m.chat.id, f"🚫 گروه بسته شد. ⏰ {shamsi_time()}")
+            else:
+                bot.send_message(m.chat.id, f"✅ گروه باز شد. ⏰ {shamsi_time()}")
         except Exception as e:
-            logging.error(f"polling crash: {e}")
-            print(f"⚠️ خطا در polling: {e}")
-            time.sleep(5)
+            bot.reply_to(m, f"⚠️ خطا در تغییر وضعیت گروه:\n<code>{e}</code>")
+        return
+
+    msg = f"🔒 قفل {key_fa} فعال شد." if enable else f"🔓 قفل {key_fa} غیرفعال شد."
+    bot.reply_to(m, msg)
+
+# ================= 🧩 فیلتر کلمه =================
+@bot.message_handler(func=lambda m: in_group(m) and cmd_text(m).startswith("افزودن فیلتر "))
+def add_filter(m):
+    if not is_admin(m.chat.id, m.from_user.id):
+        return
+    ensure_group_struct(m.chat.id)
+    word = cmd_text(m).split(" ", 2)[2].strip() if len(cmd_text(m).split(" ", 2)) >= 3 else ""
+    if not word:
+        return bot.reply_to(m, "⚠️ مثال: افزودن فیلتر سلام")
+    d = load_data()
+    arr = d["filters"].setdefault(str(m.chat.id), [])
+    if word in arr:
+        return bot.reply_to(m, "ℹ️ قبلاً همین فیلتر ثبت شده.")
+    arr.append(word)
+    save_data(d)
+    bot.reply_to(m, f"✅ فیلتر «{word}» اضافه شد.")
+
+@bot.message_handler(func=lambda m: in_group(m) and cmd_text(m).startswith("حذف فیلتر "))
+def del_filter(m):
+    if not is_admin(m.chat.id, m.from_user.id):
+        return
+    ensure_group_struct(m.chat.id)
+    word = cmd_text(m).split(" ", 2)[2].strip() if len(cmd_text(m).split(" ", 2)) >= 3 else ""
+    if not word:
+        return bot.reply_to(m, "⚠️ مثال: حذف فیلتر سلام")
+    d = load_data()
+    arr = d["filters"].setdefault(str(m.chat.id), [])
+    if word in arr:
+        arr.remove(word)
+        save_data(d)
+        return bot.reply_to(m, f"✅ فیلتر «{word}» حذف شد.")
+    bot.reply_to(m, "ℹ️ چنین فیلتری ثبت نشده بود.")
+
+@bot.message_handler(func=lambda m: in_group(m) and cmd_text(m) == "لیست فیلتر")
+def list_filters(m):
+    d = load_data()
+    arr = d["filters"].get(str(m.chat.id), [])
+    if not arr:
+        return bot.reply_to(m, "ℹ️ هیچ فیلتری ثبت نشده.")
+    bot.reply_to(m, "🧩 <b>فیلترها:</b>\n" + "\n".join([f"• {w}" for w in arr]))
+
+# ================= 🚫 کنترل خودکار (قفل‌ها + فیلتر + سکوت) =================
+@bot.message_handler(content_types=["text","photo","video","sticker","animation","document","audio","voice","forward"])
+def auto_moderate(m):
+    if not in_group(m):
+        return
+    ensure_group_struct(m.chat.id)
+    d = load_data()
+    gid = str(m.chat.id)
+
+    # ثبت کاربر برای آمار
+    try:
+        users = set(map(int, d.get("users", [])))
+        users.add(int(m.from_user.id))
+        d["users"] = list(users)
+        save_data(d)
+    except:
+        pass
+
+    # اگر کاربر ساکت است، پیام را حذف کن
+    if str(m.from_user.id) in list(map(str, d["muted"].get(gid, []))):
+        try: bot.delete_message(m.chat.id, m.id)
+        except: pass
+        return
+
+    # مدیرها و سودو آزادند
+    if is_admin(m.chat.id, m.from_user.id):
+        return
+
+    locks = d["locks"].get(gid, {})
+    def warn_and_delete(reason):
+        try:
+            bot.delete_message(m.chat.id, m.id)
+        except: pass
+        try:
+            msg = bot.send_message(
+                m.chat.id,
+                f"🚨 لطفاً قوانین رو رعایت کن!\n{reason}\n"
+                f"👤 <a href='tg://user?id={m.from_user.id}'>{short_name(m.from_user)}</a>",
+                parse_mode="HTML"
+            )
+            time.sleep(3)
+            bot.delete_message(m.chat.id, msg.id)
+        except:
+            pass
+
+    # قفل‌ها
+    text_lower = (m.text or "").lower()
+    if locks.get("link") and any(x in text_lower for x in ["http", "www.", "t.me/","telegram.me/"]):
+        return warn_and_delete("🔗 ارسال لینک ممنوع است.")
+    if locks.get("text") and m.text:
+        return warn_and_delete("💬 ارسال متن ممنوع است.")
+    if locks.get("photo") and m.content_type == "photo":
+        return warn_and_delete("🖼️ ارسال عکس ممنوع است.")
+    if locks.get("video") and m.content_type == "video":
+        return warn_and_delete("🎬 ارسال ویدیو ممنوع است.")
+    if locks.get("sticker") and m.content_type == "sticker":
+        return warn_and_delete("🧸 ارسال استیکر ممنوع است.")
+    if locks.get("gif") and m.content_type == "animation":
+        return warn_and_delete("🎞️ ارسال گیف ممنوع است.")
+    if locks.get("file") and m.content_type == "document":
+        return warn_and_delete("📁 ارسال فایل ممنوع است.")
+    if locks.get("music") and m.content_type == "audio":
+        return warn_and_delete("🎵 ارسال موزیک ممنوع است.")
+    if locks.get("voice") and m.content_type == "voice":
+        return warn_and_delete("🎤 ارسال ویس ممنوع است.")
+    if locks.get("forward") and (m.forward_from or m.forward_from_chat):
+        return warn_and_delete("🔁 فوروارد ممنوع است.")
+
+    # فیلتر کلمه
+    flt = d["filters"].get(gid, [])
+    if m.text and flt:
+        for w in flt:
+    
