@@ -531,11 +531,8 @@ if __name__ == "__main__":
     print("🤖 Persian Lux Panel V16 در حال اجراست...")
     while True:
         try:
-            bot.infinity_polling(
-                timeout=60,
-                long_polling_timeout=40,
-                skip_pending=True
-            )
+            bot.infinity_polling(timeout=60, long_polling_timeout=40, skip_pending=True)
         except Exception as e:
             logging.error(f"❌ خطا در polling: {e}")
-            print(f"⚠️ خط
+            print(f"⚠️ خطا در polling: {e}")
+            time.sleep(5)
