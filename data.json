@@ -1,9 +1,9 @@
 {
   "welcome": {
-    "-1001234567890": {
+    "-4890092905": {
       "enabled": true,
       "type": "text",
-      "content": null,
+      "content": "✨ سلام {name}! به گروه {title} خوش اومدی 🌸\n⏰ {time}",
       "file_id": null
     }
   },
