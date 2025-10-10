@@ -522,17 +522,24 @@ def unmute_user(m):
         print("✅ کاربر از حالت سکوت خارج شد")
     except Exception as e:
         print(f"⚠️ خطا در حذف سکوت: {e}")
-    bot.reply_to(m, f"🔊 <a href='tg://user?id={target}'>کاربر</a> از سکوت خارج شد 😄", parse_mode="HTML")
+    bot.reply_to(m, f"🔊 <a href='tg://user?id={target}'>کاربر</a> از سکوت خارج شد 😄", parse_mode="HTML")# ================= 🧪 دیباگ و اجرای نهایی =================
+@bot.message_handler(func=lambda m: True)
+def debug_all(m):
+    text = cmd_text(m)
+    print(f"📥 پیام دریافت شد: {text}")
+    if text.startswith("بن"):
+        bot.reply_to(m, "✅ دستور بن شناسایی شد (دیباگ).")
+    elif text.startswith("سکوت"):
+        bot.reply_to(m, "✅ دستور سکوت شناسایی شد (دیباگ).")
+    elif text.startswith("اخطار"):
+        bot.reply_to(m, "✅ دستور اخطار شناسایی شد (دیباگ).")
 
-
-print("✅ بخش ۵ (دیباگ بن / سکوت / اخطار) با موفقیت لود شد.")
-# ================= 🚀 اجرای نهایی =================
 if __name__ == "__main__":
     print("🤖 Persian Lux Panel V16 در حال اجراست...")
     while True:
         try:
             bot.infinity_polling(timeout=60, long_polling_timeout=40, skip_pending=True)
         except Exception as e:
-            logging.error(f"❌ خطا در polling: {e}")
+            logging.error(f"polling crash: {e}")
             print(f"⚠️ خطا در polling: {e}")
             time.sleep(5)
