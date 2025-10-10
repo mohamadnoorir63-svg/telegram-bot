@@ -431,8 +431,8 @@ def ban_user(m):
         save_data(d)
     try:
         bot.ban_chat_member(m.chat.id, target)
-    except:
-        pass
+    except Exception as e:
+        print(f"خطا در بن: {e}")
     bot.reply_to(m, f"🚫 <a href='tg://user?id={target}'>کاربر</a> از گروه بن شد.", parse_mode="HTML")
 
 # 🔓 حذف بن
@@ -452,8 +452,8 @@ def unban_user(m):
         save_data(d)
     try:
         bot.unban_chat_member(m.chat.id, target)
-    except:
-        pass
+    except Exception as e:
+        print(f"خطا در حذف بن: {e}")
     bot.reply_to(m, f"✅ <a href='tg://user?id={target}'>کاربر</a> از لیست بن خارج شد.", parse_mode="HTML")
 
 # 🔇 سکوت
@@ -561,22 +561,17 @@ def list_warn(m):
     text = "\n".join([f"• <a href='tg://user?id={x}'>کاربر {x}</a> — {warns[x]} اخطار" for x in warns])
     bot.reply_to(m, f"⚠️ <b>لیست اخطارها:</b>\n{text}", parse_mode="HTML")
 
-# جلوگیری از پیام‌دادن کاربران ساکت
-@bot.message_handler(content_types=["text", "photo", "video", "sticker", "animation", "document", "audio", "voice"])
-def block_muted(m):
-    d = load_data()
-    gid = str(m.chat.id)
-    uid = str(m.from_user.id)
-    if uid in d.get("muted", {}).get(gid, []):
-        try:
-            bot.delete_message(m.chat.id, m.id)
-        except:
-            pass
+print("✅ بخش ۵ (بن / سکوت / اخطار) با موفقیت لود شد.")
 # ================= 🚀 اجرای نهایی =================
 if __name__ == "__main__":
     print("🤖 Persian Lux Panel V15 در حال اجراست...")
-    try:
-        bot.infinity_polling(timeout=60, long_polling_timeout=40, skip_pending=True)
-    except Exception as e:
-        logging.error(f"polling crash: {e}")
-        print(f"⚠️ خطا در polling: {e}")
+    while True:
+        try:
+            bot.infinity_polling(
+                timeout=60,
+                long_polling_timeout=40,
+                skip_pending=True
+            )
+        except Exception as e:
+            logging.error(f"polling crash: {e}")
+            time.sleep(5)
