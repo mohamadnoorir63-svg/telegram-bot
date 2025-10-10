@@ -1,462 +1,439 @@
-# -*- coding: utf-8 -*-
-# Persian Lux Panel V16 – Final Edition
-# Designed for Mohammad 👑
+# coding: utf-8
+import os
+import json
+import time
+from collections import defaultdict, deque
+from typing import Dict, Any
 
-import os, json, random, time, logging
-from datetime import datetime
-import pytz, jdatetime
-import telebot
-from telebot import types
-
-# ================= ⚙️ تنظیمات پایه =================
-TOKEN = os.environ.get("BOT_TOKEN")
-SUDO_ID = int(os.environ.get("SUDO_ID", "0"))
-bot = telebot.TeleBot(TOKEN, parse_mode="HTML")
+from telegram import Update, ChatPermissions
+from telegram.ext import (
+    ApplicationBuilder,
+    CommandHandler,
+    MessageHandler,
+    ContextTypes,
+    filters,
+)
 
 DATA_FILE = "data.json"
-STATS_FILE = "stats.json"
-LOG_FILE = "error.log"
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+SUDO_ID = int(os.getenv("SUDO_ID", "0"))  # آیدی عددی مالک اصلی
 
-logging.basicConfig(filename=LOG_FILE, level=logging.ERROR,
-                    format="%(asctime)s - %(levelname)s - %(message)s")
+# نوع‌های قابل قفل (کلیدها فارسی)
+VALID_LOCKS = {
+    "لینک": "links",
+    "عکس": "photo",
+    "فیلم": "video",
+    "استیکر": "sticker",
+    "گیف": "gif",
+    "فایل": "file",
+    "صوت": "audio",
+    "مخاطب": "contact",
+    "مکان": "location",
+    "flood": "flood"  # کنترل ارسال مکرر
+}
 
-# ================= 💾 فایل داده =================
-def base_data():
-    return {
-        "welcome": {}, "locks": {}, "admins": {}, "sudo_list": [],
-        "banned": {}, "muted": {}, "warns": {}, "users": [],
-        "jokes": [], "falls": []
-    }
+# بارگذاری / ذخیره داده‌ها (ساده، مبتنی بر فایل)
+def load_data() -> Dict[str, Any]:
+    if os.path.exists(DATA_FILE):
+        try:
+            with open(DATA_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            return {}
+    return {}
 
-def load_data():
-    if not os.path.exists(DATA_FILE):
-        save_data(base_data())
-    try:
-        with open(DATA_FILE, "r", encoding="utf-8") as f:
-            data = json.load(f)
-    except Exception:
-        data = base_data()
-    for k in base_data():
-        if k not in data:
-            data[k] = base_data()[k]
-    save_data(data)
-    return data
-
-def save_data(d):
+def save_data(d: Dict[str, Any]):
     with open(DATA_FILE, "w", encoding="utf-8") as f:
         json.dump(d, f, ensure_ascii=False, indent=2)
 
-def register_group(gid):
-    data = load_data()
-    gid = str(gid)
-    data["welcome"].setdefault(gid, {
-        "enabled": True, "type": "text", "content": None, "file_id": None
-    })
-    data["locks"].setdefault(gid, {
-        k: False for k in
-        ["link","group","photo","video","sticker","gif","file","music","voice","forward"]
-    })
-    save_data(data)
+data = load_data()
+# ساختار data:
+# data = {
+#   "locks": { "<chat_id>": ["links", "photo", ..."], ... },
+#   "mods": { "<chat_id>": [<mod_id>, ...] },
+#   "warns": { "<chat_id>": { "<user_id>": count } },
+#   "flood": { "<chat_id>": {"limit": 5, "period": 8} }
+# }
 
-# ================= 🧩 ابزارها =================
-def shamsi_date(): return jdatetime.datetime.now().strftime("%A %d %B %Y")
-def shamsi_time(): return jdatetime.datetime.now().strftime("%H:%M:%S")
-def cmd_text(m): return (getattr(m, "text", None) or "").strip()
+data.setdefault("locks", {})
+data.setdefault("mods", {})
+data.setdefault("warns", {})
+data.setdefault("flood", {})
 
-def is_sudo(uid):
-    d = load_data()
-    return str(uid) in [str(SUDO_ID)] + d.get("sudo_list", [])
+# برای کنترل flood در حافظه (برای کارآیی)
+flood_tracker: Dict[str, Dict[str, deque]] = defaultdict(lambda: defaultdict(lambda: deque()))
 
-def is_admin(chat_id, uid):
-    d = load_data(); gid = str(chat_id)
-    if is_sudo(uid): return True
-    if str(uid) in d["admins"].get(gid, []): return True
+# کمک: بررسی اینکه آیا کاربر مدیر است (SUDO یا در لیست mods یا مدیر گروه)
+async def is_admin(update: Update, user_id: int) -> bool:
+    if user_id == SUDO_ID:
+        return True
+    chat = update.effective_chat
+    if not chat:
+        return False
+    # بررسی لیست ذخیره شده
+    mods = [int(x) for x in data.get("mods", {}).get(str(chat.id), [])]
+    if user_id in mods:
+        return True
+    # بررسی رسمی از طریق API
     try:
-        st = bot.get_chat_member(chat_id, uid).status
-        return st in ("administrator", "creator")
-    except:
+        member = await update.effective_chat.get_member(user_id)
+        return member.status in ("administrator", "creator")
+    except Exception:
         return False
 
-# ================= 🆔 آیدی لوکس =================
-@bot.message_handler(func=lambda m: cmd_text(m) in ["آیدی", "ایدی"])
-def show_id(m):
-    try:
-        user = m.from_user
-        name = user.first_name or ""
-        uid = user.id
-        caption = (
-            f"🧾 <b>مشخصات کاربر</b>\n"
-            f"👤 نام: {name}\n"
-            f"🆔 آیدی عددی: <code>{uid}</code>\n"
-            f"💬 آیدی گروه: <code>{m.chat.id}</code>\n"
-            f"📅 تاریخ: {shamsi_date()}\n"
-            f"⏰ ساعت: {shamsi_time()}"
-        )
-        photos = bot.get_user_profile_photos(uid)
-        if photos.total_count > 0:
-            file_id = photos.photos[0][-1].file_id
-            bot.send_photo(m.chat.id, file_id, caption=caption)
-        else:
-            bot.reply_to(m, caption)
-    except Exception as e:
-        logging.error(f"show_id error: {e}")
-        bot.reply_to(m, f"🆔 <code>{m.from_user.id}</code>\n⏰ {shamsi_time()}")
+# دستورها (فارسی)
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    await update.message.reply_text(
+        f"سلام {user.first_name} 👋\n"
+        "ربات آنتی‌اسپم روشن است.\n"
+        "برای راهنما /help را بفرستید."
+    )
 
-# ================= 🕒 آمار دقیق =================
-def base_stats():
-    return {
-        "messages":0,"photos":0,"videos":0,"voices":0,
-        "stickers":0,"gifs":0,"links":0,"forwards":0,"users":{}
-    }
+async def help_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    text = (
+        "دستورات (فارسی):\n\n"
+        "/help - نمایش راهنما\n"
+        "/قفل <نوع> - فعال کردن قفل (مثال: /قفل لینک)\n"
+        "/بازکردن <نوع|همه> - غیرفعال کردن قفل\n"
+        "/وضعیت - نمایش وضعیت قفل‌ها\n"
+        "/اضافه_مدیر <آیدی> - اضافه کردن مدیر (SUDO فقط)\n"
+        "/حذف_مدیر <آیدی> - حذف مدیر (SUDO فقط)\n"
+        "/بن <reply یا آیدی> - بن کردن کاربر (مدیرها)\n"
+        "/آنبن <آیدی> - آنبن کردن کاربر (مدیرها)\n"
+        "/سایلنت <reply یا آیدی> [ثانیه] - سایلنت موقت (مدیرها)\n"
+    )
+    await update.message.reply_text(text)
 
-def load_stats():
-    if not os.path.exists(STATS_FILE):
-        save_stats(base_stats())
-    try:
-        with open(STATS_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except:
-        return base_stats()
+# تبدیل نام فارسی نوع به کلید داخلی
+def lock_name_to_key(name: str):
+    name = name.strip()
+    return VALID_LOCKS.get(name)
 
-def save_stats(d):
-    with open(STATS_FILE, "w", encoding="utf-8") as f:
-        json.dump(d, f, ensure_ascii=False, indent=2)
-
-@bot.message_handler(content_types=["text","photo","video","voice","sticker","animation"])
-def track_stats(m):
-    s = load_stats()
-    uid = str(m.from_user.id)
-    s["messages"] += 1
-    s["users"][uid] = s["users"].get(uid,0)+1
-    if "t.me/" in (m.text or ""): s["links"] += 1
-    if m.forward_from or m.forward_from_chat: s["forwards"] += 1
-    if m.photo: s["photos"] += 1
-    if m.video: s["videos"] += 1
-    if m.voice: s["voices"] += 1
-    if m.sticker: s["stickers"] += 1
-    if m.animation: s["gifs"] += 1
-    save_stats(s)
-
-@bot.message_handler(func=lambda m: cmd_text(m)=="آمار")
-def show_stats(m):
-    s = load_stats()
-    total = s["messages"]
-    photos, videos, voices, stickers, gifs = s["photos"], s["videos"], s["voices"], s["stickers"], s["gifs"]
-    links, forwards = s["links"], s["forwards"]
-    users = s.get("users",{})
-    if users:
-        top_id = max(users,key=users.get)
-        top = f"<a href='tg://user?id={top_id}'>کاربر فعال</a> ({users[top_id]} پیام)"
-    else:
-        top = "❗ هنوز فعالیتی ثبت نشده است."
-    bot.reply_to(m,
-f"""📊 <b>آمار دقیق Persian Lux Panel</b>
-📅 تاریخ: {shamsi_date()}
-⏰ ساعت: {shamsi_time()}
-💬 کل پیام‌ها: {total}
-🖼 عکس‌ها: {photos}
-🎥 ویدیوها: {videos}
-🎙 ویس‌ها: {voices}
-🎭 استیکرها: {stickers}
-🎞 گیف‌ها: {gifs}
-🔗 لینک‌ها: {links}
-📤 فورواردها: {forwards}
-🏆 فعال‌ترین کاربر: {top}""", disable_web_page_preview=True)# ================= 👋 خوشامد =================
-@bot.message_handler(content_types=["new_chat_members"])
-def welcome_new(m):
-    register_group(m.chat.id)
-    data = load_data(); gid = str(m.chat.id)
-    s = data["welcome"].get(gid, {"enabled": True})
-    if not s.get("enabled", True): return
-    user = m.new_chat_members[0]
-    name = user.first_name or "دوست جدید"
-    text = s.get("content") or f"✨ سلام {name}!\nبه گروه <b>{m.chat.title}</b> خوش اومدی 🌸\n⏰ {shamsi_time()}"
-    text = text.replace("{name}", name).replace("{time}", shamsi_time())
-    if s.get("file_id"):
-        bot.send_photo(m.chat.id, s["file_id"], caption=text)
-    else:
-        bot.send_message(m.chat.id, text)
-
-@bot.message_handler(func=lambda m: is_admin(m.chat.id, m.from_user.id) and m.reply_to_message and cmd_text(m) == "تنظیم خوشامد")
-def set_welcome(m):
-    data = load_data(); gid = str(m.chat.id)
-    msg = m.reply_to_message
-    if msg.photo:
-        fid = msg.photo[-1].file_id
-        data["welcome"][gid] = {"enabled": True, "type": "photo", "content": msg.caption or "", "file_id": fid}
-    elif msg.text:
-        data["welcome"][gid] = {"enabled": True, "type": "text", "content": msg.text, "file_id": None}
+# قفل کردن
+async def cmd_lock(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    if not await is_admin(update, user.id):
+        return await update.message.reply_text("⛔ شما دسترسی لازم را ندارید.")
+    args = context.args
+    if not args:
+        return await update.message.reply_text("لطفاً نوع قفل را بعد از دستور وارد کنید. مثال: /قفل لینک")
+    kind_arg = args[0]
+    key = lock_name_to_key(kind_arg)
+    if not key:
+        return await update.message.reply_text("نوع قفل معتبر نیست. مثال‌ها: لینک، عکس، فیلم، استیکر، گیف، فایل، صوت، مخاطب، مکان، flood")
+    chat_id = str(update.effective_chat.id)
+    locks = set(data["locks"].get(chat_id, []))
+    if key in locks:
+        return await update.message.reply_text(f"⚠️ قفل «{kind_arg}» قبلاً فعال شده است.")
+    locks.add(key)
+    data["locks"][chat_id] = list(locks)
     save_data(data)
-    bot.reply_to(m, "✅ پیام خوشامد جدید تنظیم شد.\nاز {name} و {time} در متن می‌تونی استفاده کنی.")
+    await update.message.reply_text(f"🔒 قفل «{kind_arg}» فعال شد.")
 
-@bot.message_handler(func=lambda m: is_admin(m.chat.id, m.from_user.id) and cmd_text(m) in ["خوشامد روشن","خوشامد خاموش"])
-def toggle_welcome(m):
-    data = load_data(); gid = str(m.chat.id)
-    en = cmd_text(m) == "خوشامد روشن"
-    data["welcome"].setdefault(gid, {"enabled": True})
-    data["welcome"][gid]["enabled"] = en
+# باز کردن قفل
+async def cmd_unlock(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    if not await is_admin(update, user.id):
+        return await update.message.reply_text("⛔ شما دسترسی لازم را ندارید.")
+    args = context.args
+    if not args:
+        return await update.message.reply_text("لطفاً نوع قفل یا 'همه' را وارد کنید. مثال: /بازکردن لینک")
+    kind_arg = args[0]
+    chat_id = str(update.effective_chat.id)
+    if kind_arg == "همه":
+        data["locks"][chat_id] = []
+        save_data(data)
+        return await update.message.reply_text("🔓 تمام قفل‌ها برداشته شد.")
+    key = lock_name_to_key(kind_arg)
+    if not key:
+        return await update.message.reply_text("نوع قفل معتبر نیست.")
+    locks = set(data["locks"].get(chat_id, []))
+    if key not in locks:
+        return await update.message.reply_text(f"⚠️ قفل «{kind_arg}» فعال نیست.")
+    locks.remove(key)
+    data["locks"][chat_id] = list(locks)
     save_data(data)
-    bot.reply_to(m, "🟢 خوشامد روشن شد." if en else "🔴 خوشامد خاموش شد.")
+    await update.message.reply_text(f"🔓 قفل «{kind_arg}» غیرفعال شد.")
 
-# ================= 🔒 قفل‌ها =================
-LOCK_MAP = {
-    "لینک":"link","گروه":"group","عکس":"photo","ویدیو":"video",
-    "استیکر":"sticker","گیف":"gif","فایل":"file","موزیک":"music",
-    "ویس":"voice","فوروارد":"forward"
-}
+# وضعیت قفل‌ها
+async def cmd_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = str(update.effective_chat.id)
+    locks = data["locks"].get(chat_id, [])
+    if not locks:
+        await update.message.reply_text("🔓 هیچ قفلی فعال نیست.")
+        return
+    # برگرداندن اسم‌های فارسی
+    inv = {v: k for k, v in VALID_LOCKS.items()}
+    active = [inv.get(k, k) for k in locks]
+    await update.message.reply_text("🔒 قفل‌های فعال:\n" + "، ".join(active))
 
-@bot.message_handler(func=lambda m: cmd_text(m).startswith("قفل ") or cmd_text(m).startswith("بازکردن "))
-def toggle_lock(m):
-    if not is_admin(m.chat.id, m.from_user.id): return
-    d = load_data(); gid = str(m.chat.id)
-    part = cmd_text(m).split(" ")
-    if len(part) < 2: return
-    key_fa = part[1]; lock_type = LOCK_MAP.get(key_fa)
-    if not lock_type: return bot.reply_to(m, "❌ نوع قفل نامعتبر است.")
-    en = cmd_text(m).startswith("قفل ")
-    d["locks"].setdefault(gid, {k: False for k in LOCK_MAP.values()})
-    if d["locks"][gid][lock_type] == en:
-        return bot.reply_to(m, "⚠️ این قفل همین حالا هم در همین حالت است.")
-    d["locks"][gid][lock_type] = en; save_data(d)
-    if lock_type == "group":
-        if en:
-            bot.send_message(m.chat.id, f"🚫 گروه موقتاً بسته شد ❌\n🔒 فقط مدیران می‌توانند پیام ارسال کنند.\n⏰ {shamsi_time()}")
-        else:
-            bot.send_message(m.chat.id, f"✅ گروه باز شد 🌸\n💬 حالا همه می‌تونن گفتگو کنن!\n⏰ {shamsi_time()}")
+# اضافه/حذف مدیر (فقط SUDO)
+async def cmd_add_mod(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != SUDO_ID:
+        return await update.message.reply_text("⛔ فقط SUDO می‌تواند این کار را انجام دهد.")
+    args = context.args
+    if not args:
+        return await update.message.reply_text("آیدی را بعد از دستور وارد کن: /اضافه_مدیر 123456")
+    try:
+        uid = int(args[0])
+    except:
+        return await update.message.reply_text("آیدی باید عددی باشد.")
+    chat_id = str(update.effective_chat.id)
+    mods = set(data["mods"].get(chat_id, []))
+    mods.add(uid)
+    data["mods"][chat_id] = list(mods)
+    save_data(data)
+    await update.message.reply_text(f"✅ کاربر {uid} به عنوان مدیر محلی اضافه شد.")
+
+async def cmd_remove_mod(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != SUDO_ID:
+        return await update.message.reply_text("⛔ فقط SUDO می‌تواند این کار را انجام دهد.")
+    args = context.args
+    if not args:
+        return await update.message.reply_text("آیدی را بعد از دستور وارد کن: /حذف_مدیر 123456")
+    try:
+        uid = int(args[0])
+    except:
+        return await update.message.reply_text("آیدی باید عددی باشد.")
+    chat_id = str(update.effective_chat.id)
+    mods = set(data["mods"].get(chat_id, []))
+    if uid in mods:
+        mods.remove(uid)
+        data["mods"][chat_id] = list(mods)
+        save_data(data)
+        await update.message.reply_text(f"✅ کاربر {uid} از مدیران حذف شد.")
     else:
-        bot.reply_to(m, f"{'🔒' if en else '🔓'} قفل {key_fa} {'فعال' if en else 'غیرفعال'} شد.")
+        await update.message.reply_text("آن کاربر مدیر محلی نیست.")
 
-# ================= 👑 مدیر و سودو =================
-@bot.message_handler(func=lambda m: m.reply_to_message and cmd_text(m) == "افزودن مدیر")
-def add_admin(m):
-    if not is_sudo(m.from_user.id): return
-    data = load_data(); gid = str(m.chat.id)
-    uid = str(m.reply_to_message.from_user.id)
-    data["admins"].setdefault(gid, [])
-    if uid in data["admins"][gid]:
-        return bot.reply_to(m, "⚠️ این کاربر از قبل مدیر است.")
-    data["admins"][gid].append(uid)
-    save_data(data)
-    bot.reply_to(m, f"✅ کاربر به مدیران افزوده شد.")
-
-@bot.message_handler(func=lambda m: cmd_text(m) == "لیست مدیران")
-def list_admins(m):
-    data = load_data(); gid = str(m.chat.id)
-    lst = data["admins"].get(gid, [])
-    if not lst: return bot.reply_to(m, "📋 هیچ مدیری ثبت نشده.")
-    msg = "👑 لیست مدیران:\n" + "\n".join([f"• کاربر {a}" for a in lst])
-    bot.reply_to(m, msg)
-
-@bot.message_handler(func=lambda m: m.reply_to_message and cmd_text(m) == "افزودن سودو")
-def add_sudo(m):
-    if m.from_user.id != SUDO_ID: return
-    d = load_data(); uid = str(m.reply_to_message.from_user.id)
-    if uid in d["sudo_list"]: return bot.reply_to(m, "⚠️ این کاربر از قبل سودو است.")
-    d["sudo_list"].append(uid); save_data(d)
-    bot.reply_to(m, f"✅ کاربر به سودوها افزوده شد.")
-
-@bot.message_handler(func=lambda m: cmd_text(m) == "لیست سودو")
-def list_sudos(m):
-    if not is_sudo(m.from_user.id): return
-    d = load_data(); s = d.get("sudo_list", [])
-    if not s: return bot.reply_to(m, "❗ هیچ سودویی ثبت نشده.")
-    txt = "👑 لیست سودوها:\n" + "\n".join([f"• کاربر {x}" for x in s])
-    bot.reply_to(m, txt)
-
-# ================= 🚫 بن / سکوت / اخطار =================
-@bot.message_handler(func=lambda m: m.reply_to_message and cmd_text(m) == "بن")
-def ban_user(m):
-    if not is_admin(m.chat.id, m.from_user.id): return
-    uid = m.reply_to_message.from_user.id
-    if is_sudo(uid): return bot.reply_to(m, "⚡ نمی‌توان سودو را بن کرد.")
-    try:
-        bot.ban_chat_member(m.chat.id, uid)
-        bot.reply_to(m, f"🚫 کاربر بن شد.")
-    except Exception as e:
-        bot.reply_to(m, f"❗ خطا در بن کاربر: {e}")
-
-@bot.message_handler(func=lambda m: m.reply_to_message and cmd_text(m) == "حذف بن")
-def unban_user(m):
-    if not is_admin(m.chat.id, m.from_user.id): return
-    try:
-        bot.unban_chat_member(m.chat.id, m.reply_to_message.from_user.id, only_if_banned=True)
-        bot.reply_to(m, "✅ کاربر از بن خارج شد.")
-    except:
-        bot.reply_to(m, "❗ خطا در حذف بن.")
-
-@bot.message_handler(func=lambda m: m.reply_to_message and cmd_text(m) == "سکوت")
-def mute_user(m):
-    if not is_admin(m.chat.id, m.from_user.id): return
-    uid = str(m.reply_to_message.from_user.id)
-    d = load_data(); d["muted"][uid] = True; save_data(d)
-    bot.reply_to(m, f"🔇 کاربر ساکت شد.")
-
-@bot.message_handler(func=lambda m: m.reply_to_message and cmd_text(m) == "حذف سکوت")
-def unmute_user(m):
-    if not is_admin(m.chat.id, m.from_user.id): return
-    uid = str(m.reply_to_message.from_user.id)
-    d = load_data()
-    if uid in d["muted"]: d["muted"].pop(uid)
-    save_data(d)
-    bot.reply_to(m, f"🔊 سکوت کاربر برداشته شد.")# ================= 😂 جوک و 🔮 فال =================
-@bot.message_handler(func=lambda m: is_admin(m.chat.id, m.from_user.id) and m.reply_to_message and cmd_text(m) == "ثبت جوک")
-def add_joke(m):
-    d = load_data()
-    txt = (m.reply_to_message.text or "").strip()
-    if not txt:
-        return bot.reply_to(m, "⚠️ لطفاً روی پیام متنی ریپلای کن تا ذخیره کنم.")
-    if txt in d["jokes"]:
-        return bot.reply_to(m, "⚠️ این جوک قبلاً ثبت شده بود.")
-    d["jokes"].append(txt); save_data(d)
-    bot.reply_to(m, f"😂 جوک جدید ذخیره شد:\n\n{txt[:60]}")
-
-@bot.message_handler(func=lambda m: cmd_text(m) == "جوک")
-def random_joke(m):
-    d = load_data(); jokes = d.get("jokes", [])
-    if not jokes: return bot.reply_to(m, "😅 هنوز جوکی ثبت نشده!")
-    bot.reply_to(m, f"😂 <b>جوک امروز:</b>\n{random.choice(jokes)}")
-
-@bot.message_handler(func=lambda m: cmd_text(m) == "لیست جوک")
-def list_jokes(m):
-    d = load_data(); jokes = d.get("jokes", [])
-    if not jokes: return bot.reply_to(m, "❗ هیچ جوکی ثبت نشده.")
-    text = "\n".join([f"{i+1}. {j}" for i, j in enumerate(jokes)])
-    bot.reply_to(m, f"📜 <b>لیست جوک‌های ذخیره‌شده:</b>\n{text}")
-
-@bot.message_handler(func=lambda m: cmd_text(m).startswith("حذف جوک "))
-def del_joke(m):
-    d = load_data(); jokes = d.get("jokes", [])
-    try:
-        idx = int(cmd_text(m).split()[2]) - 1
-        if idx < 0 or idx >= len(jokes): raise ValueError
-        removed = jokes.pop(idx)
-        save_data(d)
-        bot.reply_to(m, f"🗑 جوک شماره {idx+1} حذف شد:\n«{removed}»")
-    except:
-        bot.reply_to(m, "❗ شماره جوک نامعتبر است یا خطایی رخ داده.")
-
-# ==== فال ====
-@bot.message_handler(func=lambda m: is_admin(m.chat.id, m.from_user.id) and m.reply_to_message and cmd_text(m) == "ثبت فال")
-def add_fal(m):
-    d = load_data()
-    txt = (m.reply_to_message.text or "").strip()
-    if not txt:
-        return bot.reply_to(m, "⚠️ لطفاً روی پیام متنی ریپلای کن.")
-    d["falls"].append(txt); save_data(d)
-    bot.reply_to(m, "🔮 فال ذخیره شد.")
-
-@bot.message_handler(func=lambda m: cmd_text(m) == "فال")
-def random_fal(m):
-    d = load_data(); f = d.get("falls", [])
-    if not f: return bot.reply_to(m, "😅 هنوز هیچ فالی ثبت نشده!")
-    bot.reply_to(m, f"🔮 <b>فال امروز:</b>\n{random.choice(f)}")
-
-@bot.message_handler(func=lambda m: cmd_text(m) == "لیست فال")
-def list_fals(m):
-    d = load_data(); f = d.get("falls", [])
-    if not f: return bot.reply_to(m, "❗ هیچ فالی ثبت نشده.")
-    text = "\n".join([f"{i+1}. {j}" for i, j in enumerate(f)])
-    bot.reply_to(m, f"📜 <b>لیست فال‌های ذخیره‌شده:</b>\n{text}")
-
-@bot.message_handler(func=lambda m: cmd_text(m).startswith("حذف فال "))
-def del_fal(m):
-    d = load_data(); f = d.get("falls", [])
-    try:
-        idx = int(cmd_text(m).split()[2]) - 1
-        if idx < 0 or idx >= len(f): raise ValueError
-        removed = f.pop(idx)
-        save_data(d)
-        bot.reply_to(m, f"🗑 فال شماره {idx+1} حذف شد:\n«{removed}»")
-    except:
-        bot.reply_to(m, "❗ شماره فال نامعتبر است یا خطایی رخ داده.")
-
-# ================= 📢 ارسال همگانی =================
-@bot.message_handler(func=lambda m: is_sudo(m.from_user.id) and m.reply_to_message and cmd_text(m) == "ارسال")
-def broadcast(m):
-    d = load_data()
-    users = list(set(d.get("users", [])))
-    groups = [int(g) for g in d["welcome"].keys()]
-    msg = m.reply_to_message
-    total = 0
-    for uid in users + groups:
+# بن کردن
+async def cmd_ban(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not await is_admin(update, update.effective_user.id):
+        return await update.message.reply_text("⛔ شما دسترسی ندارید.")
+    target = None
+    if update.message.reply_to_message:
+        target = update.message.reply_to_message.from_user.id
+    elif context.args:
         try:
-            if msg.text:
-                bot.send_message(uid, msg.text)
-            elif msg.photo:
-                bot.send_photo(uid, msg.photo[-1].file_id, caption=msg.caption or "")
-            total += 1
+            target = int(context.args[0])
         except:
-            continue
-    bot.reply_to(m, f"📢 پیام برای {total} کاربر ارسال شد.")
-
-# ================= 🚪 خروج از گروه =================
-@bot.message_handler(func=lambda m: cmd_text(m) == "لفت بده")
-def leave_group(m):
-    if not is_sudo(m.from_user.id): return
+            pass
+    if not target:
+        return await update.message.reply_text("لطفاً به پیام کاربر ریپلای کن یا آیدی کاربر را وارد کن.")
     try:
-        bot.send_message(m.chat.id, "👋 با اجازه، از گروه خارج می‌شوم 💨")
-        bot.leave_chat(m.chat.id)
-    except:
-        bot.reply_to(m, "⚠️ نتوانستم از گروه خارج شوم.")
-
-# ================= 🚀 شروع با دکمه‌های شیشه‌ای =================
-@bot.message_handler(commands=["start"])
-def start_cmd(m):
-    d = load_data()
-    uid = str(m.from_user.id)
-    if uid not in d["users"]:
-        d["users"].append(uid)
-        save_data(d)
-
-    caption = (
-        "👋 سلام دوست عزیز!\n\n"
-        "به <b>ربات مدیریتی Persian Lux Panel</b> خوش اومدی 💎\n\n"
-        "این ربات برای مدیریت حرفه‌ای گروه‌ها ساخته شده:\n"
-        "🔹 قفل لینک، گیف، عکس و فیلم\n"
-        "🔹 خوشامد خودکار با عکس یا متن\n"
-        "🔹 اخطار، بن، سکوت و آمار دقیق فعالیت\n"
-        "🔹 ثبت جوک و فال روزانه 😂🔮\n\n"
-        "یکی از گزینه‌های زیر رو انتخاب کن 👇"
-    )
-
-    keyboard = types.InlineKeyboardMarkup()
-    add_btn = types.InlineKeyboardButton("➕ افزودن ربات به گروه", url="https://t.me/Noorir63_Bot?startgroup=true")
-    support_btn = types.InlineKeyboardButton("💬 پشتیبانی", url="https://t.me/NOORI_NOOR")
-    keyboard.add(add_btn)
-    keyboard.add(support_btn)
-
-    bot.send_message(m.chat.id, caption, reply_markup=keyboard)
-
-# ================= ℹ️ راهنما =================
-@bot.message_handler(func=lambda m: cmd_text(m) == "راهنما")
-def show_help(m):
-    txt = (
-        "📘 <b>راهنمای Persian Lux Panel V16</b>\n\n"
-        "🆔 آیدی | ساعت | آمار دقیق | لینک ربات/گروه\n"
-        "👋 خوشامد | تنظیم خوشامد | روشن/خاموش\n"
-        "🔒 قفل‌ها | 🚫 بن | 🔇 سکوت | ⚠️ اخطار\n"
-        "😂 جوک | 🔮 فال | 🧹 حذف پیام | 📢 ارسال همگانی\n"
-        "🚪 لفت بده (فقط سودو)\n\n"
-        "👑 سازنده: محمد | Persian Lux Panel"
-    )
-    bot.reply_to(m, txt)
-
-# ================= 🤖 پاسخ مخصوص سودو =================
-@bot.message_handler(func=lambda m: is_sudo(m.from_user.id) and cmd_text(m).lower() in ["سلام","ربات","هی","bot"])
-def sudo_reply(m):
-    replies = [
-        f"👑 جانم {m.from_user.first_name} 💎",
-        f"✨ سلام {m.from_user.first_name}! آماده‌ام 💪",
-        f"🤖 بله {m.from_user.first_name}، در خدمتتم 🔥"
-    ]
-    bot.reply_to(m, random.choice(replies))
-
-# ================= 🚀 اجرای نهایی =================
-print("🤖 Persian Lux Panel V16 Final Edition در حال اجراست...")
-
-while True:
-    try:
-        bot.infinity_polling(timeout=60, long_polling_timeout=30)
+        await update.effective_chat.ban_member(target)
+        await update.message.reply_text(f"✅ کاربر {target} بن شد.")
     except Exception as e:
-        logging.error(f"polling crash: {e}")
-        time.sleep(5)
+        await update.message.reply_text(f"خطا در بن کردن: {e}")
+
+# آنبن
+async def cmd_unban(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not await is_admin(update, update.effective_user.id):
+        return await update.message.reply_text("⛔ شما دسترسی ندارید.")
+    if not context.args:
+        return await update.message.reply_text("آیدی کاربر را وارد کن: /آنبن 123456")
+    try:
+        target = int(context.args[0])
+    except:
+        return await update.message.reply_text("آیدی معتبر نیست.")
+    try:
+        await update.effective_chat.unban_member(target)
+        await update.message.reply_text(f"✅ کاربر {target} آنبن شد.")
+    except Exception as e:
+        await update.message.reply_text(f"خطا در آنبن: {e}")
+
+# سایلنت (موقت)
+async def cmd_silent(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not await is_admin(update, update.effective_user.id):
+        return await update.message.reply_text("⛔ شما دسترسی ندارید.")
+    timeout = 3600  # پیش فرض 1 ساعت
+    target = None
+    if update.message.reply_to_message:
+        target = update.message.reply_to_message.from_user.id
+    elif context.args:
+        try:
+            target = int(context.args[0])
+            if len(context.args) > 1:
+                timeout = int(context.args[1])
+        except:
+            pass
+    if not target:
+        return await update.message.reply_text("لطفاً به پیام کاربر ریپلای کن یا آیدی کاربر + مدت (ثانیه) وارد کن.")
+    try:
+        until = int(time.time() + timeout)
+        await update.effective_chat.restrict_member(
+            user_id=target,
+            permissions=ChatPermissions(can_send_messages=False),
+            until_date=until,
+        )
+        await update.message.reply_text(f"🔇 کاربر {target} به مدت {timeout} ثانیه سایلنت شد.")
+    except Exception as e:
+        await update.message.reply_text(f"خطا در سایلنت: {e}")
+
+# بررسی پیام‌ها و اعمال قفل‌ها (محور اصلی)
+async def on_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    msg = update.message
+    if not msg or not update.effective_chat:
+        return
+    chat_id = str(update.effective_chat.id)
+    locks = set(data["locks"].get(chat_id, []))
+
+    # 1) flood کنترل
+    if "flood" in locks:
+        cfg = data.get("flood", {}).get(chat_id, {"limit": 5, "period": 8})
+        limit = int(cfg.get("limit", 5))
+        period = int(cfg.get("period", 8))
+        user_id = str(msg.from_user.id)
+        dq = flood_tracker[chat_id][user_id]
+        now = time.time()
+        dq.append(now)
+        # تمیز کردن زمان‌های قدیمی
+        while dq and dq[0] < now - period:
+            dq.popleft()
+        if len(dq) > limit:
+            # عمل: حذف پیام و در صورت نیاز اخطار یا بن
+            try:
+                await msg.delete()
+            except:
+                pass
+            # افزایش شمار تخلفات
+            warns_chat = data["warns"].setdefault(chat_id, {})
+            warns_chat[user_id] = warns_chat.get(user_id, 0) + 1
+            save_data(data)
+            if warns_chat[user_id] >= 3:
+                # بن موقت به عنوان مثال
+                try:
+                    await update.effective_chat.ban_member(int(user_id))
+                    await context.bot.send_message(chat_id=update.effective_chat.id, text=f"کاربر {user_id} به دلیل ارسال مکرر بن شد.")
+                except:
+                    pass
+            return
+
+    # 2) لینک
+    if "links" in locks:
+        has_link = False
+        if msg.entities:
+            for e in msg.entities:
+                if e.type in ("url", "text_link"):
+                    has_link = True
+                    break
+        text = (msg.text or msg.caption or "") or ""
+        if "t.me/" in text or "telegram.me/" in text:
+            has_link = True
+        if has_link:
+            try:
+                await msg.delete()
+            except:
+                pass
+            return
+
+    # 3) عکس
+    if "photo" in locks and msg.photo:
+        try:
+            await msg.delete()
+        except:
+            pass
+        return
+
+    # 4) ویدیو
+    if "video" in locks and msg.video:
+        try:
+            await msg.delete()
+        except:
+            pass
+        return
+
+    # 5) استیکر
+    if "sticker" in locks and msg.sticker:
+        try:
+            await msg.delete()
+        except:
+            pass
+        return
+
+    # 6) گیف (animation)
+    if "gif" in locks and msg.animation:
+        try:
+            await msg.delete()
+        except:
+            pass
+        return
+
+    # 7) فایل (document)
+    if "file" in locks and msg.document:
+        try:
+            await msg.delete()
+        except:
+            pass
+        return
+
+    # 8) صوت / ویس
+    if "audio" in locks and (msg.audio or msg.voice):
+        try:
+            await msg.delete()
+        except:
+            pass
+        return
+
+    # 9) مخاطب
+    if "contact" in locks and msg.contact:
+        try:
+            await msg.delete()
+        except:
+            pass
+        return
+
+    # 10) مکان
+    if "location" in locks and msg.location:
+        try:
+            await msg.delete()
+        except:
+            pass
+        return
+
+# فرمان تنظیم flood (SUDO یا مدیر)
+async def set_flood(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not await is_admin(update, update.effective_user.id):
+        return await update.message.reply_text("⛔ شما دسترسی ندارید.")
+    args = context.args
+    if len(args) < 2:
+        return await update.message.reply_text("استفاده: /تنظیم_flood <limit> <period_ثانیه>  مثال: /تنظیم_flood 5 8")
+    try:
+        limit = int(args[0])
+        period = int(args[1])
+    except:
+        return await update.message.reply_text("مقادیر باید عددی باشند.")
+    chat_id = str(update.effective_chat.id)
+    data.setdefault("flood", {})
+    data["flood"][chat_id] = {"limit": limit, "period": period}
+    save_data(data)
+    await update.message.reply_text(f"تنظیم flood ثبت شد: {limit} پیام در {period} ثانیه.")
+
+# راه‌اندازی اپ
+def main():
+    if not BOT_TOKEN:
+        print("BOT_TOKEN تنظیم نشده است!")
+        return
+    app = ApplicationBuilder().token(BOT_TOKEN).build()
+
+    # دستورات
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("help", help_cmd))
+    app.add_handler(CommandHandler("قفل", cmd_lock))
+    app.add_handler(CommandHandler("بازکردن", cmd_unlock))
+    app.add_handler(CommandHandler("وضعیت", cmd_status))
+    app.add_handler(CommandHandler("اضافه_مدیر", cmd_add_mod))
+    app.add_handler(CommandHandler("حذف_مدیر", cmd_remove_mod))
+    app.add_handler(CommandHandler("بن", cmd_ban))
+    app.add_handler(CommandHandler("آنبن", cmd_unban))
+    app.add_handler(CommandHandler("سایلنت", cmd_silent))
+    app.add_handler(CommandHandler("تنظیم_flood", set_flood))
+
+    # دریافت همه پیام‌ها برای بررسی قفل‌ها
+    app.add_handler(MessageHandler(filters.ALL & (~filters.COMMAND), on_message))
+
+    print("ربات آنتی‌اسپم فارسی در حال اجراست...")
+    app.run_polling()
+
+if __name__ == "__main__":
+    main()
