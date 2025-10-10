@@ -178,7 +178,26 @@ def toggle_lock(m):
     d["locks"].setdefault(gid, {k: False for k in LOCK_MAP.values()})
     if d["locks"][gid][lock_type] == en:
         return bot.reply_to(m, "⚠️ این قفل همین حالا هم در همین حالت است.")
-    d["locks"][gid][lock_type] = en; save_data(d)
+    d["locks"][gid][lock_type] = en; save_data(d)# 🔒 قفل واقعی گروه
+if lock_type == "group":
+    try:
+        # اگر قفل فعال شود، فقط مدیران اجازه ارسال دارند
+        perms = types.ChatPermissions(can_send_messages=not en)
+        bot.set_chat_permissions(m.chat.id, perms)
+
+        if en:
+            bot.send_message(
+                m.chat.id,
+                "🚫 گروه موقتاً <b>بسته شد</b> ❌\n🔒 فقط مدیران می‌تونن پیام بفرستن.\n⏰ " + shamsi_time()
+            )
+        else:
+            bot.send_message(
+                m.chat.id,
+                "✅ گروه <b>باز شد</b> 🌸\n💬 حالا همه می‌تونن چت کنن!\n⏰ " + shamsi_time()
+            )
+    except Exception as e:
+        bot.reply_to(m, f"❗ خطا در تغییر وضعیت گروه:\n<code>{e}</code>")
+    return
     if lock_type == "group":
         if en:
             bot.send_message(m.chat.id, "🚫 گروه موقتاً <b>بسته شد</b> ❌\n🔒 فقط مدیران می‌توانند پیام ارسال کنند.\n⏰ " + shamsi_time())
