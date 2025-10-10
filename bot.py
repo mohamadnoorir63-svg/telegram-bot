@@ -543,7 +543,6 @@ def filter_check(m):
             except:
                 pass
             break
-# ================= 🚀 اجرای نهایی =================
 if __name__ == "__main__":
     print("🤖 Persian Lux Panel V15 در حال اجراست...")
 
@@ -555,4 +554,5 @@ if __name__ == "__main__":
                 skip_pending=True
             )
         except Exception as e:
-            logging.error
+            logging.error(f"خطا در polling: {e}", exc_info=True)
+            t
