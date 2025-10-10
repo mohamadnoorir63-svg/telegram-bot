@@ -1,5 +1,12 @@
 {
-  "welcome": {},
+  "welcome": {
+    "-1001234567890": {
+      "enabled": true,
+      "type": "text",
+      "content": null,
+      "file_id": null
+    }
+  },
   "locks": {},
   "admins": {},
   "sudo_list": [],
