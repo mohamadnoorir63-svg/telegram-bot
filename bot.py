@@ -250,5 +250,149 @@ def show_current_welcome(m):
         f"📄 متن:\n{msg}"
     )
 
-print("✅ بخش ۳ (خوشامد حرفه‌ای) با موفقیت لود شد.")
+print("✅ بخش ۳ (خوشامد حرفه‌ای) با موفقیت لود شد.")# ================= 🔒 سیستم قفل‌ها (Lock System Pro) =================
+
+# نوع قفل‌ها
+LOCK_MAP = {
+    "لینک": "link",
+    "گروه": "group",
+    "عکس": "photo",
+    "ویدیو": "video",
+    "استیکر": "sticker",
+    "گیف": "gif",
+    "فایل": "file",
+    "موزیک": "music",
+    "ویس": "voice",
+    "فوروارد": "forward",
+    "متن": "text"
+}
+
+# 📌 فعال / غیرفعال کردن قفل‌ها
+@bot.message_handler(func=lambda m: cmd_text(m).startswith("قفل ") or cmd_text(m).startswith("بازکردن "))
+def toggle_lock(m):
+    if not is_admin(m.chat.id, m.from_user.id):
+        return
+
+    d = load_data()
+    gid = str(m.chat.id)
+    parts = cmd_text(m).split(" ", 1)
+    if len(parts) < 2:
+        return bot.reply_to(m, "⚠️ دستور نادرست است.\nمثال: قفل لینک")
+
+    key_fa = parts[1]
+    lock_type = LOCK_MAP.get(key_fa)
+    if not lock_type:
+        return bot.reply_to(m, "❌ نوع قفل معتبر نیست.")
+
+    enable = cmd_text(m).startswith("قفل ")
+    d["locks"].setdefault(gid, {k: False for k in LOCK_MAP.values()})
+
+    if d["locks"][gid][lock_type] == enable:
+        return bot.reply_to(m, f"ℹ️ قفل {key_fa} از قبل {'فعال' if enable else 'غیرفعال'} بوده است.")
+
+    d["locks"][gid][lock_type] = enable
+    save_data(d)
+
+    # قفل گروه (بستن چت)
+    if lock_type == "group":
+        try:
+            perms = types.ChatPermissions(can_send_messages=not enable)
+            bot.set_chat_permissions(m.chat.id, perms)
+            msg = (
+                "🚫 گروه هم‌اکنون <b>بسته شد</b> ❌\n"
+                "💬 ارسال پیام فقط برای مدیران فعال است.\n"
+                f"⏰ {shamsi_time()}"
+            ) if enable else (
+                "✅ گروه <b>باز شد</b> 🌸\n"
+                "💬 حالا همه می‌تونن دوباره چت کنن!\n"
+                f"⏰ {shamsi_time()}"
+            )
+            bot.send_message(m.chat.id, msg)
+        except Exception as e:
+            bot.reply_to(m, f"⚠️ خطا در تغییر وضعیت گروه:\n<code>{e}</code>")
+        return
+
+    # پیام زیبای فعال/غیرفعال شدن
+    msg = (
+        f"🔒 قفل <b>{key_fa}</b> با موفقیت فعال شد.\n"
+        f"🚫 از این پس ارسال این نوع پیام ممنوع است."
+        if enable
+        else f"🔓 قفل <b>{key_fa}</b> غیرفعال شد.\n💬 کاربران می‌توانند دوباره از آن استفاده کنند."
+    )
+    bot.reply_to(m, msg)
+
+
+# ================= 🚫 کنترل خودکار پیام‌های ممنوعه =================
+
+@bot.message_handler(content_types=["text", "photo", "video", "sticker", "animation", "document", "audio", "voice", "forward"])
+def lock_filter_system(m):
+    d = load_data()
+    gid = str(m.chat.id)
+    locks = d.get("locks", {}).get(gid, {})
+
+    if not locks:
+        return  # هیچ قفلی تنظیم نشده
+
+    def warn_and_delete(reason):
+        """حذف پیام و اخطار زیبا به کاربر"""
+        if is_admin(m.chat.id, m.from_user.id):
+            return  # مدیران استثنا هستند
+        try:
+            bot.delete_message(m.chat.id, m.id)
+        except:
+            pass
+
+        warn_text = (
+            f"🚨 <b>اخطار!</b>\n"
+            f"{reason}\n"
+            f"👤 <a href='tg://user?id={m.from_user.id}'>{m.from_user.first_name}</a> لطفاً قوانین گروه را رعایت کن 🌸"
+        )
+        msg = bot.send_message(m.chat.id, warn_text, parse_mode="HTML")
+        time.sleep(3)
+        try:
+            bot.delete_message(m.chat.id, msg.id)
+        except:
+            pass
+
+    # 🔗 قفل لینک
+    if locks.get("link") and m.text and any(x in m.text.lower() for x in ["http", "www.", "t.me/", "telegram.me/"]):
+        return warn_and_delete("ارسال لینک در این گروه مجاز نیست ❌")
+
+    # 💬 قفل متن
+    if locks.get("text") and m.text:
+        return warn_and_delete("ارسال پیام متنی در این گروه بسته است 💬")
+
+    # 🖼️ قفل عکس
+    if locks.get("photo") and m.content_type == "photo":
+        return warn_and_delete("ارسال عکس در این گروه ممنوع است 🖼️")
+
+    # 🎥 قفل ویدیو
+    if locks.get("video") and m.content_type == "video":
+        return warn_and_delete("ارسال ویدیو در این گروه مجاز نیست 🎬")
+
+    # 🧸 قفل استیکر
+    if locks.get("sticker") and m.content_type == "sticker":
+        return warn_and_delete("استفاده از استیکر در این گروه ممنوع است 🧸")
+
+    # 🎞️ قفل گیف
+    if locks.get("gif") and m.content_type == "animation":
+        return warn_and_delete("ارسال گیف در این گروه بسته است 🎞️")
+
+    # 📁 قفل فایل
+    if locks.get("file") and m.content_type == "document":
+        return warn_and_delete("ارسال فایل در این گروه مجاز نیست 📁")
+
+    # 🎵 قفل موزیک
+    if locks.get("music") and m.content_type == "audio":
+        return warn_and_delete("ارسال موزیک در این گروه ممنوع است 🎵")
+
+    # 🎤 قفل ویس
+    if locks.get("voice") and m.content_type == "voice":
+        return warn_and_delete("ارسال ویس در این گروه مجاز نیست 🎤")
+
+    # 🔁 قفل فوروارد
+    if locks.get("forward") and (m.forward_from or m.forward_from_chat):
+        return warn_and_delete("ارسال پیام فورواردی در این گروه بسته شده است 🔁")
+
+print("✅ بخش ۴ (سیستم قفل‌ها) با موفقیت لود شد.")
 bot.infinity_polling(timeout=60, long_polling_timeout=40)
