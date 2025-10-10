@@ -1,231 +1,178 @@
 # -*- coding: utf-8 -*-
-# 🤖 محافظ V1.0 (Funny Mode)
-# Designed with ❤️ by Mohammad & ChatGPT
+# Persian Tebchi Maker – One File Edition 👑
 
-import os
-import json
-import time
-import jdatetime
-import telebot
-from telebot import types
+import os, json, telebot, subprocess, time, textwrap
 
-# ================= ⚙️ تنظیمات پایه =================
+ADMIN_ID = int(os.environ.get("ADMIN_ID", "0"))
 TOKEN = os.environ.get("BOT_TOKEN")
-SUDO_ID = int(os.environ.get("SUDO_ID", "0"))
 
 bot = telebot.TeleBot(TOKEN, parse_mode="HTML")
-DATA_FILE = "data.json"
 
+DATA_DIR = "data"
+BOTS_DIR = os.path.join(DATA_DIR, "bots")
+USERS_FILE = os.path.join(DATA_DIR, "users.json")
 
-# ================= 💾 فایل داده =================
-def base_data():
-    return {
-        "admins": {},
-        "sudo_list": [],
-        "banned": {},
-        "muted": {},
-        "warns": {},
-        "filters": {},
-        "welcome": {}
-    }
+os.makedirs(BOTS_DIR, exist_ok=True)
+if not os.path.exists(USERS_FILE):
+    json.dump({}, open(USERS_FILE, "w", encoding="utf-8"), ensure_ascii=False, indent=2)
 
-
-def load_data():
-    if not os.path.exists(DATA_FILE):
-        save_data(base_data())
-    with open(DATA_FILE, "r", encoding="utf-8") as f:
+# ---------------- داده‌ها ----------------
+def load_users():
+    with open(USERS_FILE, "r", encoding="utf-8") as f:
         return json.load(f)
 
-
-def save_data(d):
-    with open(DATA_FILE, "w", encoding="utf-8") as f:
+def save_users(d):
+    with open(USERS_FILE, "w", encoding="utf-8") as f:
         json.dump(d, f, ensure_ascii=False, indent=2)
 
+# ---------------- استارت ----------------
+@bot.message_handler(commands=["start"])
+def start(m):
+    uid = str(m.from_user.id)
+    users = load_users()
+    if uid not in users:
+        users[uid] = {"token": None, "created": False}
+        save_users(users)
 
-# ================= 🧩 ابزارها =================
-def cmd(m):
-    return (getattr(m, "text", "") or "").strip()
+    msg = (
+        f"✨ سلام {m.from_user.first_name}!\n"
+        "من یه <b>ربات‌ساز تبچی</b> هستم 🤖\n\n"
+        "با من می‌تونی ربات خودت رو بسازی که:\n"
+        "• پیام همگانی بده 💬\n"
+        "• فوروارد کنه 🔁\n"
+        "• متن استارت تنظیم کنه ✏️\n\n"
+        "فقط کافیه <b>توکن رباتت</b> رو بفرستی 👇"
+    )
+    bot.reply_to(m, msg)
 
-def is_sudo(uid):
-    d = load_data()
-    return str(uid) in [str(SUDO_ID)] + d.get("sudo_list", [])
+# ---------------- ثبت توکن ----------------
+@bot.message_handler(func=lambda m: len(m.text or "") > 30 and "bot" in m.text)
+def save_token(m):
+    uid = str(m.from_user.id)
+    token = m.text.strip()
+    users = load_users()
+    users[uid] = {"token": token, "created": False}
+    save_users(users)
+    bot.reply_to(m, "✅ توکن ذخیره شد.\nحالا بنویس: <b>ساخت ربات</b>")
 
-def is_admin(chat_id, uid):
-    d = load_data()
-    gid = str(chat_id)
-    if is_sudo(uid):
-        return True
-    if str(uid) in d["admins"].get(gid, []):
-        return True
-    try:
-        st = bot.get_chat_member(chat_id, uid).status
-        return st in ("administrator", "creator")
-    except:
-        return False
+# ---------------- ساخت ربات ----------------
+@bot.message_handler(func=lambda m: m.text == "ساخت ربات")
+def make_bot(m):
+    uid = str(m.from_user.id)
+    users = load_users()
+    if uid not in users or not users[uid].get("token"):
+        return bot.reply_to(m, "⚠️ اول توکن رباتت رو بفرست.")
 
-def time_fa():
-    return jdatetime.datetime.now().strftime("%H:%M:%S")
+    token = users[uid]["token"]
+    file_path = os.path.join(BOTS_DIR, f"bot_{uid}.py")
 
-def date_fa():
-    return jdatetime.datetime.now().strftime("%A %d %B %Y")
+    # قالب خودکار برای ربات کاربر
+    template_code = textwrap.dedent(f"""
+    import telebot, time, json, os
+    TOKEN = "{token}"
+    bot = telebot.TeleBot(TOKEN, parse_mode="HTML")
+    DATA_FILE = f"data_user_{{TOKEN[:8]}}.json"
 
-# ================= 👋 خوشامد =================
-@bot.message_handler(content_types=["new_chat_members"])
-def welcome_new(m):
-    d = load_data()
-    gid = str(m.chat.id)
-    s = d["welcome"].get(gid, {"enabled": True, "msg": None})
+    def load_users():
+        if not os.path.exists(DATA_FILE):
+            json.dump({{"users": []}}, open(DATA_FILE, "w"))
+        return json.load(open(DATA_FILE, "r"))
 
-    if not s.get("enabled", True):
-        return
+    def save_users(d):
+        json.dump(d, open(DATA_FILE, "w"), ensure_ascii=False, indent=2)
 
-    for user in m.new_chat_members:
-        name = user.first_name or "رفیق جدید"
-        msg = s.get("msg") or f"🌸 خوش اومدی {name}!\nخونه خودته 😄"
-        bot.send_message(m.chat.id, msg)
+    @bot.message_handler(commands=["start"])
+    def start(m):
+        d = load_users()
+        if m.from_user.id not in d["users"]:
+            d["users"].append(m.from_user.id)
+            save_users(d)
+        bot.reply_to(m, "🤖 سلام! این یه ربات خودکاره که پیام همگانی می‌فرسته 💬")
 
-@bot.message_handler(func=lambda m: is_admin(m.chat.id, m.from_user.id) and cmd(m) == "خوشامد روشن")
-def enable_welcome(m):
-    d = load_data()
-    gid = str(m.chat.id)
-    d["welcome"].setdefault(gid, {})["enabled"] = True
-    save_data(d)
-    bot.reply_to(m, "✅ خوشامد فعال شد! از این به بعد با آغوش باز 😄")
+    @bot.message_handler(func=lambda m: m.text == "آمار")
+    def stats(m):
+        if m.from_user.id == {uid}:
+            d = load_users()
+            bot.reply_to(m, f"📊 کاربران ثبت‌شده: {{len(d['users'])}}")
+    
+    @bot.message_handler(func=lambda m: m.text.startswith("ارسال"))
+    def send_all(m):
+        if m.from_user.id != {uid}: return
+        txt = m.text.replace("ارسال", "").strip()
+        if not txt: return bot.reply_to(m, "⚠️ بنویس چی بفرستم.")
+        d = load_users()
+        for u in d["users"]:
+            try:
+                bot.send_message(u, txt)
+                time.sleep(0.1)
+            except: pass
+        bot.reply_to(m, "✅ پیام برای همه فرستاده شد!")
 
-@bot.message_handler(func=lambda m: is_admin(m.chat.id, m.from_user.id) and cmd(m) == "خوشامد خاموش")
-def disable_welcome(m):
-    d = load_data()
-    gid = str(m.chat.id)
-    d["welcome"].setdefault(gid, {})["enabled"] = False
-    save_data(d)
-    bot.reply_to(m, "🚫 خوشامد خاموش شد. دیگه خبری از احوال‌پرسی نیست 😅")
+    @bot.message_handler(func=lambda m: m.text.startswith("فوروارد"))
+    def fwd_all(m):
+        if m.from_user.id != {uid} or not m.reply_to_message: return
+        d = load_users()
+        for u in d["users"]:
+            try:
+                bot.forward_message(u, m.chat.id, m.reply_to_message.id)
+                time.sleep(0.1)
+            except: pass
+        bot.reply_to(m, "🔁 فوروارد برای همه انجام شد!")
 
-@bot.message_handler(func=lambda m: is_admin(m.chat.id, m.from_user.id) and m.reply_to_message and cmd(m) == "تنظیم خوشامد")
-def set_welcome(m):
-    txt = (m.reply_to_message.text or "").strip()
-    if not txt:
-        return bot.reply_to(m, "⚠️ لطفاً روی یه پیام متنی ریپلای کن 😁")
-    d = load_data()
-    gid = str(m.chat.id)
-    d["welcome"][gid] = {"enabled": True, "msg": txt}
-    save_data(d)
-    bot.reply_to(m, "✅ پیام خوشامد با موفقیت تنظیم شد 🌸")
+    print(f"🤖 Bot for user {uid} is running...")
+    bot.infinity_polling(skip_pending=True)
+    """)
 
+    with open(file_path, "w", encoding="utf-8") as f:
+        f.write(template_code)
 
-# ================= 🚫 بن / سکوت / اخطار =================
-def target_user(m):
-    if m.reply_to_message:
-        return m.reply_to_message.from_user.id
-    parts = cmd(m).split()
-    if len(parts) > 1 and parts[1].isdigit():
-        return int(parts[1])
-    return None
+    users[uid]["created"] = True
+    save_users(users)
+    bot.reply_to(m, "🚀 رباتت ساخته شد و فعال شد ✅")
+    time.sleep(1)
+    subprocess.Popen(["python", file_path])
 
-def bot_can(m):
-    try:
-        me = bot.get_me()
-        perms = bot.get_chat_member(m.chat.id, me.id)
-        return perms.status in ("administrator", "creator") and getattr(perms, "can_restrict_members", True)
-    except:
-        bot.reply_to(m, "⚠️ من دسترسی محدودسازی ندارم 😢")
-        return False
+# ---------------- پنل مدیر کل ----------------
+@bot.message_handler(func=lambda m: m.from_user.id == ADMIN_ID and m.text == "پنل")
+def admin_panel(m):
+    users = load_users()
+    total = len(users)
+    bots = sum(1 for u in users.values() if u.get("created"))
+    msg = (
+        "👑 <b>پنل مدیر کل</b>\n\n"
+        f"📊 کاربران: {total}\n🤖 ربات‌های ساخته‌شده: {bots}\n\n"
+        "دستورات:\n"
+        "• لیست کاربران\n"
+        "• حذف ربات [آیدی]"
+    )
+    bot.reply_to(m, msg)
 
+@bot.message_handler(func=lambda m: m.from_user.id == ADMIN_ID and m.text == "لیست کاربران")
+def list_users(m):
+    users = load_users()
+    if not users:
+        return bot.reply_to(m, "❌ هیچ کاربری ثبت نشده.")
+    msg = "📋 لیست کاربران:\n\n"
+    for uid, info in users.items():
+        msg += f"👤 {uid} — {'✅ ساخته' if info['created'] else '❌'}\n"
+    bot.reply_to(m, msg)
 
-# 🚫 بن
-@bot.message_handler(func=lambda m: cmd(m).startswith("بن "))
-def ban_user(m):
-    if not is_admin(m.chat.id, m.from_user.id) or not bot_can(m):
-        return
-    target = target_user(m)
-    if not target:
-        return bot.reply_to(m, "⚠️ ریپلای کن رو پیام کسی که می‌خوای بن شه 😅")
-    if is_admin(m.chat.id, target) or is_sudo(target):
-        return bot.reply_to(m, "😎 من با رئیس در نمی‌افتم! اون مدیر یا سودوئه.")
-
-    try:
-        bot.ban_chat_member(m.chat.id, target)
-        bot.send_message(m.chat.id, f"🚫 کاربر <a href='tg://user?id={target}'>بن شد!</a>\nرفیق، دفعه بعد رعایت کن 😅", parse_mode="HTML")
-    except:
-        bot.reply_to(m, "⚠️ نتونستم بنش کنم، شاید دسترسی ندارم!")
-
-
-# 🔇 سکوت
-@bot.message_handler(func=lambda m: cmd(m).startswith("سکوت "))
-def mute_user(m):
-    if not is_admin(m.chat.id, m.from_user.id) or not bot_can(m):
-        return
-    target = target_user(m)
-    if not target:
-        return bot.reply_to(m, "⚠️ ریپلای کن رو پیام کسی که می‌خوای ساکت شه 😅")
-    if is_admin(m.chat.id, target) or is_sudo(target):
-        return bot.reply_to(m, "😂 مدیر یا سودو رو نمی‌تونم ساکت کنم.")
-
-    bot.restrict_chat_member(m.chat.id, target, permissions=types.ChatPermissions(can_send_messages=False))
-    bot.send_message(m.chat.id, f"🔇 کاربر <a href='tg://user?id={target}'>ساکت شد!</a>\nبی‌صدا ولی همچنان نازنین 😎", parse_mode="HTML")
-
-
-# ⚠️ اخطار
-@bot.message_handler(func=lambda m: cmd(m).startswith("اخطار "))
-def warn_user(m):
-    if not is_admin(m.chat.id, m.from_user.id):
-        return
-    target = target_user(m)
-    if not target:
-        return bot.reply_to(m, "⚠️ ریپلای کن رو پیامش 😅")
-    if is_admin(m.chat.id, target) or is_sudo(target):
-        return bot.reply_to(m, "🤓 به رئیس اخطار نمی‌دن برادر!")
-
-    d = load_data()
-    gid = str(m.chat.id)
-    d["warns"].setdefault(gid, {})
-    d["warns"][gid][str(target)] = d["warns"][gid].get(str(target), 0) + 1
-    save_data(d)
-
-    count = d["warns"][gid][str(target)]
-    if count >= 3:
-        bot.ban_chat_member(m.chat.id, target)
-        d["warns"][gid][str(target)] = 0
-        save_data(d)
-        bot.send_message(m.chat.id, f"🚫 <a href='tg://user?id={target}'>بعد از ۳ اخطار بن شد!</a> 😅", parse_mode="HTML")
+@bot.message_handler(func=lambda m: m.from_user.id == ADMIN_ID and m.text.startswith("حذف ربات"))
+def del_bot(m):
+    parts = m.text.split()
+    if len(parts) < 3:
+        return bot.reply_to(m, "مثال: حذف ربات 123456789")
+    uid = parts[2]
+    path = os.path.join(BOTS_DIR, f"bot_{uid}.py")
+    if os.path.exists(path):
+        os.remove(path)
+        users = load_users()
+        users[uid]["created"] = False
+        save_users(users)
+        bot.reply_to(m, f"🗑️ ربات کاربر {uid} حذف شد.")
     else:
-        bot.send_message(m.chat.id, f"⚠️ <a href='tg://user?id={target}'>اخطار شماره {count}</a> گرفت!\nمواظب باش، تا ۳ بشه می‌پرم 😆", parse_mode="HTML")
+        bot.reply_to(m, "چنین رباتی وجود ندارد.")
 
-
-# ================= 🧾 فیلتر کلمات =================
-@bot.message_handler(func=lambda m: is_admin(m.chat.id, m.from_user.id) and cmd(m).startswith("افزودن فیلتر "))
-def add_filter(m):
-    gid = str(m.chat.id)
-    d = load_data()
-    word = cmd(m).split(" ", 2)[2].strip().lower()
-    d["filters"].setdefault(gid, [])
-    if word in d["filters"][gid]:
-        return bot.reply_to(m, "😅 این کلمه از قبل فیلتره!")
-    d["filters"][gid].append(word)
-    save_data(d)
-    bot.reply_to(m, f"🚫 کلمه «{word}» فیلتر شد! دیگه کسی حق نداره بگه 😎")
-
-@bot.message_handler(content_types=["text"])
-def filter_check(m):
-    d = load_data()
-    gid = str(m.chat.id)
-    filters = d.get("filters", {}).get(gid, [])
-    if not filters or is_admin(m.chat.id, m.from_user.id):
-        return
-    for w in filters:
-        if w in m.text.lower():
-            bot.delete_message(m.chat.id, m.id)
-            msg = bot.send_message(m.chat.id, f"🚫 اون کلمه فیلتره رفیق 😅 رعایت کن!", parse_mode="HTML")
-            time.sleep(3)
-            bot.delete_message(m.chat.id, msg.id)
-            break
-
-
-# ================= 🚀 اجرا =================
-if __name__ == "__main__":
-    print("🤖 محافظ V1.0 در حال اجراست...")
-    while True:
-        try:
-            bot.infinity_polling(timeout=60, long_polling_timeout=40, skip_pending=True)
-        except Exception as e:
-            print("⚠️ خطا:", e)
-            time.sleep(5)
+# ---------------- اجرا ----------------
+print("🤖 Persian Tebchi Maker v1.0 در حال اجراست...")
+bot.infinity_polling(skip_pending=True)
