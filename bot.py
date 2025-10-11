@@ -1,24 +1,30 @@
-import json, random, os, asyncio
-from gtts import gTTS
+# -*- coding: utf-8 -*-
+import os, json, random, asyncio
 from telegram import Update
-from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
+from telegram.ext import ApplicationBuilder, MessageHandler, ContextTypes, filters
+from transformers import AutoTokenizer, AutoModelForCausalLM
+import torch
 
 TOKEN = os.getenv("BOT_TOKEN")
+SUDO_ID = int(os.getenv("SUDO_ID", "0"))
 MEMORY_FILE = "memory.json"
 
-# ===================== حافظه =====================
-def init_memory():
-    base = {"learning": True, "mood": "happy", "chats": {}}
-    if not os.path.exists(MEMORY_FILE):
-        with open(MEMORY_FILE, "w", encoding="utf-8") as f:
-            json.dump(base, f, ensure_ascii=False, indent=2)
-    else:
-        try:
-            with open(MEMORY_FILE, "r", encoding="utf-8") as f:
-                json.load(f)
-        except:
-            with open(MEMORY_FILE, "w", encoding="utf-8") as f:
-                json.dump(base, f, ensure_ascii=False, indent=2)
+# =============== مدل زبانی فارسی ===============
+print("🤖 بارگذاری مدل هوش زبانی ...")
+tokenizer = AutoTokenizer.from_pretrained("HooshvareLab/gpt2-fa")
+model = AutoModelForCausalLM.from_pretrained("HooshvareLab/gpt2-fa")
+model.eval()
+
+# =============== حافظه ===============
+if not os.path.exists(MEMORY_FILE):
+    with open(MEMORY_FILE, "w", encoding="utf-8") as f:
+        json.dump({
+            "learning": True,
+            "active": True,
+            "mood": "happy",
+            "chats": {},
+            "custom_rules": {}
+        }, f, ensure_ascii=False, indent=2)
 
 def load_data():
     with open(MEMORY_FILE, "r", encoding="utf-8") as f:
@@ -28,128 +34,106 @@ def save_data(data):
     with open(MEMORY_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
-init_memory()
+# =============== تولید پاسخ هوشمند ===============
+def generate_reply(prompt):
+    inputs = tokenizer(prompt, return_tensors="pt", truncation=True, max_length=100)
+    outputs = model.generate(**inputs, max_new_tokens=60, temperature=0.8, top_p=0.9, pad_token_id=tokenizer.eos_token_id)
+    text = tokenizer.decode(outputs[0], skip_special_tokens=True)
+    text = text.replace(prompt, "").strip()
+    if len(text) < 2:
+        text = random.choice(["عه چه جالب 😄", "اینو خوب گفتی 😂", "باشه رفیق 😎"])
+    return text
 
-# ===================== صدا =====================
-def make_voice(text, filename="voice.ogg"):
-    try:
-        tts = gTTS(text=text, lang="fa")
-        tts.save(filename)
-        return filename
-    except Exception as e:
-        print("خطا در تولید صدا:", e)
-        return None
+# =============== پاسخ‌دهی اصلی ===============
+async def khengool(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    text = update.message.text.strip()
+    data = load_data()
 
-# ===================== پاسخ خودکار =====================
-async def khengool_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not update.message or not update.message.text:
+    # حالت خاموش
+    if not data.get("active", True):
         return
 
-    text = update.message.text.strip().lower()
-    data = load_data()
-    chats = data.get("chats", {})
-    mood = data.get("mood", "happy")
+    # بررسی دستورات فارسی ساده
+    msg_l = text.lower()
+    chat_id = update.message.chat.id
+    uid = update.message.from_user.id
 
-    # پاسخ‌های پیش‌فرض هر مود
-    mood_replies = {
-        "happy": ["عه چه باحال گفتی 😂", "اوه چه جالب 😄", "منم همینو فکر می‌کردم 😆", "زندگی قشنگه نه؟ 😎"],
-        "sad": ["بی‌حوصله‌ام 😔", "غم دارم امروز 😢", "نمی‌دونم چرا دلم گرفته 😞"],
-        "angry": ["ولم کن اعصاب ندارم 😡", "الان وقتش نیست 😤", "می‌خوای دعوا کنیم؟ 😠"]
-    }
-
-    # اگر جمله جدید بود، یه جواب خلاق بساز
-    if text not in chats:
-        base_reply = random.choice(mood_replies[mood])
-        creative_end = random.choice([
-            " ولی تو باحالی 😅",
-            " راستی دیشب خواب پیتزا دیدم 🍕",
-            " اینو بنویسم یادم نره 😜",
-            " بگو بازم، حرفات جالبه 😁"
-        ])
-        chats[text] = [base_reply + creative_end]
-    else:
-        # اگر جمله قبلاً ذخیره شده، یه جواب جدید بساز که تکراری نباشه
-        old_replies = chats[text]
-        new_reply = random.choice(mood_replies[mood])
-        while new_reply in old_replies and len(old_replies) < 10:
-            new_reply = random.choice(mood_replies[mood])
-        old_replies.append(new_reply)
-        chats[text] = old_replies[-10:]  # فقط 10 پاسخ آخر ذخیره کن
-
-    data["chats"] = chats
-    save_data(data)
-
-    # انتخاب پاسخ نهایی
-    response = random.choice(chats[text])
-
-    # ارسال پاسخ متنی و صوتی
-    await update.message.reply_text(response)
-    voice_path = make_voice(response)
-    if voice_path:
-        with open(voice_path, "rb") as voice:
-            await update.message.reply_voice(voice)
-
-    # گاهی خودش وسط چت شروع می‌کنه 😂
-    if random.random() < 0.2:
-        await asyncio.sleep(random.randint(3, 7))
-        auto_talk = random.choice([
-            "من هنوز اینجام 😁",
-            "می‌دونی دلم چی می‌خواد؟ پیتزاااا 🍕",
-            "اوه حوصله‌م سر رفت 😴",
-            "می‌خوای یه لطیفه بگم؟ 😜"
-        ])
-        await update.message.reply_text(auto_talk)
-        voice_path = make_voice(auto_talk)
-        if voice_path:
-            with open(voice_path, "rb") as voice:
-                await update.message.reply_voice(voice)
-
-# ===================== دستورات =====================
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    msg = "سلام من خنگولم 🤪 بیا با هم حرف بزنیم!"
-    await update.message.reply_text(msg)
-    voice_path = make_voice(msg)
-    if voice_path:
-        with open(voice_path, "rb") as voice:
-            await update.message.reply_voice(voice)
-
-async def mood(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    data = load_data()
-    if context.args:
-        new_mood = context.args[0].lower()
-        if new_mood in ["happy", "sad", "angry"]:
-            data["mood"] = new_mood
-            save_data(data)
-            await update.message.reply_text(f"مود خنگول تغییر کرد به: {new_mood} 😎")
-        else:
-            await update.message.reply_text("مودهای قابل استفاده: happy / sad / angry")
-    else:
-        await update.message.reply_text(f"مود فعلی: {data.get('mood', 'happy')}")
-
-async def learn(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    data = load_data()
-    if context.args:
-        state = context.args[0].lower()
-        if state == "on":
-            data["learning"] = True
-            msg = "یادگیری روشن شد 😁"
-        elif state == "off":
-            data["learning"] = False
-            msg = "یادگیری خاموش شد 😴"
-        else:
-            msg = "فقط از 'on' یا 'off' استفاده کن 😅"
+    if msg_l == "یادگیری روشن":
+        data["learning"] = True
         save_data(data)
-        await update.message.reply_text(msg)
-    else:
-        status = "روشن" if data.get("learning", True) else "خاموش"
-        await update.message.reply_text(f"یادگیری الان {status} است.")
+        return await update.message.reply_text("🧠 یادگیری فعال شد.")
+    if msg_l == "یادگیری خاموش":
+        data["learning"] = False
+        save_data(data)
+        return await update.message.reply_text("😴 یادگیری غیرفعال شد.")
+    if msg_l == "بازنشانی":
+        data["chats"].clear()
+        data["custom_rules"].clear()
+        save_data(data)
+        return await update.message.reply_text("♻️ حافظه‌ی خنگول پاک شد.")
+    if msg_l == "وضعیت":
+        status = "روشن ✅" if data.get("active", True) else "خاموش ❌"
+        learning = "فعال 🧠" if data.get("learning", True) else "غیرفعال 😴"
+        return await update.message.reply_text(f"وضعیت ربات: {status}\nوضعیت یادگیری: {learning}")
+    if msg_l == "خنگول خاموش":
+        data["active"] = False
+        save_data(data)
+        return await update.message.reply_text("🛑 خنگول خاموش شد.")
+    if msg_l == "خنگول روشن":
+        data["active"] = True
+        save_data(data)
+        return await update.message.reply_text("✅ خنگول روشن شد.")
 
-# ===================== اجرای ربات =====================
+    # یادگیری سفارشی
+    if msg_l.startswith("یاد بگیر"):
+        try:
+            part = text.split("وقتی کسی گفت", 1)[1]
+            trigger, replies = part.split("بگو", 1)
+            trigger = trigger.strip()
+            reply_list = [r.strip() for r in replies.split("\n") if r.strip()]
+            if trigger and reply_list:
+                data["custom_rules"][trigger] = reply_list
+                save_data(data)
+                return await update.message.reply_text(f"✅ یاد گرفتم وقتی کسی گفت «{trigger}» چی بگم 😎")
+        except Exception:
+            return await update.message.reply_text("❗فرمت درست: یاد بگیر وقتی کسی گفت سلام بگو:\nسلام رفیق 😎\nخوش اومدی ❤️")
+
+    # پاسخ سفارشی
+    for k, v in data["custom_rules"].items():
+        if k in text:
+            return await update.message.reply_text(random.choice(v))
+
+    # فقط وقتی اسمش گفته بشه جواب بده
+    if "خنگول" not in msg_l:
+        if data.get("learning"):
+            data["chats"][msg_l] = generate_reply(msg_l)
+            if len(data["chats"]) > 200:
+                data["chats"] = dict(list(data["chats"].items())[-200:])
+            save_data(data)
+        return
+
+    # تولید پاسخ هوشمند
+    mood_words = {"خوش": "happy", "غم": "sad", "عصب": "angry"}
+    for word, mood in mood_words.items():
+        if word in msg_l:
+            data["mood"] = mood
+            save_data(data)
+
+    base_prompt = f"{text}\nخنگول:"
+    reply = generate_reply(base_prompt)
+
+    # ذخیره‌ی گفتگو
+    if data.get("learning", True):
+        data["chats"][msg_l] = reply
+        if len(data["chats"]) > 200:
+            data["chats"] = dict(list(data["chats"].items())[-200:])
+        save_data(data)
+
+    await update.message.reply_text(reply)
+
+# =============== اجرا ===============
 if __name__ == "__main__":
     app = ApplicationBuilder().token(TOKEN).build()
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("mood", mood))
-    app.add_handler(CommandHandler("learn", learn))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, khengool_reply))
-    print("🤖 Khengool Plus Creative Mode Started ...")
-    app.run_polling()            
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, khengool))
+    print("🤖 Khengool 2.0 Started ...")
+    app.run_polling()
