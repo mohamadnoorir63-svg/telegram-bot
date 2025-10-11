@@ -1,32 +1,43 @@
 import os
 import requests
 
+# دریافت توکن از تنظیمات Heroku
 HF_TOKEN = os.getenv("HUGGINGFACE_TOKEN")
-headers = {"Authorization": f"Bearer {HF_TOKEN}"}
 
-# مدل تستی که حتماً فعال است
+# اگر متغیر محیطی خالی بود، اخطار بده
+if not HF_TOKEN:
+    print("❌ خطا: متغیر HUGGINGFACE_TOKEN تنظیم نشده است.")
+    exit()
+
+# آدرس مدل امن و فعال
 API_URL = "https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.3"
 
+headers = {
+    "Authorization": f"Bearer {HF_TOKEN}",
+    "Content-Type": "application/json"
+}
+
+# ورودی تستی برای مدل
 payload = {
     "inputs": "سلام! حالت چطوره؟",
-    "parameters": {"max_new_tokens": 50}
+    "parameters": {"max_new_tokens": 100}
 }
 
 print("🚀 در حال ارسال درخواست به Hugging Face...")
 
 try:
-    response = requests.post(API_URL, headers=headers, json=payload, timeout=60)
+    response = requests.post(API_URL, headers=headers, json=payload)
     print("📩 پاسخ دریافت شد!")
     print("کد وضعیت:", response.status_code)
-    print("خروجی خام:\n", response.text)
 
     if response.status_code == 200:
-        print("\n✅ اتصال و مدل هر دو درست کار می‌کنند!")
-    elif "error" in response.text:
-        print("\n⚠️ خطا از سمت Hugging Face:")
-        print(response.text)
+        result = response.json()
+        print("✅ پاسخ مدل:")
+        print(result[0]["generated_text"])
     else:
-        print("\n❌ پاسخ غیرمنتظره دریافت شد.")
+        print("❌ پاسخ غیرمنتظره دریافت شد.")
+        print("خروجی خام:")
+        print(response.text)
 
 except Exception as e:
-    print("💥 خطا در اتصال یا درخواست:", str(e))
+    print("⚠️ خطای کلی هنگام اتصال:", e)
