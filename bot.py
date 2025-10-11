@@ -1,51 +1,43 @@
 import os
-import yt_dlp
+import requests
 from telegram import Update
-from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
+from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
 
-BOT_TOKEN = os.getenv("BOT_TOKEN")
+TOKEN = os.getenv("BOT_TOKEN")
+
+# تابع جست‌وجو در JioSaavn
+def search_song(query):
+    url = f"https://saavn.dev/api/search/songs?query={query}"
+    r = requests.get(url)
+    data = r.json()
+    if data.get("data") and len(data["data"]["results"]) > 0:
+        return data["data"]["results"][0]
+    return None
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(
-        "🎵 سلام! اسم آهنگ یا لینک یوتیوب رو بفرست تا برات به MP3 تبدیل کنم 🎶"
-    )
+    await update.message.reply_text("🎵 سلام! اسم آهنگ رو بنویس تا برات MP3 بفرستم 🎧")
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.message.text.strip()
-    chat_id = update.effective_chat.id
-    await context.bot.send_message(chat_id, "🔍 در حال جست‌وجو و دانلود موزیک... ⏳")
+    await update.message.reply_text("🔎 در حال جست‌وجو در JioSaavn... لطفاً صبر کنید ⏳")
 
-    # پیکربندی yt-dlp
-    ydl_opts = {
-        'format': 'bestaudio/best',
-        'noplaylist': True,
-        'outtmpl': 'song.%(ext)s',
-        'quiet': True,
-        'postprocessors': [{
-            'key': 'FFmpegExtractAudio',
-            'preferredcodec': 'mp3',
-            'preferredquality': '192',
-        }],
-    }
+    song = search_song(query)
+    if not song:
+        await update.message.reply_text("❌ آهنگی پیدا نشد. دوباره تلاش کن!")
+        return
 
-    try:
-        # جستجو و دانلود آهنگ
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(f"ytsearch:{query}", download=True)
-            file_name = ydl.prepare_filename(info['entries'][0]).replace('.webm', '.mp3').replace('.m4a', '.mp3')
-            title = info['entries'][0].get('title', 'آهنگ')
+    title = song["name"]
+    artist = song["artists"]["primary"][0]["name"]
+    mp3_url = song["downloadUrl"][-1]["url"]
 
-        # ارسال فایل
-        await context.bot.send_audio(chat_id, audio=open(file_name, 'rb'), title=title)
+    caption = f"🎶 {title}\n👤 {artist}\n💽 از JioSaavn"
+    await update.message.reply_audio(audio=mp3_url, caption=caption)
 
-        os.remove(file_name)
-
-    except Exception as e:
-        await context.bot.send_message(chat_id, f"⚠️ خطا: {e}")
-
-if __name__ == "__main__":
-    app = ApplicationBuilder().token(BOT_TOKEN).build()
+def main():
+    app = ApplicationBuilder().token(TOKEN).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-    print("🚀 Bot is running...")
     app.run_polling()
+
+if __name__ == "__main__":
+    main()
