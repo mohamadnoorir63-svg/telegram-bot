@@ -16,7 +16,7 @@ HEADERS = {
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("🎧 سلام! اسم آهنگ یا لینک یوتیوب رو بفرست تا فایل صوتی‌ش رو برات بفرستم 🎶")
+    await update.message.reply_text("🎶 سلام! اسم آهنگ یا لینک یوتیوب رو بفرست تا فایل صوتی‌ش رو برات بفرستم.")
 
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -25,37 +25,52 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await context.bot.send_message(chat_id=chat_id, text="🔎 در حال جست‌وجو و تبدیل به MP3... لطفاً صبر کنید ⏳")
 
     try:
-        # جستجو در یوتیوب
+        # جستجوی ویدیو
         search_response = requests.get(SEARCH_URL, headers=HEADERS, params={"query": query, "type": "v"})
-        data = search_response.json()
+        search_data = search_response.json()
 
-        if not data.get("contents"):
+        if not search_data.get("contents"):
             await context.bot.send_message(chat_id=chat_id, text="❌ آهنگی با این نام پیدا نشد.")
             return
 
-        video_id = data["contents"][0]["video"]["videoId"]
+        video_id = search_data["contents"][0]["video"]["videoId"]
+        title = search_data["contents"][0]["video"]["title"]
 
-        # دریافت لینک دانلود (MP3)
+        # دانلود صدا
         download_response = requests.get(DOWNLOAD_URL, headers=HEADERS, params={"id": video_id})
         download_data = download_response.json()
 
-        if "url" not in download_data:
-            await context.bot.send_message(chat_id=chat_id, text="⚠️ لینک دانلود پیدا نشد.")
+        # پیدا کردن لینک mp3 از پاسخ
+        audio_url = None
+        for fmt in download_data.get("formats", []):
+            if fmt.get("mimeType", "").startswith("audio/mp4") or fmt.get("mimeType", "").startswith("audio/mp3"):
+                audio_url = fmt.get("url")
+                break
+
+        if not audio_url:
+            audio_url = download_data.get("url")  # بک‌آپ
+
+        if not audio_url:
+            await context.bot.send_message(chat_id=chat_id, text="⚠️ لینک دانلود صوت پیدا نشد.")
             return
 
-        audio_url = download_data["url"]
-        audio_data = requests.get(audio_url)
+        # دانلود فایل از لینک واقعی
+        audio_content = requests.get(audio_url)
+        filename = f"{title}.mp3"
 
-        filename = f"{query}.mp3"
+        if len(audio_content.content) < 500:
+            await context.bot.send_message(chat_id=chat_id, text="⚠️ فایل صوتی خالی بود یا کامل دانلود نشد.")
+            return
+
         with open(filename, "wb") as f:
-            f.write(audio_data.content)
+            f.write(audio_content.content)
 
-        # ارسال صوت به تلگرام
-        await context.bot.send_audio(chat_id=chat_id, audio=open(filename, "rb"), title=query)
+        # ارسال فایل صوتی
+        await context.bot.send_audio(chat_id=chat_id, audio=open(filename, "rb"), title=title)
         os.remove(filename)
 
     except Exception as e:
-        await context.bot.send_message(chat_id=chat_id, text=f"⚠️ خطا: {e}")
+        await context.bot.send_message(chat_id=chat_id, text=f"⚠️ خطا در دانلود: {e}")
 
 
 if __name__ == "__main__":
