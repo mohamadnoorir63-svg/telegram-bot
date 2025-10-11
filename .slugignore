@@ -2,10 +2,14 @@
 *.mp4
 *.zip
 *.rar
-*.pt
+*.7z
 *.bin
-venv/
+*.pt
 __pycache__/
+venv/
+.env
 datasets/
 models/
 node_modules/
+.git/
+.gitignore
