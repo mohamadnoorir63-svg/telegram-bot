@@ -1,5 +1,5 @@
 {
   "learning": true,
-  "talking": true,
-  "memory": {}
+  "active": true,
+  "chats": {}
 }
