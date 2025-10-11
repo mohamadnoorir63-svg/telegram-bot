@@ -1,159 +1,93 @@
-import json, random, os, time
+import json
+import random
 from telegram import Update
-from telegram.ext import ApplicationBuilder, MessageHandler, CommandHandler, ContextTypes, filters
+from telegram.ext import ApplicationBuilder, MessageHandler, filters, ContextTypes
 
-TOKEN = os.getenv("BOT_TOKEN")
+# 📁 فایل حافظه
 MEMORY_FILE = "memory.json"
 
-# =============== حافظه ===============
-def init_memory():
-    base = {
-        "learning": True,
-        "active": True,
-        "mood": "happy",
-        "chats": {},
-        "teaching": None,  # حالت آموزش دستی
-        "last_active": time.time()
-    }
-    if not os.path.exists(MEMORY_FILE):
-        with open(MEMORY_FILE, "w", encoding="utf-8") as f:
-            json.dump(base, f, ensure_ascii=False, indent=2)
-        return base
+def load_memory():
     try:
         with open(MEMORY_FILE, "r", encoding="utf-8") as f:
-            data = json.load(f)
-    except:
-        data = base
-    for k in base:
-        if k not in data:
-            data[k] = base[k]
-    save_data(data)
-    return data
+            return json.load(f)
+    except FileNotFoundError:
+        return {"active": True, "learning": True, "chats": {}}
 
-def load_data():
-    return init_memory()
-
-def save_data(data):
+def save_memory(data):
     with open(MEMORY_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
-# =============== پاسخ خودکار ===============
-def random_reply(text, mood):
-    patterns = {
-        "happy": [
-            f"{text}؟ 😄", f"عه {text} گفتی؟ 😂", f"{text}؟ خندم گرفت 😆", f"در مورد {text} حرف بزن 😎"
-        ],
-        "sad": [
-            f"{text} رو نگو دلم گرفت 😢", f"اه {text}؟ حوصله ندارم 😞", f"{text} واسم غم‌انگیزه 😔"
-        ],
-        "angry": [
-            f"{text}؟ بازم اون؟ 😡", f"از {text} متنفرم 😤", f"ولش کن {text} رو 😠"
-        ]
-    }
-    return random.choice(patterns[mood])
-
-# =============== پیام‌ها ===============
+# 🤖 پاسخ‌دهی
 async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    text = update.message.text.strip()
-    data = load_data()
+    text = update.message.text.strip().lower()
+    data = load_memory()
 
-    # اگر خاموشه
-    if not data.get("active", True):
-        return
-
-    # ======= حالت آموزش دستی =======
-    if data.get("teaching"):
-        key = data["teaching"]
-        if text.lower() == "پایان":
-            data["teaching"] = None
-            save_data(data)
-            await update.message.reply_text(f"✅ آموزش برای «{key}» تموم شد! حالا هر وقت کسی بگه «{key}» من یکی از جواب‌هایی که گفتی رو می‌گم 😁")
+    # 🔹 دستور روشن — همیشه چک می‌شود
+    if "روشن" in text:
+        if data["active"]:
+            await update.message.reply_text("من که روشنم آقا 😎")
         else:
-            data["chats"].setdefault(key, []).append(text)
-            save_data(data)
-            await update.message.reply_text(f"یاد گرفتم: «{text}» 😎\n(بنویس «پایان» وقتی تموم شد)")
+            data["active"] = True
+            save_memory(data)
+            await update.message.reply_text("ربات روشن شد 😍 بریم شروع کنیم!")
         return
 
-    # ======= شروع آموزش =======
-    if text.startswith("یادبگیر "):
-        key = text.replace("یادبگیر ", "").strip().lower()
-        data["teaching"] = key
-        save_data(data)
-        await update.message.reply_text(f"🧠 حالت آموزش برای «{key}» فعال شد!\nحالا جواب‌هارو زیرش بنویس و آخرش بنویس «پایان» 😁")
+    # 🔹 اگر خاموش است، هیچ پاسخی نده
+    if not data["active"]:
         return
 
-    # ======= سایر دستورات =======
-    if text == "یادبگیر روشن":
-        data["learning"] = True
-        save_data(data)
-        await update.message.reply_text("🧠 یادگیری خودکار روشن شد 😄")
-        return
-
-    if text == "یادبگیر خاموش":
-        data["learning"] = False
-        save_data(data)
-        await update.message.reply_text("😴 یادگیری خودکار خاموش شد.")
-        return
-
-    if text == "بازنشانی":
-        data = {"learning": True, "active": True, "mood": "happy", "chats": {}, "teaching": None}
-        save_data(data)
-        await update.message.reply_text("♻️ همه‌چیو از اول شروع کردم 😁")
-        return
-
-    if text == "خنگول خاموش":
+    # 🔹 دستور خاموش
+    if "خاموش" in text:
         data["active"] = False
-        save_data(data)
-        await update.message.reply_text("😴 خنگول خوابید...")
+        save_memory(data)
+        await update.message.reply_text("ربات خاموش شد 😴 تا بعد!")
         return
 
-    if text == "خنگول روشن":
-        data["active"] = True
-        save_data(data)
-        await update.message.reply_text("😎 بیدار شدم، بگو ببینم چی شده!")
+    # 🔹 یادگیری
+    if text.startswith("یادبگیر"):
+        parts = text.split("\n")
+        if len(parts) >= 2:
+            key = parts[0].replace("یادبگیر", "").strip()
+            answers = [p.strip() for p in parts[1:] if p.strip()]
+
+            # بررسی تکراری بودن و تغییر جواب‌ها
+            if key in data["chats"]:
+                for ans in answers:
+                    if ans not in data["chats"][key]:
+                        data["chats"][key].append(ans)
+            else:
+                data["chats"][key] = answers
+
+            save_memory(data)
+            await update.message.reply_text(f"جملات جدید برای «{key}» یاد گرفتم 🤓")
+        else:
+            await update.message.reply_text("بگو چی رو یاد بگیرم 😅")
         return
 
-    if text == "وضعیت":
-        await update.message.reply_text(
-            f"🤖 فعال: {'روشن ✅' if data['active'] else 'خاموش ❌'}\n"
-            f"🧠 یادگیری: {'روشن ✅' if data['learning'] else 'خاموش ❌'}\n"
-            f"💬 مود: {data['mood']}"
-        )
-        return
+    # 🔹 پاسخ از حافظه
+    for key, responses in data["chats"].items():
+        if key in text:
+            response = random.choice(responses)
+            await update.message.reply_text(response)
+            return
 
-    # ======= پاسخ =======
-    chats = data["chats"]
-    mood = data["mood"]
-    response = None
+    # 🔹 fallback — جمله خاصی بلد نیست
+    await update.message.reply_text(random.choice([
+        "عجب؟ بگو ببینم چی تو ذهنت بود 🤔",
+        "جالب گفتی، بیشتر بگو 😏",
+        "نمیدونم دقیق 😅 ولی سعی می‌کنم یاد بگیرم!",
+        "ها؟ دوباره بگو ببینم 😜"
+    ]))
 
-    for key in chats:
-        if key in text.lower():
-            response = random.choice(chats[key])
-            break
-
-    # یادگیری خودکار
-    if not response and data.get("learning", True):
-        response = random_reply(text, mood)
-        chats.setdefault(text.lower(), []).append(response)
-        save_data(data)
-
-    if not response:
-        response = random.choice([
-            "جالبه 😄", "اوه اینو قبلاً نشنیده بودم 😯", "ادامه بده ببینم 😅", "ههه جالب گفتی 😂"
-        ])
-
-    await update.message.reply_text(response)
-    save_data(data)
-
-# =============== شروع ===============
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("سلام من خنگول ۲.۵ هستم 🤪 بیا یادم بده چی بگم 😁")
-
-# =============== اجرای ربات ===============
-if __name__ == "__main__":
-    init_memory()
+# 🚀 راه‌اندازی ربات
+def main():
+    from os import getenv
+    TOKEN = getenv("BOT_TOKEN")  # توکن تلگرام تو در هاست تنظیم شده
     app = ApplicationBuilder().token(TOKEN).build()
-    app.add_handler(CommandHandler("start", start))
+
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, reply))
-    print("🤖 خنگول ۲.۵ در حال اجراست ...")
+    print("🤖 خنگول 2.5 آماده‌ست...")
     app.run_polling()
+
+if __name__ == "__main__":
+    main()
