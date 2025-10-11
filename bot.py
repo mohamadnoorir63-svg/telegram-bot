@@ -1,59 +1,71 @@
 # -- coding: utf-8 --
-import os
-import telebot
-from yt_dlp import YoutubeDL
+import os, requests, telebot
+from telebot import types
 
-# گرفتن اطلاعات از Environment (هاست Heroku)
-TOKEN = os.environ.get("BOT_TOKEN")
-SUDO_ID = int(os.environ.get("SUDO_ID", "0"))
-
+TOKEN = os.environ.get("BOT_TOKEN")  # توکن از متغیر محیطی
 bot = telebot.TeleBot(TOKEN, parse_mode="HTML")
 
-def download_audio(query):
-    """دانلود آهنگ از یوتیوب به صورت mp3 با کاور"""
-    try:
-        opts = {
-            "format": "bestaudio/best",
-            "noplaylist": True,
-            "outtmpl": "song.%(ext)s",
-            "quiet": True,
-            "default_search": "ytsearch1",
-            "writethumbnail": True,  # دانلود تصویر کاور
-            "postprocessors": [
-                {  # تبدیل به mp3
-                    "key": "FFmpegExtractAudio",
-                    "preferredcodec": "mp3",
-                    "preferredquality": "128",
-                },
-                {  # تنظیم تصویر کاور برای آهنگ
-                    "key": "EmbedThumbnail",
-                },
-            ],
-        }
+API_URL = "https://api-v2.vedba.com/search?query="  # منبع جستجو
 
-        with YoutubeDL(opts) as ydl:
-            info = ydl.extract_info(query, download=True)
-            title = info.get("title", "Music")
-            artist = info.get("uploader", "Unknown Artist")
-            thumb = info.get("thumbnail")
-        return "song.mp3", title, artist, thumb
-    except Exception as e:
-        print("Error:", e)
-        return None, None, None, None
+# ------------------ شروع / راهنما ------------------
+@bot.message_handler(commands=['start', 'help'])
+def start(m):
+    txt = (
+        "🎵 <b>سلام!</b>\n"
+        "من یه ربات جستجوگر موزیک هستم 🎧\n"
+        "اسم آهنگ یا خواننده رو بفرست تا برات بیارم ❤️\n\n"
+        "مثلاً بنویس:\n<code>imagine dragons believer</code>\n"
+    )
+    bot.send_message(m.chat.id, txt)
 
-# هندل پیام‌ها
+# ------------------ جستجو ------------------
 @bot.message_handler(func=lambda m: True)
-def handle_message(m):
+def search_music(m):
     query = m.text.strip()
-    bot.reply_to(m, f"🎶 در حال جستجوی آهنگ: {query} ... لطفاً صبر کنید ⏳")
-    path, title, artist, thumb = download_audio(query)
-    if not path:
-        return bot.send_message(m.chat.id, "❗ خطا در دانلود آهنگ یا نتیجه‌ای یافت نشد.")
-    caption = f"🎵 <b>{title}</b>\n👤 <i>{artist}</i>"
-    if thumb:
-        bot.send_photo(m.chat.id, thumb, caption=caption)
-    bot.send_audio(m.chat.id, open(path, "rb"), title=title, performer=artist, caption=caption)
-    os.remove(path)
+    bot.send_message(m.chat.id, f"🔎 در حال جستجوی آهنگ: <b>{query}</b> ...")
 
-print("✅ Music Bot is Running...")
+    try:
+        r = requests.get(API_URL + query, timeout=10)
+        data = r.json().get("data", [])
+    except Exception as e:
+        return bot.send_message(m.chat.id, "❗ خطا در ارتباط با سرور موزیک.")
+
+    if not data:
+        return bot.send_message(m.chat.id, "❗ آهنگی با این نام پیدا نشد.")
+
+    markup = types.InlineKeyboardMarkup()
+    for item in data[:5]:
+        title = item.get("title", "Unknown")
+        url = item.get("url")
+        btn = types.InlineKeyboardButton(text=title[:45], callback_data=url)
+        markup.add(btn)
+
+    bot.send_message(
+        m.chat.id,
+        "🎶 آهنگ مورد نظرت رو از بین نتایج زیر انتخاب کن 👇",
+        reply_markup=markup
+    )
+
+# ------------------ انتخاب و ارسال آهنگ ------------------
+@bot.callback_query_handler(func=lambda c: True)
+def send_music(c):
+    url = c.data
+    try:
+        info = requests.get(f"https://api-v2.vedba.com/download?url={url}").json()
+        title = info.get("title", "Music")
+        artist = info.get("channel", "Unknown Artist")
+        thumb = info.get("thumbnail")
+        dl_link = info.get("url_audio")
+
+        caption = f"🎵 <b>{title}</b>\n👤 <i>{artist}</i>\n\n🔗 <a href='{dl_link}'>دانلود MP3</a>"
+
+        if thumb:
+            bot.send_photo(c.message.chat.id, thumb, caption=caption)
+        else:
+            bot.send_message(c.message.chat.id, caption)
+
+    except Exception as e:
+        bot.send_message(c.message.chat.id, "❗ خطا در دریافت اطلاعات آهنگ.")
+
+print("✅ Music Search Bot is Running...")
 bot.infinity_polling()
