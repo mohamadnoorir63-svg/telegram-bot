@@ -1,107 +1,37 @@
-import os, json, random, asyncio, requests
-from telegram import Update
-from telegram.ext import ApplicationBuilder, MessageHandler, ContextTypes, filters
+import os
+import requests
 
-TOKEN = os.getenv("BOT_TOKEN")
+# توکن رو از متغیر محیطی بخون (همون HUGGINGFACE_TOKEN در Heroku)
 HF_TOKEN = os.getenv("HUGGINGFACE_TOKEN")
 
-DATA_FILE = "memory.json"
-if not os.path.exists(DATA_FILE):
-    with open(DATA_FILE, "w", encoding="utf-8") as f:
-        json.dump({"learning": True, "talking": True, "memory": {}}, f, ensure_ascii=False, indent=2)
+# اگر خواستی دستی بزاری، خط زیر رو باز کن و توکن رو بین کوتیشن بنویس
+# HF_TOKEN = "hf_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 
-# -------------------- حافظه --------------------
-def load_data():
-    with open(DATA_FILE, "r", encoding="utf-8") as f:
-        return json.load(f)
+headers = {"Authorization": f"Bearer {HF_TOKEN}"}
 
-def save_data(data):
-    with open(DATA_FILE, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
+# یه مدل ساده و سبک برای تست انتخاب می‌کنیم (gpt2 جواب متنی میده)
+API_URL = "https://api-inference.huggingface.co/models/gpt2"
 
-# -------------------- تولید پاسخ هوشمند --------------------
-def ai_reply(text):
-    url = "https://api-inference.huggingface.co/models/HooshvareLab/bert-fa-base-uncased-clf-persiannews"
-    headers = {"Authorization": f"Bearer {HF_TOKEN}"}
-    payload = {"inputs": text}
-    try:
-        r = requests.post(url, headers=headers, json=payload, timeout=10)
-        if r.status_code == 200:
-            return f"{text} 😉"
-        else:
-            return random.choice([
-                "چه جالب گفتی 😄", "آره درسته 😁", "منم همین فکر رو کردم 🤔", 
-                "عجب حرف باحالی زدی 😂", "در موردش فکر می‌کنم 😎"
-            ])
-    except Exception:
-        return random.choice(["عه اینترنت قطع شده؟ 😅", "نمیشه الان جواب بدم 😐"])
+payload = {
+    "inputs": "سلام خنگول! حالت چطوره؟",
+    "parameters": {"max_new_tokens": 50}
+}
 
-# -------------------- پاسخ اصلی --------------------
-async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    text = update.message.text.strip()
-    data = load_data()
-    memory = data["memory"]
+print("🚀 در حال ارسال درخواست به Hugging Face...")
 
-    # ---- دستورات ----
-    if text == "یادگیری روشن":
-        data["learning"] = True
-        save_data(data)
-        return await update.message.reply_text("یادگیری روشن شد 🧠")
-    if text == "یادگیری خاموش":
-        data["learning"] = False
-        save_data(data)
-        return await update.message.reply_text("یادگیری خاموش شد 😴")
-    if text == "حرف زدن خاموش":
-        data["talking"] = False
-        save_data(data)
-        return await update.message.reply_text("خنگول دیگه ساکته 🤐")
-    if text == "حرف زدن روشن":
-        data["talking"] = True
-        save_data(data)
-        return await update.message.reply_text("خنگول دوباره حرف‌زن شد 😁")
-    if text == "بازنشانی":
-        data = {"learning": True, "talking": True, "memory": {}}
-        save_data(data)
-        return await update.message.reply_text("حافظه پاک شد ✅")
-    if text == "وضعیت":
-        status = f"یادگیری: {'روشن' if data['learning'] else 'خاموش'} | حرف زدن: {'روشن' if data['talking'] else 'خاموش'}"
-        return await update.message.reply_text(status)
-    if text.startswith("یاد بگیر:"):
-        try:
-            part = text.split("یاد بگیر:")[1].strip()
-            if "،" in part:
-                key, value = part.split("،", 1)
-                key, value = key.strip(), value.strip()
-                memory[key] = memory.get(key, []) + [value]
-                save_data(data)
-                return await update.message.reply_text(f"یاد گرفتم وقتی گفتن '{key}' بگم '{value}' 😎")
-            else:
-                return await update.message.reply_text("فرمت درست نیست. مثال: یاد بگیر: سلام، سلام خوش اومدی 🌸")
-        except:
-            return await update.message.reply_text("مشکلی در یادگیری پیش اومد 😅")
+try:
+    response = requests.post(API_URL, headers=headers, json=payload, timeout=20)
+    print("📩 پاسخ دریافت شد!")
+    print("کد وضعیت:", response.status_code)
+    print("خروجی خام:\n", response.text)
 
-    # ---- پاسخ‌دهی ----
-    if not data["talking"]:
-        return
-    if text in memory:
-        response = random.choice(memory[text])
+    if response.status_code == 200:
+        print("\n✅ اتصال موفق است! مدل جواب داد.")
+    elif "error" in response.text:
+        print("\n⚠️ خطا از سمت Hugging Face:")
+        print(response.text)
     else:
-        response = ai_reply(text)
-        if data["learning"]:
-            memory[text] = [response]
-            data["memory"] = memory
-            save_data(data)
-    await update.message.reply_text(response)
+        print("\n❌ پاسخ غیرمنتظره دریافت شد.")
 
-    # گاهی خودش حرف بزنه
-    if random.random() < 0.1:
-        await asyncio.sleep(random.randint(5, 15))
-        talk = random.choice(["من هنوز اینجام 😁", "برو حرف بزن حوصله‌م سر رفت 😜", "هی منو یادت نره 😅"])
-        await update.message.reply_text(talk)
-
-# -------------------- شروع --------------------
-if __name__ == "__main__":
-    app = ApplicationBuilder().token(TOKEN).build()
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, reply))
-    print("🤖 خنگول نهایی در حال اجراست ...")
-    app.run_polling()
+except Exception as e:
+    print("💥 خطا در اتصال یا درخواست:", str(e))
