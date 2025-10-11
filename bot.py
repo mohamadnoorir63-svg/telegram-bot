@@ -3,8 +3,8 @@ import requests
 
 HUGGINGFACE_TOKEN = os.getenv("HUGGINGFACE_TOKEN")
 
-# 🟢 مدل عمومی و فعال
-API_URL = "https://api-inference.huggingface.co/models/NousResearch/hermes-2-pro-mistral"
+# ✅ مدل عمومی که 100٪ فعال و رایگان است
+API_URL = "https://api-inference.huggingface.co/models/facebook/blenderbot-3B"
 
 headers = {
     "Authorization": f"Bearer {HUGGINGFACE_TOKEN}",
@@ -13,7 +13,7 @@ headers = {
 
 def ask_huggingface(prompt):
     print("🚀 در حال ارسال درخواست به Hugging Face...")
-    data = {"inputs": prompt, "parameters": {"max_new_tokens": 150}}
+    data = {"inputs": prompt}
     response = requests.post(API_URL, headers=headers, json=data)
     print("📩 پاسخ دریافت شد!")
     print("کد وضعیت:", response.status_code)
