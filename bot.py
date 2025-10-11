@@ -1,5 +1,6 @@
 import os
 import requests
+from pydub import AudioSegment
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
 
@@ -14,68 +15,52 @@ HEADERS = {
     "x-rapidapi-host": "youtube-search-and-download.p.rapidapi.com"
 }
 
-
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("🎶 سلام! اسم آهنگ یا لینک یوتیوب رو بفرست تا فایل صوتی‌ش رو برات بفرستم.")
-
+    await update.message.reply_text("🎵 اسم آهنگ یا لینک یوتیوب رو بفرست تا برات به MP3 تبدیل کنم 🎧")
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.message.text.strip()
     chat_id = update.effective_chat.id
-    await context.bot.send_message(chat_id=chat_id, text="🔎 در حال جست‌وجو و تبدیل به MP3... لطفاً صبر کنید ⏳")
+    await context.bot.send_message(chat_id=chat_id, text="🔎 در حال جست‌وجو و دانلود از یوتیوب... ⏳")
 
     try:
         # جستجوی ویدیو
-        search_response = requests.get(SEARCH_URL, headers=HEADERS, params={"query": query, "type": "v"})
-        search_data = search_response.json()
+        search_res = requests.get(SEARCH_URL, headers=HEADERS, params={"query": query, "type": "v"}).json()
+        video_id = search_res["contents"][0]["video"]["videoId"]
+        title = search_res["contents"][0]["video"]["title"]
 
-        if not search_data.get("contents"):
-            await context.bot.send_message(chat_id=chat_id, text="❌ آهنگی با این نام پیدا نشد.")
+        # دانلود ویدیو
+        download_res = requests.get(DOWNLOAD_URL, headers=HEADERS, params={"id": video_id}).json()
+        video_url = download_res.get("url")
+
+        if not video_url:
+            await context.bot.send_message(chat_id=chat_id, text="⚠️ لینک دانلود پیدا نشد.")
             return
 
-        video_id = search_data["contents"][0]["video"]["videoId"]
-        title = search_data["contents"][0]["video"]["title"]
+        video_file = f"{title}.mp4"
+        audio_file = f"{title}.mp3"
 
-        # دانلود صدا
-        download_response = requests.get(DOWNLOAD_URL, headers=HEADERS, params={"id": video_id})
-        download_data = download_response.json()
+        video_data = requests.get(video_url)
+        with open(video_file, "wb") as f:
+            f.write(video_data.content)
 
-        # پیدا کردن لینک mp3 از پاسخ
-        audio_url = None
-        for fmt in download_data.get("formats", []):
-            if fmt.get("mimeType", "").startswith("audio/mp4") or fmt.get("mimeType", "").startswith("audio/mp3"):
-                audio_url = fmt.get("url")
-                break
+        # تبدیل mp4 به mp3
+        sound = AudioSegment.from_file(video_file, format="mp4")
+        sound.export(audio_file, format="mp3")
 
-        if not audio_url:
-            audio_url = download_data.get("url")  # بک‌آپ
+        # ارسال صدا
+        await context.bot.send_audio(chat_id=chat_id, audio=open(audio_file, "rb"), title=title)
 
-        if not audio_url:
-            await context.bot.send_message(chat_id=chat_id, text="⚠️ لینک دانلود صوت پیدا نشد.")
-            return
-
-        # دانلود فایل از لینک واقعی
-        audio_content = requests.get(audio_url)
-        filename = f"{title}.mp3"
-
-        if len(audio_content.content) < 500:
-            await context.bot.send_message(chat_id=chat_id, text="⚠️ فایل صوتی خالی بود یا کامل دانلود نشد.")
-            return
-
-        with open(filename, "wb") as f:
-            f.write(audio_content.content)
-
-        # ارسال فایل صوتی
-        await context.bot.send_audio(chat_id=chat_id, audio=open(filename, "rb"), title=title)
-        os.remove(filename)
+        # پاکسازی فایل‌ها
+        os.remove(video_file)
+        os.remove(audio_file)
 
     except Exception as e:
-        await context.bot.send_message(chat_id=chat_id, text=f"⚠️ خطا در دانلود: {e}")
-
+        await context.bot.send_message(chat_id=chat_id, text=f"⚠️ خطا: {e}")
 
 if __name__ == "__main__":
     app = ApplicationBuilder().token(BOT_TOKEN).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-    print("🎵 Bot is running...")
+    print("🎧 Bot is running...")
     app.run_polling()
