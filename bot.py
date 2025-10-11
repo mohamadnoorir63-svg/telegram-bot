@@ -1,77 +1,85 @@
 import os
 import requests
 from telegram import Update
-from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
+from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
 from pydub import AudioSegment
-from pydub.utils import which
 
-# 🔧 تنظیم مسیر ffmpeg و ffprobe برای Heroku
-AudioSegment.converter = which("ffmpeg")
-AudioSegment.ffprobe = which("ffprobe")
-
-# 🔑 کلیدهای محیطی (تو Heroku تنظیمشون کردی)
-RAPIDAPI_KEY = os.getenv("RAPIDAPI_KEY")
+# توکن ربات تلگرام
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 
-# 🌐 لینک‌های RapidAPI
-SEARCH_URL = "https://youtube-search-and-download.p.rapidapi.com/search"
-DOWNLOAD_URL = "https://youtube-search-and-download.p.rapidapi.com/video/download"
+# کلید RapidAPI
+RAPIDAPI_KEY = os.getenv("RAPIDAPI_KEY")
+
+# URL پایه RapidAPI
+API_URL = "https://youtube-search-and-download.p.rapidapi.com/video/download"
 
 HEADERS = {
-    "x-rapidapi-key": RAPIDAPI_KEY,
-    "x-rapidapi-host": "youtube-search-and-download.p.rapidapi.com"
+    "X-RapidAPI-Key": RAPIDAPI_KEY,
+    "X-RapidAPI-Host": "youtube-search-and-download.p.rapidapi.com"
 }
 
-# 🟢 فرمان شروع
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("🎧 سلام! اسم آهنگ یا لینک یوتیوب رو بفرست تا برات به MP3 تبدیل کنم 🎶")
-
-# 🎵 هندل اصلی پیام‌ها
+# ✅ تابع جستجو و دانلود
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.message.text.strip()
-    chat_id = update.effective_chat.id
-    await context.bot.send_message(chat_id=chat_id, text="🔍 در حال جست‌وجو و تبدیل به MP3... ⏳")
+    await update.message.reply_text("🔍 در حال جست‌وجو و دانلود از یوتیوب... لطفاً صبر کنید ⏳")
 
+    # مرحله ۱: جستجوی ویدیو در RapidAPI
+    search_url = "https://youtube-search-and-download.p.rapidapi.com/search"
+    search_params = {"query": query}
+    response = requests.get(search_url, headers=HEADERS, params=search_params)
+    data = response.json()
+
+    if "contents" not in data or len(data["contents"]) == 0:
+        await update.message.reply_text("❌ ویدیو پیدا نشد.")
+        return
+
+    video_id = data["contents"][0]["video"]["videoId"]
+
+    # مرحله ۲: گرفتن لینک دانلود
+    download_params = {"id": video_id}
+    download_response = requests.get(API_URL, headers=HEADERS, params=download_params)
+    download_info = download_response.json()
+
+    if "url" not in download_info:
+        await update.message.reply_text("⚠️ خطا در دریافت لینک دانلود.")
+        return
+
+    video_url = download_info["url"]
+
+    # مرحله ۳: دانلود کامل ویدیو با stream=True
     try:
-        # مرحله ۱: جست‌وجوی ویدیو در یوتیوب
-        search_res = requests.get(SEARCH_URL, headers=HEADERS, params={"query": query, "type": "v"}).json()
-        video_id = search_res["contents"][0]["video"]["videoId"]
-        title = search_res["contents"][0]["video"]["title"]
-
-        # مرحله ۲: گرفتن لینک دانلود
-        download_res = requests.get(DOWNLOAD_URL, headers=HEADERS, params={"id": video_id}).json()
-        video_url = download_res.get("url")
-
-        if not video_url:
-            await context.bot.send_message(chat_id=chat_id, text="⚠️ لینک دانلود پیدا نشد.")
-            return
-
-        # مرحله ۳: دانلود فایل MP4 موقت
-        video_file = "temp_video.mp4"
-        audio_file = "temp_audio.mp3"
-
-        video_data = requests.get(video_url)
-        with open(video_file, "wb") as f:
-            f.write(video_data.content)
-
-        # مرحله ۴: تبدیل MP4 به MP3 با pydub
-        sound = AudioSegment.from_file(video_file, format="mp4")
-        sound.export(audio_file, format="mp3")
-
-        # مرحله ۵: ارسال آهنگ در تلگرام
-        await context.bot.send_audio(chat_id=chat_id, audio=open(audio_file, "rb"), title=title)
-
-        # مرحله ۶: پاکسازی فایل‌ها
-        os.remove(video_file)
-        os.remove(audio_file)
-
+        video_response = requests.get(video_url, stream=True)
+        with open("temp_video.mp4", "wb") as f:
+            for chunk in video_response.iter_content(chunk_size=1024):
+                if chunk:
+                    f.write(chunk)
     except Exception as e:
-        await context.bot.send_message(chat_id=chat_id, text=f"⚠️ خطا: {e}")
+        await update.message.reply_text(f"⚠️ خطا در دانلود ویدیو: {e}")
+        return
 
-# 🟢 اجرای ربات
+    # مرحله ۴: تبدیل ویدیو به MP3 با ffmpeg
+    try:
+        audio = AudioSegment.from_file("temp_video.mp4", format="mp4")
+        audio.export("output.mp3", format="mp3")
+    except Exception as e:
+        await update.message.reply_text(f"⚠️ خطا در تبدیل به MP3: {e}")
+        return
+
+    # مرحله ۵: ارسال آهنگ به کاربر
+    try:
+        await update.message.reply_audio(audio=open("output.mp3", "rb"), title=query)
+        os.remove("temp_video.mp4")
+        os.remove("output.mp3")
+    except Exception as e:
+        await update.message.reply_text(f"⚠️ خطا در ارسال فایل: {e}")
+
+# ✅ تابع شروع
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("سلام 👋 من ربات دانلود موزیک از یوتیوب هستم 🎵 فقط اسم آهنگ رو بفرست!")
+
+# راه‌اندازی ربات
 if __name__ == "__main__":
     app = ApplicationBuilder().token(BOT_TOKEN).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-    print("🚀 Bot is running...")
     app.run_polling()
