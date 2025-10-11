@@ -1,93 +1,72 @@
-# -- coding: utf-8 --
-import os
-import telebot
 import requests
+from telegram import Update
+from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
+import os
 
-# 🔐 گرفتن مقادیر از تنظیمات Heroku
+# 🧩 دریافت متغیرها از تنظیمات هاست (Heroku Config Vars)
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 RAPIDAPI_KEY = os.getenv("RAPIDAPI_KEY")
 
-bot = telebot.TeleBot(BOT_TOKEN, parse_mode="HTML")
+# 📦 مشخصات API RapidAPI (این قسمت رو اگر API دیگه‌ای داری می‌تونی عوض کنی)
+API_URL = "https://youtube-video-fast-downloader24.p.rapidapi.com/download"
+API_HOST = "youtube-video-fast-downloader24.p.rapidapi.com"
 
-# 🌐 لینک APIهای RapidAPI
-YOUTUBE_SEARCH_URL = "https://youtube-v31.p.rapidapi.com/search"
-YOUTUBE_DOWNLOAD_URL = "https://youtube-mp36.p.rapidapi.com/dl"
 
-# 🎬 فرمان شروع
-@bot.message_handler(commands=["start"])
-def start(m):
-    txt = (
-        "🎵 <b>سلام!</b>\n"
-        "به ربات جستجوگر و دانلود موزیک خوش اومدی 🎧\n\n"
-        "کافیه اسم آهنگ یا لینک یوتیوب رو بفرستی تا برات بیارم 🎶\n\n"
-        "مثلاً:\n"
-        "<code>شادمهر خسته شدم</code>\n"
-        "یا:\n"
-        "<code>https://www.youtube.com/watch?v=6f3jKxCQEzo</code>\n\n"
+# 🎬 شروع ربات
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(
+        "🎵 سلام! من ربات جستجوگر موزیک هستم.\n"
+        "کافیه اسم آهنگ یا لینک یوتیوب رو بفرستی تا برات بفرستم 🎧\n\n"
         "✨ پشتیبانی از فارسی و انگلیسی ✅"
     )
-    bot.send_message(m.chat.id, txt)
 
-# 🎶 هندل هر پیام متنی (جستجو یا لینک)
-@bot.message_handler(func=lambda m: True)
-def handle_message(m):
-    query = m.text.strip()
 
-    if "youtube.com" in query or "youtu.be" in query:
-        download_from_youtube(m, query)
-    else:
-        search_and_download(m, query)
+# 🔍 تابع جستجوی موزیک
+async def search_music(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.message.text.strip()
 
-# 🔎 جستجوی یوتیوب با نام آهنگ
-def search_and_download(m, query):
-    bot.send_message(m.chat.id, f"🔍 در حال جست‌وجوی آهنگ <b>{query}</b> ... لطفاً صبر کنید ⏳")
-
-    headers = {
-        "X-RapidAPI-Key": RAPIDAPI_KEY,
-        "X-RapidAPI-Host": "youtube-v31.p.rapidapi.com"
-    }
-    params = {"q": query, "part": "snippet", "maxResults": "1"}
+    await update.message.reply_text(f"🔎 در حال جستجو برای '{query}' هستم...\n⏳ لطفاً صبر کن...")
 
     try:
-        r = requests.get(YOUTUBE_SEARCH_URL, headers=headers, params=params, timeout=10)
-        data = r.json()
-
-        video_id = data["items"][0]["id"]["videoId"]
-        title = data["items"][0]["snippet"]["title"]
-        channel = data["items"][0]["snippet"]["channelTitle"]
-        thumb = data["items"][0]["snippet"]["thumbnails"]["high"]["url"]
-
-        youtube_url = f"https://www.youtube.com/watch?v={video_id}"
-        caption = f"🎵 <b>{title}</b>\n👤 {channel}\n\n⏬ در حال آماده‌سازی آهنگ..."
-        bot.send_photo(m.chat.id, thumb, caption=caption)
-
-        download_from_youtube(m, youtube_url)
-
-    except Exception as e:
-        bot.send_message(m.chat.id, "❌ خطایی در جست‌وجوی آهنگ رخ داد.\nلطفاً دوباره تلاش کن 🎶")
-
-# ⬇️ دانلود آهنگ از یوتیوب
-def download_from_youtube(m, url):
-    headers = {
-        "X-RapidAPI-Key": RAPIDAPI_KEY,
-        "X-RapidAPI-Host": "youtube-mp36.p.rapidapi.com"
-    }
-    params = {"url": url}
-
-    try:
-        r = requests.get(YOUTUBE_DOWNLOAD_URL, headers=headers, params=params, timeout=15)
-        data = r.json()
-
-        if "link" in data:
-            audio_url = data["link"]
-            title = data.get("title", "Music")
-            caption = f"✅ <b>{title}</b>\n\n🎧 آهنگ آماده است!\n🔗 <a href='{audio_url}'>دانلود مستقیم</a>"
-            bot.send_message(m.chat.id, caption)
+        # اگر لینک یوتیوب بود
+        if "youtube.com" in query or "youtu.be" in query:
+            url = f"{API_URL}?url={query}"
         else:
-            bot.send_message(m.chat.id, "❗ آهنگ پیدا نشد یا خطایی رخ داد.")
+            # اگر فقط اسم آهنگ بود → کاربر رو راهنمایی می‌کنیم تا لینک بفرسته
+            yt_search = f"https://www.youtube.com/results?search_query={query.replace(' ', '+')}"
+            await update.message.reply_text(
+                f"🎶 نتایج جستجو برای '{query}':\n\n🔗 {yt_search}\n"
+                "لطفاً یکی از لینک‌های بالا رو کپی کرده و بفرست تا دانلود کنم 🎧"
+            )
+            return
+
+        headers = {
+            "x-rapidapi-key": RAPIDAPI_KEY,
+            "x-rapidapi-host": API_HOST
+        }
+
+        response = requests.get(url, headers=headers)
+        data = response.json()
+
+        if "link" in data and data["link"]:
+            mp3_url = data["link"]
+            await update.message.reply_audio(audio=mp3_url, caption=f"🎵 آهنگ {query}")
+        else:
+            await update.message.reply_text("❌ آهنگ پیدا نشد یا لینک معتبر نبود. لطفاً دوباره امتحان کن 🎧")
 
     except Exception as e:
-        bot.send_message(m.chat.id, "⚠️ خطا در ارتباط با سرور.\nلطفاً دوباره تلاش کن.")
+        await update.message.reply_text(f"⚠️ خطا در دریافت آهنگ:\n{str(e)}")
 
-print("✅ Bot is running...")
-bot.infinity_polling()
+
+# 🚀 اجرای ربات
+def main():
+    app = ApplicationBuilder().token(BOT_TOKEN).build()
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, search_music))
+
+    print("🤖 ربات موزیک در حال اجراست...")
+    app.run_polling()
+
+
+if __name__ == "__main__":
+    main()
