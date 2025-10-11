@@ -4,77 +4,89 @@ import requests
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
 
-# 📦 گرفتن متغیرها از تنظیمات Heroku
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 RAPIDAPI_KEY = os.getenv("RAPIDAPI_KEY")
 
-# 🌐 تنظیمات RapidAPI
-API_URL = "https://youtube-video-fast-downloader24.p.rapidapi.com/download"
-API_HOST = "youtube-video-fast-downloader24.p.rapidapi.com"
+# 📦 API‌ها
+SEARCH_URL = "https://youtube-v31.p.rapidapi.com/search"
+DOWNLOAD_URL = "https://youtube-video-fast-downloader24.p.rapidapi.com/download"
+DOWNLOAD_HOST = "youtube-video-fast-downloader24.p.rapidapi.com"
 
-# 🎬 فرمان /start
+# 🎬 شروع
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    text = (
-        "🎵 <b>سلام!</b>\n"
-        "من یه ربات جستجوگر و دانلود موزیک هستم 🎧\n\n"
-        "کافیه اسم آهنگ یا لینک یوتیوب رو بفرستی تا برات بیارم 🎶\n\n"
+    await update.message.reply_text(
+        "🎧 سلام! من ربات موزیک یاب هستم.\n"
+        "اسم آهنگ یا لینک یوتیوب رو بفرست تا برات بیارم 🎶\n\n"
         "مثلاً:\n"
-        "<code>شادمهر عقیلی خسته شدم</code>\n"
-        "یا لینک:\n"
-        "<code>https://www.youtube.com/watch?v=JGwWNGJdvx8</code>"
+        "شادمهر خسته شدم\n"
+        "یا لینک مستقیم یوتیوب"
     )
-    await update.message.reply_text(text, parse_mode="HTML")
 
-# 🔍 بررسی پیام‌ها
+# 🔎 جستجو و دانلود
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.message.text.strip()
-    await update.message.reply_text("🔎 در حال پردازش درخواست... لطفاً صبر کن ⏳")
+    await update.message.reply_text("🔍 در حال جستجو و پردازش... لطفاً صبر کنید ⏳")
 
     try:
-        # اگر لینک YouTube بود
+        # اگه لینک مستقیم فرستاده شده
         if "youtube.com" in query or "youtu.be" in query:
-            url = f"{API_URL}?url={query}"
-            headers = {
-                "x-rapidapi-key": RAPIDAPI_KEY,
-                "x-rapidapi-host": API_HOST
-            }
+            await download_audio(update, query)
+            return
 
-            response = requests.get(url, headers=headers, timeout=15)
-            data = response.json()
+        # جستجو در یوتیوب بر اساس اسم آهنگ
+        headers = {
+            "X-RapidAPI-Key": RAPIDAPI_KEY,
+            "X-RapidAPI-Host": "youtube-v31.p.rapidapi.com"
+        }
+        params = {"q": query, "part": "snippet", "maxResults": "1"}
 
-            if "link" in data and data["link"]:
-                mp3_url = data["link"]
+        search = requests.get(SEARCH_URL, headers=headers, params=params, timeout=10)
+        data = search.json()
 
-                # دانلود فایل موقت
-                audio_data = requests.get(mp3_url)
-                temp_file = "temp.mp3"
-                with open(temp_file, "wb") as f:
-                    f.write(audio_data.content)
+        if "items" not in data or not data["items"]:
+            await update.message.reply_text("❌ آهنگی با این اسم پیدا نشد.")
+            return
 
-                # ارسال فایل صوتی به کاربر
-                await update.message.reply_audio(
-                    audio=open(temp_file, "rb"),
-                    caption="🎧 آهنگ آماده است! از شنیدنش لذت ببر ❤️"
-                )
+        video_id = data["items"][0]["id"]["videoId"]
+        title = data["items"][0]["snippet"]["title"]
+        video_url = f"https://www.youtube.com/watch?v={video_id}"
 
-                # حذف فایل موقت
-                os.remove(temp_file)
-            else:
-                await update.message.reply_text("❗ خطا در دریافت آهنگ. لطفاً لینک دیگری امتحان کن 🎶")
-
-        # اگر فقط اسم آهنگ فرستاده شده
-        else:
-            yt_search = f"https://www.youtube.com/results?search_query={query.replace(' ', '+')}"
-            await update.message.reply_text(
-                f"🎶 متاسفانه API فقط با لینک مستقیم کار می‌کند.\n"
-                f"🔗 برای دانلود، وارد لینک زیر شو و یکی از ویدیوها را انتخاب کن:\n{yt_search}\n\n"
-                "سپس لینک آن ویدیو را برای من بفرست 😊"
-            )
+        await update.message.reply_text(f"🎵 پیدا شد!\n<b>{title}</b>\nدر حال دانلود...", parse_mode="HTML")
+        await download_audio(update, video_url)
 
     except Exception as e:
         await update.message.reply_text(f"⚠️ خطایی رخ داد:\n{str(e)}")
 
-# 🚀 اجرای ربات
+# 🎧 دانلود از یوتیوب
+async def download_audio(update: Update, video_url):
+    headers = {
+        "x-rapidapi-key": RAPIDAPI_KEY,
+        "x-rapidapi-host": DOWNLOAD_HOST
+    }
+    params = {"url": video_url}
+
+    try:
+        res = requests.get(DOWNLOAD_URL, headers=headers, params=params, timeout=15)
+        data = res.json()
+
+        if "link" in data and data["link"]:
+            mp3_url = data["link"]
+            # دانلود و ارسال
+            audio_data = requests.get(mp3_url)
+            temp_file = "temp.mp3"
+            with open(temp_file, "wb") as f:
+                f.write(audio_data.content)
+
+            await update.message.reply_audio(
+                audio=open(temp_file, "rb"),
+                caption="🎶 آهنگ آماده است ❤️"
+            )
+            os.remove(temp_file)
+        else:
+            await update.message.reply_text("❗ خطا در دریافت آهنگ از سرور.")
+    except Exception as e:
+        await update.message.reply_text(f"⚠️ خطا در دانلود:\n{str(e)}")
+
 def main():
     app = ApplicationBuilder().token(BOT_TOKEN).build()
     app.add_handler(CommandHandler("start", start))
