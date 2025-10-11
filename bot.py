@@ -1,43 +1,40 @@
 import os
 import requests
 
-# دریافت توکن از تنظیمات Heroku
-HF_TOKEN = os.getenv("HUGGINGFACE_TOKEN")
+# 🔑 خواندن توکن از Config Vars در Heroku
+HUGGINGFACE_TOKEN = os.getenv("HUGGINGFACE_TOKEN")
 
-# اگر متغیر محیطی خالی بود، اخطار بده
-if not HF_TOKEN:
-    print("❌ خطا: متغیر HUGGINGFACE_TOKEN تنظیم نشده است.")
-    exit()
-
-# آدرس مدل امن و فعال
-API_URL = "https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.3"
+# ✅ مدل جدید و فعال (پشتیبانی از فارسی)
+API_URL = "https://api-inference.huggingface.co/models/google/gemma-2b-it"
 
 headers = {
-    "Authorization": f"Bearer {HF_TOKEN}",
+    "Authorization": f"Bearer {HUGGINGFACE_TOKEN}",
     "Content-Type": "application/json"
 }
 
-# ورودی تستی برای مدل
-payload = {
-    "inputs": "سلام! حالت چطوره؟",
-    "parameters": {"max_new_tokens": 100}
-}
-
-print("🚀 در حال ارسال درخواست به Hugging Face...")
-
-try:
-    response = requests.post(API_URL, headers=headers, json=payload)
+# 📤 تابع برای ارسال درخواست به Hugging Face
+def ask_huggingface(prompt):
+    print("🚀 در حال ارسال درخواست به Hugging Face...")
+    data = {
+        "inputs": prompt,
+        "parameters": {"max_new_tokens": 150}
+    }
+    response = requests.post(API_URL, headers=headers, json=data)
     print("📩 پاسخ دریافت شد!")
     print("کد وضعیت:", response.status_code)
 
     if response.status_code == 200:
         result = response.json()
-        print("✅ پاسخ مدل:")
-        print(result[0]["generated_text"])
+        if isinstance(result, list) and "generated_text" in result[0]:
+            print("✅ پاسخ مدل:")
+            print(result[0]["generated_text"])
+        else:
+            print("⚠️ ساختار خروجی غیرمنتظره:", result)
     else:
         print("❌ پاسخ غیرمنتظره دریافت شد.")
         print("خروجی خام:")
         print(response.text)
 
-except Exception as e:
-    print("⚠️ خطای کلی هنگام اتصال:", e)
+# 🧠 تست اتصال
+if __name__ == "__main__":
+    ask_huggingface("سلام، حالت چطوره؟")
