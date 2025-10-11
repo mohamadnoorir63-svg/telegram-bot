@@ -2,14 +2,13 @@ import os
 import requests
 
 HF_TOKEN = os.getenv("HUGGINGFACE_TOKEN")
-
 headers = {"Authorization": f"Bearer {HF_TOKEN}"}
 
-# مدل فعال و تست‌شده از Hugging Face (برای تولید متن فارسی و انگلیسی)
-API_URL = "https://api-inference.huggingface.co/models/google/flan-t5-base"
+# مدل فعال و حتماً قابل دسترسی از Hugging Face (پاسخ متنی عمومی)
+API_URL = "https://api-inference.huggingface.co/models/bigscience/bloomz-560m"
 
 payload = {
-    "inputs": "سلام خنگول! حالت چطوره؟",
+    "inputs": "سلام! امروز حالت چطوره؟",
     "parameters": {"max_new_tokens": 50}
 }
 
@@ -22,7 +21,7 @@ try:
     print("خروجی خام:\n", response.text)
 
     if response.status_code == 200:
-        print("\n✅ اتصال و مدل هر دو درست کار می‌کنند!")
+        print("\n✅ همه‌چیز عالیه! اتصال برقرار و مدل جواب داد.")
     elif "error" in response.text:
         print("\n⚠️ خطا از سمت Hugging Face:")
         print(response.text)
