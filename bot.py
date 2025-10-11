@@ -4,11 +4,12 @@ import requests
 HF_TOKEN = os.getenv("HUGGINGFACE_TOKEN")
 headers = {"Authorization": f"Bearer {HF_TOKEN}"}
 
+# مدل تستی که حتماً فعال است
 API_URL = "https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.3"
 
 payload = {
     "inputs": "سلام! حالت چطوره؟",
-    "parameters": {"max_new_tokens": 60}
+    "parameters": {"max_new_tokens": 50}
 }
 
 print("🚀 در حال ارسال درخواست به Hugging Face...")
