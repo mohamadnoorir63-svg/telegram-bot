@@ -1,30 +1,17 @@
 # -*- coding: utf-8 -*-
-import os, json, random, asyncio
+import os, json, random, asyncio, aiohttp
+from gtts import gTTS
 from telegram import Update
-from telegram.ext import ApplicationBuilder, MessageHandler, ContextTypes, filters
-from transformers import AutoTokenizer, AutoModelForCausalLM
-import torch
+from telegram.ext import ApplicationBuilder, MessageHandler, CommandHandler, ContextTypes, filters
 
 TOKEN = os.getenv("BOT_TOKEN")
-SUDO_ID = int(os.getenv("SUDO_ID", "0"))
+HF_TOKEN = os.getenv("HUGGINGFACE_TOKEN")
 MEMORY_FILE = "memory.json"
 
-# =============== مدل زبانی فارسی ===============
-print("🤖 بارگذاری مدل هوش زبانی ...")
-tokenizer = AutoTokenizer.from_pretrained("HooshvareLab/gpt2-fa")
-model = AutoModelForCausalLM.from_pretrained("HooshvareLab/gpt2-fa")
-model.eval()
-
-# =============== حافظه ===============
+# ===================== حافظه =====================
 if not os.path.exists(MEMORY_FILE):
     with open(MEMORY_FILE, "w", encoding="utf-8") as f:
-        json.dump({
-            "learning": True,
-            "active": True,
-            "mood": "happy",
-            "chats": {},
-            "custom_rules": {}
-        }, f, ensure_ascii=False, indent=2)
+        json.dump({"learning": True, "mood": "happy", "chats": {}}, f, ensure_ascii=False, indent=2)
 
 def load_data():
     with open(MEMORY_FILE, "r", encoding="utf-8") as f:
@@ -32,108 +19,177 @@ def load_data():
 
 def save_data(data):
     with open(MEMORY_FILE, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
+        json.dump(data, f, ensure_ascii=False, indent=2)# ===================== تولید صدا =====================
+def make_voice(text, filename="voice.ogg"):
+    """تبدیل متن به صدا با gTTS"""
+    try:
+        tts = gTTS(text=text, lang="fa")
+        tts.save(filename)
+        return filename
+    except Exception as e:
+        print("خطا در ساخت صدا:", e)
+        return None
 
-# =============== تولید پاسخ هوشمند ===============
-def generate_reply(prompt):
-    inputs = tokenizer(prompt, return_tensors="pt", truncation=True, max_length=100)
-    outputs = model.generate(**inputs, max_new_tokens=60, temperature=0.8, top_p=0.9, pad_token_id=tokenizer.eos_token_id)
-    text = tokenizer.decode(outputs[0], skip_special_tokens=True)
-    text = text.replace(prompt, "").strip()
-    if len(text) < 2:
-        text = random.choice(["عه چه جالب 😄", "اینو خوب گفتی 😂", "باشه رفیق 😎"])
-    return text
+# ===================== مودها =====================
+MOODS = {
+    "happy": [
+        "عه سلام! 😄", "چه باحال گفتی 😂", "منم همینو می‌خواستم بگم 😆",
+        "آره دیگه زندگی همینه 😎", "خوشحالم ببینمت 😍"
+    ],
+    "sad": [
+        "اوه حوصله ندارم 😔", "غم دارم امروز 😢", "بیخیال حرف نزن الان 😕",
+        "دلم گرفته یه کم 😞"
+    ],
+    "angry": [
+        "ولم کن اعصاب ندارم 😡", "باز شروع شد؟ 😤", "می‌خوای دعوا کنیم؟ 😠",
+        "چی گفتی؟ حواست باشه! 😒"
+    ]
+}# ===================== پاسخ هوش مصنوعی =====================
+async def ask_huggingface(prompt):
+    """ارسال سوال به Hugging Face API"""
+    try:
+        async with aiohttp.ClientSession() as session:
+            url = "https://api-inference.huggingface.co/models/gpt2"
+            headers = {"Authorization": f"Bearer {HF_TOKEN}"}
+            payload = {"inputs": prompt}
 
-# =============== پاسخ‌دهی اصلی ===============
-async def khengool(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    text = update.message.text.strip()
+            async with session.post(url, headers=headers, json=payload, timeout=60) as resp:
+                if resp.status == 200:
+                    data = await resp.json()
+                    if isinstance(data, list) and len(data) > 0:
+                        return data[0].get("generated_text", "").strip()
+                    elif isinstance(data, dict):
+                        return data.get("generated_text", "").strip()
+                else:
+                    print("HF Error:", await resp.text())
+                    return None
+    except Exception as e:
+        print("خطا در ارتباط با Hugging Face:", e)
+        return None
+
+# ===================== تولید پاسخ =====================
+async def generate_reply(user_text):
     data = load_data()
+    chats = data.get("chats", {})
+    mood = data.get("mood", "happy")
 
-    # حالت خاموش
-    if not data.get("active", True):
+    # اگر قبلاً یاد گرفته
+    if user_text in chats and len(chats[user_text]) > 0:
+        return random.choice(chats[user_text])
+
+    # اگر بلد نیست → از هوش مصنوعی بپرس
+    ai_answer = await ask_huggingface(user_text)
+    if ai_answer:
+        # پاسخ رو ذخیره کن برای دفعات بعد
+        if data.get("learning", True):
+            chats.setdefault(user_text, []).append(ai_answer)
+            data["chats"] = chats
+            save_data(data)
+        return ai_answer
+
+    # اگر هوش مصنوعی هم جواب نداد
+    return random.choice(MOODS[mood])# ===================== پاسخ خنگول =====================
+async def khengool_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    text = (update.message.text or "").strip()
+    if not text:
         return
 
-    # بررسی دستورات فارسی ساده
-    msg_l = text.lower()
-    chat_id = update.message.chat.id
-    uid = update.message.from_user.id
+    data = load_data()
+    learning = data.get("learning", True)
 
-    if msg_l == "یادگیری روشن":
-        data["learning"] = True
-        save_data(data)
-        return await update.message.reply_text("🧠 یادگیری فعال شد.")
-    if msg_l == "یادگیری خاموش":
-        data["learning"] = False
-        save_data(data)
-        return await update.message.reply_text("😴 یادگیری غیرفعال شد.")
-    if msg_l == "بازنشانی":
-        data["chats"].clear()
-        data["custom_rules"].clear()
-        save_data(data)
-        return await update.message.reply_text("♻️ حافظه‌ی خنگول پاک شد.")
-    if msg_l == "وضعیت":
-        status = "روشن ✅" if data.get("active", True) else "خاموش ❌"
-        learning = "فعال 🧠" if data.get("learning", True) else "غیرفعال 😴"
-        return await update.message.reply_text(f"وضعیت ربات: {status}\nوضعیت یادگیری: {learning}")
-    if msg_l == "خنگول خاموش":
-        data["active"] = False
-        save_data(data)
-        return await update.message.reply_text("🛑 خنگول خاموش شد.")
-    if msg_l == "خنگول روشن":
-        data["active"] = True
-        save_data(data)
-        return await update.message.reply_text("✅ خنگول روشن شد.")
-
-    # یادگیری سفارشی
-    if msg_l.startswith("یاد بگیر"):
-        try:
-            part = text.split("وقتی کسی گفت", 1)[1]
-            trigger, replies = part.split("بگو", 1)
-            trigger = trigger.strip()
-            reply_list = [r.strip() for r in replies.split("\n") if r.strip()]
-            if trigger and reply_list:
-                data["custom_rules"][trigger] = reply_list
-                save_data(data)
-                return await update.message.reply_text(f"✅ یاد گرفتم وقتی کسی گفت «{trigger}» چی بگم 😎")
-        except Exception:
-            return await update.message.reply_text("❗فرمت درست: یاد بگیر وقتی کسی گفت سلام بگو:\nسلام رفیق 😎\nخوش اومدی ❤️")
-
-    # پاسخ سفارشی
-    for k, v in data["custom_rules"].items():
-        if k in text:
-            return await update.message.reply_text(random.choice(v))
-
-    # فقط وقتی اسمش گفته بشه جواب بده
-    if "خنگول" not in msg_l:
-        if data.get("learning"):
-            data["chats"][msg_l] = generate_reply(msg_l)
-            if len(data["chats"]) > 200:
-                data["chats"] = dict(list(data["chats"].items())[-200:])
-            save_data(data)
+    # فقط وقتی اسم خنگول گفته بشه فعال شو (در گروه‌ها)
+    keywords = ["خنگول", "خنگی", "خنگول جون", "khengool"]
+    if not any(k in text for k in keywords) and update.message.chat.type != "private":
         return
 
-    # تولید پاسخ هوشمند
-    mood_words = {"خوش": "happy", "غم": "sad", "عصب": "angry"}
-    for word, mood in mood_words.items():
-        if word in msg_l:
-            data["mood"] = mood
-            save_data(data)
+    # پاک کردن اسم از جمله
+    for k in keywords:
+        text = text.replace(k, "").strip()
 
-    base_prompt = f"{text}\nخنگول:"
-    reply = generate_reply(base_prompt)
-
-    # ذخیره‌ی گفتگو
-    if data.get("learning", True):
-        data["chats"][msg_l] = reply
-        if len(data["chats"]) > 200:
-            data["chats"] = dict(list(data["chats"].items())[-200:])
-        save_data(data)
-
+    # تولید پاسخ
+    reply = await generate_reply(text)
     await update.message.reply_text(reply)
 
-# =============== اجرا ===============
+    # ساخت و ارسال صدا
+    voice_path = make_voice(reply)
+    if voice_path:
+        with open(voice_path, "rb") as v:
+            await update.message.reply_voice(v)
+
+    # گاهی خودش وسط حرف می‌پره 😆
+    if random.random() < 0.12:
+        await asyncio.sleep(random.randint(2, 6))
+        say = random.choice([
+            "من هنوز اینجام 😁", 
+            "حوصله‌م سر رفت 😜", 
+            "هی منو صدا نزن، خسته شدم 😅",
+            "می‌دونی امروز دلم چی می‌خواد؟ یه بستنی 🍦"
+        ])
+        await update.message.reply_text(say)
+        voice_path = make_voice(say)
+        if voice_path:
+            with open(voice_path, "rb") as v:
+                await update.message.reply_voice(v)
+
+# ===================== کنترل مود =====================
+async def set_mood(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    data = load_data()
+    if not context.args:
+        await update.message.reply_text(f"مود فعلی: {data['mood']}")
+        return
+
+    mood = context.args[0].lower()
+    if mood not in MOODS:
+        await update.message.reply_text("مودهای موجود: happy / sad / angry")
+        return
+
+    data["mood"] = mood
+    save_data(data)
+    await update.message.reply_text(f"مود خنگول تغییر کرد به {mood} 😎")
+
+# ===================== یادگیری روشن / خاموش =====================
+async def toggle_learning(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    data = load_data()
+    data["learning"] = not data.get("learning", True)
+    save_data(data)
+    status = "روشن 😁" if data["learning"] else "خاموش 😴"
+    await update.message.reply_text(f"یادگیری الان {status} است.")# ===================== شروع ربات =====================
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    msg = "سلام من خنگولم 🤪 بیا باهام حرف بزن!"
+    await update.message.reply_text(msg)
+    voice_path = make_voice(msg)
+    if voice_path:
+        with open(voice_path, "rb") as v:
+            await update.message.reply_voice(v)
+
+# ===================== وضعیت خنگول =====================
+async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    data = load_data()
+    mood = data.get("mood", "happy")
+    learning = "روشن" if data.get("learning", True) else "خاموش"
+    total = len(data.get("chats", {}))
+    msg = f"📊 وضعیت خنگول:\n\nمود: {mood}\nیادگیری: {learning}\nتعداد جملات یادگرفته‌شده: {total}"
+    await update.message.reply_text(msg)
+
+# ===================== ریست حافظه =====================
+async def reset_memory(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    with open(MEMORY_FILE, "w", encoding="utf-8") as f:
+        json.dump({"learning": True, "mood": "happy", "chats": {}}, f, ensure_ascii=False, indent=2)
+    await update.message.reply_text("🧠 حافظه خنگول پاک شد! حالا مثل روز اوله 😅")
+
+# ===================== اجرای ربات =====================
 if __name__ == "__main__":
+    print("🤖 خنگول نهایی در حال اجراست ...")
     app = ApplicationBuilder().token(TOKEN).build()
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, khengool))
-    print("🤖 Khengool 2.0 Started ...")
+
+    # دستورها
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("mood", set_mood))
+    app.add_handler(CommandHandler("learn", toggle_learning))
+    app.add_handler(CommandHandler("status", status))
+    app.add_handler(CommandHandler("reset", reset_memory))
+
+    # پیام‌ها
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, khengool_reply))
+
     app.run_polling()
