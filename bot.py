@@ -6,7 +6,9 @@ from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, Con
 RAPIDAPI_KEY = os.getenv("RAPIDAPI_KEY")
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 
-API_URL = "https://youtube-search-and-download.p.rapidapi.com/video/download"
+SEARCH_URL = "https://youtube-search-and-download.p.rapidapi.com/search"
+DOWNLOAD_URL = "https://youtube-search-and-download.p.rapidapi.com/video/download"
+
 HEADERS = {
     "x-rapidapi-key": RAPIDAPI_KEY,
     "x-rapidapi-host": "youtube-search-and-download.p.rapidapi.com"
@@ -14,52 +16,51 @@ HEADERS = {
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("🎵 سلام! اسم آهنگ یا لینک یوتیوب رو بفرست تا برات دانلودش کنم.")
+    await update.message.reply_text("🎧 سلام! اسم آهنگ یا لینک یوتیوب رو بفرست تا فایل صوتی‌ش رو برات بفرستم 🎶")
 
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.message.text.strip()
     chat_id = update.effective_chat.id
-
-    await context.bot.send_message(chat_id=chat_id, text="🔎 در حال جست‌وجو و پردازش... لطفاً صبر کنید ⏳")
+    await context.bot.send_message(chat_id=chat_id, text="🔎 در حال جست‌وجو و تبدیل به MP3... لطفاً صبر کنید ⏳")
 
     try:
-        # جست‌وجوی ویدیو
-        search_url = "https://youtube-search-and-download.p.rapidapi.com/search"
-        search_query = {"query": query, "type": "v"}
-        search_response = requests.get(search_url, headers=HEADERS, params=search_query)
-        search_data = search_response.json()
+        # جستجو در یوتیوب
+        search_response = requests.get(SEARCH_URL, headers=HEADERS, params={"query": query, "type": "v"})
+        data = search_response.json()
 
-        if not search_data.get("contents"):
-            await context.bot.send_message(chat_id=chat_id, text="❌ آهنگی با این اسم پیدا نشد.")
+        if not data.get("contents"):
+            await context.bot.send_message(chat_id=chat_id, text="❌ آهنگی با این نام پیدا نشد.")
             return
 
-        video_id = search_data["contents"][0]["video"]["videoId"]
+        video_id = data["contents"][0]["video"]["videoId"]
 
-        # دریافت لینک دانلود
-        download_query = {"id": video_id}
-        download_response = requests.get(API_URL, headers=HEADERS, params=download_query)
+        # دریافت لینک دانلود (MP3)
+        download_response = requests.get(DOWNLOAD_URL, headers=HEADERS, params={"id": video_id})
         download_data = download_response.json()
 
-        video_url = download_data["url"]
+        if "url" not in download_data:
+            await context.bot.send_message(chat_id=chat_id, text="⚠️ لینک دانلود پیدا نشد.")
+            return
 
-        # دانلود فایل
-        video_content = requests.get(video_url)
-        filename = f"{query}.mp4"
+        audio_url = download_data["url"]
+        audio_data = requests.get(audio_url)
+
+        filename = f"{query}.mp3"
         with open(filename, "wb") as f:
-            f.write(video_content.content)
+            f.write(audio_data.content)
 
-        # ارسال ویدیو
-        await context.bot.send_video(chat_id=chat_id, video=open(filename, "rb"))
+        # ارسال صوت به تلگرام
+        await context.bot.send_audio(chat_id=chat_id, audio=open(filename, "rb"), title=query)
         os.remove(filename)
 
     except Exception as e:
-        await context.bot.send_message(chat_id=chat_id, text=f"⚠️ خطا در پردازش آهنگ: {e}")
+        await context.bot.send_message(chat_id=chat_id, text=f"⚠️ خطا: {e}")
 
 
 if __name__ == "__main__":
     app = ApplicationBuilder().token(BOT_TOKEN).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-    print("🤖 Bot is running...")
+    print("🎵 Bot is running...")
     app.run_polling()
