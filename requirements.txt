@@ -1,2 +1,8 @@
-python-telegram-bot==20.6
-jdatetime
+python-telegram-bot==20.7
+aiohttp==3.9.5
+async-timeout==4.0.3
+requests==2.31.0
+certifi>=2024.7.4
+charset-normalizer>=3.3.2
+idna>=3.6
+urllib3>=2.2.2
