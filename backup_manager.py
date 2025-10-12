@@ -2,60 +2,32 @@ import os
 import zipfile
 from datetime import datetime
 
-BACKUP_FILES = [
-    "memory.json",
-    "group_data.json",
-    "stickers.json",
-    "jokes.json",
-    "fortunes.json"
-]
-
-# ======================= 📦 ایجاد بک‌آپ ZIP =======================
-
-def create_backup(filename=None):
-    """ساخت فایل ZIP از داده‌های اصلی"""
+async def create_backup(filename=None):
+    """ساخت بک‌آپ ZIP از تمام فایل‌های اصلی"""
     if not filename:
         filename = f"backup_{datetime.now().strftime('%Y-%m-%d_%H-%M')}.zip"
 
     with zipfile.ZipFile(filename, "w") as zipf:
-        for file in BACKUP_FILES:
-            if os.path.exists(file):
-                zipf.write(file)
-
+        for root, _, files in os.walk("."):
+            for file in files:
+                if file.endswith((".json", ".jpg", ".png", ".webp", ".mp3", ".ogg")):
+                    path = os.path.join(root, file)
+                    zipf.write(path)
     return filename
 
-# ======================= 📤 بازیابی از بک‌آپ =======================
-
-def restore_backup(zip_path):
-    """بازیابی کامل از فایل ZIP بک‌آپ"""
-    if not os.path.exists(zip_path):
-        raise FileNotFoundError("❌ فایل بک‌آپ پیدا نشد!")
-
-    with zipfile.ZipFile(zip_path, "r") as zip_ref:
-        zip_ref.extractall(".")
-
-    return True
-
-# ======================= 🧹 حذف بک‌آپ موقت =======================
-
-def cleanup_backup(filename):
-    """حذف فایل ZIP موقت پس از ارسال"""
+async def send_backup(bot, admin_id, reason="Manual Backup"):
+    """ارسال بک‌آپ ZIP به مدیر"""
     try:
-        if os.path.exists(filename):
-            os.remove(filename)
-    except Exception as e:
-        print(f"[CLEANUP ERROR] {e}")
-
-# ======================= ☁️ بک‌آپ ابری =======================
-
-async def send_backup_to_admin(bot, admin_id, reason="Manual Backup"):
-    """ارسال بک‌آپ ZIP به سودو"""
-    filename = create_backup()
-    try:
+        filename = await create_backup()
         await bot.send_document(chat_id=admin_id, document=open(filename, "rb"), filename=filename)
-        await bot.send_message(chat_id=admin_id, text=f"☁️ {reason} انجام شد ✅")
-        print(f"[CLOUD BACKUP] {reason} sent ✅")
+        await bot.send_message(chat_id=admin_id, text=f"☁️ بک‌آپ {reason} ارسال شد ✅")
+        os.remove(filename)
     except Exception as e:
-        print(f"[CLOUD BACKUP ERROR] {e}")
-    finally:
-        cleanup_backup(filename)
+        print(f"[BACKUP ERROR] {e}")
+
+async def auto_backup_loop(bot, admin_id):
+    """بک‌آپ خودکار هر ۱۲ ساعت"""
+    import asyncio
+    while True:
+        await asyncio.sleep(43200)
+        await send_backup(bot, admin_id, "Auto Backup")
