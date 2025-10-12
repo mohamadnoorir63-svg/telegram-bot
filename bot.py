@@ -118,7 +118,7 @@ async def unlock_learning(update: Update, context: ContextTypes.DEFAULT_TYPE):
     status["locked"] = False
     await update.message.reply_text("🔓 یادگیری باز شد!")
 
-# ======================= 📊 آمار و آمار کامل =======================
+# ======================= 📊 آمار خلاصه =======================
 async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data = get_stats()
     memory = load_data("memory.json")
@@ -134,20 +134,28 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     await update.message.reply_text(msg)
 
-
+# ======================= 📊 آمار کامل گروه‌ها =======================
 async def fullstats(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    group_data = load_data("group_data.json")
-    if not group_data:
-        return await update.message.reply_text("❌ هنوز داده‌ای برای گروه‌ها ثبت نشده!")
+    data = load_data("group_data.json")
+    groups = data.get("groups", [])
 
-    text = "📈 آمار کامل گروه‌ها:\n\n"
-    for gid, info in group_data.items():
-        title = info.get("title", "بدون‌نام")
-        members = len(info.get("members", []))
-        last_active = info.get("last_active", "نامشخص")
-        text += f"🏠 {title}\n👥 اعضا: {members}\n🕓 آخرین فعالیت: {last_active}\n\n"
+    if not groups:
+        return await update.message.reply_text("ℹ️ هنوز هیچ گروهی ثبت نشده.")
 
-    await update.message.reply_text(text[:4000])# ======================= 👋 خوشامد با عکس پروفایل =======================
+    text = "📈 آمار کامل گروه‌ها و اعضا:\n\n"
+
+    for g in groups:
+        title = g.get("title", "بدون‌نام")
+        members = len(g.get("members", []))
+        last_active = g.get("last_active", "نامشخص")
+        text += f"🏠 گروه: {title}\n👥 اعضا: {members}\n🕓 آخرین فعالیت: {last_active}\n\n"
+
+    if len(text) > 4000:
+        text = text[:3990] + "..."
+
+    await update.message.reply_text(text)
+
+# ======================= 👋 خوشامد با عکس پروفایل =======================
 async def welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not status["welcome"]:
         return
@@ -172,7 +180,7 @@ async def welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ======================= ☁️ بک‌آپ خودکار و دستی =======================
 async def auto_backup(context: ContextTypes.DEFAULT_TYPE):
     while True:
-        await asyncio.sleep(43200)  # هر ۱۲ ساعت
+        await asyncio.sleep(43200)
         await cloudsync_internal(context.bot, "Auto Backup")
 
 async def cloudsync_internal(bot, reason="Manual Backup"):
@@ -189,7 +197,6 @@ async def cloudsync_internal(bot, reason="Manual Backup"):
     try:
         await bot.send_document(chat_id=ADMIN_ID, document=open(filename, "rb"), filename=filename)
         await bot.send_message(chat_id=ADMIN_ID, text=f"☁️ {reason} انجام شد ✅")
-        print(f"[CLOUD BACKUP] {reason} sent ✅")
     except Exception as e:
         print(f"[CLOUD BACKUP ERROR] {e}")
     finally:
@@ -199,33 +206,6 @@ async def cloudsync(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_ID:
         return
     await cloudsync_internal(context.bot, "Manual Cloud Backup")
-
-# ======================= 💾 بک‌آپ و بازیابی ZIP در چت =======================
-async def backup(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    filename = f"backup_{datetime.now().strftime('%Y-%m-%d_%H-%M')}.zip"
-    with zipfile.ZipFile(filename, "w") as zipf:
-        for root, _, files in os.walk("."):
-            for file in files:
-                if file.endswith((".json", ".jpg", ".png", ".webp", ".mp3", ".ogg")):
-                    zipf.write(os.path.join(root, file))
-    await update.message.reply_document(document=open(filename, "rb"), filename=filename)
-    await update.message.reply_text("✅ بک‌آپ کامل گرفته شد!")
-    os.remove(filename)
-
-async def restore(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("📂 فایل ZIP بک‌آپ را ارسال کن تا بازیابی شود.")
-    context.user_data["await_restore"] = True
-
-async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not context.user_data.get("await_restore"):
-        return
-    file = await update.message.document.get_file()
-    await file.download_to_drive("restore.zip")
-    with zipfile.ZipFile("restore.zip", "r") as zip_ref:
-        zip_ref.extractall(".")
-    os.remove("restore.zip")
-    context.user_data["await_restore"] = False
-    await update.message.reply_text("✅ بازیابی کامل انجام شد!")
 
 # ======================= 💬 پاسخ، یادگیری، جوک و فال =======================
 async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -288,7 +268,7 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(list_phrases())
         return
 
-    # ✅ یادگیری هوشمند با پیام مناسب
+    # ✅ یادگیری هوشمند
     if text.startswith("یادبگیر "):
         parts = text.replace("یادبگیر ", "").split("\n")
         if len(parts) > 1:
@@ -308,7 +288,9 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # ✅ پاسخ هوشمند
     emotion = detect_emotion(text)
     reply_text = smart_response(text, emotion) or enhance_sentence(get_reply(text))
-    await update.message.reply_text(reply_text)# ======================= 🧹 ریست و ریلود =======================
+    await update.message.reply_text(reply_text)
+
+# ======================= 🧹 ریست و ریلود =======================
 async def reset_memory(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_ID:
         return await update.message.reply_text("⛔ فقط مدیر اصلی مجازه!")
