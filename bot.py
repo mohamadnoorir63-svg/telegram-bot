@@ -47,7 +47,8 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "▪️ /stats → نمایش آمار (فقط سودو)\n"
         "▪️ /backup → پشتیبان‌گیری (فقط سودو)\n"
         "▪️ /broadcast متن → ارسال همگانی (فقط سودو)\n"
-        "▪️ /leave → خروج از گروه (فقط سودو)\n\n"
+        "▪️ /leave → خروج از گروه (فقط سودو)\n"
+        "▪️ /restore → بازیابی حافظه از فایل بک‌آپ (فقط سودو)\n\n"
         "👋 خوشامد:\n"
         "▪️ /welcome → روشن/خاموش کردن خوشامد\n\n"
         "😄 ربات خودش مود، احساس و شوخی‌ها رو تشخیص می‌ده!"
@@ -109,7 +110,6 @@ async def welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
     for member in update.message.new_chat_members:
         t = datetime.now().strftime("%H:%M")
         d = datetime.now().strftime("%Y-%m-%d")
-        # استیکر خوشامد (اختیاری؛ اگر خطا داد حذف کن)
         try:
             await update.message.reply_sticker("CAACAgIAAxkBAAEIBbVkn3IoRh6EPUbE4a7yR1yMG-4aFAACWQADVp29Cmb0vh8k0JtbNgQ")
         except Exception:
@@ -128,7 +128,6 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
     uid = update.effective_user.id
 
-    # ثبت کاربر برای ارسال همگانی
     data = load_data("memory.json")
     if "users" not in data:
         data["users"] = []
@@ -136,13 +135,11 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
         data["users"].append(uid)
         save_data("memory.json", data)
 
-    # در حالت خاموش فقط یادگیری پنهان
     if not status["active"]:
         if status["learning"]:
             shadow_learn(text, "")
         return
 
-    # شوخی خودکار
     if datetime.now() - status["last_joke"] > timedelta(hours=1):
         await update.message.reply_text(random.choice([
             "می‌دونی فرق تو با خر چیه؟ هیچی فقط خر مودب‌تره 🤪",
@@ -151,7 +148,6 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ]))
         status["last_joke"] = datetime.now()
 
-    # یادگیری دستی: «یادبگیر جمله» و در خطوط بعد پاسخ‌ها
     if text.startswith("یادبگیر "):
         parts = text.replace("یادبگیر ", "").split("\n")
         if len(parts) > 1:
@@ -162,7 +158,6 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
             new_resps = [r for r in responses if r not in known_resps]
 
             if known_resps:
-                # بگه بلد بودم + اضافه کردن پاسخ‌های جدید (اگر بود)
                 for r in new_resps:
                     learn(phrase, r)
                 msg = "😏 اینو بلد بودم!"
@@ -179,7 +174,6 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("❗ بعد از 'یادبگیر' جمله و پاسخ‌هاش رو با خط جدید بنویس.")
         return
 
-    # لیست جملات
     if text == "لیست":
         phrases = list(load_data("memory.json").get("data", {}).keys())
         if phrases:
@@ -188,12 +182,10 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("هنوز چیزی یاد نگرفتم 😅")
         return
 
-    # جمله‌سازی
     if text == "جمله بساز":
         await update.message.reply_text(generate_sentence())
         return
 
-    # پاسخ عادی
     reply_text = get_reply(text)
     reply_text = enhance_sentence(reply_text)
     await update.message.reply_text(reply_text)
@@ -206,7 +198,6 @@ async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = " ".join(context.args)
     if not msg:
         return await update.message.reply_text("❗ بعد از /broadcast پیام رو بنویس.")
-
     users = load_data("memory.json").get("users", [])
     count = 0
     for uid in users:
@@ -231,37 +222,28 @@ async def backup(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("✅ فایل پشتیبان ارسال شد!")
     os.remove(filename)
 
-async def leave(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id == ADMIN_ID:
-        await update.message.reply_text("🫡 خدافظ! تا دیدار بعدی 😂")
-        await context.bot.leave_chat(update.message.chat.id)# ======================= ♻️ بازیابی حافظه =======================
+# ======================= ♻️ بازیابی حافظه =======================
 
 async def restore(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_ID:
         return await update.message.reply_text("⛔ فقط مدیر اصلی می‌تونه بازیابی انجام بده!")
-
     await update.message.reply_text("📂 لطفاً فایل memory.json رو بفرست تا حافظه بازیابی بشه.")
-
-    # حالت انتظار فایل
     context.user_data["awaiting_restore"] = True
-
 
 async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message.document:
         return
-
     if not context.user_data.get("awaiting_restore"):
         return
-
     doc = update.message.document
     if doc.file_name != "memory.json":
         return await update.message.reply_text("❌ نام فایل باید دقیقاً memory.json باشه!")
-
     file = await doc.get_file()
     await file.download_to_drive("memory.json")
-
     context.user_data["awaiting_restore"] = False
-    await update.message.reply_text("✅ حافظه با موفقیت بازیابی شد! حالا می‌تونی ادامه بدی 😎")
+    data = load_data("memory.json")
+    phrases_count = len(data.get("data", {}))
+    await update.message.reply_text(f"✅ حافظه با موفقیت بازیابی شد!\n📚 تعداد جمله‌ها: {phrases_count}")
 
 # ======================= 🚀 اجرای ربات =======================
 
@@ -269,7 +251,6 @@ if __name__ == "__main__":
     print("🤖 خنگول فارسی 7.9 فول پلاس آماده به خدمت است ...")
     app = ApplicationBuilder().token(TOKEN).build()
 
-    # دستورات
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("help", help_command))
     app.add_handler(CommandHandler("mode", mode_change))
@@ -279,8 +260,9 @@ if __name__ == "__main__":
     app.add_handler(CommandHandler("leave", leave))
     app.add_handler(CommandHandler("broadcast", broadcast))
     app.add_handler(CommandHandler("backup", backup))
+    app.add_handler(CommandHandler("restore", restore))
+    app.add_handler(MessageHandler(filters.Document.ALL, handle_document))
 
-    # خوشامد و پیام‌های متنی
     app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome))
     app.add_handler(MessageHandler(filters.TEXT & filters.Regex(r"^(راهنما)$"), help_command))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, reply))
