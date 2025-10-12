@@ -1,141 +1,100 @@
 import json
 import os
 import random
+from fix_memory import fix_json
 
-MEMORY_FILE = "memory.json"
-SHADOW_FILE = "shadow_memory.json"
+# 🧩 مسیر فایل‌های اصلی حافظه
+FILES = ["memory.json", "shadow_memory.json", "group_data.json"]
 
-# ======================= 📦 راه‌اندازی فایل‌های حافظه =======================
-
+# ========================= 📂 آماده‌سازی اولیه =========================
 def init_files():
-    """ایجاد فایل‌های حافظه در صورت نبود"""
-    files = [
-        MEMORY_FILE,
-        SHADOW_FILE,
-        "group_data.json",
-        "stickers.json",
-        "jokes.json",
-        "fortunes.json"
-    ]
-    for file in files:
-        if not os.path.exists(file):
-            # 🧠 ساختار پیش‌فرض هر فایل
-            if file == MEMORY_FILE:
-                data = {
-                    "data": {},
-                    "users": [],
-                    "stats": {"phrases": 0, "responses": 0, "mode": "نرمال"}
-                }
-            elif file == SHADOW_FILE:
-                data = {"data": {}}
-            elif file == "group_data.json":
-                data = {"groups": {}}
-            else:
-                data = {}
-            with open(file, "w", encoding="utf-8") as f:
-                json.dump(data, f, ensure_ascii=False, indent=2)
+    for f in FILES:
+        if not os.path.exists(f):
+            with open(f, "w", encoding="utf-8") as file:
+                json.dump({"data": {}, "users": []}, file, ensure_ascii=False, indent=2)
+    print("✅ فایل‌های حافظه بررسی و ایجاد شدند.")
 
-# ======================= 📥 بارگذاری و ذخیره داده =======================
-
-def load_data(filename=MEMORY_FILE):
-    if not os.path.exists(filename):
-        init_files()
+# ========================= 💾 عملیات پایه حافظه =========================
+def load_data(file):
     try:
-        with open(filename, "r", encoding="utf-8") as f:
-            data = json.load(f)
-        # ✅ اگر ساختار ناقص بود، ترمیم می‌کنیم
-        if filename == MEMORY_FILE and "data" not in data:
-            data["data"] = {}
-        if filename == MEMORY_FILE and "users" not in data:
-            data["users"] = []
-        if filename == MEMORY_FILE and "stats" not in data:
-            data["stats"] = {"phrases": 0, "responses": 0, "mode": "نرمال"}
-        return data
-    except Exception:
-        init_files()
-        return load_data(filename)
+        with open(file, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except json.JSONDecodeError:
+        print(f"⚠️ خطا در {file}، تلاش برای تعمیر خودکار...")
+        fixed = fix_json(file)
+        if fixed:
+            with open(file, "r", encoding="utf-8") as f:
+                return json.load(f)
+        else:
+            return {"data": {}, "users": []}
 
-def save_data(filename, data):
-    with open(filename, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
+def save_data(file, data):
+    try:
+        with open(file, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        print(f"❌ خطا در ذخیره {file}: {e}")
 
-# ======================= 🧩 یادگیری =======================
-
+# ========================= 🧠 یادگیری و پاسخ =========================
 def learn(phrase, response):
-    """افزودن جمله و پاسخ به حافظه"""
-    data = load_data()
-    phrase = phrase.strip()
-    response = response.strip()
-    if "data" not in data:
-        data["data"] = {}
-    if phrase not in data["data"]:
-        data["data"][phrase] = []
-    if response not in data["data"][phrase]:
-        data["data"][phrase].append(response)
-    data["stats"]["phrases"] = len(data["data"])
-    data["stats"]["responses"] = sum(len(v) for v in data["data"].values())
-    save_data(MEMORY_FILE, data)
+    mem = load_data("memory.json")
+    data = mem.get("data", {})
 
-# ======================= 🕶 یادگیری سایه (در حالت غیرفعال) =======================
+    if phrase not in data:
+        data[phrase] = []
+
+    if response not in data[phrase]:
+        data[phrase].append(response)
+        save_data("memory.json", mem)
+        print(f"🧠 یادگیری: {phrase} → {response}")
+    else:
+        print("⚙️ تکراری، یاد نگرفت.")
 
 def shadow_learn(phrase, response):
-    """ذخیره یادگیری در حالت غیرفعال برای تمرین بعدی"""
-    data = load_data(SHADOW_FILE)
-    if "data" not in data:
-        data["data"] = {}
-    if phrase not in data["data"]:
-        data["data"][phrase] = []
-    if response not in data["data"][phrase]:
-        data["data"][phrase].append(response)
-    save_data(SHADOW_FILE, data)
+    shadow = load_data("shadow_memory.json")
+    data = shadow.get("data", {})
 
-# ======================= 💬 واکشی پاسخ =======================
+    if phrase not in data:
+        data[phrase] = []
 
-def get_reply(phrase):
-    data = load_data()
-    phrase = phrase.strip()
-    if phrase in data["data"]:
-        return random.choice(data["data"][phrase])
-    else:
-        # جستجو در عبارات مشابه
-        for key in data["data"]:
-            if key in phrase or phrase in key:
-                return random.choice(data["data"][key])
-    return "نمی‌دونم چی بگم 😅"
+    if response not in data[phrase]:
+        data[phrase].append(response)
+        save_data("shadow_memory.json", shadow)
 
-# ======================= 🎭 تنظیم و دریافت مود =======================
+def get_reply(text):
+    mem = load_data("memory.json")
+    data = mem.get("data", {})
+
+    matches = [k for k in data.keys() if k in text]
+    if matches:
+        key = random.choice(matches)
+        return random.choice(data[key])
+    return None
+
+# ========================= ✨ ابزارهای پیشرفته =========================
+def get_stats():
+    mem = load_data("memory.json")
+    total_phrases = len(mem.get("data", {}))
+    total_responses = sum(len(v) for v in mem.get("data", {}).values())
+    mode = mem.get("mode", "نرمال")
+    return {"phrases": total_phrases, "responses": total_responses, "mode": mode}
 
 def set_mode(mode):
-    data = load_data()
-    data["stats"]["mode"] = mode
-    save_data(MEMORY_FILE, data)
-
-def get_stats():
-    return load_data().get("stats", {"phrases": 0, "responses": 0, "mode": "نرمال"})
-
-# ======================= 🧠 تقویت جمله =======================
+    mem = load_data("memory.json")
+    mem["mode"] = mode
+    save_data("memory.json", mem)
 
 def enhance_sentence(sentence):
-    """افزودن تنوع به جمله‌ها"""
-    extras = ["😄", "😉", "😂", "🌟", "✨", "😎", "😁"]
-    if sentence.endswith("!") or sentence.endswith("؟") or sentence.endswith("."):
-        return f"{sentence} {random.choice(extras)}"
-    return f"{sentence}! {random.choice(extras)}"
-
-# ======================= 🧩 جمله‌سازی تصادفی =======================
+    if not sentence:
+        return "🤔 نمی‌دونم چی بگم!"
+    extras = ["🙂", "😂", "😎", "🤖", "😅", "😉"]
+    return sentence + " " + random.choice(extras)
 
 def generate_sentence():
-    data = load_data()
-    if not data["data"]:
-        return "من هنوز چیزی یاد نگرفتم 😅"
-    phrase = random.choice(list(data["data"].keys()))
-    response = random.choice(data["data"][phrase])
-    return f"{phrase} → {response}"
-
-# ======================= 👥 ثبت کاربر =======================
-
-def register_user(user_id):
-    data = load_data()
-    if user_id not in data["users"]:
-        data["users"].append(user_id)
-        save_data(MEMORY_FILE, data)
+    mem = load_data("memory.json")
+    data = mem.get("data", {})
+    if not data:
+        return "😅 هنوز چیزی بلد نیستم!"
+    phrase = random.choice(list(data.keys()))
+    resp = random.choice(data[phrase])
+    return f"{phrase} → {resp}"
