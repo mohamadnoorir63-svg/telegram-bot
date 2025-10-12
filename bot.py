@@ -304,9 +304,6 @@ async def leave(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id == ADMIN_ID:
         await update.message.reply_text("🫡 خدافظ! تا دیدار بعدی 😂")
         await context.bot.leave_chat(update.message.chat.id)
-
-# ======================= 🚀 اجرای ربات =======================
-
 if __name__ == "__main__":
     print("🤖 خنگول فارسی 8.4 Cloud+ Supreme Edition آماده به خدمت است ...")
     app = ApplicationBuilder().token(TOKEN).build()
@@ -331,8 +328,12 @@ if __name__ == "__main__":
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, reply))
     app.add_handler(CommandHandler("leave", leave))
 
-    # وظایف خودکار
-    app.create_task(auto_backup(app))
-    app.create_task(notify_admin_on_startup(app))
+    # ✅ اصلاح‌شده برای هماهنگی با python-telegram-bot v20+
+    async def on_startup(app):
+        await notify_admin_on_startup(app)
+        app.create_task(auto_backup(app))
+        print("🌙 [SYSTEM] Startup tasks scheduled ✅")
+
+    app.post_init = on_startup  # به‌جای create_task مستقیم
 
     app.run_polling(allowed_updates=Update.ALL_TYPES)
