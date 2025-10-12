@@ -1,143 +1,4 @@
-import json
-import random
-import os
-
-# مسیر فایل‌های حافظه
-MAIN_MEMORY = "memory.json"
-SHADOW_MEMORY = "shadow_memory.json"
-GROUP_MEMORY = "group_data.json"
-
-
-# 🧠 اگر فایل‌ها وجود نداشتن، بسازشون
-def init_files():
-    for file_name, default_data in [
-        (MAIN_MEMORY, {"replies": {}, "learning": True, "mode": "normal"}),
-        (SHADOW_MEMORY, {"hidden": {}}),
-        (GROUP_MEMORY, {}),
-    ]:
-        if not os.path.exists(file_name):
-            with open(file_name, "w", encoding="utf-8") as f:
-                json.dump(default_data, f, ensure_ascii=False, indent=2)
-
-
-# 📂 خواندن داده‌ها از فایل
-def load_data(file_name):
-    with open(file_name, "r", encoding="utf-8") as f:
-        return json.load(f)
-
-
-# 💾 ذخیره داده‌ها در فایل
-def save_data(file_name, data):
-    with open(file_name, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
-
-
-# 🔄 گرفتن مود فعلی (شوخ، بی‌ادب، غمگین...)
-def get_mode():
-    data = load_data(MAIN_MEMORY)
-    return data.get("mode", "normal")
-
-
-# ✍️ تغییر مود
-def set_mode(new_mode):
-    data = load_data(MAIN_MEMORY)
-    data["mode"] = new_mode
-    save_data(MAIN_MEMORY, data)
-
-
-# 💡 اضافه کردن جمله جدید به حافظه
-def learn(phrase, response):
-    data = load_data(MAIN_MEMORY)
-    phrase = phrase.lower().strip()
-    response = response.strip()
-
-    if phrase not in data["replies"]:
-        data["replies"][phrase] = []
-
-    if response not in data["replies"][phrase]:
-        data["replies"][phrase].append(response)
-
-    save_data(MAIN_MEMORY, data)
-
-
-# 🕵️ یادگیری پنهان در حالت خاموش
-def shadow_learn(phrase, response):
-    data = load_data(SHADOW_MEMORY)
-    phrase = phrase.lower().strip()
-    response = response.strip()
-
-    if phrase not in data["hidden"]:
-        data["hidden"][phrase] = []
-
-    if response not in data["hidden"][phrase]:
-        data["hidden"][phrase].append(response)
-
-    save_data(SHADOW_MEMORY, data)
-
-
-# 🔁 ادغام حافظه پنهان با اصلی وقتی روشن میشه
-def merge_shadow_memory():
-    main = load_data(MAIN_MEMORY)
-    shadow = load_data(SHADOW_MEMORY)
-
-    for phrase, replies in shadow.get("hidden", {}).items():
-        if phrase not in main["replies"]:
-            main["replies"][phrase] = replies
-        else:
-            for r in replies:
-                if r not in main["replies"][phrase]:
-                    main["replies"][phrase].append(r)
-
-    shadow["hidden"] = {}
-    save_data(MAIN_MEMORY, main)
-    save_data(SHADOW_MEMORY, shadow)
-
-
-# 🎲 گرفتن پاسخ تصادفی بر اساس مود
-def get_reply(text):
-    data = load_data(MAIN_MEMORY)
-    replies = data.get("replies", {})
-    text = text.lower().strip()
-
-    if text in replies:
-        return random.choice(replies[text])
-
-    # اگر بلد نبود، یه جمله بامزه بسازه
-    random_words = ["عه", "جدی؟", "باشه", "نمی‌دونم والا", "جالبه 😅", "اوه"]
-    return random.choice(random_words)
-
-
-# 📊 آمار حافظه
-def get_stats():
-    data = load_data(MAIN_MEMORY)
-    total_phrases = len(data.get("replies", {}))
-    total_responses = sum(len(v) for v in data["replies"].values())
-    mode = data.get("mode", "normal")
-    return {
-        "phrases": total_phrases,
-        "responses": total_responses,
-        "mode": mode,
-    }
-
-
-# 🧩 تقویت طبیعی پاسخ‌ها (تغییر ساختار جمله)
-def enhance_sentence(sentence):
-    replacements = {
-        "خوب": ["عالی", "باحال", "اوکی"],
-        "نه": ["نخیر", "اصلاً", "نچ"],
-        "آره": ["آرههه", "اوهوم", "قطعاً"],
-    }
-
-    words = sentence.split()
-    new_words = []
-    for word in words:
-        if word in replacements and random.random() < 0.4:
-            new_words.append(random.choice(replacements[word]))
-        else:
-            new_words.append(word)
-
-    return " ".join(new_words)
-    import asyncio
+import asyncio
 import random
 import os
 from datetime import datetime, timedelta
@@ -258,12 +119,48 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data["broadcast_mode"] = True
 
 
+# ========================= 📨 ارسال همگانی و ثبت گروه =========================
+
+async def broadcast_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != ADMIN_ID:
+        return
+    if not context.user_data.get("broadcast_mode"):
+        return
+
+    message = update.message.text
+    context.user_data["broadcast_mode"] = False
+
+    try:
+        groups = load_data("group_data.json")
+    except:
+        groups = {}
+
+    sent = 0
+    for chat_id in groups.keys():
+        try:
+            await context.bot.send_message(chat_id=chat_id, text=message)
+            sent += 1
+        except Exception as e:
+            print(f"❌ ارسال به {chat_id} ناموفق: {e}")
+
+    await update.message.reply_text(f"✅ پیام به {sent} گروه ارسال شد!")
+
+
+async def register_group(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat = update.effective_chat
+    if chat.type in ["group", "supergroup"]:
+        data = load_data("group_data.json")
+        if str(chat.id) not in data:
+            data[str(chat.id)] = {"title": chat.title, "members": 0}
+            save_data("group_data.json", data)
+            await update.message.reply_text("😜 نصب خنگول با موفقیت انجام شد!")
+
+
 # ========================= 💬 پاسخ به پیام =========================
 
 async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
     if not status["active"]:
-        # یادگیری پنهان
         if status["learning"]:
             shadow_learn(text, "")
         return
@@ -311,6 +208,10 @@ if __name__ == "__main__":
     app.add_handler(CommandHandler("stats", stats))
     app.add_handler(CommandHandler("leave", leave_group))
     app.add_handler(CallbackQueryHandler(admin_callback))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, reply))
 
+    # اضافه کردن دو هندلر جدید
+    app.add_handler(MessageHandler(filters.TEXT & filters.User(ADMIN_ID), broadcast_handler))
+    app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, register_group))
+
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, reply))
     app.run_polling()
