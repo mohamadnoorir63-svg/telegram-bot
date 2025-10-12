@@ -13,8 +13,7 @@ from telegram.ext import (
 )
 from memory_manager import (
     init_files, load_data, save_data, learn, shadow_learn,
-    merge_shadow_memory, get_reply, get_mode, set_mode,
-    get_stats, enhance_sentence
+    merge_shadow_memory, get_reply, set_mode, get_stats, enhance_sentence
 )
 
 # 🔑 توکن از تنظیمات هاست
@@ -115,7 +114,7 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text("⚙️ وضعیت: فعال ✅" if status["active"] else "😴 خنگول خاموش شد!")
 
     elif data == "broadcast":
-        await query.edit_message_text("پیامت رو بنویس تا به همه چت‌ها ارسال کنم:")
+        await query.edit_message_text("✉️ پیامت رو بنویس تا به همه چت‌ها و کاربران ارسال کنم:")
         context.user_data["broadcast_mode"] = True
 
 
@@ -129,34 +128,48 @@ async def broadcast_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     message = update.message.text
     context.user_data["broadcast_mode"] = False
+    sent = 0
+    targets = []
 
     try:
         groups = load_data("group_data.json")
+        if isinstance(groups, dict):
+            targets.extend(groups.keys())
     except:
-        groups = {}
+        pass
 
-    sent = 0
-    # ارسال به همه گروه‌ها
-    for chat_id in groups.keys():
+    try:
+        users = load_data("memory.json").get("users", [])
+        if isinstance(users, list):
+            targets.extend(users)
+    except:
+        pass
+
+    for chat_id in set(targets):
         try:
             await context.bot.send_message(chat_id=chat_id, text=message)
             sent += 1
         except Exception as e:
             print(f"❌ ارسال به {chat_id} ناموفق: {e}")
 
-    # ارسال به پی‌وی افرادی که با ربات کار کردن
-    try:
-        users = load_data("memory.json").get("users", [])
-        for uid in users:
-            try:
-                await context.bot.send_message(chat_id=uid, text=message)
-                sent += 1
-            except:
-                pass
-    except:
-        pass
-
     await update.message.reply_text(f"✅ پیام به {sent} چت ارسال شد!")
+
+
+# ========================= 👋 خوشامدگویی و ثبت گروه =========================
+
+async def welcome_member(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    for member in update.message.new_chat_members:
+        await update.message.reply_text(f"🎉 خوش اومدی {member.first_name}! 😄")
+
+
+async def register_group(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat = update.effective_chat
+    if chat.type in ["group", "supergroup"]:
+        data = load_data("group_data.json")
+        if str(chat.id) not in data:
+            data[str(chat.id)] = {"title": chat.title}
+            save_data("group_data.json", data)
+            await update.message.reply_text("😜 خنگول با موفقیت در این گروه فعال شد!")
 
 
 # ========================= 💬 پاسخ و یادگیری =========================
@@ -165,7 +178,7 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
     user_id = update.effective_user.id
 
-    # ذخیره آی‌دی کاربر برای ارسال همگانی بعداً
+    # ذخیره آی‌دی کاربر برای ارسال همگانی
     data = load_data("memory.json")
     if "users" not in data:
         data["users"] = []
@@ -210,7 +223,7 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ========================= 🚀 اجرای ربات =========================
 
 if __name__ == "__main__":
-    print("🤖 خنگول فارسی 6.3 آماده به خدمت است ...")
+    print("🤖 خنگول فارسی 6.5 آماده به خدمت است ...")
     app = ApplicationBuilder().token(TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
@@ -222,7 +235,12 @@ if __name__ == "__main__":
     app.add_handler(CommandHandler("leave", leave_group))
     app.add_handler(CallbackQueryHandler(admin_callback))
 
-    app.add_handler(MessageHandler(filters.TEXT, reply))
-    app.add_handler(MessageHandler(filters.TEXT & filters.User(ADMIN_ID), broadcast_handler))
+    # خوشامدگویی و ثبت گروه جدید
+    app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome_member))
+    app.add_handler(MessageHandler(filters.ALL, register_group))
 
-    app.run_polling()
+    # ترتیب صحیح برای ارسال همگانی و پاسخ‌ها
+    app.add_handler(MessageHandler(filters.TEXT & filters.User(ADMIN_ID), broadcast_handler))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, reply))
+
+    app.run_polling(allowed_updates=Update.ALL_TYPES, stop_signals=None)
