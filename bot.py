@@ -234,7 +234,34 @@ async def backup(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def leave(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id == ADMIN_ID:
         await update.message.reply_text("🫡 خدافظ! تا دیدار بعدی 😂")
-        await context.bot.leave_chat(update.message.chat.id)
+        await context.bot.leave_chat(update.message.chat.id)# ======================= ♻️ بازیابی حافظه =======================
+
+async def restore(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != ADMIN_ID:
+        return await update.message.reply_text("⛔ فقط مدیر اصلی می‌تونه بازیابی انجام بده!")
+
+    await update.message.reply_text("📂 لطفاً فایل memory.json رو بفرست تا حافظه بازیابی بشه.")
+
+    # حالت انتظار فایل
+    context.user_data["awaiting_restore"] = True
+
+
+async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not update.message.document:
+        return
+
+    if not context.user_data.get("awaiting_restore"):
+        return
+
+    doc = update.message.document
+    if doc.file_name != "memory.json":
+        return await update.message.reply_text("❌ نام فایل باید دقیقاً memory.json باشه!")
+
+    file = await doc.get_file()
+    await file.download_to_drive("memory.json")
+
+    context.user_data["awaiting_restore"] = False
+    await update.message.reply_text("✅ حافظه با موفقیت بازیابی شد! حالا می‌تونی ادامه بدی 😎")
 
 # ======================= 🚀 اجرای ربات =======================
 
