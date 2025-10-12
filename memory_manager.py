@@ -15,13 +15,17 @@ def load_memory():
     with open(MEMORY_FILE, "r", encoding="utf-8") as f:
         return json.load(f)
 
-# ✅ این تابع برای سازگاری با bot.py اضافه شد
+# ✅ سازگاری با bot.py
 def load_data():
     return load_memory()
 
 def save_memory(data):
     with open(MEMORY_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
+
+# ✅ سازگاری با bot.py
+def save_data(data):
+    save_memory(data)
 
 def load_shadow():
     with open(SHADOW_FILE, "r", encoding="utf-8") as f:
