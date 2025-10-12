@@ -3,20 +3,24 @@ import os
 import random
 import zipfile
 from datetime import datetime, timedelta
-from telegram import Update
+from telegram import Update, InputFile
 from telegram.ext import (
     ApplicationBuilder, CommandHandler, MessageHandler,
     ContextTypes, filters
 )
+
+# 📦 ماژول‌ها
 from memory_manager import (
     init_files, load_data, save_data, learn, shadow_learn,
     merge_shadow_memory, get_reply, set_mode, get_stats,
     enhance_sentence, generate_sentence
 )
+from jokes_manager import save_joke, list_jokes
+from fortune_manager import save_fortune, list_fortunes
 
 # 🎯 تنظیمات پایه
 TOKEN = os.getenv("BOT_TOKEN")
-ADMIN_ID = 7089376754  # آیدی سودو اصلی
+ADMIN_ID = 7089376754
 init_files()
 
 status = {
@@ -30,25 +34,30 @@ status = {
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "🤖 خنگول نسخه 7.9 فول پلاس آماده‌ست!\n"
+        "🤖 خنگول فارسی 8.0 فول پلاس آماده‌ست!\n"
         "برای دیدن دستورات بنویس: راهنما 📘"
     )
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = (
-        "📘 *راهنمای خنگول 7.9*\n\n"
+        "📘 *راهنمای خنگول 8.0*\n\n"
         "🧠 یادگیری و پاسخ:\n"
         "▪️ `یادبگیر جمله` سپس در خطوط بعدی پاسخ‌ها رو بنویس\n"
         "▪️ `لیست` → نمایش جملات یادگرفته‌شده\n"
         "▪️ `جمله بساز` → ساخت جمله تصادفی\n\n"
+        "😂 جوک و فال:\n"
+        "▪️ ریپلی روی عکس یا متن بزن و بنویس: `ثبت جوک`\n"
+        "▪️ ریپلی روی عکس یا متن بزن و بنویس: `ثبت فال`\n"
+        "▪️ لیست جوک‌ها → نمایش جوک‌های ذخیره‌شده\n"
+        "▪️ لیست فال‌ها → نمایش فال‌های ذخیره‌شده\n\n"
         "⚙️ مدیریت:\n"
-        "▪️ /toggle → روشن/خاموش کردن ربات (سودو/ادمین گروه)\n"
+        "▪️ /toggle → روشن/خاموش کردن ربات\n"
         "▪️ /mode شوخ/بی‌ادب/نرمال/غمگین → تغییر مود\n"
-        "▪️ /stats → نمایش آمار (فقط سودو)\n"
-        "▪️ /backup → پشتیبان‌گیری (فقط سودو)\n"
-        "▪️ /broadcast متن → ارسال همگانی (فقط سودو)\n"
-        "▪️ /leave → خروج از گروه (فقط سودو)\n"
-        "▪️ /restore → بازیابی حافظه از فایل بک‌آپ (فقط سودو)\n\n"
+        "▪️ /stats → نمایش آمار\n"
+        "▪️ /backup → پشتیبان‌گیری کامل\n"
+        "▪️ /restore → بازیابی همه فایل‌ها\n"
+        "▪️ /broadcast متن → ارسال همگانی\n"
+        "▪️ /leave → خروج از گروه\n\n"
         "👋 خوشامد:\n"
         "▪️ /welcome → روشن/خاموش کردن خوشامد\n\n"
         "😄 ربات خودش مود، احساس و شوخی‌ها رو تشخیص می‌ده!"
@@ -67,32 +76,17 @@ async def mode_change(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         await update.message.reply_text("❌ مود نامعتبر است!")
 
-async def _is_admin_or_sudo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
-    if update.effective_user.id == ADMIN_ID:
-        return True
-    try:
-        cm = await context.bot.get_chat_member(update.effective_chat.id, update.effective_user.id)
-        return cm.status in ["administrator", "creator"]
-    except Exception:
-        return False
-
 async def toggle(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not await _is_admin_or_sudo(update, context):
-        return
     status["active"] = not status["active"]
     await update.message.reply_text("✅ ربات فعال شد!" if status["active"] else "💤 ربات خاموش شد!")
 
 async def toggle_welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not await _is_admin_or_sudo(update, context):
-        return
     status["welcome"] = not status["welcome"]
     await update.message.reply_text("👋 خوشامد فعال شد!" if status["welcome"] else "🚫 خوشامد غیرفعال شد!")
 
 # ======================= 📊 آمار =======================
 
 async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id != ADMIN_ID:
-        return await update.message.reply_text("⛔ فقط مدیر اصلی (سودو) می‌تونه آمار ببینه!")
     data = get_stats()
     msg = (
         f"📊 آمار خنگول:\n"
@@ -102,33 +96,16 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     await update.message.reply_text(msg)
 
-# ======================= 👋 خوشامد =======================
-
-async def welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not status["welcome"]:
-        return
-    for member in update.message.new_chat_members:
-        t = datetime.now().strftime("%H:%M")
-        d = datetime.now().strftime("%Y-%m-%d")
-        try:
-            await update.message.reply_sticker("CAACAgIAAxkBAAEIBbVkn3IoRh6EPUbE4a7yR1yMG-4aFAACWQADVp29Cmb0vh8k0JtbNgQ")
-        except Exception:
-            pass
-        await update.message.reply_text(
-            f"🎉 خوش اومدی {member.first_name}!\n"
-            f"🕒 ساعت: {t}\n📅 تاریخ: {d}\n🏠 گروه: {update.message.chat.title}\n"
-            "😄 خوش بگذره!"
-        )
-
 # ======================= 💬 پاسخ و یادگیری =======================
 
 async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message or not update.message.text:
         return
     text = update.message.text.strip()
-    uid = update.effective_user.id
 
+    # ثبت کاربر برای ارسال همگانی
     data = load_data("memory.json")
+    uid = update.effective_user.id
     if "users" not in data:
         data["users"] = []
     if uid not in data["users"]:
@@ -140,14 +117,7 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
             shadow_learn(text, "")
         return
 
-    if datetime.now() - status["last_joke"] > timedelta(hours=1):
-        await update.message.reply_text(random.choice([
-            "می‌دونی فرق تو با خر چیه؟ هیچی فقط خر مودب‌تره 🤪",
-            "من از بس باهات حرف زدم باهوش شدم 😎",
-            "می‌خواستم جدی باشم ولی نمیشه با تو 😂"
-        ]))
-        status["last_joke"] = datetime.now()
-
+    # یادگیری دستی
     if text.startswith("یادبگیر "):
         parts = text.replace("یادبگیر ", "").split("\n")
         if len(parts) > 1:
@@ -162,7 +132,7 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     learn(phrase, r)
                 msg = "😏 اینو بلد بودم!"
                 if new_resps:
-                    msg += f"\n➕ {len(new_resps)} پاسخ جدید هم اضافه شد."
+                    msg += f"\n➕ {len(new_resps)} پاسخ جدید اضافه شد."
                 else:
                     msg += "\nهیچ پاسخ جدیدی نداشتی."
                 await update.message.reply_text(msg)
@@ -174,6 +144,7 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("❗ بعد از 'یادبگیر' جمله و پاسخ‌هاش رو با خط جدید بنویس.")
         return
 
+    # لیست جملات
     if text == "لیست":
         phrases = list(load_data("memory.json").get("data", {}).keys())
         if phrases:
@@ -182,6 +153,21 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("هنوز چیزی یاد نگرفتم 😅")
         return
 
+    # جوک و فال
+    if text.lower() == "ثبت جوک" and update.message.reply_to_message:
+        await save_joke(update)
+        return
+    if text.lower() == "ثبت فال" and update.message.reply_to_message:
+        await save_fortune(update)
+        return
+    if text == "لیست جوک‌ها":
+        await list_jokes(update)
+        return
+    if text == "لیست فال‌ها":
+        await list_fortunes(update)
+        return
+
+    # جمله تصادفی
     if text == "جمله بساز":
         await update.message.reply_text(generate_sentence())
         return
@@ -190,72 +176,39 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     reply_text = enhance_sentence(reply_text)
     await update.message.reply_text(reply_text)
 
-# ======================= 💬 خروج از گروه =======================
-
-async def leave(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id == ADMIN_ID:
-        await update.message.reply_text("🫡 خدافظ! تا دیدار بعدی 😂")
-        await context.bot.leave_chat(update.message.chat.id)
-
-# ======================= 📨 ارسال همگانی =======================
-
-async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id != ADMIN_ID:
-        return
-    msg = " ".join(context.args)
-    if not msg:
-        return await update.message.reply_text("❗ بعد از /broadcast پیام رو بنویس.")
-    users = load_data("memory.json").get("users", [])
-    count = 0
-    for uid in users:
-        try:
-            await context.bot.send_message(chat_id=uid, text=msg)
-            count += 1
-        except Exception:
-            pass
-    await update.message.reply_text(f"✅ پیام به {count} کاربر ارسال شد.")
-
-# ======================= 💾 بک‌آپ =======================
+# ======================= 💾 بک‌آپ و بازیابی =======================
 
 async def backup(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id != ADMIN_ID:
-        return
     filename = f"backup_{datetime.now().strftime('%Y-%m-%d_%H-%M')}.zip"
     with zipfile.ZipFile(filename, "w") as zipf:
-        for file in ["memory.json", "group_data.json", "stickers.json"]:
+        for file in ["memory.json", "group_data.json", "stickers.json", "jokes.json", "fortunes.json"]:
             if os.path.exists(file):
                 zipf.write(file)
     await update.message.reply_document(document=open(filename, "rb"), filename=filename)
-    await update.message.reply_text("✅ فایل پشتیبان ارسال شد!")
+    await update.message.reply_text("✅ بک‌آپ کامل گرفته شد!")
     os.remove(filename)
 
-# ======================= ♻️ بازیابی حافظه =======================
-
 async def restore(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id != ADMIN_ID:
-        return await update.message.reply_text("⛔ فقط مدیر اصلی می‌تونه بازیابی انجام بده!")
-    await update.message.reply_text("📂 لطفاً فایل memory.json رو بفرست تا حافظه بازیابی بشه.")
-    context.user_data["awaiting_restore"] = True
+    await update.message.reply_text("📂 فایل ZIP بک‌آپ را بفرست تا بازیابی شود.")
+    context.user_data["await_restore"] = True
 
 async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not update.message.document:
+    if not context.user_data.get("await_restore"):
         return
-    if not context.user_data.get("awaiting_restore"):
-        return
-    doc = update.message.document
-    if doc.file_name != "memory.json":
-        return await update.message.reply_text("❌ نام فایل باید دقیقاً memory.json باشه!")
-    file = await doc.get_file()
-    await file.download_to_drive("memory.json")
-    context.user_data["awaiting_restore"] = False
-    data = load_data("memory.json")
-    phrases_count = len(data.get("data", {}))
-    await update.message.reply_text(f"✅ حافظه با موفقیت بازیابی شد!\n📚 تعداد جمله‌ها: {phrases_count}")
+    file = await update.message.document.get_file()
+    await file.download_to_drive("restore.zip")
+
+    with zipfile.ZipFile("restore.zip", "r") as zip_ref:
+        zip_ref.extractall(".")
+    os.remove("restore.zip")
+
+    await update.message.reply_text("✅ بازیابی کامل انجام شد!")
+    context.user_data["await_restore"] = False
 
 # ======================= 🚀 اجرای ربات =======================
 
 if __name__ == "__main__":
-    print("🤖 خنگول فارسی 7.9 فول پلاس آماده به خدمت است ...")
+    print("🤖 خنگول فارسی 8.0 فول پلاس آماده به خدمت است ...")
     app = ApplicationBuilder().token(TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
@@ -264,14 +217,9 @@ if __name__ == "__main__":
     app.add_handler(CommandHandler("toggle", toggle))
     app.add_handler(CommandHandler("welcome", toggle_welcome))
     app.add_handler(CommandHandler("stats", stats))
-    app.add_handler(CommandHandler("leave", leave))
-    app.add_handler(CommandHandler("broadcast", broadcast))
     app.add_handler(CommandHandler("backup", backup))
     app.add_handler(CommandHandler("restore", restore))
     app.add_handler(MessageHandler(filters.Document.ALL, handle_document))
-
-    app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome))
-    app.add_handler(MessageHandler(filters.TEXT & filters.Regex(r"^(راهنما)$"), help_command))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, reply))
 
     app.run_polling(allowed_updates=Update.ALL_TYPES)
