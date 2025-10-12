@@ -81,13 +81,27 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
+
+    # پشتیبانی از دستورات فارسی
+    if text.lower() in ["شروع", "start"]:
+        return await start(update, context)
+    if text.lower() in ["خاموش", "روشن"]:
+        return await toggle(update, context)
+    if text.lower() in ["یادگیری", "learn"]:
+        return await learn_mode(update, context)
+    if text.lower() in ["آمار", "stats"]:
+        return await stats(update, context)
+    if text.lower().startswith("مود "):
+        context.args = [text.split("مود ")[1]]
+        return await mode_change(update, context)
+
+    # اگر غیرفعال است
     if not status["active"]:
-        # یادگیری پنهان
         if status["learning"]:
             shadow_learn(text, "")
         return
 
-    # شوخی خودکار هر ساعت
+    # شوخی خودکار
     if datetime.now() - status["last_joke"] > timedelta(hours=1):
         joke = random.choice([
             "می‌دونی فرق تو با خر چیه؟ 😜 هیچی، فقط خر مودب‌تره!",
@@ -110,7 +124,7 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("❗ بعد از 'یادبگیر' بنویس جمله و پاسخ‌هاش رو با خط جدید جدا کن.")
         return
 
-    # پاسخ دادن
+    # پاسخ معمولی
     reply_text = get_reply(text)
     if not reply_text:
         return
@@ -124,12 +138,12 @@ if __name__ == "__main__":
     print("🤖 خنگول 6.0 آماده به خدمت است...")
     app = ApplicationBuilder().token(TOKEN).build()
 
-    app.add_handler(CommandHandler(["start", "شروع"], start))
-    app.add_handler(CommandHandler(["toggle", "روشن"], toggle))
-    app.add_handler(CommandHandler(["learn", "یادگیری"], learn_mode))
-    app.add_handler(CommandHandler(["mode", "مود"], mode_change))
-    app.add_handler(CommandHandler(["stats", "آمار"], stats))
-    app.add_handler(CommandHandler(["leave", "خروج"], leave_group))
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("toggle", toggle))
+    app.add_handler(CommandHandler("learn", learn_mode))
+    app.add_handler(CommandHandler("mode", mode_change))
+    app.add_handler(CommandHandler("stats", stats))
+    app.add_handler(CommandHandler("leave", leave_group))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, reply))
 
     app.run_polling()
