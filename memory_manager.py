@@ -69,18 +69,33 @@ def learn(phrase, *responses):
     # اگه هیچ پاسخ جدیدی نبود
     return "😏 اینو بلد بودم!\nهیچ پاسخ جدیدی نداشتی."
 
-# ========================= 🧠 یادگیری در سایه =========================
+# ========================= 🌙 یادگیری خودکار در سایه =========================
 def shadow_learn(phrase, response):
-    """یادگیری غیر فعال (در سایه) برای ذخیره داده‌ها بدون تکرار"""
+    """یادگیری خودکار در سایه — یادگیری غیرفعال ولی هوشمند"""
+    if not phrase or not response:
+        return
+
     shadow = load_data("shadow_memory.json")
     data = shadow.get("data", {})
 
-    if phrase not in data:
-        data[phrase] = []
+    phrase = phrase.strip()
+    response = response.strip()
 
+    # اگر جمله جدید بود
+    if phrase not in data:
+        data[phrase] = [response]
+        save_data("shadow_memory.json", shadow)
+        print(f"🌙 [Shadow Learn] جمله جدید: '{phrase}' → '{response}'")
+        return
+
+    # اگر جمله وجود داشت ولی پاسخ جدید بود
     if response not in data[phrase]:
         data[phrase].append(response)
         save_data("shadow_memory.json", shadow)
+        print(f"🌙 [Shadow Learn] پاسخ جدید برای '{phrase}' افزوده شد.")
+    else:
+        # یاد گرفته بود، اما نیاز به ذخیره دوباره نیست
+        print(f"🌙 [Shadow Learn] تکراری بود، رد شد.")
 
 # ========================= 💬 پاسخ‌دهی =========================
 def get_reply(text):
@@ -130,29 +145,4 @@ def list_phrases(limit=50):
     if not phrases:
         return "😅 هنوز چیزی یاد نگرفتم!"
     show = phrases[:limit]
-    return "🧾 جملات یادگرفته‌شده:\n\n" + "\n".join(show)def shadow_learn(phrase, response):
-    """یادگیری خودکار در سایه — یادگیری غیرفعال ولی هوشمند"""
-    if not phrase or not response:
-        return
-
-    shadow = load_data("shadow_memory.json")
-    data = shadow.get("data", {})
-
-    phrase = phrase.strip()
-    response = response.strip()
-
-    # اگر جمله جدید بود
-    if phrase not in data:
-        data[phrase] = [response]
-        save_data("shadow_memory.json", shadow)
-        print(f"🌙 [Shadow Learn] جمله جدید: '{phrase}' → '{response}'")
-        return
-
-    # اگر جمله وجود داشت ولی پاسخ جدید بود
-    if response not in data[phrase]:
-        data[phrase].append(response)
-        save_data("shadow_memory.json", shadow)
-        print(f"🌙 [Shadow Learn] پاسخ جدید برای '{phrase}' افزوده شد.")
-    else:
-        # یاد گرفته بود، اما نیاز به ذخیره دوباره نیست
-        print(f"🌙 [Shadow Learn] تکراری بود، رد شد.")
+    return "🧾 جملات یادگرفته‌شده:\n\n" + "\n".join(show)
