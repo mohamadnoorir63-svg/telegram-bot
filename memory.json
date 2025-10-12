@@ -1,5 +1,7 @@
 {
-  "learning": true,
   "active": true,
-  "chats": {}
+  "learning": true,
+  "mood": "normal",
+  "replies": {},
+  "groups": []
 }
