@@ -37,7 +37,7 @@ status = {
 # ======================= ✳️ شروع و پیام فعال‌سازی =======================
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "🤖 خنگول فارسی 8.5.1 Cloud+ Supreme Pro Stable+ Adamson Edition\n"
+        "🤖 خنگول فارسی 8.5.1 Cloud+ Supreme Pro Stable+\n"
         "📘 برای دیدن لیست دستورات بنویس: راهنما"
     )
 
@@ -45,7 +45,7 @@ async def notify_admin_on_startup(app):
     try:
         await app.bot.send_message(
             chat_id=ADMIN_ID,
-            text="🚀 Adamson Edition با موفقیت فعال شد ✅"
+            text="🚀 ربات خنگول 8.5.1 Cloud+ Supreme Pro Stable+ با موفقیت فعال شد ✅"
         )
         print("[INFO] Startup notification sent ✅")
     except Exception as e:
@@ -63,22 +63,32 @@ async def handle_error(update: object, context: ContextTypes.DEFAULT_TYPE):
 # ======================= 📘 راهنما =======================
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = (
-        "📘 راهنمای Adamson Edition:\n\n"
+        "📘 راهنمای خنگول فارسی 8.5.1 Cloud+ Supreme Pro Stable+\n\n"
         "🧠 یادگیری:\n"
         "▪️ یادبگیر جمله سپس در خطوط بعد پاسخ‌ها رو بنویس\n"
         "▪️ لیست → نمایش جملات یادگرفته‌شده\n"
         "▪️ جمله بساز → ساخت جمله تصادفی\n\n"
         "😂 جوک و فال:\n"
-        "▪️ ثبت جوک یا ثبت فال با ریپلای (متن، عکس، ویدیو، استیکر)\n"
+        "▪️ ثبت جوک یا ثبت فال با ریپلای\n"
         "▪️ لیست جوک‌ها و لیست فال‌ها\n"
         "▪️ بنویس «جوک» یا «فال» برای تصادفی\n\n"
         "☁️ بک‌آپ:\n"
-        "▫️ /cloudsync → بک‌آپ ابری\n"
-        "▫️ /backup → فشرده در چت\n\n"
+        "▫️ خودکار هر ۱۲ ساعت برای سودو\n"
+        "▫️ /cloudsync → بک‌آپ ابری دستی\n"
+        "▫️ شامل json، عکس، صدا و استیکرها\n\n"
         "⚙️ مدیریت:\n"
-        "▪️ /toggle ▪️ /welcome ▪️ /mode ▪️ /stats ▪️ /fullstats ▪️ /reset ▪️ /reload"
+        "▪️ /toggle → روشن/خاموش کردن ربات\n"
+        "▪️ /welcome → فعال/غیرفعال کردن خوشامد\n"
+        "▪️ /mode شوخ / غمگین / نرمال / بی‌ادب\n"
+        "▪️ /stats → آمار خلاصه\n"
+        "▪️ /fullstats → آمار کامل گروه‌ها\n"
+        "▪️ /backup → بک‌آپ ZIP در چت\n"
+        "▪️ /reset → پاک‌کردن کامل داده‌ها\n"
+        "▪️ /reload → بارگذاری مجدد حافظه\n"
+        "▪️ /broadcast → ارسال همگانی\n"
+        "▪️ /leave → خروج از گروه\n"
     )
-    await update.message.reply_text(text)
+    await update.message.reply_text(text, parse_mode="Markdown")
 
 # ======================= 🎭 تغییر مود =======================
 async def mode_change(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -100,14 +110,22 @@ async def toggle_welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
     status["welcome"] = not status["welcome"]
     await update.message.reply_text("👋 خوشامد فعال شد!" if status["welcome"] else "🚫 خوشامد غیرفعال شد!")
 
-# ======================= 📊 آمار =======================
+async def lock_learning(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    status["locked"] = True
+    await update.message.reply_text("🔒 یادگیری قفل شد!")
+
+async def unlock_learning(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    status["locked"] = False
+    await update.message.reply_text("🔓 یادگیری باز شد!")
+
+# ======================= 📊 آمار خلاصه =======================
 async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data = get_stats()
     memory = load_data("memory.json")
     groups = len(load_data("group_data.json").get("groups", []))
     users = len(memory.get("users", []))
     msg = (
-        f"📊 آمار ربات:\n"
+        f"📊 آمار خنگول:\n"
         f"👤 کاربران: {users}\n"
         f"👥 گروه‌ها: {groups}\n"
         f"🧩 جملات: {data['phrases']}\n"
@@ -116,7 +134,107 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     await update.message.reply_text(msg)
 
-# ======================= 💬 پاسخ، یادگیری، جوک و فال =======================
+# ======================= 📊 آمار کامل گروه‌ها =======================
+async def fullstats(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    data = load_data("group_data.json")
+    groups = data.get("groups", [])
+
+    if not groups:
+        return await update.message.reply_text("ℹ️ هنوز هیچ گروهی ثبت نشده.")
+
+    text = "📈 آمار کامل گروه‌ها و اعضا:\n\n"
+
+    for g in groups:
+        title = g.get("title", "بدون‌نام")
+        members = len(g.get("members", []))
+        last_active = g.get("last_active", "نامشخص")
+        text += f"🏠 گروه: {title}\n👥 اعضا: {members}\n🕓 آخرین فعالیت: {last_active}\n\n"
+
+    if len(text) > 4000:
+        text = text[:3990] + "..."
+
+    await update.message.reply_text(text)
+
+# ======================= 👋 خوشامد با عکس پروفایل =======================
+async def welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not status["welcome"]:
+        return
+    for member in update.message.new_chat_members:
+        now = datetime.now().strftime("%Y-%m-%d %H:%M")
+        text = (
+            f"🎉 خوش اومدی {member.first_name}!\n"
+            f"📅 {now}\n"
+            f"🏠 گروه: {update.message.chat.title}\n"
+            f"😄 امیدوارم لحظات خوبی داشته باشی!"
+        )
+        try:
+            photos = await context.bot.get_user_profile_photos(member.id, limit=1)
+            if photos.total_count > 0:
+                file_id = photos.photos[0][-1].file_id
+                await update.message.reply_photo(file_id, caption=text)
+            else:
+                await update.message.reply_text(text)
+        except:
+            await update.message.reply_text(text)
+
+# ======================= ☁️ بک‌آپ خودکار و دستی =======================
+async def auto_backup(context: ContextTypes.DEFAULT_TYPE):
+    while True:
+        await asyncio.sleep(43200)
+        await cloudsync_internal(context.bot, "Auto Backup")
+
+async def cloudsync_internal(bot, reason="Manual Backup"):
+    now = datetime.now().strftime("%Y-%m-%d_%H-%M")
+    filename = f"backup_{now}.zip"
+
+    with zipfile.ZipFile(filename, "w") as zipf:
+        for root, _, files in os.walk("."):
+            for file in files:
+                if file.endswith((".json", ".jpg", ".png", ".webp", ".mp3", ".ogg", ".zip")):
+                    path = os.path.join(root, file)
+                    zipf.write(path)
+
+    try:
+        await bot.send_document(chat_id=ADMIN_ID, document=open(filename, "rb"), filename=filename)
+        await bot.send_message(chat_id=ADMIN_ID, text=f"☁️ {reason} انجام شد ✅")
+    except Exception as e:
+        print(f"[CLOUD BACKUP ERROR] {e}")
+    finally:
+        os.remove(filename)
+
+async def cloudsync(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != ADMIN_ID:
+        return
+    await cloudsync_internal(context.bot, "Manual Cloud Backup")
+
+# ======================= 💾 بک‌آپ و بازیابی ZIP در چت =======================
+async def backup(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    filename = f"backup_{datetime.now().strftime('%Y-%m-%d_%H-%M')}.zip"
+    with zipfile.ZipFile(filename, "w") as zipf:
+        for root, _, files in os.walk("."):
+            for file in files:
+                if file.endswith((".json", ".jpg", ".png", ".webp", ".mp3", ".ogg")):
+                    zipf.write(os.path.join(root, file))
+    await update.message.reply_document(document=open(filename, "rb"), filename=filename)
+    await update.message.reply_text("✅ بک‌آپ کامل گرفته شد!")
+    os.remove(filename)
+
+
+async def restore(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("📂 فایل ZIP بک‌آپ را ارسال کن تا بازیابی شود.")
+    context.user_data["await_restore"] = True
+
+
+async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not context.user_data.get("await_restore"):
+        return
+    file = await update.message.document.get_file()
+    await file.download_to_drive("restore.zip")
+    with zipfile.ZipFile("restore.zip", "r") as zip_ref:
+        zip_ref.extractall(".")
+    os.remove("restore.zip")
+    context.user_data["await_restore"] = False
+    await update.message.reply_text("✅ بازیابی کامل انجام شد!")# ======================= 💬 پاسخ، یادگیری، جوک و فال =======================
 async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message or not update.message.text:
         return
@@ -127,6 +245,7 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     register_group_activity(chat_id, uid)
     if not status["locked"]:
         auto_learn_from_text(text)
+
     if not status["active"]:
         shadow_learn(text, "")
         return
@@ -136,20 +255,11 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if os.path.exists("jokes.json"):
             data = load_data("jokes.json")
             if data:
-                key, val = random.choice(list(data.items()))
-                t, v = val.get("type"), val.get("value")
-                if t == "text":
-                    await update.message.reply_text("😂 " + v)
-                elif t == "photo":
-                    await update.message.reply_photo(open(v, "rb"), caption="😂 جوک تصویری!")
-                elif t == "sticker":
-                    await update.message.reply_sticker(open(v, "rb"))
-                elif t == "video":
-                    await update.message.reply_video(open(v, "rb"))
+                await update.message.reply_text("😂 " + random.choice(list(data.values())))
             else:
-                await update.message.reply_text("😅 هنوز جوکی ثبت نشده.")
+                await update.message.reply_text("هنوز جوکی ثبت نشده 😅")
         else:
-            await update.message.reply_text("📂 فایل جوک‌ها وجود ندارد.")
+            await update.message.reply_text("📂 فایل جوک‌ها پیدا نشد 😕")
         return
 
     # ✅ فال تصادفی
@@ -157,23 +267,14 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if os.path.exists("fortunes.json"):
             data = load_data("fortunes.json")
             if data:
-                key, val = random.choice(list(data.items()))
-                t, v = val.get("type"), val.get("value")
-                if t == "text":
-                    await update.message.reply_text("🔮 " + v)
-                elif t == "photo":
-                    await update.message.reply_photo(open(v, "rb"), caption="🔮 فال تصویری!")
-                elif t == "sticker":
-                    await update.message.reply_sticker(open(v, "rb"))
-                elif t == "video":
-                    await update.message.reply_video(open(v, "rb"))
+                await update.message.reply_text("🔮 " + random.choice(list(data.values())))
             else:
-                await update.message.reply_text("😔 هنوز فالی ثبت نشده.")
+                await update.message.reply_text("هنوز فالی ثبت نشده 😔")
         else:
-            await update.message.reply_text("📂 فایل فال‌ها وجود ندارد.")
+            await update.message.reply_text("📂 فایل فال‌ها پیدا نشد 😕")
         return
 
-    # ✅ ثبت جوک یا فال
+    # ✅ ثبت جوک و فال
     if text.lower() == "ثبت جوک" and update.message.reply_to_message:
         await save_joke(update)
         return
@@ -187,6 +288,23 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     if text == "لیست فال‌ها":
         await list_fortunes(update)
+        return
+
+    # ✅ لیست جملات
+    if text == "لیست":
+        await update.message.reply_text(list_phrases())
+        return
+
+    # ✅ یادگیری هوشمند
+    if text.startswith("یادبگیر "):
+        parts = text.replace("یادبگیر ", "").split("\n")
+        if len(parts) > 1:
+            phrase = parts[0].strip()
+            responses = [p.strip() for p in parts[1:] if p.strip()]
+            msg = learn(phrase, *responses)
+            await update.message.reply_text(msg)
+        else:
+            await update.message.reply_text("❗ بعد از 'یادبگیر' جمله و پاسخ‌هاش رو با خط جدید بنویس.")
         return
 
     # ✅ جمله تصادفی
@@ -207,33 +325,70 @@ async def reset_memory(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if os.path.exists(f):
             os.remove(f)
     init_files()
-    await update.message.reply_text("🧹 همه داده‌ها پاک شد!")
+    await update.message.reply_text("🧹 تمام داده‌ها با موفقیت پاک شدند!")
 
 async def reload_memory(update: Update, context: ContextTypes.DEFAULT_TYPE):
     init_files()
     await update.message.reply_text("🔄 حافظه بارگذاری مجدد شد!")
 
+# ======================= 📨 ارسال همگانی =======================
+async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != ADMIN_ID:
+        return
+    msg = " ".join(context.args)
+    if not msg:
+        return await update.message.reply_text("❗ بعد از /broadcast پیام را بنویس.")
+    users = load_data("memory.json").get("users", [])
+    sent = 0
+    for uid in users:
+        try:
+            await context.bot.send_message(chat_id=uid, text=msg)
+            sent += 1
+        except:
+            pass
+    await update.message.reply_text(f"📨 پیام به {sent} کاربر ارسال شد ✅")
+
+# ======================= 🚪 خروج از گروه =======================
+async def leave(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id == ADMIN_ID:
+        await update.message.reply_text("🫡 خدافظ! تا دیدار بعدی 😂")
+        await context.bot.leave_chat(update.message.chat.id)
+
 # ======================= 🚀 اجرای نهایی =======================
-if __name__ == "__main__":
-    print("🤖 Adamson Edition آماده به خدمت است ...")
+if name == "main":
+    print("🤖 خنگول فارسی 8.5.1 Cloud+ Supreme Pro Stable+ آماده به خدمت است ...")
 
     app = ApplicationBuilder().token(TOKEN).build()
     app.add_error_handler(handle_error)
 
-    # 🧩 دستورات
+    # 🔹 دستورات اصلی
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("help", help_command))
+    app.add_handler(CommandHandler("toggle", toggle))
+    app.add_handler(CommandHandler("welcome", toggle_welcome))
+    app.add_handler(CommandHandler("lock", lock_learning))
+    app.add_handler(CommandHandler("unlock", unlock_learning))
     app.add_handler(CommandHandler("mode", mode_change))
     app.add_handler(CommandHandler("stats", stats))
+    app.add_handler(CommandHandler("fullstats", fullstats))
+    app.add_handler(CommandHandler("backup", backup))
+    app.add_handler(CommandHandler("restore", restore))
     app.add_handler(CommandHandler("reset", reset_memory))
     app.add_handler(CommandHandler("reload", reload_memory))
+    app.add_handler(CommandHandler("broadcast", broadcast))
+    app.add_handler(CommandHandler("cloudsync", cloudsync))
+    app.add_handler(CommandHandler("leave", leave))
 
-    # 💬 پیام‌ها
+    # 🔹 پیام‌ها و اسناد
+    app.add_handler(MessageHandler(filters.Document.ALL, handle_document))
+    app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, reply))
 
+    # 🔹 هنگام استارت
     async def on_startup(app):
         await notify_admin_on_startup(app)
-        print("🌙 [SYSTEM] Adamson Edition Active ✅")
+        app.create_task(auto_backup(app))
+        print("🌙 [SYSTEM] Startup tasks scheduled ✅")
 
     app.post_init = on_startup
     app.run_polling(allowed_updates=Update.ALL_TYPES)
