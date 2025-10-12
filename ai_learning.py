@@ -1,46 +1,39 @@
 import re
-from memory_manager import learn
+from memory_manager import learn, load_data, save_data
 
-# ======================= 🧠 یادگیری خودکار =======================
-
-def clean_text(text: str) -> str:
-    """پاک‌سازی متن از کاراکترهای اضافی"""
-    text = re.sub(r'[^\w\sآ-ی]', '', text)
-    return text.strip().lower()
-
+# 🧠 یادگیری خودکار بر اساس الگوی ساده جمله‌ها
 def auto_learn_from_text(text: str):
-    """
-    یادگیری خودکار از پیام‌ها:
-    اگر جمله دارای نشانه‌ی پرسش و پاسخ باشد (مثلاً شامل "؟" یا "!" و جمله بعدی)
-    آن را به‌صورت خودکار ذخیره می‌کند.
-    """
-    if not text or len(text) < 5:
+    """یادگیری خودکار از ساختار جمله‌های کاربران"""
+    if not text or len(text) < 4:
         return
 
-    # بررسی برای ساختار پرسش و پاسخ
-    if "؟" in text or "?" in text:
-        question = clean_text(text)
-        fake_response = "نمیدونم دقیق 😅"
-        learn(question, fake_response)
+    memory = load_data("memory.json")
+    data = memory.get("data", {})
 
-    elif "!" in text:
-        exclamation = clean_text(text)
-        learn(exclamation, "عه چه جالب! 😄")
+    # الگوهای ساده برای پرسش/پاسخ
+    questions = ["?", "چطوری", "کجایی", "چیکار می‌کنی", "اسمت چیه"]
+    answers = ["خوبم", "اینجام", "در حال خدمت 🤖", "اسمم خنگوله 😅"]
 
-    elif text.endswith(("هه", "😂", "😅")):
-        learn(clean_text(text), "می‌خندم باهات 😆")
+    for q, a in zip(questions, answers):
+        if q in text:
+            if q not in data:
+                learn(q, a)
+            else:
+                if a not in data[q]:
+                    data[q].append(a)
+                    save_data("memory.json", memory)
+            break
 
-# ======================= 🤫 یادگیری زمینه‌ای =======================
-
-def contextual_learning(prev_message: str, reply_message: str):
-    """
-    اگر کاربر پاسخی به پیام قبلی داد،
-    جمله‌ی قبلی را به‌عنوان «پرسش» و پاسخ فعلی را به‌عنوان «پاسخ» ذخیره می‌کند.
-    """
-    if not prev_message or not reply_message:
+# ✨ نسخه‌ی جدید دارای auto-clean برای جلوگیری از تکرار زیاد
+def clean_duplicates():
+    mem = load_data("memory.json")
+    if not mem.get("data"):
         return
-
-    prev = clean_text(prev_message)
-    reply = clean_text(reply_message)
-    if len(prev) > 2 and len(reply) > 2:
-        learn(prev, reply)
+    changed = False
+    for k, v in mem["data"].items():
+        unique = list(set(v))
+        if len(unique) != len(v):
+            mem["data"][k] = unique
+            changed = True
+    if changed:
+        save_data("memory.json", mem)
