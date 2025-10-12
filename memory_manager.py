@@ -35,22 +35,43 @@ def save_data(file, data):
     except Exception as e:
         print(f"❌ خطا در ذخیره {file}: {e}")
 
-# ========================= 🧠 یادگیری و پاسخ =========================
-def learn(phrase, response):
-    mem = load_data("memory.json")
-    data = mem.get("data", {})
+# ========================= 🧠 یادگیری هوشمند =========================
+def learn(phrase, *responses):
+    """یادگیری هوشمند با تشخیص جمله تکراری، پاسخ جدید و آمار آموزشی"""
+    data = load_data("memory.json")
 
-    if phrase not in data:
-        data[phrase] = []
+    if "data" not in data:
+        data["data"] = {}
 
-    if response not in data[phrase]:
-        data[phrase].append(response)
-        save_data("memory.json", mem)
-        print(f"🧠 یادگیری: {phrase} → {response}")
-    else:
-        print("⚙️ تکراری، یاد نگرفت.")
+    phrase = phrase.strip()
+    responses = [r.strip() for r in responses if r.strip()]
 
+    if not responses:
+        return "❗ هیچ پاسخی برای یادگیری ارسال نشد."
+
+    # اگه جمله جدید بود
+    if phrase not in data["data"]:
+        data["data"][phrase] = list(set(responses))
+        save_data("memory.json", data)
+        return f"🧠 یاد گرفتم {len(responses)} پاسخ برای '{phrase}'!"
+
+    # اگر جمله تکراریه ولی پاسخ‌های جدید داره
+    old_responses = set(data["data"][phrase])
+    new_responses = [r for r in responses if r not in old_responses]
+
+    if new_responses:
+        data["data"][phrase].extend(new_responses)
+        save_data("memory.json", data)
+        msg = f"😏 اینو بلد بودم!\n"
+        msg += f"➕ {len(new_responses)} پاسخ جدید هم اضافه شد."
+        return msg
+
+    # اگه هیچ پاسخ جدیدی نبود
+    return "😏 اینو بلد بودم!\nهیچ پاسخ جدیدی نداشتی."
+
+# ========================= 🧠 یادگیری در سایه =========================
 def shadow_learn(phrase, response):
+    """یادگیری غیر فعال (در سایه) برای ذخیره داده‌ها بدون تکرار"""
     shadow = load_data("shadow_memory.json")
     data = shadow.get("data", {})
 
@@ -61,6 +82,7 @@ def shadow_learn(phrase, response):
         data[phrase].append(response)
         save_data("shadow_memory.json", shadow)
 
+# ========================= 💬 پاسخ‌دهی =========================
 def get_reply(text):
     mem = load_data("memory.json")
     data = mem.get("data", {})
@@ -71,7 +93,7 @@ def get_reply(text):
         return random.choice(data[key])
     return None
 
-# ========================= ✨ ابزارهای پیشرفته =========================
+# ========================= 📊 آمار و اطلاعات =========================
 def get_stats():
     mem = load_data("memory.json")
     total_phrases = len(mem.get("data", {}))
@@ -84,6 +106,7 @@ def set_mode(mode):
     mem["mode"] = mode
     save_data("memory.json", mem)
 
+# ========================= ✨ بهبود و جمله تصادفی =========================
 def enhance_sentence(sentence):
     if not sentence:
         return "🤔 نمی‌دونم چی بگم!"
@@ -98,3 +121,13 @@ def generate_sentence():
     phrase = random.choice(list(data.keys()))
     resp = random.choice(data[phrase])
     return f"{phrase} → {resp}"
+
+# ========================= 📋 نمایش لیست جملات =========================
+def list_phrases(limit=50):
+    """برگرداندن لیست جملات یادگرفته‌شده برای دستور 'لیست'"""
+    mem = load_data("memory.json")
+    phrases = list(mem.get("data", {}).keys())
+    if not phrases:
+        return "😅 هنوز چیزی یاد نگرفتم!"
+    show = phrases[:limit]
+    return "🧾 جملات یادگرفته‌شده:\n\n" + "\n".join(show)
