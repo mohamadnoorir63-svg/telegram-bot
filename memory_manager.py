@@ -4,9 +4,14 @@ import os
 MEMORY_FILE = "memory.json"
 SHADOW_FILE = "shadow_memory.json"
 
-def load_memory():
+def init_files():
+    """اگر فایل‌های حافظه وجود نداشتن، بسازشون"""
     if not os.path.exists(MEMORY_FILE):
         save_memory({"replies": {}, "learning": True, "mode": "normal"})
+    if not os.path.exists(SHADOW_FILE):
+        save_shadow({"hidden": {}})
+
+def load_memory():
     with open(MEMORY_FILE, "r", encoding="utf-8") as f:
         return json.load(f)
 
@@ -15,8 +20,6 @@ def save_memory(data):
         json.dump(data, f, ensure_ascii=False, indent=2)
 
 def load_shadow():
-    if not os.path.exists(SHADOW_FILE):
-        save_shadow({"hidden": {}})
     with open(SHADOW_FILE, "r", encoding="utf-8") as f:
         return json.load(f)
 
