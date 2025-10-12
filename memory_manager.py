@@ -2,13 +2,12 @@ import json
 import random
 import os
 
-# 📂 مسیر فایل‌های حافظه
-MAIN_MEMORY = "memory.json"
-SHADOW_MEMORY = "shadow_memory.json"
-GROUP_MEMORY = "group_data.json"
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+MAIN_MEMORY = os.path.join(BASE_DIR, "memory.json")
+SHADOW_MEMORY = os.path.join(BASE_DIR, "shadow_memory.json")
+GROUP_MEMORY = os.path.join(BASE_DIR, "group_data.json")
 
-
-# 🧠 ایجاد فایل‌ها در صورت نبودن
+# 🧠 اگر فایل‌ها وجود نداشتن، بسازشون
 def init_files():
     for file_name, default_data in [
         (MAIN_MEMORY, {"replies": {}, "learning": True, "mode": "normal"}),
@@ -19,40 +18,28 @@ def init_files():
             with open(file_name, "w", encoding="utf-8") as f:
                 json.dump(default_data, f, ensure_ascii=False, indent=2)
 
-
-# 📖 خواندن داده‌ها از فایل
 def load_data(file_name):
     with open(file_name, "r", encoding="utf-8") as f:
         return json.load(f)
 
-
-# 💾 ذخیره داده‌ها در فایل
 def save_data(file_name, data):
     with open(file_name, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
-
-# 🎭 گرفتن مود فعلی (شوخ، بی‌ادب، غمگین، نرمال)
 def get_mode():
     data = load_data(MAIN_MEMORY)
     return data.get("mode", "normal")
 
-
-# ✍️ تغییر مود فعلی
 def set_mode(new_mode):
     data = load_data(MAIN_MEMORY)
     data["mode"] = new_mode
     save_data(MAIN_MEMORY, data)
 
-
-# 💡 یادگیری جمله و پاسخ جدید
+# 💡 یادگیری جدید
 def learn(phrase, response):
     data = load_data(MAIN_MEMORY)
     phrase = phrase.lower().strip()
     response = response.strip()
-
-    if "replies" not in data:
-        data["replies"] = {}
 
     if phrase not in data["replies"]:
         data["replies"][phrase] = []
@@ -62,15 +49,11 @@ def learn(phrase, response):
 
     save_data(MAIN_MEMORY, data)
 
-
-# 🕵️ یادگیری پنهان (وقتی ربات خاموشه)
+# 🕵️ یادگیری پنهان
 def shadow_learn(phrase, response):
     data = load_data(SHADOW_MEMORY)
     phrase = phrase.lower().strip()
     response = response.strip()
-
-    if "hidden" not in data:
-        data["hidden"] = {}
 
     if phrase not in data["hidden"]:
         data["hidden"][phrase] = []
@@ -80,8 +63,7 @@ def shadow_learn(phrase, response):
 
     save_data(SHADOW_MEMORY, data)
 
-
-# 🔁 ادغام حافظه پنهان با اصلی
+# 🔁 ترکیب حافظه پنهان
 def merge_shadow_memory():
     main = load_data(MAIN_MEMORY)
     shadow = load_data(SHADOW_MEMORY)
@@ -98,8 +80,7 @@ def merge_shadow_memory():
     save_data(MAIN_MEMORY, main)
     save_data(SHADOW_MEMORY, shadow)
 
-
-# 🎲 گرفتن پاسخ تصادفی
+# 🎲 پاسخ تصادفی
 def get_reply(text):
     data = load_data(MAIN_MEMORY)
     replies = data.get("replies", {})
@@ -108,10 +89,7 @@ def get_reply(text):
     if text in replies:
         return random.choice(replies[text])
 
-    # اگر جمله‌ای بلد نبود، خودش یه جواب بسازه 😄
-    random_words = ["عه 😅", "جدی میگی؟", "اوهوم", "نمی‌دونم والا", "باحاله 😎", "عه، جالبه!"]
-    return random.choice(random_words)
-
+    return random.choice(["عه", "باشه", "جالبه 😅", "نمی‌دونم والا", "اوه", "هه"])
 
 # 📊 آمار حافظه
 def get_stats():
@@ -125,14 +103,12 @@ def get_stats():
         "mode": mode,
     }
 
-
-# ✨ بهبود طبیعی جملات (ادبیات متفاوت)
+# 🧩 تغییر طبیعی جمله
 def enhance_sentence(sentence):
     replacements = {
         "خوب": ["عالی", "باحال", "اوکی"],
-        "نه": ["نچ", "اصلاً", "نخیر"],
+        "نه": ["نچ", "اصلاً", "بیخیال"],
         "آره": ["آرههه", "اوهوم", "قطعاً"],
-        "سلام": ["سلام سلام! 😁", "درود بر تو!", "سلام به روی ماهت 😎"]
     }
 
     words = sentence.split()
