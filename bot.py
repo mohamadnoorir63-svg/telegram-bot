@@ -27,52 +27,18 @@ init_files()
 # 🔄 وضعیت برای کنترل یادگیری و فعال بودن ربات
 status = {"active": True, "learning": True, "last_joke": datetime.now()}
 
-# ========================= 🎭 تنظیم مودها =========================
 
-def mood_tone(reply_text):
-    """تنظیم لحن پاسخ بر اساس مود فعلی"""
-    mode = get_mode()
-
-    if mode == "شوخ":
-        extras = ["😂", "😜", "🤣", "😆", "😉"]
-        reply_text = random.choice(["عه! ", "ههه ", "بامزه شد 😁 ", ""]) + reply_text
-        reply_text += " " + random.choice(extras)
-
-    elif mode == "بی‌ادب":
-        tones = [
-            "اوه تو بازم پیدات شد 😏",
-            "ببین کی اومده، نابغه قرن 😂",
-            "چی می‌خوای الان؟ 😒",
-            "باز شروع کردی آره؟ 😏"
-        ]
-        if random.random() < 0.5:
-            reply_text = random.choice(tones)
-        else:
-            reply_text += random.choice([" 😏", " 😒", " 🙄"])
-
-    elif mode == "غمگین":
-        reply_text = "😔 " + random.choice([
-            "حوصله ندارم ولی باشه...",
-            "همه چی یه روزی تموم میشه...",
-            "می‌نویسم ولی دلم گرفته...",
-            "اه، چرا همیشه غمگینه همه چی؟"
-        ])
-
-    elif mode == "نرمال":
-        reply_text = reply_text
-
-    return reply_text
-
-
-# ========================= ✳️ دستورات اصلی =========================
+# ========================= ✳️ دستورات =========================
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = "😜 نصب خنگول با موفقیت انجام شد!\n\nبیا ببینم چی می‌خوای ازم یاد بگیری!"
     await update.message.reply_text(msg)
 
+
 async def toggle(update: Update, context: ContextTypes.DEFAULT_TYPE):
     status["active"] = not status["active"]
     await update.message.reply_text("✅ خنگول فعال شد!" if status["active"] else "💤 خنگول خاموش شد!")
+
 
 async def learn_mode(update: Update, context: ContextTypes.DEFAULT_TYPE):
     status["learning"] = not status["learning"]
@@ -82,9 +48,10 @@ async def learn_mode(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         await update.message.reply_text("😴 یادگیری خاموش شد (در حالت پنهان ادامه دارد!)")
 
+
 async def mode_change(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.args:
-        await update.message.reply_text("🎭 دستور استفاده: /مود شوخ / بی‌ادب / غمگین / نرمال")
+        await update.message.reply_text("🎭 دستور استفاده: /mode شوخ / بی‌ادب / غمگین / نرمال")
         return
     mood = context.args[0].lower()
     if mood in ["شوخ", "بی‌ادب", "غمگین", "نرمال"]:
@@ -93,20 +60,25 @@ async def mode_change(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         await update.message.reply_text("❌ مود نامعتبر است!")
 
+
 async def leave_group(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.message.chat.type != "private":
         await update.message.reply_text("🫡 خدافظ! من رفتم ولی دلم برات تنگ میشه 😂")
         await context.bot.leave_chat(update.message.chat_id)
 
+
 async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data = get_stats()
     msg = (
         f"📊 آمار خنگول:\n"
-        f"• جملات یادگرفته‌شده: {data['phrases']}\n"
+        f"• تعداد جملات: {data['phrases']}\n"
         f"• پاسخ‌ها: {data['responses']}\n"
         f"• مود فعلی: {data['mode']}\n"
     )
-    await update.message.reply_text(msg)# ========================= ⚙️ پنل مدیر =========================
+    await update.message.reply_text(msg)
+
+
+# ========================= ⚙️ پنل مدیر =========================
 
 async def admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_ID:
@@ -216,10 +188,9 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("❗ بعد از 'یادبگیر' بنویس جمله و پاسخ‌هاش رو با خط جدید جدا کن.")
         return
 
-    # پاسخ دادن با حالت مود هوشمند
+    # پاسخ دادن
     reply_text = get_reply(text)
     reply_text = enhance_sentence(reply_text)
-    reply_text = mood_tone(reply_text)
     await update.message.reply_text(reply_text)
 
 
@@ -229,13 +200,14 @@ if __name__ == "__main__":
     print("🤖 خنگول فارسی 6.2 آماده به خدمت است ...")
     app = ApplicationBuilder().token(TOKEN).build()
 
-    app.add_handler(CommandHandler("شروع", start))
-    app.add_handler(CommandHandler("پنل", admin_panel))
-    app.add_handler(CommandHandler("خاموش", toggle))
-    app.add_handler(CommandHandler("یادگیری", learn_mode))
-    app.add_handler(CommandHandler("مود", mode_change))
-    app.add_handler(CommandHandler("آمار", stats))
-    app.add_handler(CommandHandler("لفت", leave_group))
+    # دستورات (فقط انگلیسی چون تلگرام فارسی قبول نمی‌کنه)
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("panel", admin_panel))
+    app.add_handler(CommandHandler("toggle", toggle))
+    app.add_handler(CommandHandler("learn", learn_mode))
+    app.add_handler(CommandHandler("mode", mode_change))
+    app.add_handler(CommandHandler("stats", stats))
+    app.add_handler(CommandHandler("leave", leave_group))
     app.add_handler(CallbackQueryHandler(admin_callback))
 
     app.add_handler(MessageHandler(filters.TEXT & filters.User(ADMIN_ID), broadcast_handler))
