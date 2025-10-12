@@ -8,6 +8,7 @@ GROUP_FILE = "group_data.json"
 
 
 def init_files():
+    """ساخت فایل‌ها در صورت نبودن"""
     for file, default in [
         (MEMORY_FILE, {"data": {}, "users": [], "mode": "نرمال"}),
         (SHADOW_FILE, {"data": {}}),
@@ -19,12 +20,29 @@ def init_files():
 
 
 def load_data(filename):
+    """لود داده با ترمیم خودکار"""
     try:
         with open(filename, "r", encoding="utf-8") as f:
-            return json.load(f)
+            data = json.load(f)
+            # ✅ بررسی و ترمیم ساختار
+            if filename == MEMORY_FILE and "data" not in data:
+                data = {"data": {}, "users": [], "mode": "نرمال"}
+                save_data(filename, data)
+            elif filename == SHADOW_FILE and "data" not in data:
+                data = {"data": {}}
+                save_data(filename, data)
+            elif filename == GROUP_FILE and not isinstance(data, dict):
+                data = {}
+                save_data(filename, data)
+            return data
     except (json.JSONDecodeError, FileNotFoundError):
         print(f"⚠️ فایل خراب بود ({filename}) → بازسازی شد.")
-        base = {"data": {}, "users": []} if "memory" in filename else {}
+        if filename == MEMORY_FILE:
+            base = {"data": {}, "users": [], "mode": "نرمال"}
+        elif filename == SHADOW_FILE:
+            base = {"data": {}}
+        else:
+            base = {}
         save_data(filename, base)
         return base
 
@@ -65,6 +83,10 @@ def merge_shadow_memory():
 
 def get_reply(text):
     memory = load_data(MEMORY_FILE)
+    if "data" not in memory:  # ترمیم در لحظه
+        memory = {"data": {}, "users": [], "mode": "نرمال"}
+        save_data(MEMORY_FILE, memory)
+
     text = text.strip().lower()
 
     if text in memory["data"] and memory["data"][text]:
