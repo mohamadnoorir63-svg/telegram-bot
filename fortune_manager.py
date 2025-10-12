@@ -1,63 +1,67 @@
 import json
 import os
-import random
-from telegram import InputFile
+from datetime import datetime
+from telegram import Update
 
-# ======================= 📁 فایل داده =======================
+FORTUNE_FILE = "fortunes.json"
 
-FORTUNES_FILE = "fortunes.json"
+# ======================= 📦 آماده‌سازی فایل فال‌ها =======================
 
-def _init_file():
-    if not os.path.exists(FORTUNES_FILE):
-        with open(FORTUNES_FILE, "w", encoding="utf-8") as f:
-            json.dump([], f, ensure_ascii=False, indent=2)
+def init_fortunes():
+    """ایجاد فایل در صورت نبود"""
+    if not os.path.exists(FORTUNE_FILE):
+        with open(FORTUNE_FILE, "w", encoding="utf-8") as f:
+            json.dump({"fortunes": []}, f, ensure_ascii=False, indent=2)
 
-def _load():
-    _init_file()
-    with open(FORTUNES_FILE, "r", encoding="utf-8") as f:
+def load_fortunes():
+    if not os.path.exists(FORTUNE_FILE):
+        init_fortunes()
+    with open(FORTUNE_FILE, "r", encoding="utf-8") as f:
         return json.load(f)
 
-def _save(data):
-    with open(FORTUNES_FILE, "w", encoding="utf-8") as f:
+def save_fortunes(data):
+    with open(FORTUNE_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
-# ======================= 🔮 ثبت فال =======================
+# ======================= 💫 ثبت فال =======================
 
-async def save_fortune(update):
-    """ذخیره فال از ریپلی (متن یا عکس)"""
+async def save_fortune(update: Update):
+    """ذخیره فال جدید با متن یا عکس (ریپلای لازم دارد)"""
     reply = update.message.reply_to_message
     if not reply:
-        return await update.message.reply_text("❗ باید روی پیامی ریپلای بزنی تا فال رو ذخیره کنم.")
+        await update.message.reply_text("❗ برای ثبت فال باید روی یک پیام ریپلای بزنی.")
+        return
 
-    fortunes = _load()
-    fortune_entry = {}
+    data = load_fortunes()
+    fortune_entry = {
+        "user": update.effective_user.first_name,
+        "date": datetime.now().strftime("%Y-%m-%d %H:%M"),
+        "text": reply.text or "",
+        "photo_id": reply.photo[-1].file_id if reply.photo else None,
+    }
 
-    if reply.text:
-        fortune_entry["type"] = "text"
-        fortune_entry["content"] = reply.text.strip()
-    elif reply.photo:
-        file_id = reply.photo[-1].file_id
-        fortune_entry["type"] = "photo"
-        fortune_entry["content"] = file_id
-        if reply.caption:
-            fortune_entry["caption"] = reply.caption.strip()
-    else:
-        return await update.message.reply_text("❗ فقط عکس یا متن می‌تونم ذخیره کنم!")
+    data["fortunes"].append(fortune_entry)
+    save_fortunes(data)
 
-    fortunes.append(fortune_entry)
-    _save(fortunes)
-    await update.message.reply_text("🔮 فال جدید ذخیره شد!")
+    await update.message.reply_text("🔮 فال جدید با موفقیت ذخیره شد!")
 
-# ======================= 📜 لیست فال‌ها =======================
+# ======================= 📋 لیست فال‌ها =======================
 
-async def list_fortunes(update):
-    fortunes = _load()
+async def list_fortunes(update: Update):
+    """نمایش لیست فال‌های ذخیره‌شده"""
+    data = load_fortunes()
+    fortunes = data.get("fortunes", [])
     if not fortunes:
-        return await update.message.reply_text("هنوز هیچ فالی ذخیره نکردم 😅")
+        await update.message.reply_text("هیچ فالی ثبت نشده هنوز 😅")
+        return
 
-    fortune = random.choice(fortunes)
-    if fortune["type"] == "text":
-        await update.message.reply_text(f"🔮 {fortune['content']}")
-    elif fortune["type"] == "photo":
-        caption = fortune.get("caption", "🔮 فال تصویری امروزت!")
-        await update.message.reply_photo(photo=fortune["content"], caption=caption)
+    text = "📜 لیست فال‌های ثبت‌شده:\n\n"
+    for f in fortunes[-10:][::-1]:
+        text += f"🧙‍♀️ {f['user']} — {f['date']}\n"
+        if f["text"]:
+            text += f"💬 {f['text']}\n"
+        if f["photo_id"]:
+            text += f"🖼 [عکس فال ثبت شده]\n"
+        text += "\n"
+
+    await update.message.reply_text(text[:4000])
