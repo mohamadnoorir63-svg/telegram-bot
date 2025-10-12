@@ -13,7 +13,8 @@ import aiofiles
 # 📦 ماژول‌ها
 from memory_manager import (
     init_files, load_data, save_data, learn, shadow_learn,
-    get_reply, set_mode, get_stats, enhance_sentence, generate_sentence
+    get_reply, set_mode, get_stats, enhance_sentence,
+    generate_sentence, list_phrases
 )
 from jokes_manager import save_joke, list_jokes
 from fortune_manager import save_fortune, list_fortunes
@@ -36,16 +37,15 @@ status = {
 # ======================= ✳️ شروع و پیام فعال‌سازی =======================
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "🤖 خنگول فارسی 8.5 Cloud+ Supreme Pro Edition\n"
+        "🤖 خنگول فارسی 8.5.1 Cloud+ Supreme Pro Stable+\n"
         "📘 برای دیدن لیست دستورات بنویس: راهنما"
     )
 
 async def notify_admin_on_startup(app):
-    """ارسال پیام فعال‌سازی به سودو در شروع"""
     try:
         await app.bot.send_message(
             chat_id=ADMIN_ID,
-            text="🚀 ربات خنگول 8.5 Cloud+ Supreme Pro با موفقیت فعال شد ✅"
+            text="🚀 ربات خنگول 8.5.1 Cloud+ Supreme Pro Stable+ با موفقیت فعال شد ✅"
         )
         print("[INFO] Startup notification sent ✅")
     except Exception as e:
@@ -53,7 +53,6 @@ async def notify_admin_on_startup(app):
 
 # ======================= ⚙️ خطایاب خودکار =======================
 async def handle_error(update: object, context: ContextTypes.DEFAULT_TYPE):
-    """ارسال گزارش خطا برای سودو"""
     error_text = f"⚠️ خطا در ربات:\n\n{context.error}"
     print(error_text)
     try:
@@ -64,7 +63,7 @@ async def handle_error(update: object, context: ContextTypes.DEFAULT_TYPE):
 # ======================= 📘 راهنما =======================
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = (
-        "📘 راهنمای خنگول فارسی 8.5 Cloud+ Supreme Pro\n\n"
+        "📘 راهنمای خنگول فارسی 8.5.1 Cloud+ Supreme Pro Stable+\n\n"
         "🧠 یادگیری:\n"
         "▪️ یادبگیر جمله سپس در خطوط بعد پاسخ‌ها رو بنویس\n"
         "▪️ لیست → نمایش جملات یادگرفته‌شده\n"
@@ -72,7 +71,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "😂 جوک و فال:\n"
         "▪️ ثبت جوک یا ثبت فال با ریپلای\n"
         "▪️ لیست جوک‌ها و لیست فال‌ها\n"
-        "▪️ بنویس «جوک» یا «فال» برای مورد تصادفی\n\n"
+        "▪️ بنویس «جوک» یا «فال» برای تصادفی\n\n"
         "☁️ بک‌آپ:\n"
         "▫️ خودکار هر ۱۲ ساعت برای سودو\n"
         "▫️ /cloudsync → بک‌آپ ابری دستی\n"
@@ -89,7 +88,9 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "▪️ /broadcast → ارسال همگانی\n"
         "▪️ /leave → خروج از گروه\n"
     )
-    await update.message.reply_text(text, parse_mode="Markdown")# ======================= 🎭 تغییر مود =======================
+    await update.message.reply_text(text, parse_mode="Markdown")
+
+# ======================= 🎭 تغییر مود =======================
 async def mode_change(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.args:
         return await update.message.reply_text("🎭 استفاده: /mode شوخ / بی‌ادب / غمگین / نرمال")
@@ -117,7 +118,7 @@ async def unlock_learning(update: Update, context: ContextTypes.DEFAULT_TYPE):
     status["locked"] = False
     await update.message.reply_text("🔓 یادگیری باز شد!")
 
-# ======================= 📊 آمار =======================
+# ======================= 📊 آمار و آمار کامل =======================
 async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data = get_stats()
     memory = load_data("memory.json")
@@ -133,7 +134,20 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     await update.message.reply_text(msg)
 
-# ======================= 👋 خوشامد با عکس پروفایل =======================
+
+async def fullstats(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    group_data = load_data("group_data.json")
+    if not group_data:
+        return await update.message.reply_text("❌ هنوز داده‌ای برای گروه‌ها ثبت نشده!")
+
+    text = "📈 آمار کامل گروه‌ها:\n\n"
+    for gid, info in group_data.items():
+        title = info.get("title", "بدون‌نام")
+        members = len(info.get("members", []))
+        last_active = info.get("last_active", "نامشخص")
+        text += f"🏠 {title}\n👥 اعضا: {members}\n🕓 آخرین فعالیت: {last_active}\n\n"
+
+    await update.message.reply_text(text[:4000])# ======================= 👋 خوشامد با عکس پروفایل =======================
 async def welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not status["welcome"]:
         return
@@ -145,13 +159,11 @@ async def welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"🏠 گروه: {update.message.chat.title}\n"
             f"😄 امیدوارم لحظات خوبی داشته باشی!"
         )
-
         try:
             photos = await context.bot.get_user_profile_photos(member.id, limit=1)
             if photos.total_count > 0:
                 file_id = photos.photos[0][-1].file_id
-                photo = await context.bot.get_file(file_id)
-                await update.message.reply_photo(photo.file_id, caption=text)
+                await update.message.reply_photo(file_id, caption=text)
             else:
                 await update.message.reply_text(text)
         except:
@@ -160,7 +172,7 @@ async def welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ======================= ☁️ بک‌آپ خودکار و دستی =======================
 async def auto_backup(context: ContextTypes.DEFAULT_TYPE):
     while True:
-        await asyncio.sleep(43200)
+        await asyncio.sleep(43200)  # هر ۱۲ ساعت
         await cloudsync_internal(context.bot, "Auto Backup")
 
 async def cloudsync_internal(bot, reason="Manual Backup"):
@@ -213,7 +225,9 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
         zip_ref.extractall(".")
     os.remove("restore.zip")
     context.user_data["await_restore"] = False
-    await update.message.reply_text("✅ بازیابی کامل انجام شد!")# ======================= 💬 پاسخ، یادگیری و مدیریت جوک و فال =======================
+    await update.message.reply_text("✅ بازیابی کامل انجام شد!")
+
+# ======================= 💬 پاسخ، یادگیری، جوک و فال =======================
 async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message or not update.message.text:
         return
@@ -253,7 +267,7 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("📂 فایل فال‌ها پیدا نشد 😕")
         return
 
-    # ✅ ثبت جوک و فال جدید با ریپلای
+    # ✅ ثبت جوک و فال
     if text.lower() == "ثبت جوک" and update.message.reply_to_message:
         await save_joke(update)
         return
@@ -269,15 +283,19 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await list_fortunes(update)
         return
 
-    # ✅ یادگیری معمول
+    # ✅ لیست جملات
+    if text == "لیست":
+        await update.message.reply_text(list_phrases())
+        return
+
+    # ✅ یادگیری هوشمند با پیام مناسب
     if text.startswith("یادبگیر "):
         parts = text.replace("یادبگیر ", "").split("\n")
         if len(parts) > 1:
             phrase = parts[0].strip()
             responses = [p.strip() for p in parts[1:] if p.strip()]
-            for r in responses:
-                learn(phrase, r)
-            await update.message.reply_text(f"🧠 یاد گرفتم {len(responses)} پاسخ برای '{phrase}'!")
+            msg = learn(phrase, *responses)
+            await update.message.reply_text(msg)
         else:
             await update.message.reply_text("❗ بعد از 'یادبگیر' جمله و پاسخ‌هاش رو با خط جدید بنویس.")
         return
@@ -287,12 +305,10 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(generate_sentence())
         return
 
-    # ✅ پاسخ هوشمند با احساس
+    # ✅ پاسخ هوشمند
     emotion = detect_emotion(text)
     reply_text = smart_response(text, emotion) or enhance_sentence(get_reply(text))
-    await update.message.reply_text(reply_text)
-
-# ======================= 🧹 ریست و ریلود =======================
+    await update.message.reply_text(reply_text)# ======================= 🧹 ریست و ریلود =======================
 async def reset_memory(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_ID:
         return await update.message.reply_text("⛔ فقط مدیر اصلی مجازه!")
@@ -321,7 +337,7 @@ async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
             sent += 1
         except:
             pass
-    await update.message.reply_text(f"✅ پیام به {sent} کاربر ارسال شد.")
+    await update.message.reply_text(f"📨 پیام به {sent} کاربر ارسال شد ✅")
 
 # ======================= 🚪 خروج از گروه =======================
 async def leave(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -331,7 +347,7 @@ async def leave(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ======================= 🚀 اجرای نهایی =======================
 if __name__ == "__main__":
-    print("🤖 خنگول فارسی 8.5 Cloud+ Supreme Pro Edition آماده به خدمت است ...")
+    print("🤖 خنگول فارسی 8.5.1 Cloud+ Supreme Pro Stable+ آماده به خدمت است ...")
 
     app = ApplicationBuilder().token(TOKEN).build()
     app.add_error_handler(handle_error)
@@ -345,6 +361,7 @@ if __name__ == "__main__":
     app.add_handler(CommandHandler("unlock", unlock_learning))
     app.add_handler(CommandHandler("mode", mode_change))
     app.add_handler(CommandHandler("stats", stats))
+    app.add_handler(CommandHandler("fullstats", fullstats))
     app.add_handler(CommandHandler("backup", backup))
     app.add_handler(CommandHandler("restore", restore))
     app.add_handler(CommandHandler("reset", reset_memory))
@@ -353,7 +370,7 @@ if __name__ == "__main__":
     app.add_handler(CommandHandler("cloudsync", cloudsync))
     app.add_handler(CommandHandler("leave", leave))
 
-    # 🔹 پیام‌ها
+    # 🔹 پیام‌ها و اسناد
     app.add_handler(MessageHandler(filters.Document.ALL, handle_document))
     app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, reply))
