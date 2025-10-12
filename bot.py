@@ -190,6 +190,13 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     reply_text = enhance_sentence(reply_text)
     await update.message.reply_text(reply_text)
 
+# ======================= 💬 خروج از گروه =======================
+
+async def leave(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id == ADMIN_ID:
+        await update.message.reply_text("🫡 خدافظ! تا دیدار بعدی 😂")
+        await context.bot.leave_chat(update.message.chat.id)
+
 # ======================= 📨 ارسال همگانی =======================
 
 async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
