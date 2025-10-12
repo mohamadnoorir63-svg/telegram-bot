@@ -1,7 +1,7 @@
 import json
 import os
 import random
-from telegram import Update, InputFile
+from telegram import Update
 
 FILE = "fortunes.json"
 MEDIA_DIR = "fortunes_media"
@@ -10,23 +10,23 @@ MEDIA_DIR = "fortunes_media"
 if not os.path.exists(MEDIA_DIR):
     os.makedirs(MEDIA_DIR)
 
-
 # ========================= 💾 بارگذاری و ذخیره =========================
 def load_fortunes():
+    """لود کردن تمام فال‌ها از فایل"""
     if not os.path.exists(FILE):
         with open(FILE, "w", encoding="utf-8") as f:
             json.dump({}, f, ensure_ascii=False, indent=2)
     with open(FILE, "r", encoding="utf-8") as f:
         return json.load(f)
 
-
 def save_fortunes(data):
+    """ذخیره فال‌ها در فایل JSON"""
     with open(FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
-
 # ========================= 🔮 ذخیره فال جدید =========================
 async def save_fortune(update: Update):
+    """ذخیره فال جدید (پشتیبانی از متن، عکس، استیکر و ویدیو)"""
     data = load_fortunes()
     reply = update.message.reply_to_message
 
@@ -35,10 +35,15 @@ async def save_fortune(update: Update):
 
     entry = {"type": "text", "value": None}
 
+    # 📜 متن یا کپشن
     if reply.text:
         entry["type"] = "text"
         entry["value"] = reply.text.strip()
+    elif reply.caption:
+        entry["type"] = "text"
+        entry["value"] = reply.caption.strip()
 
+    # 🖼️ عکس
     elif reply.photo:
         photo = reply.photo[-1]
         file = await photo.get_file()
@@ -47,6 +52,7 @@ async def save_fortune(update: Update):
         entry["type"] = "photo"
         entry["value"] = path
 
+    # 😄 استیکر
     elif reply.sticker:
         sticker = reply.sticker
         file = await sticker.get_file()
@@ -55,6 +61,7 @@ async def save_fortune(update: Update):
         entry["type"] = "sticker"
         entry["value"] = path
 
+    # 🎬 ویدیو یا گیف
     elif reply.video or reply.animation:
         vid = reply.video or reply.animation
         file = await vid.get_file()
@@ -70,9 +77,9 @@ async def save_fortune(update: Update):
     save_fortunes(data)
     await update.message.reply_text("🔮 فال با موفقیت ذخیره شد!")
 
-
 # ========================= 📜 نمایش فال‌ها =========================
 async def list_fortunes(update: Update):
+    """نمایش آخرین ۱۰ فال ذخیره‌شده"""
     data = load_fortunes()
     if not data:
         return await update.message.reply_text("هیچ فالی ذخیره نشده 😔")
@@ -86,11 +93,13 @@ async def list_fortunes(update: Update):
         try:
             if t == "text":
                 await update.message.reply_text(f"🔮 {val}")
-            elif t == "photo":
+            elif t == "photo" and os.path.exists(val):
                 await update.message.reply_photo(photo=open(val, "rb"))
-            elif t == "sticker":
+            elif t == "sticker" and os.path.exists(val):
                 await update.message.reply_sticker(sticker=open(val, "rb"))
-            elif t == "video":
+            elif t == "video" and os.path.exists(val):
                 await update.message.reply_video(video=open(val, "rb"))
-        except:
-            await update.message.reply_text(f"⚠️ فایل شماره {k} پیدا نشد یا حذف شده.")
+            else:
+                await update.message.reply_text(f"⚠️ فایل شماره {k} پیدا نشد یا حذف شده.")
+        except Exception as e:
+            await update.message.reply_text(f"⚠️ خطا در ارسال فال {k}: {e}")
