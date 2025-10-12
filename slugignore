@@ -1,1 +1,27 @@
+# 🧹 فایل‌های غیرضروری برای حذف از Build
 
+__pycache__/
+*.pyc
+*.pyo
+*.log
+*.zip
+*.bak
+*.old
+*.tmp
+*.rar
+
+# فولدرهای غیرلازم
+backups/
+test/
+venv/
+.cache/
+.git/
+.idea/
+.vscode/
+
+# داده‌های محلی
+*.json
+stickers/
+shadow_memory.json
+group_data.json
+memory.json
