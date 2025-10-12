@@ -136,7 +136,8 @@ def enhance_sentence(sentence):
         else:
             new_words.append(word)
 
-    return " ".join(new_words)import asyncio
+    return " ".join(new_words)
+    import asyncio
 import random
 import os
 from datetime import datetime, timedelta
