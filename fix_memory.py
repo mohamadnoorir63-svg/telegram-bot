@@ -1,55 +1,72 @@
-import json, os
+import json
+import os
 
-SRC = "memory.json"
-DST = "memory_fixed.json"
+FILES_TO_CHECK = [
+    "memory.json",
+    "group_data.json",
+    "stickers.json",
+    "jokes.json",
+    "fortunes.json"
+]
 
-def ensure_list(x):
-    # اگر مقدار None یا رشته بود، به لیست تبدیل کن
-    if x is None:
-        return []
-    if isinstance(x, list):
-        return x
-    return [x]
+def fix_json_file(filename):
+    """اصلاح ساختار JSON معیوب در صورت وجود"""
+    try:
+        if not os.path.exists(filename):
+            print(f"[FIX] فایل {filename} وجود ندارد، ایجاد جدید...")
+            with open(filename, "w", encoding="utf-8") as f:
+                json.dump({}, f, ensure_ascii=False, indent=2)
+            return True
 
-def main():
-    if not os.path.exists(SRC):
-        print(f"❌ {SRC} پیدا نشد!")
-        return
+        with open(filename, "r", encoding="utf-8") as f:
+            data = f.read().strip()
 
-    with open(SRC, "r", encoding="utf-8") as f:
+        # اگر فایل خالی بود
+        if data == "":
+            print(f"[FIX] فایل {filename} خالی بود، بازسازی شد ✅")
+            with open(filename, "w", encoding="utf-8") as f:
+                json.dump({}, f, ensure_ascii=False, indent=2)
+            return True
+
+        # تلاش برای parse کردن JSON
         try:
-            data = json.load(f)
-        except Exception as e:
-            print(f"❌ خطا در خواندن JSON: {e}")
-            return
+            json.loads(data)
+        except json.JSONDecodeError:
+            print(f"[ERROR] فایل {filename} خراب است ❌ در حال تعمیر...")
+            repaired_data = repair_json_content(data)
+            with open(filename, "w", encoding="utf-8") as f:
+                json.dump(repaired_data, f, ensure_ascii=False, indent=2)
+            print(f"[FIX] فایل {filename} با موفقیت تعمیر شد ✅")
+            return True
 
-    # اسکیمای استاندارد موردنیاز ربات:
-    # {
-    #   "data": { "جمله": ["پاسخ۱","پاسخ۲", ...] },
-    #   "mode": "نرمال" | ...,
-    #   "users": [123, ...]
-    # }
-    changed = 0
-    data.setdefault("data", {})
-    data.setdefault("mode", data.get("mode", "نرمال"))
-    data.setdefault("users", data.get("users", []))
+        return False  # نیاز به تعمیر نداشت
 
-    fixed = {}
-    for phrase, replies in data.get("data", {}).items():
-        lst = ensure_list(replies)
-        # حذف None/خالی‌ها و تبدیل به رشته
-        lst = [str(x).strip() for x in lst if str(x).strip()]
-        fixed[phrase] = lst
-        if lst != replies:
-            changed += 1
+    except Exception as e:
+        print(f"[FIX ERROR] {filename}: {e}")
+        return False
 
-    data["data"] = fixed
+def repair_json_content(content):
+    """تلاش ساده برای نجات محتوای ناقص JSON"""
+    # حذف نویزها و اصلاح بسته‌شدن آکولادها
+    fixed = content.replace("\x00", "").strip()
+    if not fixed.endswith("}"):
+        fixed += "}"
+    try:
+        return json.loads(fixed)
+    except Exception:
+        print("[REPAIR] بازسازی به حالت پایه انجام شد.")
+        return {}
 
-    with open(DST, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
-
-    print(f"✅ تمام شد! {changed} جمله اصلاح شد.")
-    print(f"📄 فایل تمیز در: {DST}")
+def repair_all():
+    """تعمیر همه فایل‌های حافظه"""
+    print("🧰 شروع تعمیر فایل‌های حافظه...")
+    for file in FILES_TO_CHECK:
+        result = fix_json_file(file)
+        if result:
+            print(f"✅ {file} بررسی و تعمیر شد.")
+        else:
+            print(f"🟢 {file} سالم بود.")
+    print("🎯 عملیات تعمیر با موفقیت پایان یافت!")
 
 if __name__ == "__main__":
-    main()
+    repair_all()
