@@ -2,139 +2,109 @@ import json
 import os
 import random
 
-# ================== 📂 مدیریت فایل‌ها ==================
+# ======================= 📁 فایل‌ها =======================
 
 def init_files():
-    for file in ["memory.json", "group_data.json", "stickers.json"]:
-        if not os.path.exists(file):
-            with open(file, "w", encoding="utf-8") as f:
-                if "memory" in file:
-                    json.dump({"data": {}, "users": [], "mode": "نرمال"}, f, ensure_ascii=False, indent=2)
-                else:
-                    json.dump({}, f, ensure_ascii=False, indent=2)
+    for f in ["memory.json", "shadow_memory.json", "group_data.json", "jokes.json", "fortunes.json"]:
+        if not os.path.exists(f):
+            with open(f, "w", encoding="utf-8") as file:
+                if f.endswith(".json"):
+                    json.dump({}, file, ensure_ascii=False, indent=2)
 
+# ======================= 📖 خواندن و ذخیره =======================
 
 def load_data(filename):
-    try:
-        with open(filename, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except:
+    if not os.path.exists(filename):
         return {}
-
+    with open(filename, "r", encoding="utf-8") as file:
+        try:
+            return json.load(file)
+        except json.JSONDecodeError:
+            return {}
 
 def save_data(filename, data):
-    with open(filename, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
+    with open(filename, "w", encoding="utf-8") as file:
+        json.dump(data, file, ensure_ascii=False, indent=2)
 
+# ======================= 🧠 یادگیری =======================
 
-# ================== 🧠 یادگیری و پاسخ ==================
+def learn(phrase, reply):
+    data = load_data("memory.json")
+    if "data" not in data:
+        data["data"] = {}
+    if phrase not in data["data"]:
+        data["data"][phrase] = []
+    if reply not in data["data"][phrase]:
+        data["data"][phrase].append(reply)
+    save_data("memory.json", data)
 
-def learn(phrase, response):
-    memory = load_data("memory.json")
-    if "data" not in memory:
-        memory["data"] = {}
-    if phrase not in memory["data"]:
-        memory["data"][phrase] = []
-    if response not in memory["data"][phrase]:
-        memory["data"][phrase].append(response)
-        save_data("memory.json", memory)
+# یادگیری پنهان (در حالت خاموش)
+def shadow_learn(phrase, reply):
+    data = load_data("shadow_memory.json")
+    if phrase not in data:
+        data[phrase] = []
+    if reply not in data[phrase]:
+        data[phrase].append(reply)
+    save_data("shadow_memory.json", data)
 
-
-def shadow_learn(phrase, response):
-    """یادگیری پنهان در حالت غیرفعال"""
-    if not phrase.strip():
-        return
-    memory = load_data("memory_shadow.json") if os.path.exists("memory_shadow.json") else {"data": {}}
-    if phrase not in memory["data"]:
-        memory["data"][phrase] = []
-    if response and response not in memory["data"][phrase]:
-        memory["data"][phrase].append(response)
-    save_data("memory_shadow.json", memory)
-
-
+# ادغام حافظه پنهان
 def merge_shadow_memory():
-    """ادغام یادگیری پنهان در حافظه اصلی"""
-    if not os.path.exists("memory_shadow.json"):
-        return
+    shadow = load_data("shadow_memory.json")
     main = load_data("memory.json")
-    shadow = load_data("memory_shadow.json")
-    for phrase, responses in shadow.get("data", {}).items():
+    for phrase, replies in shadow.items():
+        if "data" not in main:
+            main["data"] = {}
         if phrase not in main["data"]:
-            main["data"][phrase] = responses
-        else:
-            for r in responses:
-                if r not in main["data"][phrase]:
-                    main["data"][phrase].append(r)
+            main["data"][phrase] = []
+        for r in replies:
+            if r not in main["data"][phrase]:
+                main["data"][phrase].append(r)
     save_data("memory.json", main)
-    os.remove("memory_shadow.json")
+    save_data("shadow_memory.json", {})
 
-
-# ================== 💬 پاسخ‌دهی ==================
+# ======================= 💬 پاسخ =======================
 
 def get_reply(text):
-    memory = load_data("memory.json")
-    data = memory.get("data", {})
-    if text in data and data[text]:
+    data = load_data("memory.json").get("data", {})
+    if text in data:
         return random.choice(data[text])
+    # اگر نداند، پاسخی تصادفی بده
+    generic_responses = [
+        "واقعاً نمی‌دونم چی بگم 🤔",
+        "می‌تونی بیشتر توضیح بدی؟",
+        "جالبه! بگو بیشتر بدونم 😅",
+        "اوه اینو هنوز یاد نگرفتم 😅"
+    ]
+    return random.choice(generic_responses)
 
-    # اگر جمله مشابهی پیدا بشه
-    for phrase in data.keys():
-        if phrase in text or text in phrase:
-            return random.choice(data[phrase])
-
-    # پاسخ پیش‌فرض
-    return random.choice([
-        "نمیدونم 😅",
-        "یاد بده تا یاد بگیرم 🤔",
-        "جالب بود! ولی هنوز اینو بلد نیستم 😄",
-        "بگو یادبگیر تا بفهمم چی میگی 😅"
-    ])
-
-
-def enhance_sentence(sentence):
-    """تقویت طبیعی بودن پاسخ‌ها"""
-    if not sentence or len(sentence) < 2:
-        return sentence
-    endings = ["😂", "😅", "😎", "🙂", "🤔", "😏"]
-    if not sentence.endswith(tuple(endings)):
-        sentence += " " + random.choice(endings)
-    return sentence
-
-
-# ================== 🎭 مودها ==================
-
-def get_mode():
-    memory = load_data("memory.json")
-    return memory.get("mode", "نرمال")
-
+# ======================= 🎭 مود و جمله =======================
 
 def set_mode(mode):
-    memory = load_data("memory.json")
-    memory["mode"] = mode
-    save_data("memory.json", memory)
-
-
-# ================== 📊 آمار ==================
+    data = load_data("memory.json")
+    data["mode"] = mode
+    save_data("memory.json", data)
 
 def get_stats():
-    memory = load_data("memory.json")
-    return {
-        "phrases": len(memory.get("data", {})),
-        "responses": sum(len(v) for v in memory.get("data", {}).values()),
-        "mode": memory.get("mode", "نرمال")
-    }
+    data = load_data("memory.json")
+    phrases = len(data.get("data", {}))
+    responses = sum(len(v) for v in data.get("data", {}).values())
+    mode = data.get("mode", "نرمال")
+    return {"phrases": phrases, "responses": responses, "mode": mode}
 
-
-# ================== ✍️ جمله‌سازی تصادفی ==================
-
+# جمله‌سازی تصادفی از حافظه
 def generate_sentence():
-    """ترکیب تصادفی کلمات یادگرفته‌شده برای ساخت جمله جدید"""
-    memory = load_data("memory.json")
-    data = list(memory.get("data", {}).keys())
+    data = load_data("memory.json").get("data", {})
     if not data:
         return "هنوز چیزی یاد نگرفتم 😅"
-    parts = []
-    for _ in range(random.randint(3, 7)):
-        part = random.choice(data)
-        parts.append(part.split()[0] if part else "")
-    return " ".join(parts).strip() + random.choice(["!", " 😄", " 🤪", " 🙂"])
+    phrases = list(data.keys())
+    part1 = random.choice(phrases)
+    part2 = random.choice(random.choice(list(data.values())))
+    return f"{part1}... {part2}"
+
+# ======================= ✨ بهبود پاسخ =======================
+
+def enhance_sentence(text):
+    if not text:
+        return "چی گفتی؟ 😅"
+    endings = ["😂", "😎", "🙂", "😅", "🤔", "😉", "❤️"]
+    return text.strip() + " " + random.choice(endings)
