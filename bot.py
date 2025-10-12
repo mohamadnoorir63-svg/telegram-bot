@@ -130,29 +130,31 @@ async def broadcast_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     message = update.message.text
     context.user_data["broadcast_mode"] = False
 
-    sent = 0
-    targets = []
-
     try:
         groups = load_data("group_data.json")
-        if isinstance(groups, dict):
-            targets.extend(groups.keys())
     except:
-        pass
+        groups = {}
 
-    try:
-        users = load_data("memory.json").get("users", [])
-        if isinstance(users, list):
-            targets.extend(users)
-    except:
-        pass
-
-    for chat_id in set(targets):
+    sent = 0
+    # ارسال به همه گروه‌ها
+    for chat_id in groups.keys():
         try:
             await context.bot.send_message(chat_id=chat_id, text=message)
             sent += 1
         except Exception as e:
             print(f"❌ ارسال به {chat_id} ناموفق: {e}")
+
+    # ارسال به پی‌وی افرادی که با ربات کار کردن
+    try:
+        users = load_data("memory.json").get("users", [])
+        for uid in users:
+            try:
+                await context.bot.send_message(chat_id=uid, text=message)
+                sent += 1
+            except:
+                pass
+    except:
+        pass
 
     await update.message.reply_text(f"✅ پیام به {sent} چت ارسال شد!")
 
@@ -163,7 +165,7 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
     user_id = update.effective_user.id
 
-    # ذخیره آی‌دی کاربر برای ارسال همگانی
+    # ذخیره آی‌دی کاربر برای ارسال همگانی بعداً
     data = load_data("memory.json")
     if "users" not in data:
         data["users"] = []
@@ -207,8 +209,8 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ========================= 🚀 اجرای ربات =========================
 
-if __name__ == "__main__":
-    print("🤖 خنگول فارسی 6.4 آماده به خدمت است ...")
+if name == "main":
+    print("🤖 خنگول فارسی 6.3 آماده به خدمت است ...")
     app = ApplicationBuilder().token(TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
@@ -220,10 +222,7 @@ if __name__ == "__main__":
     app.add_handler(CommandHandler("leave", leave_group))
     app.add_handler(CallbackQueryHandler(admin_callback))
 
-    # ثبت پیام‌های مدیر برای ارسال همگانی
+    app.add_handler(MessageHandler(filters.TEXT, reply))
     app.add_handler(MessageHandler(filters.TEXT & filters.User(ADMIN_ID), broadcast_handler))
 
-    # پاسخ‌دهی به همه کاربران
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, reply))
-
-    app.run_polling(allowed_updates=Update.ALL_TYPES)
+    app.run_polling()
