@@ -9,22 +9,51 @@ SHADOW_FILE = "shadow_memory.json"
 
 def init_files():
     """ایجاد فایل‌های حافظه در صورت نبود"""
-    for file in [MEMORY_FILE, SHADOW_FILE]:
+    files = [
+        MEMORY_FILE,
+        SHADOW_FILE,
+        "group_data.json",
+        "stickers.json",
+        "jokes.json",
+        "fortunes.json"
+    ]
+    for file in files:
         if not os.path.exists(file):
-            with open(file, "w", encoding="utf-8") as f:
-                json.dump({
+            # 🧠 ساختار پیش‌فرض هر فایل
+            if file == MEMORY_FILE:
+                data = {
                     "data": {},
                     "users": [],
                     "stats": {"phrases": 0, "responses": 0, "mode": "نرمال"}
-                }, f, ensure_ascii=False, indent=2)
+                }
+            elif file == SHADOW_FILE:
+                data = {"data": {}}
+            elif file == "group_data.json":
+                data = {"groups": {}}
+            else:
+                data = {}
+            with open(file, "w", encoding="utf-8") as f:
+                json.dump(data, f, ensure_ascii=False, indent=2)
 
 # ======================= 📥 بارگذاری و ذخیره داده =======================
 
 def load_data(filename=MEMORY_FILE):
     if not os.path.exists(filename):
         init_files()
-    with open(filename, "r", encoding="utf-8") as f:
-        return json.load(f)
+    try:
+        with open(filename, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        # ✅ اگر ساختار ناقص بود، ترمیم می‌کنیم
+        if filename == MEMORY_FILE and "data" not in data:
+            data["data"] = {}
+        if filename == MEMORY_FILE and "users" not in data:
+            data["users"] = []
+        if filename == MEMORY_FILE and "stats" not in data:
+            data["stats"] = {"phrases": 0, "responses": 0, "mode": "نرمال"}
+        return data
+    except Exception:
+        init_files()
+        return load_data(filename)
 
 def save_data(filename, data):
     with open(filename, "w", encoding="utf-8") as f:
@@ -37,6 +66,8 @@ def learn(phrase, response):
     data = load_data()
     phrase = phrase.strip()
     response = response.strip()
+    if "data" not in data:
+        data["data"] = {}
     if phrase not in data["data"]:
         data["data"][phrase] = []
     if response not in data["data"][phrase]:
@@ -50,6 +81,8 @@ def learn(phrase, response):
 def shadow_learn(phrase, response):
     """ذخیره یادگیری در حالت غیرفعال برای تمرین بعدی"""
     data = load_data(SHADOW_FILE)
+    if "data" not in data:
+        data["data"] = {}
     if phrase not in data["data"]:
         data["data"][phrase] = []
     if response not in data["data"][phrase]:
