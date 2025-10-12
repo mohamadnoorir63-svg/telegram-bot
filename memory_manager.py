@@ -2,149 +2,123 @@ import json
 import os
 import random
 
-# مسیر فایل‌های حافظه
-MAIN_MEMORY = "memory.json"
-SHADOW_MEMORY = "shadow_memory.json"
-GROUP_MEMORY = "group_data.json"
+# 📁 مسیر فایل‌های حافظه
+MAIN_FILE = "memory.json"
+SHADOW_FILE = "shadow_memory.json"
+MODE_FILE = "mode.json"
 
 
-# 🧠 اگر فایل‌ها وجود نداشتن، بسازشون
+# ========================= 📦 مدیریت فایل =========================
+
 def init_files():
-    files = [
-        (MAIN_MEMORY, {"replies": {}, "learning": True, "mode": "نرمال"}),
-        (SHADOW_MEMORY, {"hidden": {}}),
-        (GROUP_MEMORY, {}),
-    ]
-    for path, data in files:
-        if not os.path.exists(path):
-            with open(path, "w", encoding="utf-8") as f:
-                json.dump(data, f, ensure_ascii=False, indent=2)
+    """ایجاد فایل‌های موردنیاز در صورت نبود"""
+    for file in [MAIN_FILE, SHADOW_FILE, MODE_FILE]:
+        if not os.path.exists(file):
+            with open(file, "w", encoding="utf-8") as f:
+                json.dump({}, f, ensure_ascii=False, indent=2)
 
+def load_data(file):
+    """خواندن داده از فایل"""
+    try:
+        with open(file, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except:
+        return {}
 
-# 📂 خواندن داده‌ها از فایل
-def load_data(file_name):
-    if not os.path.exists(file_name):
-        init_files()
-    with open(file_name, "r", encoding="utf-8") as f:
-        return json.load(f)
-
-
-# 💾 ذخیره داده‌ها در فایل
-def save_data(file_name, data):
-    with open(file_name, "w", encoding="utf-8") as f:
+def save_data(file, data):
+    """ذخیره داده در فایل"""
+    with open(file, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
 
-# 🔄 گرفتن مود فعلی (شوخ، بی‌ادب، غمگین، نرمال)
+# ========================= 🧠 یادگیری و حافظه =========================
+
+def learn(phrase, response):
+    """افزودن پاسخ به جمله خاص"""
+    data = load_data(MAIN_FILE)
+    if phrase not in data:
+        data[phrase] = []
+    if response not in data[phrase]:
+        data[phrase].append(response)
+    save_data(MAIN_FILE, data)
+
+
+def shadow_learn(phrase, response):
+    """یادگیری پنهان زمانی که ربات خاموش است"""
+    data = load_data(SHADOW_FILE)
+    if phrase not in data:
+        data[phrase] = []
+    if response not in data[phrase]:
+        data[phrase].append(response)
+    save_data(SHADOW_FILE, data)
+
+
+def merge_shadow_memory():
+    """ترکیب حافظه پنهان با حافظه اصلی"""
+    main = load_data(MAIN_FILE)
+    shadow = load_data(SHADOW_FILE)
+    for phrase, responses in shadow.items():
+        if phrase not in main:
+            main[phrase] = responses
+        else:
+            for r in responses:
+                if r not in main[phrase]:
+                    main[phrase].append(r)
+    save_data(MAIN_FILE, main)
+    save_data(SHADOW_FILE, {})
+
+
+def get_reply(phrase):
+    """پیدا کردن پاسخ برای جمله داده‌شده"""
+    data = load_data(MAIN_FILE)
+    if phrase in data and data[phrase]:
+        return random.choice(data[phrase])
+    else:
+        # پاسخ پیش‌فرض
+        defaults = [
+            "من هنوز اینو یاد نگرفتم 😅",
+            "می‌خوای یادم بدی؟ 😎",
+            "این جمله رو نمی‌دونم، بگو یاد بگیرم؟ 🤔"
+        ]
+        return random.choice(defaults)
+
+
+# ========================= 🎭 مودها =========================
+
 def get_mode():
-    data = load_data(MAIN_MEMORY)
+    data = load_data(MODE_FILE)
     return data.get("mode", "نرمال")
 
-
-# ✍️ تغییر مود
-def set_mode(new_mode):
-    data = load_data(MAIN_MEMORY)
-    data["mode"] = new_mode
-    save_data(MAIN_MEMORY, data)
+def set_mode(mode):
+    data = {"mode": mode}
+    save_data(MODE_FILE, data)
 
 
-# 💡 یادگیری جمله جدید
-def learn(phrase, response):
-    data = load_data(MAIN_MEMORY)
-    phrase = phrase.lower().strip()
-    response = response.strip()
+# ========================= 📈 آمار =========================
 
-    if phrase not in data["replies"]:
-        data["replies"][phrase] = []
-
-    if response not in data["replies"][phrase]:
-        data["replies"][phrase].append(response)
-
-    save_data(MAIN_MEMORY, data)
-
-
-# 🕵️ یادگیری پنهان (وقتی خاموشه)
-def shadow_learn(phrase, response):
-    data = load_data(SHADOW_MEMORY)
-    phrase = phrase.lower().strip()
-    response = response.strip()
-
-    if phrase not in data["hidden"]:
-        data["hidden"][phrase] = []
-
-    if response and response not in data["hidden"][phrase]:
-        data["hidden"][phrase].append(response)
-
-    save_data(SHADOW_MEMORY, data)
-
-
-# 🔁 ادغام حافظه پنهان با اصلی
-def merge_shadow_memory():
-    main = load_data(MAIN_MEMORY)
-    shadow = load_data(SHADOW_MEMORY)
-
-    for phrase, replies in shadow.get("hidden", {}).items():
-        if phrase not in main["replies"]:
-            main["replies"][phrase] = replies
-        else:
-            for r in replies:
-                if r not in main["replies"][phrase]:
-                    main["replies"][phrase].append(r)
-
-    shadow["hidden"] = {}
-    save_data(MAIN_MEMORY, main)
-    save_data(SHADOW_MEMORY, shadow)
-
-
-# 🎲 پاسخ تصادفی با fallback هوشمند
-def get_reply(text):
-    data = load_data(MAIN_MEMORY)
-    replies = data.get("replies", {})
-    text = text.lower().strip()
-
-    if text in replies:
-        return random.choice(replies[text])
-
-    # اگر بلد نبود، یه جمله طبیعی بسازه
-    default_replies = [
-        "عه جالبه 😅",
-        "چی گفتی؟ دوباره بگو 😜",
-        "من تازه دارم یاد می‌گیرم 😎",
-        "هوم... شاید بعداً بفهمم 🤔",
-        "اینو تا حالا نشنیده بودم 😅",
-    ]
-    return random.choice(default_replies)
-
-
-# 📊 آمار یادگیری
 def get_stats():
-    data = load_data(MAIN_MEMORY)
-    total_phrases = len(data.get("replies", {}))
-    total_responses = sum(len(v) for v in data["replies"].values())
-    mode = data.get("mode", "نرمال")
+    data = load_data(MAIN_FILE)
+    mode = get_mode()
     return {
-        "phrases": total_phrases,
-        "responses": total_responses,
-        "mode": mode,
+        "phrases": len(data),
+        "responses": sum(len(v) for v in data.values()),
+        "mode": mode
     }
 
 
-# 🧩 بهبود طبیعی جمله‌ها (برای طبیعی‌تر شدن)
-def enhance_sentence(sentence):
-    replacements = {
-        "خوب": ["عالی", "باحال", "اوکی", "خفن"],
-        "نه": ["نخیر", "اصلاً", "نچ", "هرگز"],
-        "آره": ["آرههه", "اوهوم", "قطعاً", "صد در صد"],
-        "سلام": ["سلام رفیق 😎", "درود 😄", "هی سلام ✋"],
-        "باشه": ["باشه دیگه 😅", "اوکی خب", "قبول 😏"],
-    }
+# ========================= 💬 بهبود جمله =========================
 
-    words = sentence.split()
-    new_words = []
-    for word in words:
-        if word in replacements and random.random() < 0.5:
-            new_words.append(random.choice(replacements[word]))
-        else:
-            new_words.append(word)
+def enhance_sentence(text):
+    """کمی چاشنی مود به پاسخ اضافه می‌کند"""
+    mood = get_mode()
 
-    return " ".join(new_words)
+    if mood == "شوخ":
+        addons = ["😂", "😜", "🤣", "😆"]
+    elif mood == "بی‌ادب":
+        addons = ["😏", "😈", "🤨", "💢"]
+    elif mood == "غمگین":
+        addons = ["😔", "😞", "💔", "🥀"]
+    else:
+        addons = ["🙂", "🤖", "😇"]
+
+    return f"{text} {random.choice(addons)}"
