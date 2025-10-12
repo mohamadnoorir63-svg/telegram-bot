@@ -1,67 +1,46 @@
 import json
 import os
-from datetime import datetime
 from telegram import Update
 
-JOKES_FILE = "jokes.json"
-
-# ======================= 📦 آماده‌سازی فایل جوک‌ها =======================
-
-def init_jokes():
-    """ایجاد فایل در صورت نبود"""
-    if not os.path.exists(JOKES_FILE):
-        with open(JOKES_FILE, "w", encoding="utf-8") as f:
-            json.dump({"jokes": []}, f, ensure_ascii=False, indent=2)
+FILE = "jokes.json"
 
 def load_jokes():
-    if not os.path.exists(JOKES_FILE):
-        init_jokes()
-    with open(JOKES_FILE, "r", encoding="utf-8") as f:
-        return json.load(f)
+    if not os.path.exists(FILE):
+        with open(FILE, "w", encoding="utf-8") as f:
+            json.dump({}, f, ensure_ascii=False, indent=2)
+    try:
+        with open(FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except json.JSONDecodeError:
+        # 🧹 اگر فایل خراب بود، دوباره بسازش
+        with open(FILE, "w", encoding="utf-8") as f:
+            json.dump({}, f, ensure_ascii=False, indent=2)
+        return {}
 
 def save_jokes(data):
-    with open(JOKES_FILE, "w", encoding="utf-8") as f:
+    with open(FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
-# ======================= 😂 ثبت جوک =======================
-
 async def save_joke(update: Update):
-    """ذخیره جوک جدید از پیام ریپلای‌شده"""
-    reply = update.message.reply_to_message
-    if not reply:
-        await update.message.reply_text("❗ برای ثبت جوک باید روی یه پیام ریپلای بزنی.")
-        return
+    try:
+        if not update.message.reply_to_message:
+            return await update.message.reply_text("❗ باید روی پیام جوک ریپلای بزنی.")
+        msg = update.message.reply_to_message.text
+        if not msg:
+            return await update.message.reply_text("❌ پیام ریپلای باید متنی باشه!")
 
-    data = load_jokes()
-    joke_entry = {
-        "user": update.effective_user.first_name,
-        "date": datetime.now().strftime("%Y-%m-%d %H:%M"),
-        "text": reply.text or "",
-        "photo_id": reply.photo[-1].file_id if reply.photo else None,
-    }
-
-    data["jokes"].append(joke_entry)
-    save_jokes(data)
-
-    await update.message.reply_text("😂 جوک با موفقیت ذخیره شد!")
-
-# ======================= 📋 لیست جوک‌ها =======================
+        data = load_jokes()
+        data[str(len(data) + 1)] = msg.strip()
+        save_jokes(data)
+        await update.message.reply_text("😂 جوک ذخیره شد!")
+    except Exception as e:
+        await update.message.reply_text(f"⚠️ خطا در ذخیره جوک: {e}")
 
 async def list_jokes(update: Update):
-    """نمایش لیست جوک‌های ذخیره‌شده"""
     data = load_jokes()
-    jokes = data.get("jokes", [])
-    if not jokes:
-        await update.message.reply_text("فعلاً هیچ جوکی ذخیره نشده 😅")
-        return
-
-    text = "🤣 لیست آخرین جوک‌ها:\n\n"
-    for j in jokes[-10:][::-1]:
-        text += f"👤 {j['user']} — {j['date']}\n"
-        if j["text"]:
-            text += f"💬 {j['text']}\n"
-        if j["photo_id"]:
-            text += f"🖼 [جوک تصویری ثبت شده]\n"
-        text += "\n"
-
-    await update.message.reply_text(text[:4000])
+    if not data:
+        return await update.message.reply_text("هنوز جوکی ثبت نشده 😅")
+    text = "\n\n".join([f"{k}. {v}" for k, v in data.items()])
+    if len(text) > 4000:
+        text = text[:3990] + "..."
+    await update.message.reply_text(f"😂 لیست جوک‌ها:\n\n{text}")
