@@ -1,14 +1,14 @@
 import asyncio
 import random
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 from telegram import Update
 from telegram.ext import (
     ApplicationBuilder,
     CommandHandler,
     MessageHandler,
     ContextTypes,
-    filters
+    filters,
 )
 from memory_manager import (
     init_files, load_data, save_data, learn, shadow_learn,
@@ -16,55 +16,46 @@ from memory_manager import (
     get_stats, enhance_sentence
 )
 
-# 🔑 تنظیمات اولیه
+# 🔑 توکن از محیط هاست
 TOKEN = os.getenv("BOT_TOKEN")
-ADMIN_ID = 7089376754  # آیدی مدیر
+ADMIN_ID = 7089376754  # آیدی مدیر اصلی
+
+# 🧠 مقداردهی اولیه حافظه
 init_files()
 
-# 🧠 وضعیت‌ها
-status = {"active": True, "learning": True, "welcome": True, "last_joke": datetime.now()}
-
-# 🎴 استیکرهای خوشامد
-WELCOME_STICKERS = [
-    "CAACAgQAAxkBAAEFZ7dlcMuDGz4GdjvJt2bqWJqPBuYcNwAC9QADVp29Cq5MlK4mD1LqNgQ",
-    "CAACAgUAAxkBAAEFZ7tlcMuwY5TuPQABomE5pWIEUEyN2k0AAg4AA6t8rAR5-xb2PMshpDYE",
-    "CAACAgUAAxkBAAEFZ71lcMu6UcvJY-6TJPj6zIuE2eAqKwACuQADVp29CsjIX1vH3W9eNgQ"
-]
+# 🔄 وضعیت‌ها
+status = {
+    "active": True,
+    "learning": True,
+    "welcome": True,
+    "last_joke": datetime.now()
+}
 
 
-# ========================= ✳️ دستورات =========================
+# ========================= ✳️ دستورات اصلی =========================
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    msg = "🤖 خنگول فول 7.1 با موفقیت روشن شد!\nبگو چی یاد بگیرم؟ 😎"
+    msg = "😜 خنگول 7.2 با موفقیت فعال شد!\nبیا ببینم چی می‌خوای ازم یاد بگیری!"
     await update.message.reply_text(msg)
 
 
 async def toggle(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """خاموش یا روشن کردن ربات"""
     status["active"] = not status["active"]
     await update.message.reply_text("✅ خنگول روشن شد!" if status["active"] else "💤 خنگول خاموش شد!")
 
 
-async def toggle_welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """خاموش یا روشن کردن خوشامد"""
-    status["welcome"] = not status["welcome"]
-    await update.message.reply_text("🎉 خوشامد فعال شد!" if status["welcome"] else "🚫 خوشامد خاموش شد!")
-
-
 async def learn_mode(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """روشن یا خاموش کردن یادگیری"""
     status["learning"] = not status["learning"]
     if status["learning"]:
         merge_shadow_memory()
-        await update.message.reply_text("📚 یادگیری فعال شد!")
+        await update.message.reply_text("📚 یادگیری دوباره فعال شد!")
     else:
-        await update.message.reply_text("😴 یادگیری غیرفعال شد (پنهانی ادامه دارد!)")
+        await update.message.reply_text("😴 یادگیری خاموش شد (در حالت پنهان ادامه دارد!)")
 
 
 async def mode_change(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """تغییر مود گفتار"""
     if not context.args:
-        await update.message.reply_text("🎭 دستور استفاده: /mode شوخ / بی‌ادب / غمگین / نرمال")
+        await update.message.reply_text("🎭 دستور: /mode شوخ / بی‌ادب / غمگین / نرمال")
         return
     mood = context.args[0].lower()
     if mood in ["شوخ", "بی‌ادب", "غمگین", "نرمال"]:
@@ -74,78 +65,114 @@ async def mode_change(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ مود نامعتبر است!")
 
 
+async def welcome_toggle(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    status["welcome"] = not status["welcome"]
+    await update.message.reply_text("👋 خوش‌آمد روشن شد!" if status["welcome"] else "🚫 خوش‌آمد خاموش شد!")
+
+
 async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """نمایش آمار حافظه"""
     data = get_stats()
+    users = load_data("memory.json").get("users", [])
+    groups = load_data("group_data.json")
     msg = (
-        f"📊 آمار خنگول فول:\n"
+        f"📊 آمار خنگول:\n"
         f"• جملات: {data['phrases']}\n"
         f"• پاسخ‌ها: {data['responses']}\n"
-        f"• مود فعلی: {data['mode']}\n"
+        f"• کاربران: {len(users)}\n"
+        f"• گروه‌ها: {len(groups)}\n"
+        f"• مود فعلی: {data['mode']}"
     )
     await update.message.reply_text(msg)
 
 
-# ========================= 🎉 خوشامد =========================
-
-async def welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not status["welcome"]:
-        return
-    for member in update.message.new_chat_members:
-        time_str = datetime.now().strftime("%H:%M")
-        date_str = datetime.now().strftime("%Y-%m-%d")
-        chat_title = update.message.chat.title
-        welcome_text = (
-            f"🎉 خوش اومدی {member.first_name}!\n"
-            f"🕒 ساعت: {time_str}\n"
-            f"📅 تاریخ: {date_str}\n"
-            f"📍 گروه: {chat_title}"
-        )
-        await update.message.reply_text(welcome_text)
-        await update.message.reply_sticker(random.choice(WELCOME_STICKERS))
+async def leave_group(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.message.chat.type in ["group", "supergroup"]:
+        await update.message.reply_text("🫡 خدافظ! من رفتم ولی دلم برات تنگ میشه 😂")
+        await context.bot.leave_chat(update.message.chat_id)
 
 
-# ========================= 📨 ارسال همگانی =========================
+# ========================= 📢 ارسال همگانی =========================
 
 async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """ارسال پیام همگانی برای همه کاربران"""
     if update.effective_user.id != ADMIN_ID:
-        return await update.message.reply_text("⛔ فقط مدیر اصلی مجازه!")
-    if len(context.args) == 0:
-        return await update.message.reply_text("📨 استفاده: /broadcast متن پیام")
+        return
+    if not context.args:
+        await update.message.reply_text("📨 دستور: /broadcast پیام_شما")
+        return
 
     message = " ".join(context.args)
-    data = load_data("memory.json")
-    users = data.get("users", [])
+    groups = load_data("group_data.json")
+    users = load_data("memory.json").get("users", [])
     sent = 0
-    for uid in users:
+
+    for chat_id in list(groups.keys()) + users:
         try:
-            await context.bot.send_message(chat_id=uid, text=message)
+            await context.bot.send_message(chat_id=int(chat_id), text=message)
             sent += 1
         except:
             pass
-    await update.message.reply_text(f"✅ پیام به {sent} کاربر ارسال شد!")
+
+    await update.message.reply_text(f"✅ پیام به {sent} چت ارسال شد!")
 
 
-# ========================= 💬 پاسخ به پیام =========================
+# ========================= 👋 خوش‌آمد به اعضای جدید =========================
+
+async def welcome_new_member(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not status["welcome"]:
+        return
+
+    for member in update.message.new_chat_members:
+        name = member.first_name
+        group_name = update.message.chat.title
+        time_now = datetime.now().strftime("%H:%M:%S")
+        date_now = datetime.now().strftime("%Y-%m-%d")
+
+        text = (
+            f"👋 خوش اومدی {name}!\n"
+            f"به گروه 🌟 {group_name}\n"
+            f"🕒 ساعت: {time_now}\n📅 تاریخ: {date_now}"
+        )
+        await update.message.reply_text(text)
+
+
+# ========================= 💬 پاسخ‌گویی و یادگیری =========================
 
 async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
+    chat = update.effective_chat
     user_id = update.effective_user.id
 
-    # ثبت کاربر
-    data = load_data("memory.json")
-    if "users" not in data:
-        data["users"] = []
-    if user_id not in data["users"]:
-        data["users"].append(user_id)
-        save_data("memory.json", data)
+    # ذخیره خودکار کاربر یا گروه
+    if chat.type in ["group", "supergroup"]:
+        data = load_data("group_data.json")
+        if str(chat.id) not in data:
+            data[str(chat.id)] = {"title": chat.title}
+            save_data("group_data.json", data)
+    else:
+        data = load_data("memory.json")
+        if "users" not in data:
+            data["users"] = []
+        if user_id not in data["users"]:
+            data["users"].append(user_id)
+            save_data("memory.json", data)
 
+    # در حالت خاموش فقط یادگیری پنهان
     if not status["active"]:
         if status["learning"]:
             shadow_learn(text, "")
         return
 
+    # شوخی خودکار
+    if datetime.now() - status["last_joke"] > timedelta(hours=1):
+        joke = random.choice([
+            "می‌دونی فرق تو با خر چیه؟ 😜 هیچی فقط خر مودب‌تره!",
+            "من از بس با شما حرف زدم باهوش شدم 😎",
+            "می‌خواستم جدی باشم ولی نمیشه با تو 😂"
+        ])
+        await update.message.reply_text(joke)
+        status["last_joke"] = datetime.now()
+
+    # یادگیری دستی
     if text.startswith("یادبگیر "):
         parts = text.replace("یادبگیر ", "").split("\n")
         if len(parts) > 1:
@@ -158,6 +185,7 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("❗ بعد از 'یادبگیر' بنویس جمله و پاسخ‌هاش رو با خط جدید جدا کن.")
         return
 
+    # پاسخ‌دهی
     reply_text = get_reply(text)
     reply_text = enhance_sentence(reply_text)
     await update.message.reply_text(reply_text)
@@ -166,17 +194,18 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ========================= 🚀 اجرای ربات =========================
 
 if __name__ == "__main__":
-    print("🤖 خنگول فول 7.1 آماده به خدمت است ...")
+    print("🤖 خنگول فارسی 7.2 آماده به خدمت است ...")
     app = ApplicationBuilder().token(TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("toggle", toggle))
-    app.add_handler(CommandHandler("toggle_welcome", toggle_welcome))
     app.add_handler(CommandHandler("learn", learn_mode))
     app.add_handler(CommandHandler("mode", mode_change))
+    app.add_handler(CommandHandler("welcome", welcome_toggle))
     app.add_handler(CommandHandler("stats", stats))
     app.add_handler(CommandHandler("broadcast", broadcast))
-    app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome))
+    app.add_handler(CommandHandler("leave", leave_group))
+    app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome_new_member))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, reply))
 
     app.run_polling()
