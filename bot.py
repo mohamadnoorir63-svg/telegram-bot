@@ -199,4 +199,12 @@ if __name__ == "__main__":
     app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, reply))
 
-    app.run_polling(allowed_updates=Update.ALL_TYPES)
+    try:
+        app.run_polling(allowed_updates=Update.ALL_TYPES)
+    except KeyboardInterrupt:
+        print("🛑 خاموش شدن ربات...")
+    finally:
+        import asyncio
+        loop = asyncio.get_event_loop()
+        if not loop.is_closed():
+            loop.close()
