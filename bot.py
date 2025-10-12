@@ -209,7 +209,7 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ========================= 🚀 اجرای ربات =========================
 
-if name == "main":
+if __name__ == "__main__":
     print("🤖 خنگول فارسی 6.3 آماده به خدمت است ...")
     app = ApplicationBuilder().token(TOKEN).build()
 
