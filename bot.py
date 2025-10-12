@@ -24,7 +24,7 @@ ADMIN_ID = 7089376754  # آیدی تو
 # 🧠 مقداردهی اولیه حافظه
 init_files()
 
-# 🔄 وضعیت کلی ربات
+# 🔄 وضعیت برای کنترل یادگیری و فعال بودن ربات
 status = {"active": True, "learning": True, "last_joke": datetime.now()}
 
 
@@ -119,21 +119,6 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data["broadcast_mode"] = True
 
 
-# ========================= 📦 ثبت خودکار چت‌ها =========================
-
-async def register_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    chat = update.effective_chat
-    data = load_data("group_data.json")
-
-    if str(chat.id) not in data:
-        data[str(chat.id)] = {
-            "title": chat.title if chat.title else "Private Chat",
-            "type": chat.type
-        }
-        save_data("group_data.json", data)
-        print(f"✅ چت جدید ثبت شد: {chat.id} ({chat.type})")
-
-
 # ========================= 📨 ارسال همگانی =========================
 
 async def broadcast_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -145,15 +130,26 @@ async def broadcast_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     message = update.message.text
     context.user_data["broadcast_mode"] = False
 
+    sent = 0
+    targets = []
+
     try:
         groups = load_data("group_data.json")
+        if isinstance(groups, dict):
+            targets.extend(groups.keys())
     except:
-        groups = {}
+        pass
 
-    sent = 0
-    for chat_id in groups.keys():
+    try:
+        users = load_data("memory.json").get("users", [])
+        if isinstance(users, list):
+            targets.extend(users)
+    except:
+        pass
+
+    for chat_id in set(targets):
         try:
-            await context.bot.send_message(chat_id=int(chat_id), text=message)
+            await context.bot.send_message(chat_id=chat_id, text=message)
             sent += 1
         except Exception as e:
             print(f"❌ ارسال به {chat_id} ناموفق: {e}")
@@ -161,10 +157,20 @@ async def broadcast_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(f"✅ پیام به {sent} چت ارسال شد!")
 
 
-# ========================= 💬 پاسخ به پیام =========================
+# ========================= 💬 پاسخ و یادگیری =========================
 
 async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
+    user_id = update.effective_user.id
+
+    # ذخیره آی‌دی کاربر برای ارسال همگانی
+    data = load_data("memory.json")
+    if "users" not in data:
+        data["users"] = []
+    if user_id not in data["users"]:
+        data["users"].append(user_id)
+        save_data("memory.json", data)
+
     if not status["active"]:
         if status["learning"]:
             shadow_learn(text, "")
@@ -205,7 +211,6 @@ if __name__ == "__main__":
     print("🤖 خنگول فارسی 6.4 آماده به خدمت است ...")
     app = ApplicationBuilder().token(TOKEN).build()
 
-    # دستورات اصلی
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("panel", admin_panel))
     app.add_handler(CommandHandler("toggle", toggle))
@@ -215,36 +220,10 @@ if __name__ == "__main__":
     app.add_handler(CommandHandler("leave", leave_group))
     app.add_handler(CallbackQueryHandler(admin_callback))
 
-    # ثبت چت‌ها برای ارسال همگانی
-    app.add_handler(MessageHandler(filters.ALL, register_chat))
-
-    # ارسال همگانی برای مدیر
+    # ثبت پیام‌های مدیر برای ارسال همگانی
     app.add_handler(MessageHandler(filters.TEXT & filters.User(ADMIN_ID), broadcast_handler))
 
-    # پاسخ به پیام‌ها
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, reply))
-
-    app.run_polling()if __name__ == "__main__":
-    print("🤖 خنگول فارسی 6.4 آماده به خدمت است ...")
-    app = ApplicationBuilder().token(TOKEN).build()
-
-    # دستورات اصلی
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("panel", admin_panel))
-    app.add_handler(CommandHandler("toggle", toggle))
-    app.add_handler(CommandHandler("learn", learn_mode))
-    app.add_handler(CommandHandler("mode", mode_change))
-    app.add_handler(CommandHandler("stats", stats))
-    app.add_handler(CommandHandler("leave", leave_group))
-    app.add_handler(CallbackQueryHandler(admin_callback))
-
-    # 📦 ثبت چت‌ها برای ارسال همگانی
-    app.add_handler(MessageHandler(filters.ALL, register_chat))
-
-    # 📨 ارسال همگانی فقط برای مدیر
-    app.add_handler(MessageHandler(filters.TEXT & filters.User(ADMIN_ID), broadcast_handler))
-
-    # 💬 پاسخ به پیام‌ها برای همه کاربران
+    # پاسخ‌دهی به همه کاربران
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, reply))
 
     app.run_polling(allowed_updates=Update.ALL_TYPES)
