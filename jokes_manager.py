@@ -9,7 +9,8 @@ MEDIA_DIR = "jokes_media"
 if not os.path.exists(MEDIA_DIR):
     os.makedirs(MEDIA_DIR)
 
-# 💾 لود و ذخیره داده‌ها
+
+# 💾 بارگذاری و ذخیره جوک‌ها
 def load_jokes():
     if not os.path.exists(JOKES_FILE):
         with open(JOKES_FILE, "w", encoding="utf-8") as f:
@@ -17,52 +18,60 @@ def load_jokes():
     with open(JOKES_FILE, "r", encoding="utf-8") as f:
         return json.load(f)
 
+
 def save_jokes(data):
     with open(JOKES_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
-# 😂 ذخیره جوک جدید
+
+# 😂 ذخیره جوک جدید با تشخیص تکراری
 async def save_joke(update: Update):
-    """ذخیره جوک با پشتیبانی از متن، عکس، ویدیو یا استیکر"""
     reply = update.message.reply_to_message
     if not reply:
         return await update.message.reply_text("❗ لطفاً روی پیام جوک ریپلای کن (متن یا مدیا).")
 
     data = load_jokes()
     entry = {"type": "text", "value": ""}
+    new_value = None
 
     try:
+        # تشخیص نوع داده
         if reply.text:
+            new_value = reply.text.strip()
             entry["type"] = "text"
-            entry["value"] = reply.text.strip()
-
+            entry["value"] = new_value
         elif reply.caption:
+            new_value = reply.caption.strip()
             entry["type"] = "text"
-            entry["value"] = reply.caption.strip()
-
+            entry["value"] = new_value
         elif reply.photo:
             file = await reply.photo[-1].get_file()
             path = os.path.join(MEDIA_DIR, f"photo_{len(data)+1}.jpg")
             await file.download_to_drive(path)
+            new_value = path
             entry["type"] = "photo"
             entry["value"] = path
-
         elif reply.video:
             file = await reply.video.get_file()
             path = os.path.join(MEDIA_DIR, f"video_{len(data)+1}.mp4")
             await file.download_to_drive(path)
+            new_value = path
             entry["type"] = "video"
             entry["value"] = path
-
         elif reply.sticker:
             file = await reply.sticker.get_file()
             path = os.path.join(MEDIA_DIR, f"sticker_{len(data)+1}.webp")
             await file.download_to_drive(path)
+            new_value = path
             entry["type"] = "sticker"
             entry["value"] = path
-
         else:
             return await update.message.reply_text("⚠️ فقط متن، عکس، ویدیو یا استیکر پشتیبانی می‌شود.")
+
+        # ضدتکرار
+        for v in data.values():
+            if v.get("value") == new_value:
+                return await update.message.reply_text("😅 این جوک قبلاً ذخیره شده بود!")
 
         data[str(len(data) + 1)] = entry
         save_jokes(data)
@@ -71,9 +80,9 @@ async def save_joke(update: Update):
     except Exception as e:
         await update.message.reply_text(f"⚠️ خطا در ذخیره جوک: {e}")
 
-# 📋 نمایش لیست جوک‌ها
+
+# 📋 نمایش جوک‌ها
 async def list_jokes(update: Update):
-    """نمایش آخرین جوک‌های ذخیره‌شده"""
     data = load_jokes()
     if not data:
         return await update.message.reply_text("هیچ جوکی هنوز ثبت نشده 😅")
