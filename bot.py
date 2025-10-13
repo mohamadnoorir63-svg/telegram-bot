@@ -23,6 +23,8 @@ from fortune_manager import save_fortune, list_fortunes
 from group_manager import register_group_activity, get_group_stats
 from ai_learning import auto_learn_from_text
 from smart_reply import detect_emotion, smart_response
+from emotion_memory import remember_emotion, get_last_emotion, emotion_context_reply
+from auto_brain.auto_brain import start_auto_brain_loop
 
 # 🎯 تنظیمات پایه
 TOKEN = os.getenv("BOT_TOKEN")
@@ -663,13 +665,21 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(generate_sentence())
         return
 
-    # ✅ پاسخ هوشمند
+    # ✅ پاسخ هوشمند و احساسی
     learned_reply = get_reply(text)
-    if learned_reply:
+    emotion = detect_emotion(text)
+
+    # ذخیره و واکنش احساسی
+    last_emotion = get_last_emotion(uid)
+    context_reply = emotion_context_reply(emotion, last_emotion)
+    remember_emotion(uid, emotion)
+
+    if context_reply:
+        reply_text = enhance_sentence(context_reply)
+    elif learned_reply:
         reply_text = enhance_sentence(learned_reply)
     else:
-        emotion = detect_emotion(text)
-        reply_text = smart_response(text, emotion) or enhance_sentence(text)
+        reply_text = smart_response(text, uid) or enhance_sentence(text)
 
     await update.message.reply_text(reply_text)
 
@@ -745,7 +755,7 @@ async def leave(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await context.bot.leave_chat(update.message.chat.id)
 
 # ======================= 🚀 اجرای نهایی =======================
-if __name__ == "__main__":
+if name == "main":
     print("🤖 خنگول فارسی 8.5.1 Cloud+ Supreme Pro Stable+ آماده به خدمت است ...")
 
     app = ApplicationBuilder().token(TOKEN).build()
@@ -778,10 +788,11 @@ if __name__ == "__main__":
     app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, reply))
 
-    # 🔹 هنگام استارت
+# 🔹 هنگام استارت
     async def on_startup(app):
         await notify_admin_on_startup(app)
         app.create_task(auto_backup(app.bot))
+        app.create_task(start_auto_brain_loop(app.bot))  # 🧠 فعال‌سازی مغز خودکار
         print("🌙 [SYSTEM] Startup tasks scheduled ✅")
 
     app.post_init = on_startup
