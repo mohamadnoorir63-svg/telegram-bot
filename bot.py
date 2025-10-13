@@ -540,10 +540,13 @@ if __name__ == "__main__":
     app.add_handler(MessageHandler(filters.Document.ALL, handle_document))
     app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome))
 
-    # 🧠 پاسخ‌های سفارشی (قبل از پاسخ هوشمند)
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, reply_manager))
+# 🧠 پاسخ‌های سفارشی (فقط برای دستور /replies ، /delreply یا پیام ریپلای‌شده)
+    app.add_handler(MessageHandler(
+        filters.Regex("^/delreply|^/replies") | filters.REPLY,
+        reply_manager
+    ))
 
-    # 💬 پاسخ‌های هوشمند و یادگیری
+    # 💬 پاسخ‌های هوشمند و یادگیری (برای همه پیام‌های متنی دیگر)
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, reply))
 
     # 🔹 هنگام استارت
