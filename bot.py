@@ -312,9 +312,14 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(generate_sentence())
         return
 
-    # ✅ پاسخ هوشمند
-    emotion = detect_emotion(text)
-    reply_text = smart_response(text, emotion) or enhance_sentence(get_reply(text))
+    # ✅ پاسخ هوشمند و یادگیری واقعی
+    learned_reply = get_reply(text)
+    if learned_reply:
+        reply_text = enhance_sentence(learned_reply)
+    else:
+        emotion = detect_emotion(text)
+        reply_text = smart_response(text, emotion) or enhance_sentence(text)
+
     await update.message.reply_text(reply_text)
 
 # ======================= 🧹 ریست و ریلود =======================
