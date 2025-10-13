@@ -1,78 +1,94 @@
 import json
 import os
 from datetime import datetime
+from memory_manager import load_data, save_data
 
 GROUP_FILE = "group_data.json"
 
 # ======================= 📦 راه‌اندازی فایل گروه‌ها =======================
-
 def init_group_file():
-    """ایجاد فایل آمار گروه‌ها در صورت نبود"""
+    """اگر فایل گروه وجود نداشت، ایجادش می‌کند"""
     if not os.path.exists(GROUP_FILE):
         with open(GROUP_FILE, "w", encoding="utf-8") as f:
-            json.dump({"groups": {}}, f, ensure_ascii=False, indent=2)
+            json.dump({"groups": []}, f, ensure_ascii=False, indent=2)
 
 # ======================= 📥 بارگذاری و ذخیره =======================
-
 def load_groups():
+    """خواندن لیست گروه‌ها از فایل"""
     if not os.path.exists(GROUP_FILE):
         init_group_file()
     with open(GROUP_FILE, "r", encoding="utf-8") as f:
-        return json.load(f)
+        try:
+            data = json.load(f)
+            # اگر فایل خراب یا رشته بود، اصلاح شود
+            if not isinstance(data, dict) or "groups" not in data:
+                data = {"groups": []}
+        except:
+            data = {"groups": []}
+    return data
 
 def save_groups(data):
+    """ذخیره داده گروه‌ها"""
     with open(GROUP_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
 # ======================= 🧩 ثبت فعالیت گروه =======================
-
-def register_group_activity(group_id, user_id):
-    """ثبت فعالیت کاربر در گروه"""
+def register_group_activity(group_id, user_id, title="بدون‌نام"):
+    """ثبت یا بروزرسانی اطلاعات یک گروه"""
     data = load_groups()
-    groups = data.get("groups", {})
+    groups = data.get("groups", [])
 
-    group_id = str(group_id)
-    if group_id not in groups:
-        groups[group_id] = {
-            "title": f"Group_{group_id}",
+    # بررسی اینکه گروه قبلاً ثبت شده یا نه
+    group = next((g for g in groups if g.get("id") == group_id), None)
+
+    if not group:
+        group = {
+            "id": group_id,
+            "title": title,
             "members": [],
-            "last_active": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "last_active": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         }
+        groups.append(group)
 
-    if user_id not in groups[group_id]["members"]:
-        groups[group_id]["members"].append(user_id)
+    # افزودن کاربر جدید در صورت نبود
+    if user_id not in group["members"]:
+        group["members"].append(user_id)
 
-    groups[group_id]["last_active"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    # بروزرسانی آخرین فعالیت
+    group["last_active"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
+    # ذخیره در فایل
     data["groups"] = groups
     save_groups(data)
 
 # ======================= 📊 آمار گروه =======================
-
 def get_group_stats():
-    """نمایش آمار کلی گروه‌ها و اعضا"""
+    """برگرداندن آمار کلی گروه‌ها"""
     data = load_groups()
-    groups = data.get("groups", {})
-
+    groups = data.get("groups", [])
     total_groups = len(groups)
-    total_users = sum(len(info.get("members", [])) for info in groups.values())
+    total_members = sum(len(g.get("members", [])) for g in groups)
 
     return {
         "total_groups": total_groups,
-        "total_users": total_users,
-        "last_updated": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        "total_members": total_members,
+        "last_update": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     }
 
 # ======================= 🧾 لیست گروه‌ها =======================
-
 def list_groups():
-    """لیست نام گروه‌ها و اعضای آنها"""
+    """لیست کامل گروه‌ها و اعضا"""
     data = load_groups()
-    groups = data.get("groups", {})
-    text = "📋 لیست گروه‌ها:\n\n"
-    for gid, info in groups.items():
-        title = info.get("title", f"Group_{gid}")
-        members = len(info.get("members", []))
-        last = info.get("last_active", "نامشخص")
-        text += f"🏠 {title}\n👥 اعضا: {members}\n🕓 آخرین فعالیت: {last}\n\n"
-    return text if groups else "هنوز در هیچ گروهی فعالیت نکرده‌ام 😅"
+    groups = data.get("groups", [])
+
+    if not groups:
+        return "ℹ️ هنوز هیچ گروهی ثبت نشده."
+
+    text = "📈 آمار کامل گروه‌ها:\n\n"
+    for g in groups:
+        title = g.get("title", "بدون‌نام")
+        members = len(g.get("members", []))
+        last = g.get("last_active", "نامشخص")
+        text += f"🏠 گروه: {title}\n👥 اعضا: {members}\n🕓 آخرین فعالیت: {last}\n\n"
+
+    return text
