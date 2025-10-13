@@ -201,10 +201,9 @@ async def fullstats(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     except Exception as e:
         await update.message.reply_text(f"⚠️ خطا در آمار گروه‌ها:\n{e}")
-
-
 # ======================= 👋 خوشامد با عکس پروفایل =======================
 async def welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """ارسال پیام خوشامد با عکس پروفایل"""
     if not status["welcome"]:
         return
 
@@ -223,8 +222,20 @@ async def welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await update.message.reply_photo(file_id, caption=text)
             else:
                 await update.message.reply_text(text)
-        except:
-            await update.message.reply_text(text)# ======================= ☁️ بک‌آپ خودکار و دستی =======================
+        except Exception:
+            await update.message.reply_text(text)
+
+# ======================= 👤 ثبت خودکار کاربران =======================
+def register_user(user_id):
+    """ثبت کاربر در فایل memory.json"""
+    data = load_data("memory.json")
+    users = data.get("users", [])
+    if user_id not in users:
+        users.append(user_id)
+        data["users"] = users
+        save_data("memory.json", data)
+
+# ======================= ☁️ بک‌آپ خودکار و دستی =======================
 async def auto_backup(context: ContextTypes.DEFAULT_TYPE):
     while True:
         await asyncio.sleep(43200)
@@ -300,6 +311,7 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     uid = update.effective_user.id
     chat_id = update.effective_chat.id
 
+    register_user(uid)
     register_group_activity(chat_id, uid)
 
     if not status["locked"]:
@@ -438,16 +450,40 @@ async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not msg:
         return await update.message.reply_text("❗ بعد از /broadcast پیام را بنویس.")
 
+    # 📋 لود کاربران و گروه‌ها
     users = load_data("memory.json").get("users", [])
-    sent = 0
+    groups_data = load_data("group_data.json").get("groups", {})
+
+    # اگر گروه‌ها دیکشنری یا لیست بودن، درست استخراج کن
+    group_ids = []
+    if isinstance(groups_data, dict):
+        group_ids = list(groups_data.keys())
+    elif isinstance(groups_data, list):
+        group_ids = [g.get("id") for g in groups_data if "id" in g]
+
+    sent, failed = 0, 0
+
+    # 📩 ارسال به کاربران
     for uid in users:
         try:
             await context.bot.send_message(chat_id=uid, text=msg)
             sent += 1
         except:
-            pass
+            failed += 1
 
-    await update.message.reply_text(f"📨 پیام به {sent} کاربر ارسال شد ✅")
+    # 📢 ارسال به گروه‌ها
+    for gid in group_ids:
+        try:
+            await context.bot.send_message(chat_id=int(gid), text=msg)
+            sent += 1
+        except:
+            failed += 1
+
+    await update.message.reply_text(
+        f"📨 ارسال همگانی انجام شد ✅\n"
+        f"👤 کاربران: {len(users)} | 👥 گروه‌ها: {len(group_ids)}\n"
+        f"✅ موفق: {sent} | ⚠️ ناموفق: {failed}"
+    )
 
 
 # ======================= 🚪 خروج از گروه =======================
@@ -458,7 +494,7 @@ async def leave(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 # ======================= 🚀 اجرای نهایی =======================
-if __name__ == "__main__":
+if name == "main":
     print("🤖 خنگول فارسی 8.5.1 Cloud+ Supreme Pro Stable+ آماده به خدمت است ...")
 
     app = ApplicationBuilder().token(TOKEN).build()
