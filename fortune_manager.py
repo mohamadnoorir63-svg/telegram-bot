@@ -5,12 +5,9 @@ from telegram import Update
 FORTUNE_FILE = "fortunes.json"
 MEDIA_DIR = "fortunes_media"
 
-# 📁 پوشه‌ها
 if not os.path.exists(MEDIA_DIR):
     os.makedirs(MEDIA_DIR)
 
-
-# 💾 بارگذاری و ذخیره فال‌ها
 def load_fortunes():
     if not os.path.exists(FORTUNE_FILE):
         with open(FORTUNE_FILE, "w", encoding="utf-8") as f:
@@ -18,20 +15,22 @@ def load_fortunes():
     with open(FORTUNE_FILE, "r", encoding="utf-8") as f:
         return json.load(f)
 
-
 def save_fortunes(data):
     with open(FORTUNE_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
 
-# 🔮 ذخیره فال جدید با ضدتکرار
+# 🔮 ذخیره فال با تگ
 async def save_fortune(update: Update):
     reply = update.message.reply_to_message
     if not reply:
         return await update.message.reply_text("❗ لطفاً روی پیام فال ریپلای کن (متن یا مدیا).")
 
+    args = update.message.text.split(" ", 1)
+    tag = args[1].strip() if len(args) > 1 else "عمومی"
+
     data = load_fortunes()
-    entry = {"type": "text", "value": ""}
+    entry = {"type": "text", "value": "", "tag": tag}
     new_value = None
 
     try:
@@ -74,35 +73,43 @@ async def save_fortune(update: Update):
 
         data[str(len(data) + 1)] = entry
         save_fortunes(data)
-        await update.message.reply_text("✅ فال جدید با موفقیت ذخیره شد!")
+        await update.message.reply_text(f"✅ فال جدید در دسته '{tag}' ذخیره شد!")
 
     except Exception as e:
         await update.message.reply_text(f"⚠️ خطا در ذخیره فال: {e}")
 
 
-# 📋 لیست فال‌ها
+# 📋 لیست فال‌ها (با فیلتر تگ)
 async def list_fortunes(update: Update):
+    text = update.message.text.strip()
+    args = text.split(" ", 1)
+    tag_filter = args[1].strip() if len(args) > 1 else None
+
     data = load_fortunes()
     if not data:
         return await update.message.reply_text("هیچ فالی هنوز ثبت نشده 😔")
 
-    await update.message.reply_text(f"📜 تعداد کل فال‌ها: {len(data)}")
+    fortunes = list(data.items())
+    if tag_filter:
+        fortunes = [f for f in fortunes if f[1].get("tag") == tag_filter]
+        if not fortunes:
+            return await update.message.reply_text(f"⚠️ فالی در دسته '{tag_filter}' پیدا نشد!")
 
-    for k, v in list(data.items())[-10:]:
+    await update.message.reply_text(f"📜 تعداد فال‌های{' '+tag_filter if tag_filter else ''}: {len(fortunes)}")
+
+    for k, v in fortunes[-10:]:
         t, val = v.get("type"), v.get("value")
         try:
             if t == "text":
-                await update.message.reply_text("🔮 " + val)
+                await update.message.reply_text(f"🔮 ({v.get('tag')})\n{val}")
             elif t == "photo" and os.path.exists(val):
                 with open(val, "rb") as f:
-                    await update.message.reply_photo(photo=f)
+                    await update.message.reply_photo(photo=f, caption=f"🔮 ({v.get('tag')})")
             elif t == "video" and os.path.exists(val):
                 with open(val, "rb") as f:
-                    await update.message.reply_video(video=f)
+                    await update.message.reply_video(video=f, caption=f"🔮 ({v.get('tag')})")
             elif t == "sticker" and os.path.exists(val):
                 with open(val, "rb") as f:
                     await update.message.reply_sticker(sticker=f)
-            else:
-                await update.message.reply_text(f"⚠️ فایل فال شماره {k} پیدا نشد یا حذف شده.")
         except Exception as e:
-            await update.message.reply_text(f"⚠️ خطا در ارسال فال {k}: {e}")
+            await update.message.reply_text(f"⚠️ خطا در نمایش فال {k}: {e}")
