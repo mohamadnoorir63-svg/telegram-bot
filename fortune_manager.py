@@ -1,5 +1,6 @@
 import json
 import os
+import random
 from telegram import Update
 
 FORTUNE_FILE = "fortunes.json"
@@ -19,8 +20,7 @@ def save_fortunes(data):
     with open(FORTUNE_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
-
-# 🔮 ذخیره فال با تگ
+# 🔮 ذخیره فال با دسته‌بندی
 async def save_fortune(update: Update):
     reply = update.message.reply_to_message
     if not reply:
@@ -66,10 +66,9 @@ async def save_fortune(update: Update):
         else:
             return await update.message.reply_text("⚠️ فقط متن، عکس، ویدیو یا استیکر پشتیبانی می‌شود.")
 
-        # ضدتکرار
         for v in data.values():
             if v.get("value") == new_value:
-                return await update.message.reply_text("🔁 این فال قبلاً ثبت شده بود!")
+                return await update.message.reply_text("🔁 این فال قبلاً ذخیره شده بود!")
 
         data[str(len(data) + 1)] = entry
         save_fortunes(data)
@@ -78,38 +77,32 @@ async def save_fortune(update: Update):
     except Exception as e:
         await update.message.reply_text(f"⚠️ خطا در ذخیره فال: {e}")
 
-
-# 📋 لیست فال‌ها (با فیلتر تگ)
-async def list_fortunes(update: Update):
-    text = update.message.text.strip()
-    args = text.split(" ", 1)
-    tag_filter = args[1].strip() if len(args) > 1 else None
-
+# 📜 فال تصادفی از دسته خاص
+async def random_fortune(update: Update, tag=None):
     data = load_fortunes()
     if not data:
         return await update.message.reply_text("هیچ فالی هنوز ثبت نشده 😔")
 
-    fortunes = list(data.items())
-    if tag_filter:
-        fortunes = [f for f in fortunes if f[1].get("tag") == tag_filter]
+    fortunes = list(data.values())
+    if tag:
+        fortunes = [f for f in fortunes if f.get("tag") == tag]
         if not fortunes:
-            return await update.message.reply_text(f"⚠️ فالی در دسته '{tag_filter}' پیدا نشد!")
+            return await update.message.reply_text(f"🔍 فالی در دسته '{tag}' پیدا نشد!")
 
-    await update.message.reply_text(f"📜 تعداد فال‌های{' '+tag_filter if tag_filter else ''}: {len(fortunes)}")
+    fortune = random.choice(fortunes)
+    t, val = fortune.get("type"), fortune.get("value")
 
-    for k, v in fortunes[-10:]:
-        t, val = v.get("type"), v.get("value")
-        try:
-            if t == "text":
-                await update.message.reply_text(f"🔮 ({v.get('tag')})\n{val}")
-            elif t == "photo" and os.path.exists(val):
-                with open(val, "rb") as f:
-                    await update.message.reply_photo(photo=f, caption=f"🔮 ({v.get('tag')})")
-            elif t == "video" and os.path.exists(val):
-                with open(val, "rb") as f:
-                    await update.message.reply_video(video=f, caption=f"🔮 ({v.get('tag')})")
-            elif t == "sticker" and os.path.exists(val):
-                with open(val, "rb") as f:
-                    await update.message.reply_sticker(sticker=f)
-        except Exception as e:
-            await update.message.reply_text(f"⚠️ خطا در نمایش فال {k}: {e}")
+    try:
+        if t == "text":
+            await update.message.reply_text(f"🔮 ({fortune.get('tag')})\n{val}")
+        elif t == "photo" and os.path.exists(val):
+            with open(val, "rb") as f:
+                await update.message.reply_photo(photo=f, caption=f"🔮 ({fortune.get('tag')})")
+        elif t == "video" and os.path.exists(val):
+            with open(val, "rb") as f:
+                await update.message.reply_video(video=f, caption=f"🔮 ({fortune.get('tag')})")
+        elif t == "sticker" and os.path.exists(val):
+            with open(val, "rb") as f:
+                await update.message.reply_sticker(sticker=f)
+    except Exception as e:
+        await update.message.reply_text(f"⚠️ خطا در ارسال فال: {e}")
