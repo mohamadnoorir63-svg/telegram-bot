@@ -136,63 +136,24 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ======================= 📊 آمار کامل گروه‌ها =======================
 async def fullstats(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """نمایش آمار کامل گروه‌ها (سازگار با ساختار جدید و قدیمی group_data.json)"""
-    try:
-        data = load_data("group_data.json")
-        groups = data.get("groups", {})
+    data = load_data("group_data.json")
+    groups = data.get("groups", [])
 
-        # ✅ اگر ساختار جدید باشد (لیست از دیکشنری‌ها)
-        if isinstance(groups, list):
-            if not groups:
-                return await update.message.reply_text("ℹ️ هنوز هیچ گروهی ثبت نشده.")
-            
-            text = "📈 آمار کامل گروه‌ها:\n\n"
-            for g in groups:
-                group_id = g.get("id", "نامشخص")
-                title = g.get("title", f"Group_{group_id}")
-                members = len(g.get("members", []))
-                last_active = g.get("last_active", "نامشخص")
+    if not groups:
+        return await update.message.reply_text("ℹ️ هنوز هیچ گروهی ثبت نشده.")
 
-                # تلاش برای گرفتن نام واقعی گروه از تلگرام
-                try:
-                    chat = await context.bot.get_chat(group_id)
-                    if chat.title:
-                        title = chat.title
-                except Exception:
-                    pass
+    text = "📈 آمار کامل گروه‌ها و اعضا:\n\n"
 
-                text += f"🏠 گروه: {title}\n👥 اعضا: {members}\n🕓 آخرین فعالیت: {last_active}\n\n"
+    for g in groups:
+        title = g.get("title", "بدون‌نام")
+        members = len(g.get("members", []))
+        last_active = g.get("last_active", "نامشخص")
+        text += f"🏠 گروه: {title}\n👥 اعضا: {members}\n🕓 آخرین فعالیت: {last_active}\n\n"
 
-        # ✅ اگر ساختار قدیمی باشد (دیکشنری از گروه‌ها)
-        elif isinstance(groups, dict):
-            if not groups:
-                return await update.message.reply_text("ℹ️ هنوز هیچ گروهی ثبت نشده.")
-            
-            text = "📈 آمار کامل گروه‌ها:\n\n"
-            for group_id, info in groups.items():
-                title = info.get("title", f"Group_{group_id}")
-                members = len(info.get("members", []))
-                last_active = info.get("last_active", "نامشخص")
+    if len(text) > 4000:
+        text = text[:3990] + "..."
 
-                try:
-                    chat = await context.bot.get_chat(group_id)
-                    if chat.title:
-                        title = chat.title
-                except Exception:
-                    pass
-
-                text += f"🏠 گروه: {title}\n👥 اعضا: {members}\n🕓 آخرین فعالیت: {last_active}\n\n"
-
-        else:
-            return await update.message.reply_text("⚠️ ساختار فایل group_data.json نامعتبر است!")
-
-        if len(text) > 4000:
-            text = text[:3990] + "..."
-
-        await update.message.reply_text(text)
-
-    except Exception as e:
-        await update.message.reply_text(f"⚠️ خطا در آمار گروه‌ها:\n{e}")
+    await update.message.reply_text(text)
 
 # ======================= 👋 خوشامد با عکس پروفایل =======================
 async def welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -289,54 +250,24 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
         shadow_learn(text, "")
         return
 
-    # ✅ جوک تصادفی (پشتیبانی از عکس، ویدیو، استیکر و متن)
+    # ✅ جوک تصادفی
     if text == "جوک":
         if os.path.exists("jokes.json"):
             data = load_data("jokes.json")
             if data:
-                key, val = random.choice(list(data.items()))
-                t = val.get("type", "text")
-                v = val.get("value", "")
-                try:
-                    if t == "text":
-                        await update.message.reply_text("😂 " + v)
-                    elif t == "photo":
-                        await update.message.reply_photo(photo=open(v, "rb"), caption="😂 جوک تصویری!")
-                    elif t == "video":
-                        await update.message.reply_video(video=open(v, "rb"), caption="😂 جوک ویدیویی!")
-                    elif t == "sticker":
-                        await update.message.reply_sticker(sticker=open(v, "rb"))
-                    else:
-                        await update.message.reply_text("⚠️ نوع فایل پشتیبانی نمی‌شود.")
-                except Exception as e:
-                    await update.message.reply_text(f"⚠️ خطا در ارسال جوک: {e}")
+                await update.message.reply_text("😂 " + random.choice(list(data.values())))
             else:
                 await update.message.reply_text("هنوز جوکی ثبت نشده 😅")
         else:
             await update.message.reply_text("📂 فایل جوک‌ها پیدا نشد 😕")
         return
 
-    # ✅ فال تصادفی (پشتیبانی از عکس، ویدیو، استیکر و متن)
+    # ✅ فال تصادفی
     if text == "فال":
         if os.path.exists("fortunes.json"):
             data = load_data("fortunes.json")
             if data:
-                key, val = random.choice(list(data.items()))
-                t = val.get("type", "text")
-                v = val.get("value", "")
-                try:
-                    if t == "text":
-                        await update.message.reply_text("🔮 " + v)
-                    elif t == "photo":
-                        await update.message.reply_photo(photo=open(v, "rb"), caption="🔮 فال تصویری!")
-                    elif t == "video":
-                        await update.message.reply_video(video=open(v, "rb"), caption="🔮 فال ویدیویی!")
-                    elif t == "sticker":
-                        await update.message.reply_sticker(sticker=open(v, "rb"))
-                    else:
-                        await update.message.reply_text("⚠️ نوع فایل پشتیبانی نمی‌شود.")
-                except Exception as e:
-                    await update.message.reply_text(f"⚠️ خطا در ارسال فال: {e}")
+                await update.message.reply_text("🔮 " + random.choice(list(data.values())))
             else:
                 await update.message.reply_text("هنوز فالی ثبت نشده 😔")
         else:
@@ -381,15 +312,11 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(generate_sentence())
         return
 
-    # ✅ پاسخ هوشمند و یادگیری واقعی
-    learned_reply = get_reply(text)
-    if learned_reply:
-        reply_text = enhance_sentence(learned_reply)
-    else:
-        emotion = detect_emotion(text)
-        reply_text = smart_response(text, emotion) or enhance_sentence(text)
-
+    # ✅ پاسخ هوشمند
+    emotion = detect_emotion(text)
+    reply_text = smart_response(text, emotion) or enhance_sentence(get_reply(text))
     await update.message.reply_text(reply_text)
+
 # ======================= 🧹 ریست و ریلود =======================
 async def reset_memory(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_ID:
@@ -427,90 +354,8 @@ async def leave(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("🫡 خدافظ! تا دیدار بعدی 😂")
         await context.bot.leave_chat(update.message.chat.id)
 
-
-# ======================= 🤖 سیستم پاسخ‌های سفارشی (Reply هوشمند + حذف + لیست) =======================
-async def reply_manager(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """سیستم کامل ساخت، حذف و نمایش پاسخ‌های دلخواه"""
-
-    if not update.message or not update.message.text:
-        return
-
-    text = update.message.text.strip().lower()
-    replies_file = "custom_replies.json"
-    replies = load_data(replies_file) if os.path.exists(replies_file) else {}
-
-    # 🧹 حذف پاسخ
-    if text.startswith("/delreply"):
-        args = text.replace("/delreply", "").strip()
-        if not args:
-            return await update.message.reply_text("❗ استفاده: /delreply <کلمه>")
-        key = args.lower()
-        if key in replies:
-            del replies[key]
-            save_data(replies_file, replies)
-            await update.message.reply_text(f"🗑️ پاسخ برای «{key}» حذف شد.")
-        else:
-            await update.message.reply_text("⚠️ هیچ پاسخی با این کلمه یافت نشد.")
-        return
-
-    # 📜 لیست پاسخ‌ها
-    if text == "/replies":
-        if not replies:
-            return await update.message.reply_text("📂 هنوز هیچ پاسخ سفارشی ذخیره نشده 😅")
-        msg = "📜 لیست پاسخ‌های سفارشی:\n\n"
-        for k, v in replies.items():
-            t = v.get("type", "text")
-            icon = "💬" if t == "text" else "🖼️" if t == "photo" else "🎞️" if t == "video" else "🎙️" if t == "voice" else "🔘"
-            msg += f"{icon} {k}\n"
-        await update.message.reply_text(msg)
-        return
-
-    # 💾 ساخت پاسخ جدید با ریپلای
-    if update.message.reply_to_message:
-        keyword = text
-        msg = update.message.reply_to_message
-
-        if msg.text:
-            replies[keyword] = {"type": "text", "value": msg.text}
-        elif msg.photo:
-            replies[keyword] = {"type": "photo", "value": msg.photo[-1].file_id}
-        elif msg.video:
-            replies[keyword] = {"type": "video", "value": msg.video.file_id}
-        elif msg.sticker:
-            replies[keyword] = {"type": "sticker", "value": msg.sticker.file_id}
-        elif msg.voice:
-            replies[keyword] = {"type": "voice", "value": msg.voice.file_id}
-        else:
-            await update.message.reply_text("⚠️ نوع پیام پشتیبانی نمی‌شود (فقط متن، عکس، ویدیو، استیکر یا ویس).")
-            return
-
-        save_data(replies_file, replies)
-        await update.message.reply_text(f"✅ پاسخ برای «{keyword}» با موفقیت ذخیره شد.")
-        return
-
-    # 📬 اگر کلمه در لیست پاسخ‌ها موجود است، ارسالش کن و دیگر ادامه نده
-    if text in replies:
-        r = replies[text]
-        t, v = r.get("type"), r.get("value")
-        try:
-            if t == "text":
-                await update.message.reply_text(v)
-            elif t == "photo":
-                await update.message.reply_photo(v)
-            elif t == "video":
-                await update.message.reply_video(v)
-            elif t == "sticker":
-                await update.message.reply_sticker(v)
-            elif t == "voice":
-                await update.message.reply_voice(v)
-        except Exception as e:
-            await update.message.reply_text(f"⚠️ خطا در ارسال پاسخ: {e}")
-        return  # ✅ مهم: بعد از پاسخ سفارشی، اجازه ادامه نده
-
-    # ⚠️ اگر پاسخ سفارشی نبود، اجازه بده بره سراغ سیستم هوشمند
-    return
 # ======================= 🚀 اجرای نهایی =======================
-if __name__ == "__main__":
+if name == "main":
     print("🤖 خنگول فارسی 8.5.1 Cloud+ Supreme Pro Stable+ آماده به خدمت است ...")
 
     app = ApplicationBuilder().token(TOKEN).build()
@@ -537,21 +382,13 @@ if __name__ == "__main__":
     # 🔹 پیام‌ها و اسناد
     app.add_handler(MessageHandler(filters.Document.ALL, handle_document))
     app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, reply))
 
-# 🧠 پاسخ‌های سفارشی (فقط برای دستور /replies ، /delreply یا پیام ریپلای‌شده)
-app.add_handler(MessageHandler(
-    filters.Regex("^/delreply|^/replies") | filters.REPLY,
-    reply_manager
-))
+    # 🔹 هنگام استارت
+    async def on_startup(app):
+        await notify_admin_on_startup(app)
+        app.create_task(auto_backup(app))
+        print("🌙 [SYSTEM] Startup tasks scheduled ✅")
 
-# 💬 پاسخ‌های هوشمند و یادگیری (برای همه پیام‌های متنی دیگر)
-app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, reply))
-
-# 🔹 هنگام استارت
-async def on_startup(app):
-    await notify_admin_on_startup(app)
-    app.create_task(auto_backup(app))
-    print("🌙 [SYSTEM] Startup tasks scheduled ✅")
-
-app.post_init = on_startup
-app.run_polling(allowed_updates=Update.ALL_TYPES)
+    app.post_init = on_startup
+    app.run_polling(allowed_updates=Update.ALL_TYPES)
