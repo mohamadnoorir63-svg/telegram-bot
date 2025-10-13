@@ -136,24 +136,38 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ======================= 📊 آمار کامل گروه‌ها =======================
 async def fullstats(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    data = load_data("group_data.json")
-    groups = data.get("groups", [])
+    """نمایش آمار کامل گروه‌ها و اعضا (سازگار با group_manager جدید)"""
+    try:
+        data = load_data("group_data.json")
+        groups = data.get("groups", {})
 
-    if not groups:
-        return await update.message.reply_text("ℹ️ هنوز هیچ گروهی ثبت نشده.")
+        if not groups:
+            return await update.message.reply_text("ℹ️ هنوز هیچ گروهی ثبت نشده.")
 
-    text = "📈 آمار کامل گروه‌ها و اعضا:\n\n"
+        text = "📈 آمار کامل گروه‌ها:\n\n"
 
-    for g in groups:
-        title = g.get("title", "بدون‌نام")
-        members = len(g.get("members", []))
-        last_active = g.get("last_active", "نامشخص")
-        text += f"🏠 گروه: {title}\n👥 اعضا: {members}\n🕓 آخرین فعالیت: {last_active}\n\n"
+        for group_id, info in groups.items():
+            title = info.get("title", f"Group_{group_id}")
+            members = len(info.get("members", []))
+            last_active = info.get("last_active", "نامشخص")
 
-    if len(text) > 4000:
-        text = text[:3990] + "..."
+            # 🎯 تلاش برای گرفتن نام واقعی گروه از تلگرام
+            try:
+                chat = await context.bot.get_chat(group_id)
+                if chat.title:
+                    title = chat.title
+            except:
+                pass
 
-    await update.message.reply_text(text)
+            text += f"🏠 گروه: {title}\n👥 اعضا: {members}\n🕓 آخرین فعالیت: {last_active}\n\n"
+
+        if len(text) > 4000:
+            text = text[:3990] + "..."
+
+        await update.message.reply_text(text)
+
+    except Exception as e:
+        await update.message.reply_text(f"⚠️ خطا در آمار گروه‌ها:\n{e}")
 
 # ======================= 👋 خوشامد با عکس پروفایل =======================
 async def welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -389,7 +403,7 @@ async def leave(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await context.bot.leave_chat(update.message.chat.id)
 
 # ======================= 🚀 اجرای نهایی =======================
-if __name__ == "__main__":
+if name == "main":
     print("🤖 خنگول فارسی 8.5.1 Cloud+ Supreme Pro Stable+ آماده به خدمت است ...")
 
     app = ApplicationBuilder().token(TOKEN).build()
