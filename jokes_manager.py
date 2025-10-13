@@ -1,15 +1,16 @@
 import json
 import os
+import random
 from telegram import Update
 
 JOKES_FILE = "jokes.json"
 MEDIA_DIR = "jokes_media"
 
-# 📁 ساخت پوشه‌ها در صورت نیاز
+# 📁 اطمینان از وجود پوشه
 if not os.path.exists(MEDIA_DIR):
     os.makedirs(MEDIA_DIR)
 
-# 💾 مدیریت فایل جوک‌ها
+# 💾 لود و ذخیره داده
 def load_jokes():
     if not os.path.exists(JOKES_FILE):
         with open(JOKES_FILE, "w", encoding="utf-8") as f:
@@ -21,7 +22,7 @@ def save_jokes(data):
     with open(JOKES_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
-# 😂 ثبت جوک با تگ و ضدتکرار
+# 😂 ذخیره جوک با تگ
 async def save_joke(update: Update):
     reply = update.message.reply_to_message
     if not reply:
@@ -67,7 +68,7 @@ async def save_joke(update: Update):
         else:
             return await update.message.reply_text("⚠️ فقط متن، عکس، ویدیو یا استیکر پشتیبانی می‌شود.")
 
-        # جلوگیری از تکرار
+        # ضدتکرار
         for v in data.values():
             if v.get("value") == new_value:
                 return await update.message.reply_text("😅 این جوک قبلاً ذخیره شده بود!")
@@ -80,7 +81,7 @@ async def save_joke(update: Update):
         await update.message.reply_text(f"⚠️ خطا در ذخیره جوک: {e}")
 
 
-# 📋 لیست جوک‌ها (عمومی یا بر اساس تگ)
+# 📜 لیست جوک‌ها (با یا بدون تگ)
 async def list_jokes(update: Update):
     text = update.message.text.strip()
     args = text.split(" ", 1)
@@ -114,3 +115,34 @@ async def list_jokes(update: Update):
                     await update.message.reply_sticker(sticker=f)
         except Exception as e:
             await update.message.reply_text(f"⚠️ خطا در نمایش جوک {k}: {e}")
+
+
+# 🎲 جوک تصادفی بر اساس تگ
+async def random_joke(update: Update, tag=None):
+    data = load_jokes()
+    if not data:
+        return await update.message.reply_text("هیچ جوکی ثبت نشده 😅")
+
+    jokes = list(data.values())
+    if tag:
+        jokes = [j for j in jokes if j.get("tag") == tag]
+        if not jokes:
+            return await update.message.reply_text(f"😕 جوکی در دسته '{tag}' پیدا نشد!")
+
+    joke = random.choice(jokes)
+    t, val = joke.get("type"), joke.get("value")
+
+    try:
+        if t == "text":
+            await update.message.reply_text(f"😂 ({joke.get('tag')})\n{val}")
+        elif t == "photo" and os.path.exists(val):
+            with open(val, "rb") as f:
+                await update.message.reply_photo(photo=f, caption=f"😂 ({joke.get('tag')})")
+        elif t == "video" and os.path.exists(val):
+            with open(val, "rb") as f:
+                await update.message.reply_video(video=f, caption=f"😂 ({joke.get('tag')})")
+        elif t == "sticker" and os.path.exists(val):
+            with open(val, "rb") as f:
+                await update.message.reply_sticker(sticker=f)
+    except Exception as e:
+        await update.message.reply_text(f"⚠️ خطا در ارسال جوک: {e}")
