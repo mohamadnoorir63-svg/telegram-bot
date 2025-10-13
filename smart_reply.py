@@ -2,6 +2,7 @@ import random
 import re
 from memory_manager import get_reply, enhance_sentence, shadow_learn
 from ai_learning import auto_learn_from_text
+from emotion_memory import remember_emotion, get_last_emotion, emotion_context_reply
 
 # ======================= 😄 تشخیص احساس =======================
 def detect_emotion(text: str) -> str:
@@ -26,16 +27,29 @@ def detect_emotion(text: str) -> str:
 
     return "neutral"
 
-# ======================= 💬 پاسخ هوشمند و یادگیرنده =======================
-def smart_response(text: str, emotion: str) -> str:
-    """پاسخ پویا و یادگیرنده بر اساس احساس و حافظه"""
+# ======================= 💬 پاسخ هوشمند و احساسی =======================
+def smart_response(text: str, user_id: int) -> str:
+    """پاسخ پویا و احساسی بر اساس حافظه و وضعیت کاربر"""
     if not text:
         return ""
 
-    # قبل از پاسخ دادن، از متن یاد بگیر
+    # ۱️⃣ تشخیص احساس فعلی
+    emotion = detect_emotion(text)
+
+    # ۲️⃣ بررسی احساس قبلی و واکنش متناسب
+    last_emotion = get_last_emotion(user_id)
+    context_reply = emotion_context_reply(emotion, last_emotion)
+    if context_reply:
+        remember_emotion(user_id, emotion)
+        return enhance_sentence(context_reply)
+
+    # ۳️⃣ ثبت احساس فعلی در حافظه
+    remember_emotion(user_id, emotion)
+
+    # ۴️⃣ یادگیری خودکار از متن
     auto_learn_from_text(text)
 
-    # پاسخ‌های پایه
+    # ۵️⃣ پاسخ‌های پایه برای هر احساس
     responses = {
         "happy": [
             "😂 خوشحالم حالت خوبه!",
@@ -74,20 +88,20 @@ def smart_response(text: str, emotion: str) -> str:
         ],
     }
 
-    # تلاش برای یافتن پاسخ از حافظه
+    # ۶️⃣ تلاش برای یافتن پاسخ از حافظه
     mem_reply = get_reply(text)
     if mem_reply:
         shadow_learn(text, mem_reply)
         return enhance_sentence(mem_reply)
 
-    # اگر چیزی در حافظه نبود، پاسخ انسانی بساز
+    # ۷️⃣ در نبود پاسخ در حافظه، پاسخ انسانی بساز
     if random.random() < 0.3:
         emotion = "neutral"
 
     base = random.choice(responses.get(emotion, responses["neutral"]))
     reply = enhance_sentence(base)
 
-    # هر مکالمه را هم به حافظه سایه اضافه کن تا مغز خودکار رشد دهد
+    # ۸️⃣ ثبت پاسخ در حافظه سایه برای آموزش آینده
     shadow_learn(text, reply)
 
     return reply
