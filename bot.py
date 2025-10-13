@@ -250,24 +250,54 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
         shadow_learn(text, "")
         return
 
-    # ✅ جوک تصادفی
+    # ✅ جوک تصادفی (پشتیبانی از عکس، ویدیو، استیکر و متن)
     if text == "جوک":
         if os.path.exists("jokes.json"):
             data = load_data("jokes.json")
             if data:
-                await update.message.reply_text("😂 " + random.choice(list(data.values())))
+                key, val = random.choice(list(data.items()))
+                t = val.get("type", "text")
+                v = val.get("value", "")
+                try:
+                    if t == "text":
+                        await update.message.reply_text("😂 " + v)
+                    elif t == "photo":
+                        await update.message.reply_photo(photo=open(v, "rb"), caption="😂 جوک تصویری!")
+                    elif t == "video":
+                        await update.message.reply_video(video=open(v, "rb"), caption="😂 جوک ویدیویی!")
+                    elif t == "sticker":
+                        await update.message.reply_sticker(sticker=open(v, "rb"))
+                    else:
+                        await update.message.reply_text("⚠️ نوع فایل پشتیبانی نمی‌شود.")
+                except Exception as e:
+                    await update.message.reply_text(f"⚠️ خطا در ارسال جوک: {e}")
             else:
                 await update.message.reply_text("هنوز جوکی ثبت نشده 😅")
         else:
             await update.message.reply_text("📂 فایل جوک‌ها پیدا نشد 😕")
         return
 
-    # ✅ فال تصادفی
+    # ✅ فال تصادفی (پشتیبانی از عکس، ویدیو، استیکر و متن)
     if text == "فال":
         if os.path.exists("fortunes.json"):
             data = load_data("fortunes.json")
             if data:
-                await update.message.reply_text("🔮 " + random.choice(list(data.values())))
+                key, val = random.choice(list(data.items()))
+                t = val.get("type", "text")
+                v = val.get("value", "")
+                try:
+                    if t == "text":
+                        await update.message.reply_text("🔮 " + v)
+                    elif t == "photo":
+                        await update.message.reply_photo(photo=open(v, "rb"), caption="🔮 فال تصویری!")
+                    elif t == "video":
+                        await update.message.reply_video(video=open(v, "rb"), caption="🔮 فال ویدیویی!")
+                    elif t == "sticker":
+                        await update.message.reply_sticker(sticker=open(v, "rb"))
+                    else:
+                        await update.message.reply_text("⚠️ نوع فایل پشتیبانی نمی‌شود.")
+                except Exception as e:
+                    await update.message.reply_text(f"⚠️ خطا در ارسال فال: {e}")
             else:
                 await update.message.reply_text("هنوز فالی ثبت نشده 😔")
         else:
@@ -360,7 +390,7 @@ async def leave(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await context.bot.leave_chat(update.message.chat.id)
 
 # ======================= 🚀 اجرای نهایی =======================
-if __name__ == "__main__":
+if name == "main":
     print("🤖 خنگول فارسی 8.5.1 Cloud+ Supreme Pro Stable+ آماده به خدمت است ...")
 
     app = ApplicationBuilder().token(TOKEN).build()
