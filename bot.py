@@ -510,7 +510,7 @@ async def reply_manager(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 # ======================= 🚀 اجرای نهایی =======================
-if name == "main":
+if __name__ == "__main__":
     print("🤖 خنگول فارسی 8.5.1 Cloud+ Supreme Pro Stable+ آماده به خدمت است ...")
 
     app = ApplicationBuilder().token(TOKEN).build()
