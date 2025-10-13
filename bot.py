@@ -427,8 +427,90 @@ async def leave(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("🫡 خدافظ! تا دیدار بعدی 😂")
         await context.bot.leave_chat(update.message.chat.id)
 
+
+# ======================= 🤖 سیستم پاسخ‌های سفارشی (Reply هوشمند + حذف + لیست) =======================
+async def reply_manager(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """سیستم کامل ساخت، حذف و نمایش پاسخ‌های دلخواه"""
+
+    if not update.message or not update.message.text:
+        return
+
+    text = update.message.text.strip().lower()
+    replies_file = "custom_replies.json"
+    replies = load_data(replies_file) if os.path.exists(replies_file) else {}
+
+    # 🧹 حذف پاسخ
+    if text.startswith("/delreply"):
+        args = text.replace("/delreply", "").strip()
+        if not args:
+            return await update.message.reply_text("❗ استفاده: /delreply <کلمه>")
+        key = args.lower()
+        if key in replies:
+            del replies[key]
+            save_data(replies_file, replies)
+            await update.message.reply_text(f"🗑️ پاسخ برای «{key}» حذف شد.")
+        else:
+            await update.message.reply_text("⚠️ هیچ پاسخی با این کلمه یافت نشد.")
+        return
+
+    # 📜 لیست پاسخ‌ها
+    if text == "/replies":
+        if not replies:
+            return await update.message.reply_text("📂 هنوز هیچ پاسخ سفارشی ذخیره نشده 😅")
+        msg = "📜 لیست پاسخ‌های سفارشی:\n\n"
+        for k, v in replies.items():
+            t = v.get("type", "text")
+            icon = "💬" if t == "text" else "🖼️" if t == "photo" else "🎞️" if t == "video" else "🎙️" if t == "voice" else "🔘"
+            msg += f"{icon} {k}\n"
+        await update.message.reply_text(msg)
+        return
+
+    # 💾 ساخت پاسخ جدید با ریپلای
+    if update.message.reply_to_message:
+        keyword = text
+        msg = update.message.reply_to_message
+
+        if msg.text:
+            replies[keyword] = {"type": "text", "value": msg.text}
+        elif msg.photo:
+            replies[keyword] = {"type": "photo", "value": msg.photo[-1].file_id}
+        elif msg.video:
+            replies[keyword] = {"type": "video", "value": msg.video.file_id}
+        elif msg.sticker:
+            replies[keyword] = {"type": "sticker", "value": msg.sticker.file_id}
+        elif msg.voice:
+            replies[keyword] = {"type": "voice", "value": msg.voice.file_id}
+        else:
+            await update.message.reply_text("⚠️ نوع پیام پشتیبانی نمی‌شود (فقط متن، عکس، ویدیو، استیکر یا ویس).")
+            return
+
+        save_data(replies_file, replies)
+        await update.message.reply_text(f"✅ پاسخ برای «{keyword}» با موفقیت ذخیره شد.")
+        return
+
+    # 📬 اگر کلمه در لیست پاسخ‌ها موجود است، ارسالش کن
+    if text in replies:
+        r = replies[text]
+        t, v = r.get("type"), r.get("value")
+        try:
+            if t == "text":
+                await update.message.reply_text(v)
+            elif t == "photo":
+                await update.message.reply_photo(v)
+            elif t == "video":
+                await update.message.reply_video(v)
+            elif t == "sticker":
+                await update.message.reply_sticker(v)
+            elif t == "voice":
+                await update.message.reply_voice(v)
+            return
+        except Exception as e:
+            await update.message.reply_text(f"⚠️ خطا در ارسال پاسخ: {e}")
+            return
+
+
 # ======================= 🚀 اجرای نهایی =======================
-if __name__ == "__main__":
+if name == "main":
     print("🤖 خنگول فارسی 8.5.1 Cloud+ Supreme Pro Stable+ آماده به خدمت است ...")
 
     app = ApplicationBuilder().token(TOKEN).build()
@@ -455,6 +537,11 @@ if __name__ == "__main__":
     # 🔹 پیام‌ها و اسناد
     app.add_handler(MessageHandler(filters.Document.ALL, handle_document))
     app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome))
+
+    # 🧠 پاسخ‌های سفارشی (قبل از پاسخ هوشمند)
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, reply_manager))
+
+    # 💬 پاسخ‌های هوشمند و یادگیری
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, reply))
 
     # 🔹 هنگام استارت
