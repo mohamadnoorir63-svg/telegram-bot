@@ -488,7 +488,7 @@ async def reply_manager(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"✅ پاسخ برای «{keyword}» با موفقیت ذخیره شد.")
         return
 
-    # 📬 اگر کلمه در لیست پاسخ‌ها موجود است، ارسالش کن
+    # 📬 اگر کلمه در لیست پاسخ‌ها موجود است، ارسالش کن و دیگر ادامه نده
     if text in replies:
         r = replies[text]
         t, v = r.get("type"), r.get("value")
@@ -503,14 +503,12 @@ async def reply_manager(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await update.message.reply_sticker(v)
             elif t == "voice":
                 await update.message.reply_voice(v)
-            return  # ✅ فقط وقتی پاسخ داد، خروج کن
         except Exception as e:
             await update.message.reply_text(f"⚠️ خطا در ارسال پاسخ: {e}")
-            return
+        return  # ✅ مهم: بعد از پاسخ سفارشی، اجازه ادامه نده
 
-    # ✅ اگر هیچ پاسخ سفارشی نبود، ادامه بده تا reply() اجرا بشه
-    # یعنی عمداً return نمی‌کنیم تا پیام به سیستم هوشمند بره
-    pass
+    # ⚠️ اگر پاسخ سفارشی نبود، اجازه بده بره سراغ سیستم هوشمند
+    return
 # ======================= 🚀 اجرای نهایی =======================
 if __name__ == "__main__":
     print("🤖 خنگول فارسی 8.5.1 Cloud+ Supreme Pro Stable+ آماده به خدمت است ...")
@@ -541,19 +539,19 @@ if __name__ == "__main__":
     app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome))
 
 # 🧠 پاسخ‌های سفارشی (فقط برای دستور /replies ، /delreply یا پیام ریپلای‌شده)
-    app.add_handler(MessageHandler(
-        filters.Regex("^/delreply|^/replies") | filters.REPLY,
-        reply_manager
-    ))
+app.add_handler(MessageHandler(
+    filters.Regex("^/delreply|^/replies") | filters.REPLY,
+    reply_manager
+))
 
-    # 💬 پاسخ‌های هوشمند و یادگیری (برای همه پیام‌های متنی دیگر)
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, reply))
+# 💬 پاسخ‌های هوشمند و یادگیری (برای همه پیام‌های متنی دیگر)
+app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, reply))
 
-    # 🔹 هنگام استارت
-    async def on_startup(app):
-        await notify_admin_on_startup(app)
-        app.create_task(auto_backup(app))
-        print("🌙 [SYSTEM] Startup tasks scheduled ✅")
+# 🔹 هنگام استارت
+async def on_startup(app):
+    await notify_admin_on_startup(app)
+    app.create_task(auto_backup(app))
+    print("🌙 [SYSTEM] Startup tasks scheduled ✅")
 
-    app.post_init = on_startup
-    app.run_polling(allowed_updates=Update.ALL_TYPES)
+app.post_init = on_startup
+app.run_polling(allowed_updates=Update.ALL_TYPES)
