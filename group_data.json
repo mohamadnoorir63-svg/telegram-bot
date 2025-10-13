@@ -1,3 +1,9 @@
 {
-  "groups": []
+  "groups": {
+    "-1001234567890": {
+      "title": "GroupName",
+      "members": [123456789],
+      "last_active": "2025-10-13 04:30:00"
+    }
+  }
 }
