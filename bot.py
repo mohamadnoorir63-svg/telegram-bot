@@ -447,7 +447,7 @@ async def leave(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await context.bot.leave_chat(update.message.chat.id)
 
 # ======================= 🚀 اجرای نهایی =======================
-if __name__ == "__main__":
+if name == "main":
     print("🤖 خنگول فارسی 8.5.1 Cloud+ Supreme Pro Stable+ آماده به خدمت است ...")
 
     app = ApplicationBuilder().token(TOKEN).build()
@@ -487,4 +487,4 @@ if __name__ == "__main__":
         print("🌙 [SYSTEM] Startup tasks scheduled ✅")
 
     app.post_init = on_startup
-    app.run_polling(allowed_updates=Update.ALL_TYPES)                            
+    app.run_polling(allowed_updates=Update.ALL_TYPES)
