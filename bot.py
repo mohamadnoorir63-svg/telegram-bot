@@ -207,7 +207,34 @@ async def cloudsync(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     await cloudsync_internal(context.bot, "Manual Cloud Backup")
 
-# ======================= 💬 پاسخ، یادگیری، جوک و فال =======================
+# ======================= 💾 بک‌آپ و بازیابی ZIP در چت =======================
+async def backup(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    filename = f"backup_{datetime.now().strftime('%Y-%m-%d_%H-%M')}.zip"
+    with zipfile.ZipFile(filename, "w") as zipf:
+        for root, _, files in os.walk("."):
+            for file in files:
+                if file.endswith((".json", ".jpg", ".png", ".webp", ".mp3", ".ogg")):
+                    zipf.write(os.path.join(root, file))
+    await update.message.reply_document(document=open(filename, "rb"), filename=filename)
+    await update.message.reply_text("✅ بک‌آپ کامل گرفته شد!")
+    os.remove(filename)
+
+
+async def restore(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("📂 فایل ZIP بک‌آپ را ارسال کن تا بازیابی شود.")
+    context.user_data["await_restore"] = True
+
+
+async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not context.user_data.get("await_restore"):
+        return
+    file = await update.message.document.get_file()
+    await file.download_to_drive("restore.zip")
+    with zipfile.ZipFile("restore.zip", "r") as zip_ref:
+        zip_ref.extractall(".")
+    os.remove("restore.zip")
+    context.user_data["await_restore"] = False
+    await update.message.reply_text("✅ بازیابی کامل انجام شد!")# ======================= 💬 پاسخ، یادگیری، جوک و فال =======================
 async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message or not update.message.text:
         return
