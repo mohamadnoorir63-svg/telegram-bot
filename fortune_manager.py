@@ -5,11 +5,12 @@ from telegram import Update
 FORTUNE_FILE = "fortunes.json"
 MEDIA_DIR = "fortunes_media"
 
-# 📁 ساخت پوشه در صورت نبود
+# 📁 پوشه‌ها
 if not os.path.exists(MEDIA_DIR):
     os.makedirs(MEDIA_DIR)
 
-# 💾 لود و ذخیره داده‌ها
+
+# 💾 بارگذاری و ذخیره فال‌ها
 def load_fortunes():
     if not os.path.exists(FORTUNE_FILE):
         with open(FORTUNE_FILE, "w", encoding="utf-8") as f:
@@ -17,52 +18,59 @@ def load_fortunes():
     with open(FORTUNE_FILE, "r", encoding="utf-8") as f:
         return json.load(f)
 
+
 def save_fortunes(data):
     with open(FORTUNE_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
-# 🔮 ذخیره فال جدید
+
+# 🔮 ذخیره فال جدید با ضدتکرار
 async def save_fortune(update: Update):
-    """ذخیره فال (متن، عکس، ویدیو یا استیکر)"""
     reply = update.message.reply_to_message
     if not reply:
         return await update.message.reply_text("❗ لطفاً روی پیام فال ریپلای کن (متن یا مدیا).")
 
     data = load_fortunes()
     entry = {"type": "text", "value": ""}
+    new_value = None
 
     try:
         if reply.text:
+            new_value = reply.text.strip()
             entry["type"] = "text"
-            entry["value"] = reply.text.strip()
-
+            entry["value"] = new_value
         elif reply.caption:
+            new_value = reply.caption.strip()
             entry["type"] = "text"
-            entry["value"] = reply.caption.strip()
-
+            entry["value"] = new_value
         elif reply.photo:
             file = await reply.photo[-1].get_file()
             path = os.path.join(MEDIA_DIR, f"photo_{len(data)+1}.jpg")
             await file.download_to_drive(path)
+            new_value = path
             entry["type"] = "photo"
             entry["value"] = path
-
         elif reply.video:
             file = await reply.video.get_file()
             path = os.path.join(MEDIA_DIR, f"video_{len(data)+1}.mp4")
             await file.download_to_drive(path)
+            new_value = path
             entry["type"] = "video"
             entry["value"] = path
-
         elif reply.sticker:
             file = await reply.sticker.get_file()
             path = os.path.join(MEDIA_DIR, f"sticker_{len(data)+1}.webp")
             await file.download_to_drive(path)
+            new_value = path
             entry["type"] = "sticker"
             entry["value"] = path
-
         else:
             return await update.message.reply_text("⚠️ فقط متن، عکس، ویدیو یا استیکر پشتیبانی می‌شود.")
+
+        # ضدتکرار
+        for v in data.values():
+            if v.get("value") == new_value:
+                return await update.message.reply_text("🔁 این فال قبلاً ثبت شده بود!")
 
         data[str(len(data) + 1)] = entry
         save_fortunes(data)
@@ -71,9 +79,9 @@ async def save_fortune(update: Update):
     except Exception as e:
         await update.message.reply_text(f"⚠️ خطا در ذخیره فال: {e}")
 
-# 📋 نمایش لیست فال‌ها
+
+# 📋 لیست فال‌ها
 async def list_fortunes(update: Update):
-    """نمایش آخرین فال‌های ذخیره‌شده"""
     data = load_fortunes()
     if not data:
         return await update.message.reply_text("هیچ فالی هنوز ثبت نشده 😔")
