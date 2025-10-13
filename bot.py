@@ -136,30 +136,55 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ======================= 📊 آمار کامل گروه‌ها =======================
 async def fullstats(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """نمایش آمار کامل گروه‌ها و اعضا (سازگار با group_manager جدید)"""
+    """نمایش آمار کامل گروه‌ها (سازگار با ساختار جدید و قدیمی group_data.json)"""
     try:
         data = load_data("group_data.json")
         groups = data.get("groups", {})
 
-        if not groups:
-            return await update.message.reply_text("ℹ️ هنوز هیچ گروهی ثبت نشده.")
+        # ✅ اگر ساختار جدید باشد (لیست از دیکشنری‌ها)
+        if isinstance(groups, list):
+            if not groups:
+                return await update.message.reply_text("ℹ️ هنوز هیچ گروهی ثبت نشده.")
+            
+            text = "📈 آمار کامل گروه‌ها:\n\n"
+            for g in groups:
+                group_id = g.get("id", "نامشخص")
+                title = g.get("title", f"Group_{group_id}")
+                members = len(g.get("members", []))
+                last_active = g.get("last_active", "نامشخص")
 
-        text = "📈 آمار کامل گروه‌ها:\n\n"
+                # تلاش برای گرفتن نام واقعی گروه از تلگرام
+                try:
+                    chat = await context.bot.get_chat(group_id)
+                    if chat.title:
+                        title = chat.title
+                except Exception:
+                    pass
 
-        for group_id, info in groups.items():
-            title = info.get("title", f"Group_{group_id}")
-            members = len(info.get("members", []))
-            last_active = info.get("last_active", "نامشخص")
+                text += f"🏠 گروه: {title}\n👥 اعضا: {members}\n🕓 آخرین فعالیت: {last_active}\n\n"
 
-            # 🎯 تلاش برای گرفتن نام واقعی گروه از تلگرام
-            try:
-                chat = await context.bot.get_chat(group_id)
-                if chat.title:
-                    title = chat.title
-            except:
-                pass
+        # ✅ اگر ساختار قدیمی باشد (دیکشنری از گروه‌ها)
+        elif isinstance(groups, dict):
+            if not groups:
+                return await update.message.reply_text("ℹ️ هنوز هیچ گروهی ثبت نشده.")
+            
+            text = "📈 آمار کامل گروه‌ها:\n\n"
+            for group_id, info in groups.items():
+                title = info.get("title", f"Group_{group_id}")
+                members = len(info.get("members", []))
+                last_active = info.get("last_active", "نامشخص")
 
-            text += f"🏠 گروه: {title}\n👥 اعضا: {members}\n🕓 آخرین فعالیت: {last_active}\n\n"
+                try:
+                    chat = await context.bot.get_chat(group_id)
+                    if chat.title:
+                        title = chat.title
+                except Exception:
+                    pass
+
+                text += f"🏠 گروه: {title}\n👥 اعضا: {members}\n🕓 آخرین فعالیت: {last_active}\n\n"
+
+        else:
+            return await update.message.reply_text("⚠️ ساختار فایل group_data.json نامعتبر است!")
 
         if len(text) > 4000:
             text = text[:3990] + "..."
