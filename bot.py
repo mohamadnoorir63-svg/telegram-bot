@@ -503,12 +503,14 @@ async def reply_manager(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await update.message.reply_sticker(v)
             elif t == "voice":
                 await update.message.reply_voice(v)
-            return
+            return  # ✅ فقط وقتی پاسخ داد، خروج کن
         except Exception as e:
             await update.message.reply_text(f"⚠️ خطا در ارسال پاسخ: {e}")
             return
 
-
+    # ✅ اگر هیچ پاسخ سفارشی نبود، ادامه بده تا reply() اجرا بشه
+    # یعنی عمداً return نمی‌کنیم تا پیام به سیستم هوشمند بره
+    pass
 # ======================= 🚀 اجرای نهایی =======================
 if __name__ == "__main__":
     print("🤖 خنگول فارسی 8.5.1 Cloud+ Supreme Pro Stable+ آماده به خدمت است ...")
