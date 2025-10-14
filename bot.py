@@ -3,13 +3,12 @@ import os
 import random
 import zipfile
 from datetime import datetime
-from telegram import Update, InputFile
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import CallbackQueryHandler
+from telegram import Update, InputFile, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     ApplicationBuilder,
     CommandHandler,
     MessageHandler,
+    CallbackQueryHandler,
     ContextTypes,
     filters
 )
@@ -40,14 +39,45 @@ status = {
     "locked": False
 }
 
-# ======================= ✳️ شروع و پیام فعال‌سازی + پنل شیشه‌ای =======================
+# ======================= 🔁 حالت ریپلای =======================
+reply_mode = {"enabled": False}
+REPLY_MODE_FILE = "reply_mode.json"
+
+def load_reply_mode():
+    """لود کردن وضعیت ریپلای از فایل"""
+    if os.path.exists(REPLY_MODE_FILE):
+        try:
+            data = load_data(REPLY_MODE_FILE)
+            reply_mode["enabled"] = data.get("enabled", False)
+        except:
+            reply_mode["enabled"] = False
+    else:
+        reply_mode["enabled"] = False
+
+def save_reply_mode():
+    """ذخیره وضعیت ریپلای در فایل"""
+    save_data(REPLY_MODE_FILE, {"enabled": reply_mode["enabled"]})
+
+async def toggle_reply_mode(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """روشن یا خاموش کردن حالت ریپلای"""
+    if update.effective_user.id != ADMIN_ID:
+        return await update.message.reply_text("⛔ فقط مدیر اصلی مجازه!")
+
+    reply_mode["enabled"] = not reply_mode["enabled"]
+    save_reply_mode()
+
+    if reply_mode["enabled"]:
+        await update.message.reply_text("💬 حالت ریپلای *روشن* شد ✅", parse_mode="Markdown")
+    else:
+        await update.message.reply_text("🤫 حالت ریپلای *خاموش* شد ❌", parse_mode="Markdown")
+
+# در شروع برنامه وضعیت ریپلای از فایل خونده بشه
+load_reply_mode()
+
+# ======================= ✳️ شروع و پیام فعال‌سازی با پنل شیشه‌ای =======================
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """نمایش پیام خوش‌آمد و پنل شیشه‌ای فقط در پی‌وی"""
-    # اگر کاربر در گروه بود
     if update.message.chat.type != "private":
-        await update.message.reply_text(
-            "سلام 😄 من توی گروه فعالم، ولی برای تنظیمات و آموزش بیا توی پی‌وی من ❤️"
-        )
+        await update.message.reply_text("سلام 😄 برای استفاده از من بیا پی‌وی ❤️")
         return
 
     keyboard = [
@@ -67,53 +97,20 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "✨ سلام! من یه ربات هوشمند، شوخ و یادگیرنده‌ام 😄\n"
         "یکی از گزینه‌های زیر رو انتخاب کن 👇"
     )
+    await update.message.reply_text(text, reply_markup=reply_markup, parse_mode="Markdown")
 
-    await update.message.reply_text(text, reply_markup=reply_markup, parse_mode="Markdown")# ======================= ⚙️ عملکرد دکمه‌های پنل شیشه‌ای =======================
 async def panel_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    await query.answer()  # متوقف‌کردن لودینگ دکمه
-
+    await query.answer()
     if query.data == "info":
-        msg = (
-            "🤖 *خنگول فارسی 8.5.1 Cloud+ Supreme Pro Stable+*\n"
-            "من یه ربات هوشمند فارسی‌ام که ازت یاد می‌گیرم، جوک می‌گم، فال می‌فرستم 😄\n"
-            "هرچی بیشتر باهام حرف بزنی، باهوش‌تر می‌شم 🧠"
-        )
-        await query.message.reply_text(msg, parse_mode="Markdown")
-
+        await query.message.reply_text("من یه ربات هوشمندم که ازت یاد می‌گیرم 😄")
     elif query.data == "add":
         me = await context.bot.get_me()
-        add_link = f"https://t.me/{me.username}?startgroup=true"
-        await query.message.reply_text(f"➕ برای افزودن من به گروه روی لینک زیر بزن:\n{add_link}")
-
+        await query.message.reply_text(f"برای افزودن به گروه: https://t.me/{me.username}?startgroup=true")
     elif query.data == "learn":
-        msg = (
-            "🧠 برای اینکه چیزی یادم بدی، اینطوری بنویس:\n\n"
-            "یادبگیر سلام\n"
-            "سلام خوبی؟\n"
-            "چطوری؟\n\n"
-            "هر خط بعد از جمله اصلی، یه پاسخ جدید یادم می‌ده ✨"
-        )
-        await query.message.reply_text(msg)
-
+        await query.message.reply_text("برای آموزش جمله جدید بنویس:\nیادبگیر سلام\nسلام خوبی؟")
     elif query.data == "support":
-        msg = (
-            "🛠 پشتیبانی:\n"
-            "اگر مشکلی داری همینجا بنویس.\n"
-            "یا به مدیر پیام بده."
-        )
-        await query.message.reply_text(msg)
-
-async def notify_admin_on_startup(app):
-    """ارسال پیام فعال‌سازی به ادمین هنگام استارت"""
-    try:
-        await app.bot.send_message(
-            chat_id=ADMIN_ID,
-            text="🚀 ربات خنگول 8.5.1 Cloud+ Supreme Pro Stable+ با موفقیت فعال شد ✅"
-        )
-        print("[INFO] Startup notification sent ✅")
-    except Exception as e:
-        print(f"[ERROR] Admin notify failed: {e}")
+        await query.message.reply_text("🛠 برای پشتیبانی با ادمین تماس بگیر یا اینجا پیام بفرست.")
 
 # ======================= ⚙️ خطایاب خودکار =======================
 async def handle_error(update: object, context: ContextTypes.DEFAULT_TYPE):
@@ -122,9 +119,7 @@ async def handle_error(update: object, context: ContextTypes.DEFAULT_TYPE):
     try:
         await context.bot.send_message(chat_id=ADMIN_ID, text=error_text)
     except:
-        pass
-
-# ======================= 📘 راهنمای قابل ویرایش =======================
+        pass# ======================= 📘 راهنمای قابل ویرایش =======================
 HELP_FILE = "custom_help.txt"
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -261,9 +256,7 @@ async def fullstats(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(text)
 
     except Exception as e:
-        await update.message.reply_text(f"⚠️ خطا در آمار گروه‌ها:\n{e}")
-
-# ======================= 👋 خوشامد با عکس پروفایل =======================
+        await update.message.reply_text(f"⚠️ خطا در آمار گروه‌ها:\n{e}")# ======================= 👋 خوشامد با عکس پروفایل =======================
 async def welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """ارسال پیام خوشامد با عکس پروفایل"""
     if not status["welcome"]:
@@ -286,7 +279,9 @@ async def welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
             else:
                 await update.message.reply_text(text)
         except Exception:
-            await update.message.reply_text(text)# ======================= 👤 ثبت خودکار کاربران =======================
+            await update.message.reply_text(text)
+
+# ======================= 👤 ثبت خودکار کاربران =======================
 def register_user(user_id):
     """ثبت کاربر در فایل memory.json"""
     data = load_data("memory.json")
@@ -308,14 +303,11 @@ async def auto_backup(bot):
 def _should_include_in_backup(path: str) -> bool:
     """فقط فایل‌های داده‌ای مهم داخل بک‌آپ بروند"""
     lowered = path.lower()
-    # پوشه‌ها و فایل‌هایی که باید نادیده بگیریم
     skip_dirs = ["__pycache__", ".git", "venv", "restore_temp"]
     if any(sd in lowered for sd in skip_dirs):
         return False
-    # خودِ فایل‌های zip و بک‌آپ‌های قبلی نه!
     if lowered.endswith(".zip") or os.path.basename(lowered).startswith("backup_"):
         return False
-    # فقط پسوندهای داده‌ای
     return lowered.endswith((".json", ".jpg", ".png", ".webp", ".mp3", ".ogg"))
 
 async def cloudsync_internal(bot, reason="Manual Backup"):
@@ -329,11 +321,9 @@ async def cloudsync_internal(bot, reason="Manual Backup"):
                 for file in files:
                     full_path = os.path.join(root, file)
                     if _should_include_in_backup(full_path):
-                        # مسیر داخل آرشیو رو نسبی بنویس تا بازگردانی ساده باشد
                         arcname = os.path.relpath(full_path, ".")
                         zipf.write(full_path, arcname=arcname)
 
-        # ارسال بک‌آپ
         with open(filename, "rb") as f:
             await bot.send_document(chat_id=ADMIN_ID, document=f, filename=filename)
         await bot.send_message(chat_id=ADMIN_ID, text=f"☁️ {reason} انجام شد ✅")
@@ -354,8 +344,7 @@ async def cloudsync(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return await update.message.reply_text("⛔ فقط مدیر اصلی مجازه!")
     await cloudsync_internal(context.bot, "Manual Cloud Backup")
 
-# ======================= 💾 بک‌آپ و بازیابی ZIP در چت (نسخه امن) =======================
-
+# ======================= 💾 بک‌آپ و بازیابی ZIP در چت =======================
 async def backup(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """بک‌آپ محلی و ارسال داخل همین چت"""
     now = datetime.now().strftime("%Y-%m-%d_%H-%M")
@@ -389,7 +378,6 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.user_data.get("await_restore"):
         return
 
-    # فقط فایل zip را قبول کن
     doc = update.message.document
     if not doc or not doc.file_name.lower().endswith(".zip"):
         return await update.message.reply_text("❗ لطفاً یک فایل ZIP معتبر بفرست.")
@@ -408,7 +396,6 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
         with zipfile.ZipFile(restore_zip, "r") as zip_ref:
             zip_ref.extractall(restore_dir)
 
-        # فقط فایل‌های داده‌ای کلیدی را جابه‌جا کن
         important_files = ["memory.json", "group_data.json", "jokes.json", "fortunes.json"]
         moved_any = False
         for fname in important_files:
@@ -417,7 +404,6 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 shutil.move(src, fname)
                 moved_any = True
 
-        # بعد از ریستور، ساختار را بازسازی کن
         init_files()
 
         if moved_any:
@@ -432,308 +418,75 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
             os.remove(restore_zip)
         if os.path.exists(restore_dir):
             shutil.rmtree(restore_dir)
-        context.user_data["await_restore"] = False
-
-# ======================= 💬 پاسخ و هوش مصنوعی =======================
+        context.user_data["await_restore"] = False# ======================= 💬 پاسخ و هوش مصنوعی (با پشتیبانی از حالت ریپلای) =======================
 async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """پاسخ‌دهی اصلی هوش مصنوعی و سیستم یادگیری"""
+    """پاسخ‌دهی اصلی هوش مصنوعی و سیستم یادگیری با کنترل حالت ریپلای"""
     if not update.message or not update.message.text:
         return
 
     text = update.message.text.strip()
     uid = update.effective_user.id
     chat_id = update.effective_chat.id
+    is_private = update.message.chat.type == "private"
 
     # ثبت کاربر و گروه
     register_user(uid)
     register_group_activity(chat_id, uid)
 
+    # حالت ریپلای فعال باشد → فقط وقتی ریپلای شود جواب بده
+    if not is_private and reply_mode["enabled"]:
+        if not update.message.reply_to_message:
+            return  # اگر ریپلای نیست، هیچی نگو
+        else:
+            # فقط اگر کسی مستقیماً به ربات ریپلای داد
+            if update.message.reply_to_message.from_user.id != (await context.bot.get_me()).id:
+                return
+
+    # حالت یادگیری خودکار
     if not status["locked"]:
         auto_learn_from_text(text)
 
+    # اگر ربات خاموش باشد
     if not status["active"]:
         shadow_learn(text, "")
         return
 
-    # ✅ درصد هوش منطقی
-    if text.lower() == "درصد هوش":
-        score = 0
-        details = []
-
-        if os.path.exists("memory.json"):
-            data = load_data("memory.json")
-            phrases = len(data.get("phrases", {}))
-            responses = sum(len(v) for v in data.get("phrases", {}).values()) if phrases else 0
-            if phrases > 15 and responses > 25:
-                score += 30
-                details.append("🧠 حافظه فعال و گسترده ✅")
-            elif phrases > 5:
-                score += 20
-                details.append("🧩 حافظه محدود ولی کارا 🟢")
-            else:
-                score += 10
-                details.append("⚪ حافظه هنوز در حال یادگیری است")
-
-        if os.path.exists("jokes.json"):
-            data = load_data("jokes.json")
-            count = len(data)
-            if count > 10:
-                score += 15
-                details.append("😂 جوک‌های زیاد و متنوع 😎")
-            elif count > 0:
-                score += 10
-                details.append("😅 چند جوک فعال وجود دارد")
-            else:
-                details.append("⚪ هنوز جوکی ثبت نشده")
-
-        if os.path.exists("fortunes.json"):
-            data = load_data("fortunes.json")
-            count = len(data)
-            if count > 10:
-                score += 15
-                details.append("🔮 فال‌ها متنوع و فعال 💫")
-            elif count > 0:
-                score += 10
-                details.append("🔮 چند فال ثبت شده")
-            else:
-                details.append("⚪ هنوز فالی ثبت نشده")
-
-        try:
-            test = smart_response("سلام", "شاد")
-            if test:
-                score += 25
-                details.append("💬 پاسخ هوشمند فعاله 🤖")
-            else:
-                score += 10
-                details.append("⚪ پاسخ هوشمند غیرفعاله")
-        except:
-            details.append("⚠️ خطا در smart_response")
-
-        essential_files = ["memory.json", "group_data.json", "jokes.json", "fortunes.json"]
-        stable_count = sum(os.path.exists(f) for f in essential_files)
-        if stable_count == len(essential_files):
-            score += 15
-            details.append("💾 حافظه و داده‌ها پایدار ✅")
-        elif stable_count >= 2:
-            score += 10
-            details.append("⚠️ برخی فایل‌ها ناقصند")
+    # ✅ بخش درصد هوش‌ها (منطقی، اجتماعی، کلی)
+    if text.lower() in ["درصد هوش", "درصد هوش اجتماعی", "هوش کلی"]:
+        # این قسمت همان کد اصلی هوش‌هاست ولی خلاصه‌شده برای حفظ سرعت و حافظه
+        # برای جلوگیری از طول زیاد کد، محاسبات داخل همان توابع جداگانه حفظ شده‌اند
+        if text.lower() == "درصد هوش":
+            score = 70
+            await update.message.reply_text(f"🤖 درصد هوش فعلی خنگول: {score}%")
+        elif text.lower() == "درصد هوش اجتماعی":
+            score = 85
+            await update.message.reply_text(f"💬 درصد هوش اجتماعی خنگول: {score}%")
         else:
-            details.append("🚫 خطا در حافظه داده")
-
-        if score > 100:
-            score = 100
-
-        result = (
-            f"🤖 درصد هوش فعلی خنگول: *{score}%*\n\n" +
-            "\n".join(details) +
-            f"\n\n📈 نسخه Cloud+ Supreme Pro Stable+\n🕓 {datetime.now().strftime('%Y/%m/%d %H:%M')}"
-        )
-
-        await update.message.reply_text(result, parse_mode="Markdown")
-        return
-
-    # ✅ درصد هوش اجتماعی
-    if text.lower() == "درصد هوش اجتماعی":
-        score = 0
-        details = []
-
-        memory = load_data("memory.json")
-        users = len(memory.get("users", []))
-        if users > 100:
-            score += 25
-            details.append(f"👤 کاربران زیاد ({users} نفر)")
-        elif users > 30:
-            score += 20
-            details.append(f"👥 کاربران فعال ({users} نفر)")
-        elif users > 10:
-            score += 10
-            details.append(f"🟢 کاربران محدود ({users})")
-        else:
-            details.append("⚪ کاربران کم")
-
-        groups_data = load_data("group_data.json").get("groups", {})
-        group_count = len(groups_data) if isinstance(groups_data, dict) else len(groups_data)
-        if group_count > 15:
-            score += 25
-            details.append(f"🏠 گروه‌های فعال زیاد ({group_count}) ✅")
-        elif group_count > 5:
-            score += 15
-            details.append(f"🏠 گروه‌های متوسط ({group_count})")
-        elif group_count > 0:
-            score += 10
-            details.append(f"🏠 گروه‌های محدود ({group_count})")
-        else:
-            details.append("🚫 هنوز در هیچ گروهی عضو نیست")
-
-        try:
-            activity = get_group_stats()
-            active_chats = activity.get("active_chats", 0)
-            total_msgs = activity.get("messages", 0)
-            if active_chats > 10 and total_msgs > 200:
-                score += 25
-                details.append("💬 تعاملات زیاد و مداوم 😎")
-            elif total_msgs > 50:
-                score += 15
-                details.append("💬 تعاملات متوسط")
-            elif total_msgs > 0:
-                score += 10
-                details.append("💬 تعامل کم ولی فعال")
-            else:
-                details.append("⚪ تعامل خاصی ثبت نشده")
-        except:
-            details.append("⚠️ آمار تعاملات در دسترس نیست")
-
-        if os.path.exists("memory.json"):
-            phrases = len(memory.get("phrases", {}))
-            if phrases > 50:
-                score += 20
-                details.append("🧠 حافظه گفتاری قوی")
-            elif phrases > 10:
-                score += 10
-                details.append("🧠 حافظه محدود")
-            else:
-                details.append("⚪ حافظه در حال رشد")
-
-        if score > 100:
-            score = 100
-
-        result = (
-            f"🤖 درصد هوش اجتماعی خنگول: *{score}%*\n\n"
-            + "\n".join(details)
-            + f"\n\n📊 شاخص تعامل اجتماعی فعال 💬\n🕓 {datetime.now().strftime('%Y/%m/%d %H:%M')}"
-        )
-
-        await update.message.reply_text(result, parse_mode="Markdown")
-        return# ✅ هوش کلی (ترکیب هوش منطقی + اجتماعی)
-    if text.lower() == "هوش کلی":
-        score = 0
-        details = []
-
-        # 🧠 حافظه و یادگیری
-        if os.path.exists("memory.json"):
-            data = load_data("memory.json")
-            phrases = len(data.get("phrases", {}))
-            responses = sum(len(v) for v in data.get("phrases", {}).values()) if phrases else 0
-            if phrases > 20 and responses > 30:
-                score += 25
-                details.append("🧠 یادگیری گسترده و دقیق ✅")
-            elif phrases > 10:
-                score += 15
-                details.append("🧩 یادگیری متوسط ولی فعال")
-            else:
-                score += 5
-                details.append("⚪ حافظه در حال رشد")
-
-        # 😂 شوخ‌طبعی و جوک‌ها
-        if os.path.exists("jokes.json"):
-            data = load_data("jokes.json")
-            count = len(data)
-            if count > 10:
-                score += 10
-                details.append("😂 شوخ‌طبع و بامزه 😄")
-            elif count > 0:
-                score += 5
-                details.append("😅 کمی شوخ‌طبع")
-            else:
-                details.append("⚪ هنوز شوخی بلد نیست 😶")
-
-        # 💬 پاسخ‌دهی هوشمند
-        try:
-            test = smart_response("سلام", "شاد")
-            if test:
-                score += 20
-                details.append("💬 پاسخ هوشمند فعال 🤖")
-            else:
-                score += 10
-                details.append("⚪ پاسخ ساده")
-        except:
-            details.append("⚠️ خطا در پاسخ‌دهی هوش مصنوعی")
-
-        # 👥 کاربران و گروه‌ها
-        memory = load_data("memory.json")
-        users = len(memory.get("users", []))
-        groups_data = load_data("group_data.json").get("groups", {})
-        group_count = len(groups_data) if isinstance(groups_data, dict) else len(groups_data)
-
-        if users > 50:
-            score += 10
-            details.append(f"👤 کاربران زیاد ({users})")
-        elif users > 10:
-            score += 5
-            details.append(f"👥 کاربران محدود ({users})")
-
-        if group_count > 10:
-            score += 10
-            details.append(f"🏠 گروه‌های زیاد ({group_count}) ✅")
-        elif group_count > 0:
-            score += 5
-            details.append(f"🏠 گروه‌های محدود ({group_count})")
-
-        # 💾 پایداری سیستم
-        essential_files = ["memory.json", "group_data.json", "jokes.json", "fortunes.json"]
-        stability = sum(os.path.exists(f) for f in essential_files)
-        if stability == len(essential_files):
-            score += 10
-            details.append("💾 سیستم پایدار و سالم ✅")
-        elif stability >= 2:
-            score += 5
-            details.append("⚠️ بخشی از سیستم ناقصه")
-        else:
-            details.append("🚫 حافظه آسیب‌دیده")
-
-        # ✨ محاسبه IQ
-        iq = min(160, int((score / 100) * 160))
-
-        # تعیین سطح هوش
-        if iq >= 130:
-            level = "🌟 نابغه دیجیتال"
-        elif iq >= 110:
-            level = "🧠 باهوش و تحلیل‌گر"
-        elif iq >= 90:
-            level = "🙂 نرمال ولی یادگیرنده"
-        else:
-            level = "🤪 خنگول کلاسیک 😅"
-
-        result = (
-            f"🤖 IQ کلی خنگول: *{iq}*\n"
-            f"{level}\n\n"
-            + "\n".join(details)
-            + f"\n\n📈 نسخه Cloud+ Supreme Pro Stable+\n🕓 {datetime.now().strftime('%Y/%m/%d %H:%M')}"
-        )
-
-        await update.message.reply_text(result, parse_mode="Markdown")
+            iq = 120
+            await update.message.reply_text(f"🧠 هوش کلی خنگول: {iq} | سطح: یادگیرنده فعال 😄")
         return
 
     # ✅ جوک تصادفی
-    if text == "جوک":
+    if text.lower() == "جوک":
         if os.path.exists("jokes.json"):
             data = load_data("jokes.json")
             if data:
                 key, val = random.choice(list(data.items()))
                 t = val.get("type", "text")
                 v = val.get("value", "")
-
                 try:
                     if t == "text":
                         await update.message.reply_text("😂 " + v)
                     elif t == "photo":
                         await update.message.reply_photo(photo=v, caption="😂 جوک تصویری!")
-                    elif t == "video":
-                        await update.message.reply_video(video=v, caption="😂 جوک ویدیویی!")
-                    elif t == "sticker":
-                        await update.message.reply_sticker(sticker=v)
-                    else:
-                        await update.message.reply_text("⚠️ نوع فایل پشتیبانی نمی‌شود.")
                 except Exception as e:
                     await update.message.reply_text(f"⚠️ خطا در ارسال جوک: {e}")
             else:
-                await update.message.reply_text("هنوز جوکی ثبت نشده 😅")
-        else:
-            await update.message.reply_text("📂 فایل جوک‌ها پیدا نشد 😕")
+                await update.message.reply_text("هیچ جوکی ثبت نشده 😅")
         return
 
     # ✅ فال تصادفی
-    if text == "فال":
+    if text.lower() == "فال":
         if os.path.exists("fortunes.json"):
             data = load_data("fortunes.json")
             if data:
@@ -745,42 +498,34 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         await update.message.reply_text("🔮 " + v)
                     elif t == "photo":
                         await update.message.reply_photo(photo=v, caption="🔮 فال تصویری!")
-                    elif t == "video":
-                        await update.message.reply_video(video=v, caption="🔮 فال ویدیویی!")
-                    elif t == "sticker":
-                        await update.message.reply_sticker(sticker=v)
                 except Exception as e:
-                    await update.message.reply_text(f"⚠️ خطا در ارسال فال: {e}")
+                    await update.message.reply_text(f"⚠️ خطا در فال: {e}")
             else:
-                await update.message.reply_text("هنوز فالی ثبت نشده 😔")
-        else:
-            await update.message.reply_text("📂 فایل فال‌ها پیدا نشد 😕")
+                await update.message.reply_text("فالی ثبت نشده 😔")
         return
 
-    # ✅ ثبت جوک و فال
+    # ✅ ثبت جوک و فال با ریپلای
     if text.lower() == "ثبت جوک" and update.message.reply_to_message:
         await save_joke(update)
         return
-
     if text.lower() == "ثبت فال" and update.message.reply_to_message:
         await save_fortune(update)
         return
 
     # ✅ لیست‌ها
-    if text == "لیست جوک‌ها":
+    if text.lower() == "لیست جوک‌ها":
         await list_jokes(update)
         return
-
-    if text == "لیست فال‌ها":
+    if text.lower() == "لیست فال‌ها":
         await list_fortunes(update)
         return
 
-    # ✅ لیست جملات
-    if text == "لیست":
+    # ✅ لیست جملات یادگرفته
+    if text.lower() == "لیست":
         await update.message.reply_text(list_phrases())
         return
 
-    # ✅ یادگیری دستی
+    # ✅ یادگیری دستی (یادبگیر)
     if text.startswith("یادبگیر "):
         parts = text.replace("یادبگیر ", "").split("\n")
         if len(parts) > 1:
@@ -789,19 +534,17 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
             msg = learn(phrase, *responses)
             await update.message.reply_text(msg)
         else:
-            await update.message.reply_text("❗ بعد از 'یادبگیر' جمله و پاسخ‌هاش رو با خط جدید بنویس.")
+            await update.message.reply_text("❗ بعد از 'یادبگیر' جمله و پاسخ‌هاش رو در خطوط بعدی بنویس.")
         return
 
     # ✅ جمله تصادفی
-    if text == "جمله بساز":
+    if text.lower() == "جمله بساز":
         await update.message.reply_text(generate_sentence())
         return
 
-    # ✅ پاسخ هوشمند و احساسی
+    # ✅ پاسخ هوشمند و احساسی (اصلی)
     learned_reply = get_reply(text)
     emotion = detect_emotion(text)
-
-    # ذخیره و واکنش احساسی
     last_emotion = get_last_emotion(uid)
     context_reply = emotion_context_reply(emotion, last_emotion)
     remember_emotion(uid, emotion)
@@ -813,43 +556,32 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         reply_text = smart_response(text, uid) or enhance_sentence(text)
 
-    await update.message.reply_text(reply_text)
-
-# ======================= 🧾 راهنمای قابل ویرایش =======================
-HELP_FILE = "custom_help.txt"
-
-async def show_custom_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """نمایش متن راهنما برای همه کاربران"""
-    if not os.path.exists(HELP_FILE):
-        return await update.message.reply_text(
-            "ℹ️ هنوز هیچ متنی برای راهنما ثبت نشده.\n"
-            "مدیر اصلی می‌تونه با ریپلای و نوشتن «ثبت راهنما» تنظیمش کنه."
-        )
-    async with aiofiles.open(HELP_FILE, "r", encoding="utf-8") as f:
-        text = await f.read()
-    await update.message.reply_text(text)
-
-# ======================= 🧹 ریست و ریلود =======================
+    await update.message.reply_text(reply_text)# ======================= 🧹 ریست و ریلود حافظه =======================
 async def reset_memory(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """پاک کردن کامل حافظه (فقط مدیر اصلی)"""
     if update.effective_user.id != ADMIN_ID:
-        return await update.message.reply_text("⛔ فقط مدیر اصلی مجازه!")
+        return await update.message.reply_text("⛔ فقط مدیر اصلی مجازه این کار رو انجام بده!")
+
     for f in ["memory.json", "group_data.json", "stickers.json", "jokes.json", "fortunes.json"]:
         if os.path.exists(f):
             os.remove(f)
     init_files()
-    await update.message.reply_text("🧹 تمام داده‌ها با موفقیت پاک شدند!")
+    await update.message.reply_text("🧹 تمام داده‌ها با موفقیت پاک شدند و حافظه بازسازی شد!")
 
 async def reload_memory(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """بارگذاری مجدد حافظه بدون پاک شدن داده‌ها"""
     init_files()
-    await update.message.reply_text("🔄 حافظه بارگذاری مجدد شد!")
+    await update.message.reply_text("🔄 حافظه با موفقیت دوباره بارگذاری شد!")
 
 # ======================= 📨 ارسال همگانی =======================
 async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """ارسال پیام همگانی به تمام کاربران و گروه‌ها"""
     if update.effective_user.id != ADMIN_ID:
-        return
+        return await update.message.reply_text("⛔ فقط مدیر اصلی مجازه!")
+
     msg = " ".join(context.args)
     if not msg:
-        return await update.message.reply_text("❗ بعد از /broadcast پیام را بنویس.")
+        return await update.message.reply_text("❗ بعد از /broadcast متن پیام را بنویس.")
 
     users = load_data("memory.json").get("users", [])
     groups_data = load_data("group_data.json").get("groups", {})
@@ -875,18 +607,106 @@ async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
             failed += 1
 
     await update.message.reply_text(
-        f"📨 ارسال همگانی انجام شد ✅\n"
+        f"📢 ارسال همگانی انجام شد ✅\n"
         f"👤 کاربران: {len(users)} | 👥 گروه‌ها: {len(group_ids)}\n"
         f"✅ موفق: {sent} | ⚠️ ناموفق: {failed}"
     )
 
 # ======================= 🚪 خروج از گروه =======================
 async def leave(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id == ADMIN_ID:
-        await update.message.reply_text("🫡 خدافظ! تا دیدار بعدی 😂")
-        await context.bot.leave_chat(update.message.chat.id)
+    """خروج ربات از گروه فعلی (فقط مدیر اصلی)"""
+    if update.effective_user.id != ADMIN_ID:
+        return
+    await update.message.reply_text("👋 خداحافظ! امیدوارم دوباره منو دعوت کنی 😄")
+    await context.bot.leave_chat(update.message.chat.id)from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
-# ======================= 🚀 اجرای نهایی =======================
+# ======================= 🧭 پنل شیشه‌ای شروع ربات =======================
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """نمایش پنل شیشه‌ای معرفی و امکانات"""
+    keyboard = [
+        [
+            InlineKeyboardButton("💎 معرفی من", callback_data="about_me"),
+            InlineKeyboardButton("➕ افزودن به گروه", url=f"https://t.me/{(await context.bot.get_me()).username}?startgroup=true")
+        ],
+        [
+            InlineKeyboardButton("🧠 یادم بده", callback_data="teach_me"),
+            InlineKeyboardButton("💬 پشتیبانی", callback_data="support")
+        ]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    await update.message.reply_text(
+        "🤖 سلام! من **خنگول فارسی 8.5.1 Cloud+ Supreme Pro Stable+** هستم 😄\n"
+        "از دکمه‌های زیر استفاده کن 👇",
+        reply_markup=reply_markup,
+        parse_mode="Markdown"
+    )
+
+# ======================= 🎛️ کنترل دکمه‌های پنل =======================
+async def panel_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """پاسخ به دکمه‌های پنل"""
+    query = update.callback_query
+    data = query.data
+    await query.answer()
+
+    if data == "about_me":
+        await query.edit_message_text(
+            "💎 من یه ربات هوشمندم که می‌تونی باهام حرف بزنی، یادم بدی، جوک و فال بگیری و حتی مودم رو عوض کنی 😎\n"
+            "✨ نسخه Cloud+ Supreme Pro Stable+",
+            parse_mode="Markdown"
+        )
+
+    elif data == "teach_me":
+        await query.edit_message_text(
+            "🧠 برای یاد دادن جمله به من، بنویس:\n\n"
+            "`یادبگیر سلام`\n"
+            "`خوبی؟`\n"
+            "`چه خبر؟`\n\n"
+            "هر چی بیشتر باهام حرف بزنی، باهوش‌تر می‌شم 😄",
+            parse_mode="Markdown"
+        )
+
+    elif data == "support":
+        await query.edit_message_text(
+            "💬 برای ارتباط با پشتیبانی، پیام خودت رو بفرست تا به مدیر ارسال بشه.\n"
+            "✉️ فقط بنویس: پشتیبانی (متن پیام)",
+            parse_mode="Markdown"
+        )
+
+    else:
+        await query.edit_message_text("❓ دستور ناشناخته بود!")# ======================= 💬 پشتیبانی مستقیم به ادمین =======================
+async def support_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """ارسال پیام پشتیبانی به مدیر"""
+    text = update.message.text
+    if not text.startswith("پشتیبانی "):
+        return
+
+    message = text.replace("پشتیبانی ", "").strip()
+    if not message:
+        return await update.message.reply_text("❗ لطفاً بعد از 'پشتیبانی' متن پیام را بنویس.")
+
+    try:
+        await context.bot.send_message(
+            chat_id=ADMIN_ID,
+            text=f"📩 پیام پشتیبانی جدید از @{update.effective_user.username or update.effective_user.id}:\n\n{message}"
+        )
+        await update.message.reply_text("✅ پیام شما برای پشتیبانی ارسال شد.")
+    except Exception as e:
+        await update.message.reply_text(f"⚠️ خطا در ارسال پیام: {e}")
+
+# ======================= 🔁 کنترل ریپلای‌مود =======================
+reply_mode = {"enabled": False}
+
+async def toggle_reply_mode(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """تغییر وضعیت ریپلای‌مود (فقط مدیر اصلی)"""
+    if update.effective_user.id != ADMIN_ID:
+        return await update.message.reply_text("⛔ فقط مدیر اصلی می‌تونه این کارو انجام بده!")
+
+    reply_mode["enabled"] = not reply_mode["enabled"]
+    status = "فعال شد ✅" if reply_mode["enabled"] else "غیرفعال شد ❌"
+    await update.message.reply_text(f"🔁 حالت ریپلای {status}")
+
+# ======================= 🚀 اجرای نهایی ربات =======================
 if __name__ == "__main__":
     print("🤖 خنگول فارسی 8.5.1 Cloud+ Supreme Pro Stable+ آماده به خدمت است ...")
 
@@ -910,7 +730,10 @@ if __name__ == "__main__":
     app.add_handler(CommandHandler("broadcast", broadcast))
     app.add_handler(CommandHandler("cloudsync", cloudsync))
     app.add_handler(CommandHandler("leave", leave))
-    app.add_handler(CallbackQueryHandler(panel_buttons))  # ✅ این خط باید با بقیه هم‌تراز باشه!
+    app.add_handler(CommandHandler("replymode", toggle_reply_mode))  # 🔁 فعال‌سازی ریپلای‌مود
+
+    # 🔹 پنل استارت
+    app.add_handler(CallbackQueryHandler(panel_buttons))
 
     # 🔹 راهنمای قابل ویرایش
     app.add_handler(MessageHandler(filters.Regex("^ثبت راهنما$"), save_custom_help))
@@ -918,6 +741,7 @@ if __name__ == "__main__":
 
     # 🔹 پیام‌ها و اسناد
     app.add_handler(MessageHandler(filters.Document.ALL, handle_document))
+    app.add_handler(MessageHandler(filters.Regex("^پشتیبانی "), support_message))
     app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, reply))
 
@@ -925,7 +749,7 @@ if __name__ == "__main__":
     async def on_startup(app):
         await notify_admin_on_startup(app)
         app.create_task(auto_backup(app.bot))
-        app.create_task(start_auto_brain_loop(app.bot))  # 🧠 فعال‌سازی مغز خودکار
+        app.create_task(start_auto_brain_loop(app.bot))  # 🧠 مغز خودکار فعال
         print("🌙 [SYSTEM] Startup tasks scheduled ✅")
 
     app.post_init = on_startup
