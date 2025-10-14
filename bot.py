@@ -139,71 +139,6 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     await update.message.reply_text(msg)
 
-# ======================= 📊 آمار کامل گروه‌ها =======================
-async def fullstats(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """نمایش آمار کامل گروه‌ها (سازگار با ساختار جدید و قدیمی group_data.json)"""
-    try:
-        data = load_data("group_data.json")
-        groups = data.get("groups", {})
-
-        if isinstance(groups, list):
-            if not groups:
-                return await update.message.reply_text("ℹ️ هنوز هیچ گروهی ثبت نشده.")
-
-            text = "📈 آمار کامل گروه‌ها:\n\n"
-            for g in groups:
-                group_id = g.get("id", "نامشخص")
-                title = g.get("title", f"Group_{group_id}")
-                members = len(g.get("members", []))
-                last_active = g.get("last_active", "نامشخص")
-
-                try:
-                    chat = await context.bot.get_chat(group_id)
-                    if chat.title:
-                        title = chat.title
-                except Exception:
-                    pass
-
-                text += (
-                    f"🏠 گروه: {title}\n"
-                    f"👥 اعضا: {members}\n"
-                    f"🕓 آخرین فعالیت: {last_active}\n\n"
-                )
-
-        elif isinstance(groups, dict):
-            if not groups:
-                return await update.message.reply_text("ℹ️ هنوز هیچ گروهی ثبت نشده.")
-
-            text = "📈 آمار کامل گروه‌ها:\n\n"
-            for group_id, info in groups.items():
-                title = info.get("title", f"Group_{group_id}")
-                members = len(info.get("members", []))
-                last_active = info.get("last_active", "نامشخص")
-
-                try:
-                    chat = await context.bot.get_chat(group_id)
-                    if chat.title:
-                        title = chat.title
-                except Exception:
-                    pass
-
-                text += (
-                    f"🏠 گروه: {title}\n"
-                    f"👥 اعضا: {members}\n"
-                    f"🕓 آخرین فعالیت: {last_active}\n\n"
-                )
-
-        else:
-            return await update.message.reply_text("⚠️ ساختار فایل group_data.json نامعتبر است!")
-
-        if len(text) > 4000:
-            text = text[:3990] + "..."
-
-        await update.message.reply_text(text)
-
-    except Exception as e:
-        await update.message.reply_text(f"⚠️ خطا در آمار گروه‌ها:\n{e}")
-
 # ======================= 👋 خوشامد با عکس پروفایل =======================
 async def welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """ارسال پیام خوشامد با عکس پروفایل"""
@@ -227,7 +162,9 @@ async def welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
             else:
                 await update.message.reply_text(text)
         except Exception:
-            await update.message.reply_text(text)# ======================= 👤 ثبت خودکار کاربران =======================
+            await update.message.reply_text(text)
+
+# ======================= 👤 ثبت خودکار کاربران =======================
 def register_user(user_id):
     """ثبت کاربر در فایل memory.json"""
     data = load_data("memory.json")
@@ -235,9 +172,7 @@ def register_user(user_id):
     if user_id not in users:
         users.append(user_id)
     data["users"] = users
-    save_data("memory.json", data)
-
-# ======================= ☁️ بک‌آپ خودکار و دستی (نسخه امن) =======================
+    save_data("memory.json", data)# ======================= ☁️ بک‌آپ خودکار و دستی (نسخه امن) =======================
 import shutil
 
 async def auto_backup(bot):
@@ -249,14 +184,11 @@ async def auto_backup(bot):
 def _should_include_in_backup(path: str) -> bool:
     """فقط فایل‌های داده‌ای مهم داخل بک‌آپ بروند"""
     lowered = path.lower()
-    # پوشه‌ها و فایل‌هایی که باید نادیده بگیریم
     skip_dirs = ["__pycache__", ".git", "venv", "restore_temp"]
     if any(sd in lowered for sd in skip_dirs):
         return False
-    # خودِ فایل‌های zip و بک‌آپ‌های قبلی نه!
     if lowered.endswith(".zip") or os.path.basename(lowered).startswith("backup_"):
         return False
-    # فقط پسوندهای داده‌ای
     return lowered.endswith((".json", ".jpg", ".png", ".webp", ".mp3", ".ogg"))
 
 async def cloudsync_internal(bot, reason="Manual Backup"):
@@ -270,11 +202,9 @@ async def cloudsync_internal(bot, reason="Manual Backup"):
                 for file in files:
                     full_path = os.path.join(root, file)
                     if _should_include_in_backup(full_path):
-                        # مسیر داخل آرشیو رو نسبی بنویس تا بازگردانی ساده باشد
                         arcname = os.path.relpath(full_path, ".")
                         zipf.write(full_path, arcname=arcname)
 
-        # ارسال بک‌آپ
         with open(filename, "rb") as f:
             await bot.send_document(chat_id=ADMIN_ID, document=f, filename=filename)
         await bot.send_message(chat_id=ADMIN_ID, text=f"☁️ {reason} انجام شد ✅")
@@ -296,8 +226,10 @@ async def cloudsync(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await cloudsync_internal(context.bot, "Manual Cloud Backup")
 
 # ======================= 💾 بک‌آپ و بازیابی ZIP در چت (نسخه امن) =======================
-
 async def backup(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != ADMIN_ID:
+        return await update.message.reply_text("⛔ فقط مدیر اصلی مجازه بک‌آپ بگیره!")
+
     """بک‌آپ محلی و ارسال داخل همین چت"""
     now = datetime.now().strftime("%Y-%m-%d_%H-%M")
     filename = f"backup_{now}.zip"
@@ -321,16 +253,21 @@ async def backup(update: Update, context: ContextTypes.DEFAULT_TYPE):
             os.remove(filename)
 
 async def restore(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != ADMIN_ID:
+        return await update.message.reply_text("⛔ فقط مدیر اصلی می‌تونه عملیات بازیابی انجام بده!")
+
     """دریافت فایل ZIP برای بازیابی"""
     await update.message.reply_text("📂 فایل ZIP بک‌آپ را ارسال کن تا بازیابی شود.")
     context.user_data["await_restore"] = True
 
 async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != ADMIN_ID:
+        return await update.message.reply_text("⛔ فقط مدیر اصلی مجازه فایل بک‌آپ رو بازیابی کنه!")
+
     """پردازش فایل ZIP و بازیابی ایمن با پوشه موقتی"""
     if not context.user_data.get("await_restore"):
         return
 
-    # فقط فایل zip را قبول کن
     doc = update.message.document
     if not doc or not doc.file_name.lower().endswith(".zip"):
         return await update.message.reply_text("❗ لطفاً یک فایل ZIP معتبر بفرست.")
@@ -349,7 +286,6 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
         with zipfile.ZipFile(restore_zip, "r") as zip_ref:
             zip_ref.extractall(restore_dir)
 
-        # فقط فایل‌های داده‌ای کلیدی را جابه‌جا کن
         important_files = ["memory.json", "group_data.json", "jokes.json", "fortunes.json"]
         moved_any = False
         for fname in important_files:
@@ -358,7 +294,6 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 shutil.move(src, fname)
                 moved_any = True
 
-        # بعد از ریستور، ساختار را بازسازی کن
         init_files()
 
         if moved_any:
@@ -373,9 +308,7 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
             os.remove(restore_zip)
         if os.path.exists(restore_dir):
             shutil.rmtree(restore_dir)
-        context.user_data["await_restore"] = False
-
-# ======================= 💬 پاسخ و هوش مصنوعی =======================
+        context.user_data["await_restore"] = False# ======================= 💬 پاسخ و هوش مصنوعی =======================
 async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """پاسخ‌دهی اصلی هوش مصنوعی و سیستم یادگیری"""
     if not update.message or not update.message.text:
@@ -465,9 +398,9 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
             score = 100
 
         result = (
-            f"🤖 درصد هوش فعلی خنگول: *{score}%*\n\n" +
-            "\n".join(details) +
-            f"\n\n📈 نسخه Cloud+ Supreme Pro Stable+\n🕓 {datetime.now().strftime('%Y/%m/%d %H:%M')}"
+            f"🤖 درصد هوش فعلی خنگول: *{score}%*\n\n"
+            + "\n".join(details)
+            + f"\n\n📈 نسخه Cloud+ Supreme Pro Stable+\n🕓 {datetime.now().strftime('%Y/%m/%d %H:%M')}"
         )
 
         await update.message.reply_text(result, parse_mode="Markdown")
@@ -653,7 +586,6 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 key, val = random.choice(list(data.items()))
                 t = val.get("type", "text")
                 v = val.get("value", "")
-
                 try:
                     if t == "text":
                         await update.message.reply_text("😂 " + v)
@@ -663,8 +595,6 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         await update.message.reply_video(video=v, caption="😂 جوک ویدیویی!")
                     elif t == "sticker":
                         await update.message.reply_sticker(sticker=v)
-                    else:
-                        await update.message.reply_text("⚠️ نوع فایل پشتیبانی نمی‌شود.")
                 except Exception as e:
                     await update.message.reply_text(f"⚠️ خطا در ارسال جوک: {e}")
             else:
@@ -716,13 +646,15 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await list_fortunes(update)
         return
 
-    # ✅ لیست جملات
     if text == "لیست":
         await update.message.reply_text(list_phrases())
         return
 
-    # ✅ یادگیری دستی
+    # ✅ یادگیری دستی (فقط مدیر اصلی)
     if text.startswith("یادبگیر "):
+        if update.effective_user.id != ADMIN_ID:
+            return await update.message.reply_text("⛔ فقط مدیر اصلی می‌تونه جمله جدید یاد بده!")
+
         parts = text.replace("یادبگیر ", "").split("\n")
         if len(parts) > 1:
             phrase = parts[0].strip()
@@ -741,8 +673,6 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # ✅ پاسخ هوشمند و احساسی
     learned_reply = get_reply(text)
     emotion = detect_emotion(text)
-
-    # ذخیره و واکنش احساسی
     last_emotion = get_last_emotion(uid)
     context_reply = emotion_context_reply(emotion, last_emotion)
     remember_emotion(uid, emotion)
@@ -754,13 +684,10 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         reply_text = smart_response(text, uid) or enhance_sentence(text)
 
-    await update.message.reply_text(reply_text)
-
-# ======================= 🧾 راهنمای قابل ویرایش =======================
+    await update.message.reply_text(reply_text)# ======================= 🧾 راهنمای قابل ویرایش =======================
 HELP_FILE = "custom_help.txt"
 
 async def show_custom_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """نمایش متن راهنما برای همه کاربران"""
     if not os.path.exists(HELP_FILE):
         return await update.message.reply_text(
             "ℹ️ هنوز هیچ متنی برای راهنما ثبت نشده.\n"
@@ -861,11 +788,11 @@ if __name__ == "__main__":
     app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, reply))
 
-# 🔹 هنگام استارت
+    # 🔹 هنگام استارت
     async def on_startup(app):
         await notify_admin_on_startup(app)
         app.create_task(auto_backup(app.bot))
-        app.create_task(start_auto_brain_loop(app.bot))  # 🧠 فعال‌سازی مغز خودکار
+        app.create_task(start_auto_brain_loop(app.bot))
         print("🌙 [SYSTEM] Startup tasks scheduled ✅")
 
     app.post_init = on_startup
