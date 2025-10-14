@@ -489,6 +489,88 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_text = smart_response(text, uid) or enhance_sentence(text)
 
     await update.message.reply_text(reply_text)
+# ======================= 💾 بک‌آپ و بازیابی ZIP در چت =======================
+async def backup(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """بک‌آپ محلی و ارسال داخل همین چت"""
+    if update.effective_user.id != ADMIN_ID:
+        return await update.message.reply_text("⛔ فقط مدیر اصلی مجازه بک‌آپ بگیره!")
+
+    now = datetime.now().strftime("%Y-%m-%d_%H-%M")
+    filename = f"backup_{now}.zip"
+
+    try:
+        with zipfile.ZipFile(filename, "w", compression=zipfile.ZIP_DEFLATED) as zipf:
+            for root, _, files in os.walk("."):
+                for file in files:
+                    full_path = os.path.join(root, file)
+                    if _should_include_in_backup(full_path):
+                        arcname = os.path.relpath(full_path, ".")
+                        zipf.write(full_path, arcname=arcname)
+
+        with open(filename, "rb") as f:
+            await update.message.reply_document(document=f, filename=filename)
+        await update.message.reply_text("✅ بک‌آپ کامل گرفته شد!")
+    except Exception as e:
+        await update.message.reply_text(f"⚠️ خطا در گرفتن بک‌آپ:\n{e}")
+    finally:
+        if os.path.exists(filename):
+            os.remove(filename)
+
+
+async def restore(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """دریافت فایل ZIP برای بازیابی"""
+    if update.effective_user.id != ADMIN_ID:
+        return await update.message.reply_text("⛔ فقط مدیر اصلی مجازه بازیابی کنه!")
+
+    await update.message.reply_text("📂 فایل ZIP بک‌آپ را ارسال کن تا بازیابی شود.")
+    context.user_data["await_restore"] = True
+
+
+async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """پردازش فایل ZIP و بازیابی ایمن با پوشه موقتی"""
+    if not context.user_data.get("await_restore"):
+        return
+
+    doc = update.message.document
+    if not doc or not doc.file_name.lower().endswith(".zip"):
+        return await update.message.reply_text("❗ لطفاً یک فایل ZIP معتبر بفرست.")
+
+    restore_zip = "restore.zip"
+    restore_dir = "restore_temp"
+
+    try:
+        tg_file = await doc.get_file()
+        await tg_file.download_to_drive(restore_zip)
+
+        if os.path.exists(restore_dir):
+            shutil.rmtree(restore_dir)
+        os.makedirs(restore_dir, exist_ok=True)
+
+        with zipfile.ZipFile(restore_zip, "r") as zip_ref:
+            zip_ref.extractall(restore_dir)
+
+        important_files = ["memory.json", "group_data.json", "jokes.json", "fortunes.json"]
+        moved_any = False
+        for fname in important_files:
+            src = os.path.join(restore_dir, fname)
+            if os.path.exists(src):
+                shutil.move(src, fname)
+                moved_any = True
+
+        init_files()
+
+        if moved_any:
+            await update.message.reply_text("✅ بازیابی کامل انجام شد!")
+        else:
+            await update.message.reply_text("ℹ️ فایلی برای جایگزینی پیدا نشد.")
+    except Exception as e:
+        await update.message.reply_text(f"⚠️ خطا در بازیابی:\n{e}")
+    finally:
+        if os.path.exists(restore_zip):
+            os.remove(restore_zip)
+        if os.path.exists(restore_dir):
+            shutil.rmtree(restore_dir)
+        context.user_data["await_restore"] = False
 # ======================= 🧹 ریست و ریلود =======================
 async def reset_memory(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """پاک‌سازی کامل داده‌ها (فقط مدیر اصلی)"""
