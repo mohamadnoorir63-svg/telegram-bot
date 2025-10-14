@@ -237,70 +237,143 @@ def register_user(user_id):
     data["users"] = users
     save_data("memory.json", data)
 
-# ======================= ☁️ بک‌آپ خودکار و دستی =======================
+# ======================= ☁️ بک‌آپ خودکار و دستی (نسخه امن) =======================
+import shutil
+
 async def auto_backup(bot):
     """بک‌آپ خودکار هر ۱۲ ساعت"""
     while True:
         await asyncio.sleep(43200)
         await cloudsync_internal(bot, "Auto Backup")
 
+def _should_include_in_backup(path: str) -> bool:
+    """فقط فایل‌های داده‌ای مهم داخل بک‌آپ بروند"""
+    lowered = path.lower()
+    # پوشه‌ها و فایل‌هایی که باید نادیده بگیریم
+    skip_dirs = ["__pycache__", ".git", "venv", "restore_temp"]
+    if any(sd in lowered for sd in skip_dirs):
+        return False
+    # خودِ فایل‌های zip و بک‌آپ‌های قبلی نه!
+    if lowered.endswith(".zip") or os.path.basename(lowered).startswith("backup_"):
+        return False
+    # فقط پسوندهای داده‌ای
+    return lowered.endswith((".json", ".jpg", ".png", ".webp", ".mp3", ".ogg"))
+
 async def cloudsync_internal(bot, reason="Manual Backup"):
-    """ایجاد و ارسال فایل بک‌آپ به ادمین"""
+    """ایجاد و ارسال فایل بک‌آپ به ادمین (Cloud Safe)"""
     now = datetime.now().strftime("%Y-%m-%d_%H-%M")
     filename = f"backup_{now}.zip"
 
-    with zipfile.ZipFile(filename, "w") as zipf:
-        for root, _, files in os.walk("."):
-            for file in files:
-                if file.endswith((".json", ".jpg", ".png", ".webp", ".mp3", ".ogg", ".zip")):
-                    path = os.path.join(root, file)
-                    zipf.write(path)
-
     try:
-        await bot.send_document(chat_id=ADMIN_ID, document=open(filename, "rb"), filename=filename)
+        with zipfile.ZipFile(filename, "w", compression=zipfile.ZIP_DEFLATED) as zipf:
+            for root, _, files in os.walk("."):
+                for file in files:
+                    full_path = os.path.join(root, file)
+                    if _should_include_in_backup(full_path):
+                        # مسیر داخل آرشیو رو نسبی بنویس تا بازگردانی ساده باشد
+                        arcname = os.path.relpath(full_path, ".")
+                        zipf.write(full_path, arcname=arcname)
+
+        # ارسال بک‌آپ
+        with open(filename, "rb") as f:
+            await bot.send_document(chat_id=ADMIN_ID, document=f, filename=filename)
         await bot.send_message(chat_id=ADMIN_ID, text=f"☁️ {reason} انجام شد ✅")
+
     except Exception as e:
         print(f"[CLOUD BACKUP ERROR] {e}")
+        try:
+            await bot.send_message(chat_id=ADMIN_ID, text=f"⚠️ خطا در Cloud Backup:\n{e}")
+        except:
+            pass
     finally:
         if os.path.exists(filename):
             os.remove(filename)
 
 async def cloudsync(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """اجرای دستی بک‌آپ ابری"""
     if update.effective_user.id != ADMIN_ID:
-        return
+        return await update.message.reply_text("⛔ فقط مدیر اصلی مجازه!")
     await cloudsync_internal(context.bot, "Manual Cloud Backup")
 
-# ======================= 💾 بک‌آپ و بازیابی ZIP در چت =======================
+# ======================= 💾 بک‌آپ و بازیابی ZIP در چت (نسخه امن) =======================
+
 async def backup(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    filename = f"backup_{datetime.now().strftime('%Y-%m-%d_%H-%M')}.zip"
+    """بک‌آپ محلی و ارسال داخل همین چت"""
+    now = datetime.now().strftime("%Y-%m-%d_%H-%M")
+    filename = f"backup_{now}.zip"
 
-    with zipfile.ZipFile(filename, "w") as zipf:
-        for root, _, files in os.walk("."):
-            for file in files:
-                if file.endswith((".json", ".jpg", ".png", ".webp", ".mp3", ".ogg")):
-                    zipf.write(os.path.join(root, file))
+    try:
+        with zipfile.ZipFile(filename, "w", compression=zipfile.ZIP_DEFLATED) as zipf:
+            for root, _, files in os.walk("."):
+                for file in files:
+                    full_path = os.path.join(root, file)
+                    if _should_include_in_backup(full_path):
+                        arcname = os.path.relpath(full_path, ".")
+                        zipf.write(full_path, arcname=arcname)
 
-    await update.message.reply_document(document=open(filename, "rb"), filename=filename)
-    await update.message.reply_text("✅ بک‌آپ کامل گرفته شد!")
-    os.remove(filename)
+        with open(filename, "rb") as f:
+            await update.message.reply_document(document=f, filename=filename)
+        await update.message.reply_text("✅ بک‌آپ کامل گرفته شد!")
+    except Exception as e:
+        await update.message.reply_text(f"⚠️ خطا در گرفتن بک‌آپ:\n{e}")
+    finally:
+        if os.path.exists(filename):
+            os.remove(filename)
 
 async def restore(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """دریافت فایل ZIP برای بازیابی"""
     await update.message.reply_text("📂 فایل ZIP بک‌آپ را ارسال کن تا بازیابی شود.")
     context.user_data["await_restore"] = True
 
 async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """پردازش فایل ZIP و بازیابی ایمن با پوشه موقتی"""
     if not context.user_data.get("await_restore"):
         return
 
-    file = await update.message.document.get_file()
-    await file.download_to_drive("restore.zip")
+    # فقط فایل zip را قبول کن
+    doc = update.message.document
+    if not doc or not doc.file_name.lower().endswith(".zip"):
+        return await update.message.reply_text("❗ لطفاً یک فایل ZIP معتبر بفرست.")
 
-    with zipfile.ZipFile("restore.zip", "r") as zip_ref:
-        zip_ref.extractall(".")
+    restore_zip = "restore.zip"
+    restore_dir = "restore_temp"
 
-    os.remove("restore.zip")
-    context.user_data["await_restore"] = False
-    await update.message.reply_text("✅ بازیابی کامل انجام شد!")
+    try:
+        tg_file = await doc.get_file()
+        await tg_file.download_to_drive(restore_zip)
+
+        if os.path.exists(restore_dir):
+            shutil.rmtree(restore_dir)
+        os.makedirs(restore_dir, exist_ok=True)
+
+        with zipfile.ZipFile(restore_zip, "r") as zip_ref:
+            zip_ref.extractall(restore_dir)
+
+        # فقط فایل‌های داده‌ای کلیدی را جابه‌جا کن
+        important_files = ["memory.json", "group_data.json", "jokes.json", "fortunes.json"]
+        moved_any = False
+        for fname in important_files:
+            src = os.path.join(restore_dir, fname)
+            if os.path.exists(src):
+                shutil.move(src, fname)
+                moved_any = True
+
+        # بعد از ریستور، ساختار را بازسازی کن
+        init_files()
+
+        if moved_any:
+            await update.message.reply_text("✅ بازیابی کامل انجام شد!")
+        else:
+            await update.message.reply_text("ℹ️ فایلی برای جایگزینی پیدا نشد. مطمئنی ZIP درست را دادی؟")
+
+    except Exception as e:
+        await update.message.reply_text(f"⚠️ خطا در بازیابی:\n{e}")
+    finally:
+        if os.path.exists(restore_zip):
+            os.remove(restore_zip)
+        if os.path.exists(restore_dir):
+            shutil.rmtree(restore_dir)
+        context.user_data["await_restore"] = False
 
 # ======================= 💬 پاسخ و هوش مصنوعی =======================
 async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
