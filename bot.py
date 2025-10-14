@@ -420,232 +420,7 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 score += 15
                 details.append("😂 جوک‌های زیاد و متنوع 😎")
             elif count > 0:
-                score += 10
-                details.append("😅 چند جوک فعال وجود دارد")
-            else:
-                details.append("⚪ هنوز جوکی ثبت نشده")
-
-        if os.path.exists("fortunes.json"):
-            data = load_data("fortunes.json")
-            count = len(data)
-            if count > 10:
-                score += 15
-                details.append("🔮 فال‌ها متنوع و فعال 💫")
-            elif count > 0:
-                score += 10
-                details.append("🔮 چند فال ثبت شده")
-            else:
-                details.append("⚪ هنوز فالی ثبت نشده")
-
-        try:
-            test = smart_response("سلام", "شاد")
-            if test:
-                score += 25
-                details.append("💬 پاسخ هوشمند فعاله 🤖")
-            else:
-                score += 10
-                details.append("⚪ پاسخ هوشمند غیرفعاله")
-        except:
-            details.append("⚠️ خطا در smart_response")
-
-        essential_files = ["memory.json", "group_data.json", "jokes.json", "fortunes.json"]
-        stable_count = sum(os.path.exists(f) for f in essential_files)
-        if stable_count == len(essential_files):
-            score += 15
-            details.append("💾 حافظه و داده‌ها پایدار ✅")
-        elif stable_count >= 2:
-            score += 10
-            details.append("⚠️ برخی فایل‌ها ناقصند")
-        else:
-            details.append("🚫 خطا در حافظه داده")
-
-        if score > 100:
-            score = 100
-
-        result = (
-            f"🤖 درصد هوش فعلی خنگول: *{score}%*\n\n"
-            + "\n".join(details)
-            + f"\n\n📈 نسخه Cloud+ Supreme Pro Stable+\n🕓 {datetime.now().strftime('%Y/%m/%d %H:%M')}"
-        )
-
-        await update.message.reply_text(result, parse_mode="Markdown")
-        return
-
-    # ✅ درصد هوش اجتماعی
-    if text.lower() == "درصد هوش اجتماعی":
-        score = 0
-        details = []
-
-        memory = load_data("memory.json")
-        users = len(memory.get("users", []))
-        if users > 100:
-            score += 25
-            details.append(f"👤 کاربران زیاد ({users} نفر)")
-        elif users > 30:
-            score += 20
-            details.append(f"👥 کاربران فعال ({users} نفر)")
-        elif users > 10:
-            score += 10
-            details.append(f"🟢 کاربران محدود ({users})")
-        else:
-            details.append("⚪ کاربران کم")
-
-        groups_data = load_data("group_data.json").get("groups", {})
-        group_count = len(groups_data) if isinstance(groups_data, dict) else len(groups_data)
-        if group_count > 15:
-            score += 25
-            details.append(f"🏠 گروه‌های فعال زیاد ({group_count}) ✅")
-        elif group_count > 5:
-            score += 15
-            details.append(f"🏠 گروه‌های متوسط ({group_count})")
-        elif group_count > 0:
-            score += 10
-            details.append(f"🏠 گروه‌های محدود ({group_count})")
-        else:
-            details.append("🚫 هنوز در هیچ گروهی عضو نیست")
-
-        try:
-            activity = get_group_stats()
-            active_chats = activity.get("active_chats", 0)
-            total_msgs = activity.get("messages", 0)
-            if active_chats > 10 and total_msgs > 200:
-                score += 25
-                details.append("💬 تعاملات زیاد و مداوم 😎")
-            elif total_msgs > 50:
-                score += 15
-                details.append("💬 تعاملات متوسط")
-            elif total_msgs > 0:
-                score += 10
-                details.append("💬 تعامل کم ولی فعال")
-            else:
-                details.append("⚪ تعامل خاصی ثبت نشده")
-        except:
-            details.append("⚠️ آمار تعاملات در دسترس نیست")
-
-        if os.path.exists("memory.json"):
-            phrases = len(memory.get("phrases", {}))
-            if phrases > 50:
-                score += 20
-                details.append("🧠 حافظه گفتاری قوی")
-            elif phrases > 10:
-                score += 10
-                details.append("🧠 حافظه محدود")
-            else:
-                details.append("⚪ حافظه در حال رشد")
-
-        if score > 100:
-            score = 100
-
-        result = (
-            f"🤖 درصد هوش اجتماعی خنگول: *{score}%*\n\n"
-            + "\n".join(details)
-            + f"\n\n📊 شاخص تعامل اجتماعی فعال 💬\n🕓 {datetime.now().strftime('%Y/%m/%d %H:%M')}"
-        )
-
-        await update.message.reply_text(result, parse_mode="Markdown")
-        return# ✅ هوش کلی (ترکیب هوش منطقی + اجتماعی)
-    if text.lower() == "هوش کلی":
-        score = 0
-        details = []
-
-        # 🧠 حافظه و یادگیری
-        if os.path.exists("memory.json"):
-            data = load_data("memory.json")
-            phrases = len(data.get("phrases", {}))
-            responses = sum(len(v) for v in data.get("phrases", {}).values()) if phrases else 0
-            if phrases > 20 and responses > 30:
-                score += 25
-                details.append("🧠 یادگیری گسترده و دقیق ✅")
-            elif phrases > 10:
-                score += 15
-                details.append("🧩 یادگیری متوسط ولی فعال")
-            else:
-                score += 5
-                details.append("⚪ حافظه در حال رشد")
-
-        # 😂 شوخ‌طبعی و جوک‌ها
-        if os.path.exists("jokes.json"):
-            data = load_data("jokes.json")
-            count = len(data)
-            if count > 10:
-                score += 10
-                details.append("😂 شوخ‌طبع و بامزه 😄")
-            elif count > 0:
-                score += 5
-                details.append("😅 کمی شوخ‌طبع")
-            else:
-                details.append("⚪ هنوز شوخی بلد نیست 😶")
-
-        # 💬 پاسخ‌دهی هوشمند
-        try:
-            test = smart_response("سلام", "شاد")
-            if test:
-                score += 20
-                details.append("💬 پاسخ هوشمند فعال 🤖")
-            else:
-                score += 10
-                details.append("⚪ پاسخ ساده")
-        except:
-            details.append("⚠️ خطا در پاسخ‌دهی هوش مصنوعی")
-
-        # 👥 کاربران و گروه‌ها
-        memory = load_data("memory.json")
-        users = len(memory.get("users", []))
-        groups_data = load_data("group_data.json").get("groups", {})
-        group_count = len(groups_data) if isinstance(groups_data, dict) else len(groups_data)
-
-        if users > 50:
-            score += 10
-            details.append(f"👤 کاربران زیاد ({users})")
-        elif users > 10:
-            score += 5
-            details.append(f"👥 کاربران محدود ({users})")
-
-        if group_count > 10:
-            score += 10
-            details.append(f"🏠 گروه‌های زیاد ({group_count}) ✅")
-        elif group_count > 0:
-            score += 5
-            details.append(f"🏠 گروه‌های محدود ({group_count})")
-
-        # 💾 پایداری سیستم
-        essential_files = ["memory.json", "group_data.json", "jokes.json", "fortunes.json"]
-        stability = sum(os.path.exists(f) for f in essential_files)
-        if stability == len(essential_files):
-            score += 10
-            details.append("💾 سیستم پایدار و سالم ✅")
-        elif stability >= 2:
-            score += 5
-            details.append("⚠️ بخشی از سیستم ناقصه")
-        else:
-            details.append("🚫 حافظه آسیب‌دیده")
-
-        # ✨ محاسبه IQ
-        iq = min(160, int((score / 100) * 160))
-
-        # تعیین سطح هوش
-        if iq >= 130:
-            level = "🌟 نابغه دیجیتال"
-        elif iq >= 110:
-            level = "🧠 باهوش و تحلیل‌گر"
-        elif iq >= 90:
-            level = "🙂 نرمال ولی یادگیرنده"
-        else:
-            level = "🤪 خنگول کلاسیک 😅"
-
-        result = (
-            f"🤖 IQ کلی خنگول: *{iq}*\n"
-            f"{level}\n\n"
-            + "\n".join(details)
-            + f"\n\n📈 نسخه Cloud+ Supreme Pro Stable+\n🕓 {datetime.now().strftime('%Y/%m/%d %H:%M')}"
-        )
-
-        await update.message.reply_text(result, parse_mode="Markdown")
-        return
-
-    # ✅ جوک تصادفی
-    if text == "جوک":
-        if os.path.exists("jokes.json"):
+           os.path.exists("jokes.json"):
             data = load_data("jokes.json")
             if data:
                 key, val = random.choice(list(data.items()))
@@ -835,9 +610,7 @@ if __name__ == "__main__":
     app.add_handler(CommandHandler("unlock", unlock_learning))
     app.add_handler(CommandHandler("mode", mode_change))
     app.add_handler(CommandHandler("stats", stats))
-
-app.add_handler(CommandHandler("fullstats", fullstats))
- app.add_handler(CommandHandler("fullstats", fullstats))
+    app.add_handler(CommandHandler("fullstats", fullstats))
     app.add_handler(CommandHandler("backup", backup))
     app.add_handler(CommandHandler("restore", restore))
     app.add_handler(CommandHandler("reset", reset_memory))
@@ -850,7 +623,7 @@ app.add_handler(CommandHandler("fullstats", fullstats))
     app.add_handler(MessageHandler(filters.Regex("^ثبت راهنما$"), save_custom_help))
     app.add_handler(MessageHandler(filters.Regex("^راهنما$"), show_custom_help))
 
-    # 🔹 پیام‌ها و اسناد
+    # 🔹 پیام‌ها و فایل‌ها
     app.add_handler(MessageHandler(filters.Document.ALL, handle_document))
     app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, reply))
@@ -863,4 +636,4 @@ app.add_handler(CommandHandler("fullstats", fullstats))
         print("🌙 [SYSTEM] Startup tasks scheduled ✅")
 
     app.post_init = on_startup
-    app.run_polling(allowed_updates=Update.ALL_TYPES)
+    app.run_polling(allowed_updates=Update.ALL_TYPES))
