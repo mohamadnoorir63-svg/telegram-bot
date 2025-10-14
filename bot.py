@@ -10,7 +10,7 @@ from telegram import Update
 from telegram.ext import ContextTypes
 
 # ======================= ⚙️ تنظیمات اولیه =======================
-ADMIN_ID = 123456789  # آیدی عددی مدیر اصلی
+ADMIN_ID = 7089376754  # آیدی عددی مدیر اصلی
 TOKEN = os.getenv("BOT_TOKEN")  # توکن از متغیر محیطی
 if not TOKEN:
     raise Exception("❌ متغیر BOT_TOKEN تنظیم نشده است!")
