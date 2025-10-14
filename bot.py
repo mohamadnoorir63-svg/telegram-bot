@@ -195,7 +195,8 @@ async def handle_reply_mode(update: Update):
                 "👋 اینجام رئیس! در حالت ریپلی فقط صدام کنی جواب می‌دم 💬",
                 "😌 خستم ولی هوشیارم، تو بگو!"
             ])
-        )import random
+        )
+import random
 import os
 import json
 from telegram import Update
@@ -454,7 +455,8 @@ def generate_sentence():
     responses = data.get("phrases", {}).get(phrase, [])
     if responses:
         return random.choice(responses)
-    return phraseimport os
+    return phrase
+import os
 import json
 import shutil
 import zipfile
@@ -484,7 +486,7 @@ def init_files():
 def _should_include_in_backup(path: str) -> bool:
     """انتخاب فایل‌هایی که باید در بک‌آپ باشند"""
     lowered = path.lower()
-    skip_dirs = ["__pycache__", ".git", "venv", "restore_temp"]
+    skip_dirs = ["pycache", ".git", "venv", "restore_temp"]
     if any(sd in lowered for sd in skip_dirs):
         return False
     if lowered.endswith(".zip") or os.path.basename(lowered).startswith("backup_"):
@@ -734,7 +736,8 @@ async def detect_admin_entry(update: Update, context: ContextTypes.DEFAULT_TYPE)
             "🤖 سلام ارباب، خنگول آماده‌ست برای خدمت!",
             f"🌟 رئیس از راه رسید ({now})"
         ]
-        await update.message.reply_text(random.choice(greetings))import aiofiles
+        await update.message.reply_text(random.choice(greetings))
+import aiofiles
 from telegram.ext import (
     ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
 )
@@ -928,7 +931,7 @@ async def handle_error(update: object, context: ContextTypes.DEFAULT_TYPE):
 
 
 # ======================= 🚀 اجرای نهایی =======================
-if __name__ == "__main__":
+if name == "main":
     print("🤖 خنگول فارسی 8.6.2 Cloud+ Fusion Ultra AI+ آماده به خدمت است ...")
 
     app = ApplicationBuilder().token(TOKEN).build()
