@@ -647,6 +647,56 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
     await update.message.reply_html(msg)
+# ======================= 📈 آمار کامل گروه‌ها (Fullstats) =======================
+async def fullstats(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """نمایش آمار کامل گروه‌ها (فقط مدیر اصلی)"""
+    if update.effective_user.id != ADMIN_ID:
+        return await update.message.reply_text("⛔ فقط مدیر اصلی مجازه!")
+
+    try:
+        data = load_data("group_data.json")
+        groups = data.get("groups", {})
+        if not groups:
+            return await update.message.reply_text("ℹ️ هنوز هیچ گروهی ثبت نشده.")
+
+        text = "📈 <b>آمار کامل گروه‌ها:</b>\n\n"
+        count = 0
+
+        if isinstance(groups, list):
+            groups_list = groups
+        else:
+            groups_list = [{"id": gid, **info} for gid, info in groups.items()]
+
+        for g in groups_list:
+            count += 1
+            group_id = g.get("id", "نامشخص")
+            title = g.get("title", f"Group_{group_id}")
+            members = len(g.get("members", []))
+            last_active = g.get("last_active", "نامشخص")
+
+            try:
+                chat = await context.bot.get_chat(group_id)
+                if chat.title:
+                    title = chat.title
+            except Exception:
+                pass
+
+            text += (
+                f"🏠 <b>{title}</b>\n"
+                f"👥 اعضا: {members}\n"
+                f"🕓 آخرین فعالیت: {last_active}\n"
+                "━━━━━━━━━━━━━━━\n"
+            )
+
+            if count % 10 == 0:
+                await asyncio.sleep(0.5)
+
+        if len(text) > 3900:
+            text = text[:3900] + "\n... (لیست کوتاه شد)"
+        await update.message.reply_html(text)
+
+    except Exception as e:
+        await update.message.reply_text(f"⚠️ خطا در آمار گروه‌ها:\n{e}")
 # ======================= 📘 راهنمای قابل ویرایش =======================
 import aiofiles
 from telegram.ext import (
