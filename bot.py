@@ -139,6 +139,71 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     await update.message.reply_text(msg)
 
+# ======================= 📊 آمار کامل گروه‌ها =======================
+async def fullstats(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """نمایش آمار کامل گروه‌ها (سازگار با ساختار جدید و قدیمی group_data.json)"""
+    try:
+        data = load_data("group_data.json")
+        groups = data.get("groups", {})
+
+        # اگر گروه‌ها به‌صورت لیست ذخیره شده باشند
+        if isinstance(groups, list):
+            if not groups:
+                return await update.message.reply_text("ℹ️ هنوز هیچ گروهی ثبت نشده.")
+            text = "📈 آمار کامل گروه‌ها:\n\n"
+            for g in groups:
+                group_id = g.get("id", "نامشخص")
+                title = g.get("title", f"Group_{group_id}")
+                members = len(g.get("members", []))
+                last_active = g.get("last_active", "نامشخص")
+
+                try:
+                    chat = await context.bot.get_chat(group_id)
+                    if chat.title:
+                        title = chat.title
+                except Exception:
+                    pass
+
+                text += (
+                    f"🏠 گروه: {title}\n"
+                    f"👥 اعضا: {members}\n"
+                    f"🕓 آخرین فعالیت: {last_active}\n\n"
+                )
+
+        # اگر گروه‌ها به‌صورت دیکشنری ذخیره شده باشند
+        elif isinstance(groups, dict):
+            if not groups:
+                return await update.message.reply_text("ℹ️ هنوز هیچ گروهی ثبت نشده.")
+            text = "📈 آمار کامل گروه‌ها:\n\n"
+            for group_id, info in groups.items():
+                title = info.get("title", f"Group_{group_id}")
+                members = len(info.get("members", []))
+                last_active = info.get("last_active", "نامشخص")
+
+                try:
+                    chat = await context.bot.get_chat(group_id)
+                    if chat.title:
+                        title = chat.title
+                except Exception:
+                    pass
+
+                text += (
+                    f"🏠 گروه: {title}\n"
+                    f"👥 اعضا: {members}\n"
+                    f"🕓 آخرین فعالیت: {last_active}\n\n"
+                )
+
+        else:
+            return await update.message.reply_text("⚠️ ساختار فایل group_data.json نامعتبر است!")
+
+        # محدود کردن متن طولانی
+        if len(text) > 4000:
+            text = text[:3990] + "..."
+
+        await update.message.reply_text(text)
+
+    except Exception as e:
+        await update.message.reply_text(f"⚠️ خطا در آمار گروه‌ها:\n{e}")
 # ======================= 👋 خوشامد با عکس پروفایل =======================
 async def welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """ارسال پیام خوشامد با عکس پروفایل"""
@@ -770,7 +835,9 @@ if __name__ == "__main__":
     app.add_handler(CommandHandler("unlock", unlock_learning))
     app.add_handler(CommandHandler("mode", mode_change))
     app.add_handler(CommandHandler("stats", stats))
-    app.add_handler(CommandHandler("fullstats", fullstats))
+
+app.add_handler(CommandHandler("fullstats", fullstats))
+ app.add_handler(CommandHandler("fullstats", fullstats))
     app.add_handler(CommandHandler("backup", backup))
     app.add_handler(CommandHandler("restore", restore))
     app.add_handler(CommandHandler("reset", reset_memory))
