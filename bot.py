@@ -4,6 +4,8 @@ import random
 import zipfile
 from datetime import datetime
 from telegram import Update, InputFile
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import CallbackQueryHandler
 from telegram.ext import (
     ApplicationBuilder,
     CommandHandler,
@@ -38,12 +40,69 @@ status = {
     "locked": False
 }
 
-# ======================= ✳️ شروع و پیام فعال‌سازی =======================
+# ======================= ✳️ شروع و پیام فعال‌سازی + پنل شیشه‌ای =======================
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(
-        "🤖 خنگول فارسی 8.5.1 Cloud+ Supreme Pro Stable+\n"
-        "📘 برای دیدن لیست دستورات بنویس: راهنما"
+    """نمایش پیام خوش‌آمد و پنل شیشه‌ای فقط در پی‌وی"""
+    # اگر کاربر در گروه بود
+    if update.message.chat.type != "private":
+        await update.message.reply_text(
+            "سلام 😄 من توی گروه فعالم، ولی برای تنظیمات و آموزش بیا توی پی‌وی من ❤️"
+        )
+        return
+
+    keyboard = [
+        [
+            InlineKeyboardButton("🤖 معرفی ربات", callback_data="info"),
+            InlineKeyboardButton("➕ افزودن به گروه", callback_data="add"),
+        ],
+        [
+            InlineKeyboardButton("🧠 یادم بده", callback_data="learn"),
+            InlineKeyboardButton("🛠 پشتیبانی", callback_data="support"),
+        ]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    text = (
+        "🤖 *خنگول فارسی 8.5.1 Cloud+ Supreme Pro Stable+*\n"
+        "✨ سلام! من یه ربات هوشمند، شوخ و یادگیرنده‌ام 😄\n"
+        "یکی از گزینه‌های زیر رو انتخاب کن 👇"
     )
+
+    await update.message.reply_text(text, reply_markup=reply_markup, parse_mode="Markdown")# ======================= ⚙️ عملکرد دکمه‌های پنل شیشه‌ای =======================
+async def panel_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()  # متوقف‌کردن لودینگ دکمه
+
+    if query.data == "info":
+        msg = (
+            "🤖 *خنگول فارسی 8.5.1 Cloud+ Supreme Pro Stable+*\n"
+            "من یه ربات هوشمند فارسی‌ام که ازت یاد می‌گیرم، جوک می‌گم، فال می‌فرستم 😄\n"
+            "هرچی بیشتر باهام حرف بزنی، باهوش‌تر می‌شم 🧠"
+        )
+        await query.message.reply_text(msg, parse_mode="Markdown")
+
+    elif query.data == "add":
+        me = await context.bot.get_me()
+        add_link = f"https://t.me/{me.username}?startgroup=true"
+        await query.message.reply_text(f"➕ برای افزودن من به گروه روی لینک زیر بزن:\n{add_link}")
+
+    elif query.data == "learn":
+        msg = (
+            "🧠 برای اینکه چیزی یادم بدی، اینطوری بنویس:\n\n"
+            "یادبگیر سلام\n"
+            "سلام خوبی؟\n"
+            "چطوری؟\n\n"
+            "هر خط بعد از جمله اصلی، یه پاسخ جدید یادم می‌ده ✨"
+        )
+        await query.message.reply_text(msg)
+
+    elif query.data == "support":
+        msg = (
+            "🛠 پشتیبانی:\n"
+            "اگر مشکلی داری همینجا بنویس.\n"
+            "یا به مدیر پیام بده."
+        )
+        await query.message.reply_text(msg)
 
 async def notify_admin_on_startup(app):
     """ارسال پیام فعال‌سازی به ادمین هنگام استارت"""
@@ -851,6 +910,7 @@ if __name__ == "__main__":
     app.add_handler(CommandHandler("broadcast", broadcast))
     app.add_handler(CommandHandler("cloudsync", cloudsync))
     app.add_handler(CommandHandler("leave", leave))
+    app.add_handler(CallbackQueryHandler(panel_buttons))  # ✅ این خط باید با بقیه هم‌تراز باشه!
 
     # 🔹 راهنمای قابل ویرایش
     app.add_handler(MessageHandler(filters.Regex("^ثبت راهنما$"), save_custom_help))
@@ -861,7 +921,7 @@ if __name__ == "__main__":
     app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, reply))
 
-# 🔹 هنگام استارت
+    # 🔹 هنگام استارت
     async def on_startup(app):
         await notify_admin_on_startup(app)
         app.create_task(auto_backup(app.bot))
