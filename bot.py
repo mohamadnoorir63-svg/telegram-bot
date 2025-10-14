@@ -145,7 +145,8 @@ async def unlock_learning(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if user_id != ADMIN_ID:
         return await update.message.reply_text("⛔ فقط سودو مجازه این بخشو باز کنه.")
     status["locked"] = False
-    await update.message.reply_text("🔓 یادگیری باز شد!")import shutil
+    await update.message.reply_text("🔓 یادگیری باز شد!")
+import shutil
 
 # ======================= ☁️ بک‌آپ خودکار و دستی (نسخه امن) =======================
 async def auto_backup(bot):
@@ -279,7 +280,8 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
             os.remove(restore_zip)
         if os.path.exists(restore_dir):
             shutil.rmtree(restore_dir)
-        context.user_data["await_restore"] = False# ======================= 💬 پاسخ‌دهی و سیستم ریپلی =======================
+        context.user_data["await_restore"] = False
+# ======================= 💬 پاسخ‌دهی و سیستم ریپلی =======================
 
 # ذخیره وضعیت ریپلی در حافظه (برای هر چت جدا)
 REPLY_STATE_FILE = "reply_mode.json"
@@ -463,7 +465,8 @@ async def send_random_fortune(update: Update):
         elif t == "sticker":
             await update.message.reply_sticker(sticker=v)
     except Exception as e:
-        await update.message.reply_text(f"⚠️ خطا در ارسال فال: {e}")# ======================= 🧠 هوش منطقی (درصد هوش) =======================
+        await update.message.reply_text(f"⚠️ خطا در ارسال فال: {e}")
+# ======================= 🧠 هوش منطقی (درصد هوش) =======================
 async def show_logical_iq(update: Update):
     score = 0
     details = []
@@ -642,7 +645,8 @@ async def show_total_iq(update: Update):
         f"🕓 {datetime.now().strftime('%Y/%m/%d %H:%M')}\n"
         f"نسخه: Cloud+ Ultra AI Analyzer"
     )
-    await update.message.reply_text(result, parse_mode="Markdown")# ======================= 🧩 سیستم Alias (دستورات سفارشی) =======================
+    await update.message.reply_text(result, parse_mode="Markdown")
+# ======================= 🧩 سیستم Alias (دستورات سفارشی) =======================
 
 ALIASES_FILE = "aliases.json"
 
@@ -735,7 +739,8 @@ async def check_alias_and_execute(update: Update, context: ContextTypes.DEFAULT_
         await reply(fake_update, context)
         return True
 
-    return False# ======================= 🛡️ سیستم سطح دسترسی =======================
+    return False
+# ======================= 🛡️ سیستم سطح دسترسی =======================
 
 def is_admin(user_id):
     """بررسی اینکه آیا کاربر مدیر اصلی (سودو) است"""
@@ -829,7 +834,8 @@ async def show_social_iq(update: Update):
 async def show_total_iq(update: Update):
     if update.effective_user.id != ADMIN_ID:
         return await update.message.reply_text("⛔ فقط مدیر اصلی مجازه هوش کلی رو بررسی کنه.")
-    await calculate_total_iq(update)# ======================= 💬 سیستم ریپلی هوشمند =======================
+    await calculate_total_iq(update)
+# ======================= 💬 سیستم ریپلی هوشمند =======================
 
 replies_status = {
     "enabled": True  # پیش‌فرض فعال است
@@ -905,7 +911,8 @@ async def reply_to_replies(update: Update, context: ContextTypes.DEFAULT_TYPE):
 def setup_reply_handlers(app):
     """افزودن هندلرهای ریپلی و کنترلش"""
     app.add_handler(CommandHandler("replymode", toggle_replies))
-    app.add_handler(MessageHandler(filters.REPLY & filters.TEXT & ~filters.COMMAND, reply_to_replies))# ======================= 🚀 خنگول فارسی 9.0 Ultra+ Stable =======================
+    app.add_handler(MessageHandler(filters.REPLY & filters.TEXT & ~filters.COMMAND, reply_to_replies))
+# ======================= 🚀 خنگول فارسی 9.0 Ultra+ Stable =======================
 
 from telegram.ext import (
     ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
