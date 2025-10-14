@@ -931,7 +931,7 @@ async def handle_error(update: object, context: ContextTypes.DEFAULT_TYPE):
 
 
 # ======================= 🚀 اجرای نهایی =======================
-if name == "main":
+if __name__ == "__main__":
     print("🤖 خنگول فارسی 8.6.2 Cloud+ Fusion Ultra AI+ آماده به خدمت است ...")
 
     app = ApplicationBuilder().token(TOKEN).build()
