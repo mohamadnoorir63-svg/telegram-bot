@@ -117,7 +117,16 @@ async def toggle(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = "✅ ربات فعال شد!" if status["active"] else "😴 ربات خاموش شد (فقط در حال یادگیری)"
     await update.message.reply_text(msg)
 
+# ======================= 👋 خوشامدگویی =======================
+async def toggle_welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """فعال یا غیرفعال‌سازی خوشامدگویی خودکار"""
+    if update.effective_user.id != ADMIN_ID:
+        return await update.message.reply_text("⛔ فقط مدیر اصلی مجازه!")
 
+    status["welcome"] = not status["welcome"]
+    save_status()
+    msg = "👋 خوشامدگویی فعال شد!" if status["welcome"] else "🚫 خوشامدگویی غیرفعال شد!"
+    await update.message.reply_text(msg)
 # ======================= 🔒 قفل و باز کردن یادگیری =======================
 async def lock_learning(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """قفل کردن یادگیری خودکار (فقط مدیر اصلی)"""
@@ -745,9 +754,22 @@ from telegram.ext import (
 )
 
 HELP_FILE = "custom_help.txt"
+# ======================= 💡 پاسخ هوشمند پیش‌فرض =======================
+def smart_response(text: str, uid: int) -> str:
+    """پاسخ ساده در صورتی که پاسخی در حافظه نباشد"""
+    basic_responses = [
+        "جالبه 🤔 بگو بیشتر بدونم!",
+        "نمیدونم دقیق منظورت چیه، ولی دارم یاد می‌گیرم 🤖",
+        "می‌تونی یه کم واضح‌تر بگی؟ 🌸",
+        "هوم... اینو باید تو حافظه‌م ثبت کنم 📚",
+        "عه چه جالب 😄"
+    ]
+    return random.choice(basic_responses)
+
 
 # ======================= 💬 پاسخ‌دهی هوشمند اصلی =======================
 async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
     """پاسخ‌دهی اصلی هوش مصنوعی خنگول"""
     if not update.message or not update.message.text:
         return
