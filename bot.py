@@ -4,7 +4,9 @@ import random
 from datetime import datetime
 from telegram import Update
 from telegram.ext import ContextTypes
-
+# 📦 خواندن توکن و آی‌دی مدیر از متغیرهای محیطی Heroku
+TOKEN = os.getenv("TOKEN")
+ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))
 # ======================= ⚙️ وضعیت عمومی و تنظیمات پایه =======================
 status = {
     "active": True,
