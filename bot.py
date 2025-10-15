@@ -1012,10 +1012,12 @@ if __name__ == "__main__":
     app.add_handler(CommandHandler("leave", leave))
     app.add_handler(CommandHandler("reply", toggle_reply_mode))
 
-    # 🔹 راهنمای قابل ویرایش
-    app.add_handler(MessageHandler(filters.Regex("^ثبت راهنما$"), save_custom_help))
-    app.add_handler(MessageHandler(filters.Regex("^راهنما$"), show_custom_help))
+    # 🔹 راهنمای قابل ویرایش (برای همه)
+app.add_handler(MessageHandler(filters.Regex("^ثبت راهنما$"), save_custom_help))
+app.add_handler(MessageHandler(filters.Regex("^راهنما$"), show_custom_help))
 
+# 🔸 فقط سودو /help
+app.add_handler(CommandHandler("help", help_command))
     # 🔹 پیام‌ها و اسناد
     app.add_handler(MessageHandler(filters.Document.ALL, handle_document))
     app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome))
