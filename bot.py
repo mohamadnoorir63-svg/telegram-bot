@@ -21,6 +21,7 @@ from memory_manager import (
 from jokes_manager import save_joke, list_jokes
 from fortune_manager import save_fortune, list_fortunes
 from group_manager import register_group_activity, get_group_stats
+from reply_panel import add_reply_command, message_collector, button_handler, auto_reply
 from ai_learning import auto_learn_from_text
 from smart_reply import detect_emotion, smart_response
 from emotion_memory import remember_emotion, get_last_emotion, emotion_context_reply
@@ -1084,7 +1085,11 @@ app.add_handler(CommandHandler("broadcast", broadcast))
 app.add_handler(CommandHandler("cloudsync", cloudsync))
 app.add_handler(CommandHandler("leave", leave))
 app.add_handler(CommandHandler("reply", toggle_reply_mode))
-
+# 🔹 افزودن پاسخ و پنل
+app.add_handler(CommandHandler("افزودن", add_reply_command))
+app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, message_collector))
+app.add_handler(CallbackQueryHandler(button_handler))
+app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, auto_reply))
 # 🔹 راهنمای قابل ویرایش (برای همه)
 app.add_handler(MessageHandler(filters.Regex("^ثبت راهنما$"), save_custom_help))
 app.add_handler(MessageHandler(filters.Regex("^راهنما$"), show_custom_help))
