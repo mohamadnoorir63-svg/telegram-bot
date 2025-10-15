@@ -12,7 +12,7 @@ from telegram.ext import (
     filters
 )
 from telegram.ext import CallbackQueryHandler
-)
+
 import aiofiles
 
 # 📦 ماژول‌ها
