@@ -153,10 +153,10 @@ async def mode_change(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def toggle(update: Update, context: ContextTypes.DEFAULT_TYPE):
     status["active"] = not status["active"]
     await update.message.reply_text("✅ فعال شد!" if status["active"] else "😴 خاموش شد!")
-
 async def toggle_welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
     status["welcome"] = not status["welcome"]
     await update.message.reply_text("👋 خوشامد فعال شد!" if status["welcome"] else "🚫 خوشامد غیرفعال شد!")
+    
 
 async def lock_learning(update: Update, context: ContextTypes.DEFAULT_TYPE):
     status["locked"] = True
