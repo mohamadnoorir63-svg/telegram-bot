@@ -235,10 +235,56 @@ async def fullstats(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ======================= 👋 خوشامد با عکس پروفایل =======================
 async def welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """ارسال پیام خوشامد با عکس پروفایل"""
+    """ارسال پیام خوشامد با تشخیص سازنده (سودو) و عکس پروفایل"""
+    import json, os
+
+    for member in update.message.new_chat_members:
+        # 👑 تشخیص ورود سازنده (سودو)
+        if member.id == ADMIN_ID:
+            record_file = "creator_entries.json"
+            try:
+                # بررسی و ذخیره‌ی تاریخ ورود
+                if os.path.exists(record_file):
+                    with open(record_file, "r", encoding="utf-8") as f:
+                        record = json.load(f)
+                else:
+                    record = {}
+
+                group_id = str(update.effective_chat.id)
+                now = datetime.now().strftime("%Y-%m-%d %H:%M")
+
+                # اگر قبلاً وارد شده بود → پیام بازگشت
+                if group_id in record:
+                    msg = (
+                        "⚡ سیستم مرکزی به‌روزرسانی شد.\n"
+                        "👑 سازنده‌ی اصلی به گروه بازگشت!\n\n"
+                        f"🕓 زمان ورود مجدد: {now}"
+                    )
+                else:
+                    msg = (
+                        "🕶️ حضور چهره‌ی اصلی سیستم شناسایی شد...\n"
+                        "⚡ قدرت مرکزی ربات فعال گردید.\n\n"
+                        "👑 خوش آمدی *سازنده اصلی خنگول*.\n"
+                        "تمام ماژول‌ها در حالت احترام کامل قرار گرفتند 💠\n\n"
+                        f"🕓 زمان ورود اول: {now}"
+                    )
+                    record[group_id] = now
+
+                with open(record_file, "w", encoding="utf-8") as f:
+                    json.dump(record, f, ensure_ascii=False, indent=2)
+
+                await update.message.reply_text(msg, parse_mode="Markdown")
+                return  # فقط پیام مخصوص سازنده ارسال شود
+
+            except Exception as e:
+                await update.message.reply_text(f"⚠️ خطا در خوشامد سازنده: {e}")
+                return
+
+    # 🚫 اگر خوشامد خاموش است، برای بقیه کاری نکن
     if not status["welcome"]:
         return
 
+    # 👋 خوشامد برای سایر اعضا
     for member in update.message.new_chat_members:
         now = datetime.now().strftime("%Y-%m-%d %H:%M")
         text = (
@@ -247,7 +293,6 @@ async def welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"🏠 گروه: {update.message.chat.title}\n"
             f"😄 امیدوارم لحظات خوبی داشته باشی!"
         )
-
         try:
             photos = await context.bot.get_user_profile_photos(member.id, limit=1)
             if photos.total_count > 0:
@@ -256,7 +301,8 @@ async def welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
             else:
                 await update.message.reply_text(text)
         except Exception:
-            await update.message.reply_text(text)# ======================= 👤 ثبت خودکار کاربران =======================
+            await update.message.reply_text(text)
+# ======================= 👤 ثبت خودکار کاربران =======================
 def register_user(user_id):
     """ثبت کاربر در فایل memory.json"""
     data = load_data("memory.json")
