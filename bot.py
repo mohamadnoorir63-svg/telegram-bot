@@ -902,6 +902,9 @@ if __name__ == "__main__":
     app.add_handler(CommandHandler("welcome", toggle_welcome))
     app.add_handler(CommandHandler("lock", lock_learning))
     app.add_handler(CommandHandler("unlock", unlock_learning))
+    # 🔹 فعال/غیرفعال کردن ریپلی مود
+    app.add_handler(CommandHandler("reply", toggle_reply_mode))
+    app.add_handler(MessageHandler(filters.Regex("^ریپلی$"), toggle_reply_mode))
     app.add_handler(CommandHandler("mode", mode_change))
     app.add_handler(CommandHandler("stats", stats))
     app.add_handler(CommandHandler("fullstats", fullstats))
