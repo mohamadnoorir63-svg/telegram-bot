@@ -1086,7 +1086,7 @@ app.add_handler(CommandHandler("cloudsync", cloudsync))
 app.add_handler(CommandHandler("leave", leave))
 app.add_handler(CommandHandler("reply", toggle_reply_mode))
 # 🔹 افزودن پاسخ و پنل
-app.add_handler(CommandHandler("افزودن", add_reply_command))
+app.add_handler(MessageHandler(filters.Regex("^افزودن$"), add_reply_command))
 app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, message_collector))
 app.add_handler(CallbackQueryHandler(button_handler))
 app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, auto_reply))
