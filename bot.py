@@ -37,7 +37,36 @@ status = {
     "welcome": True,
     "locked": False
 }
+# ======================= 💬 ریپلی مود =======================
+REPLY_FILE = "reply_status.json"
 
+def load_reply_status():
+    """وضعیت ریپلی را از فایل بخوان"""
+    if os.path.exists(REPLY_FILE):
+        try:
+            import json
+            with open(REPLY_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except:
+            return {"enabled": False}
+    return {"enabled": False}
+
+def save_reply_status(data):
+    """ذخیره وضعیت ریپلی در فایل"""
+    import json
+    with open(REPLY_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
+reply_status = load_reply_status()
+
+async def toggle_reply_mode(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """تغییر وضعیت ریپلی مود"""
+    reply_status["enabled"] = not reply_status.get("enabled", False)
+    save_reply_status(reply_status)
+    if reply_status["enabled"]:
+        await update.message.reply_text("💬 ریپلی مود فعال شد!\nفقط با ریپلای به پیام‌های من چت کن 😄")
+    else:
+        await update.message.reply_text("🗨️ ریپلی مود غیرفعال شد!\nالان به همه پیام‌ها جواب می‌دم 😎")
 # ======================= ✳️ شروع و پیام فعال‌سازی =======================
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
@@ -384,6 +413,14 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
     uid = update.effective_user.id
     chat_id = update.effective_chat.id
+# 🧠 بررسی حالت ریپلی مود
+    if reply_status.get("enabled"):
+        # اگه کسی گفت "خنگول کجایی؟"
+        if text.lower() in ["خنگول کجایی", "خنگول کجایی؟", "کجایی خنگول"]:
+            return await update.message.reply_text("😄 من اینجام! برای صحبت، فقط روی پیام‌هام ریپلای کن 💬")
+        # فقط به پیام‌هایی که به خودش ریپلای شده پاسخ بده
+        if not update.message.reply_to_message or update.message.reply_to_message.from_user.id != context.bot.id:
+            return
 
     # ثبت کاربر و گروه
     register_user(uid)
@@ -852,6 +889,7 @@ if __name__ == "__main__":
     app.add_handler(CommandHandler("cloudsync", cloudsync))
     app.add_handler(CommandHandler("leave", leave))
 
+app.add_handler(CommandHandler("reply", toggle_reply_mode))
     # 🔹 راهنمای قابل ویرایش
     app.add_handler(MessageHandler(filters.Regex("^ثبت راهنما$"), save_custom_help))
     app.add_handler(MessageHandler(filters.Regex("^راهنما$"), show_custom_help))
