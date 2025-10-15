@@ -177,8 +177,16 @@ welcome_status = load_welcome_status()
 
 # ======================= ⚙️ کنترل وضعیت =======================
 async def toggle(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """روشن/خاموش کردن ربات — فقط برای سودو"""
+    user = update.effective_user
+
+    # فقط سودو اجازه داره
+    if user.id != ADMIN_ID:
+        return await update.message.reply_text("⛔ فقط مدیر اصلی می‌تونه ربات رو روشن یا خاموش کنه!")
+
+    # تغییر وضعیت
     status["active"] = not status["active"]
-    await update.message.reply_text("✅ فعال شد!" if status["active"] else "😴 خاموش شد!")
+    await update.message.reply_text("✅ ربات فعال شد!" if status["active"] else "😴 ربات خاموش شد!")
 async def toggle_welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """روشن/خاموش کردن خوشامد برای هر گروه به‌صورت جداگانه (فقط مدیران و سودو)"""
 
