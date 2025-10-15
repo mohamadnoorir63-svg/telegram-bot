@@ -114,11 +114,36 @@ async def handle_error(update: object, context: ContextTypes.DEFAULT_TYPE):
     except:
         pass
 
-# ======================= 📘 راهنمای قابل ویرایش =======================
+# ======================= 📘 راهنمای عمومی و مخصوص سودو =======================
 HELP_FILE = "custom_help.txt"
 
+# 🧩 راهنمای مخصوص سودو (/help)
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """دستور /help و واژه 'راهنما' از فایل custom_help.txt بخونن"""
+    """راهنمای مخصوص مدیر اصلی (ADMIN_ID)"""
+    if update.effective_user.id != ADMIN_ID:
+        return await update.message.reply_text("⛔ فقط مدیر اصلی اجازه دسترسی به /help رو داره!")
+
+    text = (
+        "🧠 دستورات مخصوص مدیر اصلی:\n\n"
+        "/toggle - روشن/خاموش کردن ربات\n"
+        "/welcome - فعال/غیرفعال کردن خوشامد گروه\n"
+        "/reply - تغییر حالت ریپلی مود گروه\n"
+        "/lock /unlock - قفل یا باز کردن یادگیری\n"
+        "/backup /restore - بک‌آپ یا بازیابی داده‌ها\n"
+        "/reset - پاک کردن کامل حافظه\n"
+        "/reload - بارگذاری مجدد حافظه\n"
+        "/broadcast [متن] - ارسال پیام همگانی\n"
+        "/cloudsync - بک‌آپ ابری برای مدیر\n"
+        "/leave - خروج از گروه\n\n"
+        "⚙️ نسخه Cloud+ Supreme Pro Stable+"
+    )
+
+    await update.message.reply_text(text)
+
+
+# 📘 راهنمای قابل ویرایش (برای همه کاربران)
+async def show_custom_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """نمایش متن راهنما از فایل custom_help.txt"""
     if not os.path.exists(HELP_FILE):
         return await update.message.reply_text(
             "ℹ️ هنوز هیچ متنی برای راهنما ثبت نشده.\n"
@@ -127,21 +152,22 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     async with aiofiles.open(HELP_FILE, "r", encoding="utf-8") as f:
         text = await f.read()
     await update.message.reply_text(text)
-    
+
+
+# ✏️ ذخیره راهنما با ریپلای (فقط برای ADMIN_ID)
 async def save_custom_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """ذخیره متن راهنما با ریپلای (فقط توسط ADMIN_ID)"""
+    """ذخیره یا ویرایش راهنمای عمومی"""
     if update.effective_user.id != ADMIN_ID:
         return await update.message.reply_text("⛔ فقط مدیر اصلی می‌تونه راهنما رو تنظیم کنه!")
 
     if not update.message.reply_to_message or not update.message.reply_to_message.text:
-        return await update.message.reply_text("❗ برای ثبت راهنما باید روی یک پیام متنی ریپلای کنی!")
+        return await update.message.reply_text("❗ باید روی یک پیام متنی ریپلای کنی تا به عنوان راهنما ذخیره بشه!")
 
     text = update.message.reply_to_message.text
     async with aiofiles.open(HELP_FILE, "w", encoding="utf-8") as f:
         await f.write(text)
 
     await update.message.reply_text("✅ متن راهنما با موفقیت ذخیره شد!")
-
 # ======================= 🎭 تغییر مود =======================
 async def mode_change(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.args:
