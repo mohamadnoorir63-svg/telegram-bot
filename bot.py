@@ -524,7 +524,8 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
     uid = update.effective_user.id
     chat_id = update.effective_chat.id
-# 🧠 بررسی حالت ریپلی مود مخصوص هر گروه
+    
+    # 🧠 بررسی حالت ریپلی مود مخصوص هر گروه
 chat_key = str(chat_id)
 if reply_status.get(chat_key, False):
     # اگه کسی گفت "خنگول کجایی؟"
@@ -534,6 +535,7 @@ if reply_status.get(chat_key, False):
     # فقط به پیام‌هایی جواب بده که ریپلای خودش هستن
     if not update.message.reply_to_message or update.message.reply_to_message.from_user.id != context.bot.id:
         return
+
 
     # ثبت کاربر و گروه
     register_user(uid)
