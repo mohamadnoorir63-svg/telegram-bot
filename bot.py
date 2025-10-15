@@ -267,11 +267,13 @@ def get_reply(text):
     return None
 
 # ======================= 😂 جوک و 🔮 فال =======================
-def save_joke(update: Update):
-    """ثبت جوک جدید با ریپلای (پشتیبانی از متن، عکس، ویدیو، استیکر)"""
+
+import asyncio
+
+async def save_joke(update: Update):
     replied = update.message.reply_to_message
     if not replied:
-        return
+        return await update.message.reply_text("❗ باید روی یک پیام ریپلای کنی.")
 
     data = load_data("jokes.json")
     joke_id = str(len(data) + 1)
@@ -279,21 +281,22 @@ def save_joke(update: Update):
     if replied.text:
         data[joke_id] = {"type": "text", "value": replied.text}
     elif replied.photo:
-        file_id = replied.photo[-1].file_id
-        data[joke_id] = {"type": "photo", "value": file_id}
+        data[joke_id] = {"type": "photo", "value": replied.photo[-1].file_id}
     elif replied.video:
         data[joke_id] = {"type": "video", "value": replied.video.file_id}
     elif replied.sticker:
         data[joke_id] = {"type": "sticker", "value": replied.sticker.file_id}
+    else:
+        return await update.message.reply_text("❗ نوع پیام پشتیبانی نمی‌شود.")
 
     save_data("jokes.json", data)
-    return update.message.reply_text("😂 جوک جدید ذخیره شد!")
+    await update.message.reply_text("😂 جوک جدید ذخیره شد!")
 
-def save_fortune(update: Update):
-    """ثبت فال جدید با ریپلای"""
+
+async def save_fortune(update: Update):
     replied = update.message.reply_to_message
     if not replied:
-        return
+        return await update.message.reply_text("❗ باید روی یک پیام ریپلای کنی.")
 
     data = load_data("fortunes.json")
     fortune_id = str(len(data) + 1)
@@ -306,61 +309,57 @@ def save_fortune(update: Update):
         data[fortune_id] = {"type": "video", "value": replied.video.file_id}
     elif replied.sticker:
         data[fortune_id] = {"type": "sticker", "value": replied.sticker.file_id}
+    else:
+        return await update.message.reply_text("❗ نوع پیام پشتیبانی نمی‌شود.")
 
     save_data("fortunes.json", data)
-    return update.message.reply_text("🔮 فال جدید ذخیره شد!")
+    await update.message.reply_text("🔮 فال جدید ذخیره شد!")
+
 
 async def list_jokes(update: Update):
-    """نمایش لیست همه جوک‌ها"""
     data = load_data("jokes.json")
     if not data:
-        return await update.message.reply_text("📂 هیچ جوکی ثبت نشده 😅")
+        return await update.message.reply_text("📂 هنوز هیچ جوکی ثبت نشده 😅")
 
-    msg = "\n".join([f"{k}. {v.get('value', '')[:30]}..." for k, v in data.items()])
-    await update.message.reply_text("😂 لیست جوک‌ها:\n" + msg)
+    await update.message.reply_text("😂 لیست جوک‌ها:")
+
+    for k, v in data.items():
+        t, val = v.get("type"), v.get("value")
+        try:
+            if t == "text":
+                await update.message.reply_text(f"#{k}\n{val}")
+            elif t == "photo":
+                await update.message.reply_photo(val, caption=f"#{k}")
+            elif t == "video":
+                await update.message.reply_video(val, caption=f"#{k}")
+            elif t == "sticker":
+                await update.message.reply_sticker(val)
+            await asyncio.sleep(0.3)
+        except Exception as e:
+            await update.message.reply_text(f"⚠️ خطا در نمایش جوک {k}: {e}")
+
 
 async def list_fortunes(update: Update):
-    """نمایش لیست فال‌ها"""
     data = load_data("fortunes.json")
     if not data:
         return await update.message.reply_text("📂 هنوز هیچ فالی ثبت نشده 😔")
 
-    msg = "\n".join([f"{k}. {v.get('value', '')[:30]}..." for k, v in data.items()])
-    await update.message.reply_text("🔮 لیست فال‌ها:\n" + msg)
+    await update.message.reply_text("🔮 لیست فال‌ها:")
 
-async def delete_joke(update: Update):
-    """حذف جوک با ریپلای"""
-    replied = update.message.reply_to_message
-    if not replied:
-        return await update.message.reply_text("❗ باید روی جوک ریپلای کنی برای حذف.")
-    data = load_data("jokes.json")
-    to_delete = None
     for k, v in data.items():
-        if v.get("value") == replied.text:
-            to_delete = k
-            break
-    if not to_delete:
-        return await update.message.reply_text("❌ جوک پیدا نشد.")
-    del data[to_delete]
-    save_data("jokes.json", data)
-    await update.message.reply_text("🗑️ جوک حذف شد!")
-
-async def delete_fortune(update: Update):
-    """حذف فال با ریپلای"""
-    replied = update.message.reply_to_message
-    if not replied:
-        return await update.message.reply_text("❗ باید روی فال ریپلای کنی برای حذف.")
-    data = load_data("fortunes.json")
-    to_delete = None
-    for k, v in data.items():
-        if v.get("value") == replied.text:
-            to_delete = k
-            break
-    if not to_delete:
-        return await update.message.reply_text("❌ فال پیدا نشد.")
-    del data[to_delete]
-    save_data("fortunes.json", data)
-    await update.message.reply_text("🗑️ فال حذف شد!")
+        t, val = v.get("type"), v.get("value")
+        try:
+            if t == "text":
+                await update.message.reply_text(f"#{k}\n{val}")
+            elif t == "photo":
+                await update.message.reply_photo(val, caption=f"#{k}")
+            elif t == "video":
+                await update.message.reply_video(val, caption=f"#{k}")
+            elif t == "sticker":
+                await update.message.reply_sticker(val)
+            await asyncio.sleep(0.3)
+        except Exception as e:
+            await update.message.reply_text(f"⚠️ خطا در نمایش فال {k}: {e}")
 
 # ======================= 🧮 محاسبه درصد هوش =======================
 async def show_intelligence(update: Update):
@@ -773,10 +772,12 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return await list_fortunes(update)
     if text.lower() == "جمله بساز":
         return await update.message.reply_text(generate_sentence())
-    if text.lower() == "ثبت جوک" and update.message.reply_to_message:
-        return save_joke(update)
+
+if text.lower() == "ثبت جوک" and update.message.reply_to_message:
+        return await save_joke(update)
     if text.lower() == "ثبت فال" and update.message.reply_to_message:
-        return save_fortune(update)
+        return await save_fortune(update)
+
     if text.lower() == "حذف جوک" and update.message.reply_to_message:
         return await delete_joke(update)
     if text.lower() == "حذف فال" and update.message.reply_to_message:
