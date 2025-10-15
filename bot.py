@@ -888,8 +888,8 @@ if __name__ == "__main__":
     app.add_handler(CommandHandler("broadcast", broadcast))
     app.add_handler(CommandHandler("cloudsync", cloudsync))
     app.add_handler(CommandHandler("leave", leave))
+    app.add_handler(CommandHandler("reply", toggle_reply_mode))
 
-app.add_handler(CommandHandler("reply", toggle_reply_mode))
     # 🔹 راهنمای قابل ویرایش
     app.add_handler(MessageHandler(filters.Regex("^ثبت راهنما$"), save_custom_help))
     app.add_handler(MessageHandler(filters.Regex("^راهنما$"), show_custom_help))
@@ -899,7 +899,7 @@ app.add_handler(CommandHandler("reply", toggle_reply_mode))
     app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, reply))
 
-# 🔹 هنگام استارت
+    # 🔹 هنگام استارت
     async def on_startup(app):
         await notify_admin_on_startup(app)
         app.create_task(auto_backup(app.bot))
