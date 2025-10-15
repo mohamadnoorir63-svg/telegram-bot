@@ -41,46 +41,52 @@ status = {
 REPLY_FILE = "reply_status.json"
 
 def load_reply_status():
-    """وضعیت ریپلی را از فایل بخوان"""
+    """خواندن وضعیت ریپلی مود برای همه گروه‌ها"""
     if os.path.exists(REPLY_FILE):
         try:
             import json
             with open(REPLY_FILE, "r", encoding="utf-8") as f:
                 return json.load(f)
         except:
-            return {"enabled": False}
-    return {"enabled": False}
+            return {}
+    return {}
 
 def save_reply_status(data):
-    """ذخیره وضعیت ریپلی در فایل"""
+    """ذخیره وضعیت ریپلی مود برای همه گروه‌ها"""
     import json
     with open(REPLY_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
 reply_status = load_reply_status()
-async def toggle_reply_mode(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """تغییر وضعیت ریپلی مود — فقط برای سودو یا مدیران گروه"""
 
+async def toggle_reply_mode(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """تغییر وضعیت ریپلی مود به‌صورت جداگانه برای هر گروه (فقط مدیران و سودو)"""
     user = update.effective_user
     chat = update.effective_chat
+    chat_id = str(chat.id)
 
-    # ✅ بررسی دسترسی: سودو یا مدیر
+    # فقط داخل گروه مجاز است
+    if chat.type == "private":
+        return await update.message.reply_text("⛔ فقط داخل گروه می‌تونی ریپلی مود رو تغییر بدی!")
+
+    # بررسی دسترسی (سودو یا مدیر)
     if user.id != ADMIN_ID:
         try:
             member = await context.bot.get_chat_member(chat.id, user.id)
             if member.status not in ["administrator", "creator"]:
-                return await update.message.reply_text("⛔ فقط مدیران یا سودو اجازه تغییر ریپلی مود را دارند!")
-        except Exception:
-            return await update.message.reply_text("⚠️ خطا در بررسی دسترسی مدیر!")
+                return await update.message.reply_text("⛔ فقط مدیران یا سودو می‌تونن ریپلی مود رو روشن یا خاموش کنن!")
+        except Exception as e:
+            return await update.message.reply_text(f"⚠️ خطا در بررسی دسترسی: {e}")
 
-    # ✅ تغییر وضعیت ریپلی مود
-    reply_status["enabled"] = not reply_status.get("enabled", False)
+    # تغییر وضعیت مخصوص همین گروه
+    current = reply_status.get(chat_id, False)
+    reply_status[chat_id] = not current
     save_reply_status(reply_status)
 
-    if reply_status["enabled"]:
-        await update.message.reply_text("💬 ریپلی مود فعال شد!\nفقط با ریپلای به پیام‌های من چت کن 😄")
+    if reply_status[chat_id]:
+        await update.message.reply_text("💬 ریپلی مود برای این گروه *فعال* شد ✅", parse_mode="Markdown")
     else:
-        await update.message.reply_text("🗨️ ریپلی مود غیرفعال شد!\nالان به همه پیام‌ها جواب می‌دم 😎")
+        await update.message.reply_text("🗨️ ریپلی مود برای این گروه *غیرفعال* شد ❌", parse_mode="Markdown")
 
 # ======================= ✳️ شروع و پیام فعال‌سازی =======================
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
