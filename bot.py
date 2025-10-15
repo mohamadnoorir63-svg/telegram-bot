@@ -1087,11 +1087,12 @@ app.add_handler(CommandHandler("broadcast", broadcast))
 app.add_handler(CommandHandler("cloudsync", cloudsync))
 app.add_handler(CommandHandler("leave", leave))
 app.add_handler(CommandHandler("reply", toggle_reply_mode))
+
 # 🔹 افزودن پاسخ و پنل
 app.add_handler(MessageHandler(filters.Regex("^افزودن$"), add_reply_command))
 app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, message_collector))
 app.add_handler(CallbackQueryHandler(button_handler))
-app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, auto_reply))
+
 # 🔹 راهنمای قابل ویرایش (برای همه)
 app.add_handler(MessageHandler(filters.Regex("^ثبت راهنما$"), save_custom_help))
 app.add_handler(MessageHandler(filters.Regex("^راهنما$"), show_custom_help))
@@ -1102,7 +1103,12 @@ app.add_handler(CommandHandler("help", help_command))
 # 🔹 پیام‌ها و اسناد
 app.add_handler(MessageHandler(filters.Document.ALL, handle_document))
 app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome))
+
+# ⚙️ پاسخ هوشمند و گفت‌وگو
 app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, reply))
+
+# ⚙️ در پایان — پاسخ خودکار (باید آخر باشد)
+app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, auto_reply))
 
 # 🔹 هنگام استارت
 async def on_startup(app):
