@@ -127,7 +127,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     async with aiofiles.open(HELP_FILE, "r", encoding="utf-8") as f:
         text = await f.read()
     await update.message.reply_text(text)
-
+    
 async def save_custom_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """ذخیره متن راهنما با ریپلای (فقط توسط ADMIN_ID)"""
     if update.effective_user.id != ADMIN_ID:
