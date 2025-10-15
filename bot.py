@@ -154,9 +154,33 @@ async def toggle(update: Update, context: ContextTypes.DEFAULT_TYPE):
     status["active"] = not status["active"]
     await update.message.reply_text("✅ فعال شد!" if status["active"] else "😴 خاموش شد!")
 async def toggle_welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    status["welcome"] = not status["welcome"]
-    await update.message.reply_text("👋 خوشامد فعال شد!" if status["welcome"] else "🚫 خوشامد غیرفعال شد!")
-    
+    """روشن/خاموش کردن خوشامد برای هر گروه به‌صورت جداگانه (فقط مدیران و سودو)"""
+
+    user = update.effective_user
+    chat = update.effective_chat
+    chat_id = str(chat.id)
+
+    # 🧩 فقط مدیران یا سودو
+    if chat.type == "private":
+        return await update.message.reply_text("⛔ فقط داخل گروه می‌تونی خوشامد رو تنظیم کنی!")
+
+    if user.id != ADMIN_ID:
+        try:
+            member = await context.bot.get_chat_member(chat.id, user.id)
+            if member.status not in ["administrator", "creator"]:
+                return await update.message.reply_text("⛔ فقط مدیران یا سودو می‌تونن خوشامد رو روشن یا خاموش کنن!")
+        except Exception as e:
+            return await update.message.reply_text(f"⚠️ خطا در بررسی دسترسی: {e}")
+
+    # 🔄 تغییر وضعیت مخصوص همین گروه
+    current = welcome_status.get(chat_id, True)
+    welcome_status[chat_id] = not current
+    save_welcome_status(welcome_status)
+
+    if welcome_status[chat_id]:
+        await update.message.reply_text("👋 خوشامد برای این گروه *فعال* شد ✅", parse_mode="Markdown")
+    else:
+        await update.message.reply_text("🚫 خوشامد برای این گروه *غیرفعال* شد ❌", parse_mode="Markdown")
 
 async def lock_learning(update: Update, context: ContextTypes.DEFAULT_TYPE):
     status["locked"] = True
