@@ -63,7 +63,7 @@ async def toggle_reply_mode(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """تغییر وضعیت ریپلی مود به‌صورت جداگانه برای هر گروه (فقط مدیران و سودو)"""
     user = update.effective_user
     chat = update.effective_chat
-    chat_id = str(chat.id)
+    chat_id_str = str(chat.id)
 
     # فقط داخل گروه مجاز است
     if chat.type == "private":
@@ -79,15 +79,14 @@ async def toggle_reply_mode(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return await update.message.reply_text(f"⚠️ خطا در بررسی دسترسی: {e}")
 
     # تغییر وضعیت مخصوص همین گروه
-    current = reply_status.get(chat_id, False)
-    reply_status[chat_id] = not current
+    current = reply_status.get(chat_id_str, False)
+    reply_status[chat_id_str] = not current
     save_reply_status(reply_status)
 
-    if reply_status[chat_id]:
+    if reply_status[chat_id_str]:
         await update.message.reply_text("💬 ریپلی مود برای این گروه *فعال* شد ✅", parse_mode="Markdown")
     else:
         await update.message.reply_text("🗨️ ریپلی مود برای این گروه *غیرفعال* شد ❌", parse_mode="Markdown")
-
 # ======================= ✳️ شروع و پیام فعال‌سازی =======================
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
