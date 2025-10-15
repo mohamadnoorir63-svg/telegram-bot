@@ -87,12 +87,59 @@ async def toggle_reply_mode(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("💬 ریپلی مود برای این گروه *فعال* شد ✅", parse_mode="Markdown")
     else:
         await update.message.reply_text("🗨️ ریپلی مود برای این گروه *غیرفعال* شد ❌", parse_mode="Markdown")
-# ======================= ✳️ شروع و پیام فعال‌سازی =======================
+from telegram import InlineKeyboardMarkup, InlineKeyboardButton, InputFile
+import os
+
+# ======================= ✳️ پنل شروع مخصوص خنگول =======================
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(
-        "🤖 خنگول فارسی 8.5.1 Cloud+ Supreme Pro Stable+\n"
-        "📘 برای دیدن لیست دستورات بنویس: راهنما"
+    """پنل ساده و حرفه‌ای — افزودن به گروه یا پشتیبانی مستقیم"""
+
+    # 🔹 مسیر عکس لوگو
+    photo_path = "logo.jpg"
+    photo_link = "https://i.ibb.co/QmW8thT/robot-logo.jpg"
+
+    # 🔹 دکمه‌ها
+    keyboard = [
+        [
+            InlineKeyboardButton(
+                "➕ افزودن به گروه",
+                url="https://t.me/Khenqol_bot?startgroup=true"  # لینک مستقیم ربات خودت
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                "💬 پشتیبانی (ارتباط با مدیر)",
+                url="https://t.me/NOORI_NOOR"  # لینک مستقیم پیوی خودت
+            )
+        ]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    # 🔹 متن پنل
+    text = (
+        "🤖 به *خنگول فارسی* خوش اومدی!\n\n"
+        "من یه ربات هوش مصنوعی هستم که می‌تونم حرف بزنم، یاد بگیرم و فال یا جوک بگم 😄\n\n"
+        "برای شروع، منو به گروهت اضافه کن یا مستقیم با پشتیبانی در تماس باش 👇"
     )
+
+    # 🔹 ارسال پنل
+    try:
+        if os.path.exists(photo_path):
+            await update.message.reply_photo(
+                photo=InputFile(photo_path),
+                caption=text,
+                parse_mode="Markdown",
+                reply_markup=reply_markup
+            )
+        else:
+            await update.message.reply_photo(
+                photo=photo_link,
+                caption=text,
+                parse_mode="Markdown",
+                reply_markup=reply_markup
+            )
+    except Exception:
+        await update.message.reply_text(text, parse_mode="Markdown", reply_markup=reply_markup)
 
 async def notify_admin_on_startup(app):
     """ارسال پیام فعال‌سازی به ادمین هنگام استارت"""
