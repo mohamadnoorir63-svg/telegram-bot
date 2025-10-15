@@ -148,6 +148,27 @@ async def mode_change(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"🎭 مود به {mood} تغییر کرد 😎")
     else:
         await update.message.reply_text("❌ مود نامعتبر است!")
+        # ======================= 👋 مدیریت خوشامد جدا برای هر گروه =======================
+WELCOME_FILE = "welcome_status.json"
+
+def load_welcome_status():
+    """خواندن وضعیت خوشامد برای هر گروه از فایل"""
+    import json, os
+    if os.path.exists(WELCOME_FILE):
+        try:
+            with open(WELCOME_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except:
+            return {}
+    return {}
+
+def save_welcome_status(data):
+    """ذخیره وضعیت خوشامد گروه‌ها در فایل"""
+    import json
+    with open(WELCOME_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
+welcome_status = load_welcome_status()
 
 # ======================= ⚙️ کنترل وضعیت =======================
 async def toggle(update: Update, context: ContextTypes.DEFAULT_TYPE):
