@@ -15,7 +15,10 @@ from telegram.ext import CallbackQueryHandler
 
 import aiofiles
 # 🧠 پنل پاسخ حرفه‌ای
-from reply_panel_pro import add_reply_command, message_collector, button_handler, auto_reply
+from reply_panel import *
+app.add_handler(CommandHandler("reply", add_reply_command))
+app.add_handler(MessageHandler(filters.ALL, message_collector))
+app.add_handler(CallbackQueryHandler(button_handler))
 
 # 📦 ماژول‌ها
 from memory_manager import (
