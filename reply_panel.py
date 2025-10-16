@@ -1,5 +1,6 @@
 # ========================= ✳️ Reply Panel Manager =========================
 # نسخه هماهنگ با Khenqol Cloud+ Supreme Pro 8.5.1
+# پشتیبانی از افزودن، حذف، و پاسخ خودکار + فرمت ریپلای و "="
 
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import ContextTypes
@@ -28,7 +29,7 @@ def save_replies(data):
         json.dump(data, f, ensure_ascii=False, indent=2)
 
 
-# ---------------------- 🎯 افزودن پاسخ (پشتیبانی از ریپلای و =) ----------------------
+# ---------------------- 🎯 افزودن پاسخ ----------------------
 async def add_reply_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """افزودن پاسخ جدید — پشتیبانی از ریپلای و فرمت <کلید>=<پاسخ>"""
     message = update.message
@@ -55,7 +56,7 @@ async def add_reply_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else:
             return await message.reply_text("⚠️ این پاسخ از قبل وجود دارد!")
 
-    # حالت ۲: ریپلای روی پیام
+    # حالت ۲: ریپلای روی پیام متنی
     if message.reply_to_message and text:
         key = text
         reply_text = message.reply_to_message.text.strip() if message.reply_to_message.text else ""
@@ -75,12 +76,44 @@ async def add_reply_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return await message.reply_text(
         "❗ استفاده صحیح:\n"
         "1️⃣ افزودن پاسخ <نام>=<پاسخ>\n"
-        "2️⃣ یا روی پیام ریپلای بزن و بنویس:\n"
+        "2️⃣ یا روی پیام متنی ریپلای بزن و بنویس:\n"
         "افزودن پاسخ <نام>"
     )
 
 
-# ---------------------- 📨 جمع‌آوری پاسخ موقت (در حالت قدیمی پنل) ----------------------
+# ---------------------- 🗑 حذف پاسخ ----------------------
+async def delete_reply_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """حذف تمام پاسخ‌های یک کلید"""
+    if not context.args:
+        return await update.message.reply_text("❗ استفاده صحیح: حذف پاسخ <نام>")
+
+    key = " ".join(context.args).strip()
+    data = load_replies()
+    replies = data.get("replies", {})
+
+    if key in replies:
+        del replies[key]
+        save_replies(data)
+        await update.message.reply_text(f"🗑 تمام پاسخ‌های '{key}' حذف شدند.")
+    else:
+        await update.message.reply_text(f"⚠️ پاسخی با نام '{key}' پیدا نشد.")
+
+
+# ---------------------- 💬 پاسخ خودکار ----------------------
+async def auto_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """ارسال پاسخ در صورت وجود کلید در memory.json"""
+    text = update.message.text.strip()
+    data = load_replies()
+    replies = data.get("replies", {})   # ← اصلاح‌شده (نه دوباره get روی data)
+
+    if text in replies:
+        options = replies[text]
+        if options:
+            reply = random.choice(options)
+            await update.message.reply_text(reply)
+
+
+# ---------------------- 🧮 پشتیبانی از پنل قدیمی (در صورت فعال بودن) ----------------------
 async def message_collector(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """جمع‌آوری پاسخ‌ها تا وقتی ذخیره زده شود"""
     if "reply_key" not in context.user_data:
@@ -96,8 +129,8 @@ async def message_collector(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(f"✅ پاسخ موقت برای '{key}' ذخیره شد.")
 
 
-# ---------------------- 🧮 دکمه‌های پنل ----------------------
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """مدیریت دکمه‌های پنل (برای حالت دستی قدیمی)"""
     query = update.callback_query
     await query.answer()
 
@@ -108,15 +141,12 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not key:
         return await query.edit_message_text("❌ هیچ کلیدی انتخاب نشده.")
 
-    # افزودن پاسخ تصادفی (از موقت)
     if query.data == "add_random":
         temp = context.user_data.get("reply_temp", [])
         if not temp:
             return await query.answer("⚠️ هنوز پاسخی اضافه نکردی!", show_alert=True)
 
-        if key not in replies:
-            replies[key] = []
-
+        replies.setdefault(key, [])
         for t in temp:
             if t not in replies[key]:
                 replies[key].append(t)
@@ -125,15 +155,12 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data["reply_temp"] = []
         await query.edit_message_text(f"🎲 پاسخ‌های تصادفی برای '{key}' ثبت شدند ✅")
 
-    # ذخیره پاسخ‌ها
     elif query.data == "save_reply":
         temp = context.user_data.get("reply_temp", [])
         if not temp:
             return await query.answer("⚠️ پاسخی برای ذخیره نیست!", show_alert=True)
 
-        if key not in replies:
-            replies[key] = []
-
+        replies.setdefault(key, [])
         for t in temp:
             if t not in replies[key]:
                 replies[key].append(t)
@@ -142,7 +169,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data.clear()
         await query.edit_message_text(f"✅ پاسخ برای '{key}' ذخیره شد و پنل بسته شد.")
 
-    # حذف پاسخ‌ها
     elif query.data == "delete_reply":
         if key in replies:
             del replies[key]
@@ -150,17 +176,3 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.edit_message_text(f"🗑 تمام پاسخ‌های '{key}' حذف شدند.")
         else:
             await query.answer("⚠️ پاسخی برای حذف وجود ندارد!")
-
-
-# ---------------------- 💬 پاسخ خودکار ----------------------
-async def auto_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """ارسال پاسخ در صورت وجود کلید در memory.json"""
-    text = update.message.text.strip()
-    data = load_replies().get("replies", {})
-
-    if text in data:
-        options = data[text]
-        if not options:
-            return
-        reply = random.choice(options)
-        await update.message.reply_text(reply)
