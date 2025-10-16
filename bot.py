@@ -1026,7 +1026,7 @@ if __name__ == "__main__":
     app.add_error_handler(handle_error)
 
 
-    # 🔹 دستورات اصلی
+# 🔹 دستورات اصلی
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("help", help_command))
     app.add_handler(CommandHandler("toggle", toggle))
@@ -1053,9 +1053,11 @@ if __name__ == "__main__":
     app.add_handler(MessageHandler(filters.Document.ALL, handle_document))
     app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, reply))
-# 🔹 پنل اصلی و قابلیت‌ها
-app.add_handler(MessageHandler(filters.Regex("^ثبت قابلیت$"), save_features))
-app.add_handler(CallbackQueryHandler(feature_button_handler, pattern="^feature_"))
+
+    # 🔹 پنل اصلی و قابلیت‌ها
+    app.add_handler(MessageHandler(filters.Regex("^ثبت قابلیت$"), save_features))
+    app.add_handler(CallbackQueryHandler(feature_button_handler, pattern="^feature_"))
+
     # 🔹 هنگام استارت
     async def on_startup(app):
         await notify_admin_on_startup(app)
