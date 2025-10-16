@@ -1091,8 +1091,8 @@ if __name__ == "__main__":
     app.add_handler(CommandHandler("reply", toggle_reply_mode))
 
     # 🧠 Reply Panel Pro++
-    app.add_handler(MessageHandler(filters.Regex("^افزودن پاسخ"), add_reply_command))
-    app.add_handler(MessageHandler(filters.Regex("^مدیریت پاسخ‌ها$"), manage_replies))
+    # app.add_handler(MessageHandler(filters.Regex("^مدیریت پاسخ‌ها$"), manage_replies))
+# app.add_handler(CallbackQueryHandler(start_edit_reply, pattern="^edit_"))
     app.add_handler(CallbackQueryHandler(button_handler))
     app.add_handler(CallbackQueryHandler(start_edit_reply, pattern="^edit_"))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, message_collector))
