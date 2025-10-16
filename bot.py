@@ -42,16 +42,44 @@ status = {
     "welcome": True,
     "locked": False
 }
+
+# ======================= 💬 ریپلی مود گروهی و محدود به مدیران =======================
+REPLY_FILE = "reply_status.json"
+
+def load_reply_status():
+    """خواندن وضعیت ریپلی مود برای تمام گروه‌ها"""
+    import json, os
+    if os.path.exists(REPLY_FILE):
+        try:
+            with open(REPLY_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except:
+            pass
+    return {}  # ساختار: { "group_id": {"enabled": True/False} }
+
+def save_reply_status(data):
+    """ذخیره وضعیت ریپلی برای همه گروه‌ها"""
+    import json
+    with open(REPLY_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
+reply_status = load_reply_status()
+
+def is_group_reply_enabled(chat_id):
+    """بررسی فعال بودن ریپلی مود در گروه خاص"""
+    return reply_status.get(str(chat_id), {}).get("enabled", False)
+
+
 async def toggle_reply_mode(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """تغییر وضعیت ریپلی مود — فقط برای مدیران گروه و سودو مجاز است"""
+    """تغییر وضعیت ریپلی مود — فقط مدیران گروه یا سودو مجازند"""
     chat = update.effective_chat
     user = update.effective_user
 
-    # چک اینکه داخل گروه هست یا نه
+    # فقط در گروه قابل استفاده است
     if chat.type not in ["group", "supergroup"]:
         return await update.message.reply_text("⚠️ فقط داخل گروه می‌تونی ریپلی مود رو تنظیم کنی!")
 
-    # بررسی سودو یا ادمین گروه
+    # بررسی سودو یا مدیر گروه بودن
     is_sudo_user = is_sudo(user.id)
     is_group_admin = False
 
@@ -65,7 +93,7 @@ async def toggle_reply_mode(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not (is_sudo_user or is_group_admin):
         return await update.message.reply_text("⛔ فقط مدیران گروه یا سودو می‌تونن این تنظیم رو تغییر بدن!")
 
-    # تغییر وضعیت فقط برای همان گروه
+    # تغییر وضعیت مخصوص همین گروه
     group_id = str(chat.id)
     current = reply_status.get(group_id, {}).get("enabled", False)
     reply_status[group_id] = {"enabled": not current}
@@ -75,7 +103,6 @@ async def toggle_reply_mode(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("💬 ریپلی مود در این گروه فعال شد!\nفقط با ریپلای به پیام‌های من چت کنید 😄")
     else:
         await update.message.reply_text("🗨️ ریپلی مود در این گروه غیرفعال شد!\nالان به همه پیام‌ها جواب می‌دم 😎")
-
 # ======================= ✳️ شروع و پیام فعال‌سازی =======================
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
