@@ -1065,7 +1065,7 @@ async def leave(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await context.bot.leave_chat(update.message.chat.id)
 
 if __name__ == "__main__":
-    print("🤖 خنگول فارسی 8.5.1 Cloud+ Supreme Pro Stable+ آماده به خدمت است ...")
+    print("🤖 خنگول فارسی 8.7 Cloud+ Supreme Pro Stable+ آماده به خدمت است ...")
 
     app = ApplicationBuilder().token(TOKEN).build()
     app.add_error_handler(handle_error)
@@ -1089,10 +1089,12 @@ if __name__ == "__main__":
     app.add_handler(CommandHandler("leave", leave))
     app.add_handler(CommandHandler("replymode", toggle_reply_mode))
 
-    # ======================= 🧠 Reply Panel Pro++ =======================
-    app.add_handler(CommandHandler("reply", add_reply_command))
-    app.add_handler(MessageHandler(filters.ALL, message_collector))
+    # ======================= 🧠 Reply Panel Pro++ (بدون /) =======================
+    # فعال‌سازی با نوشتن "Reply <کلمه>"
+    app.add_handler(MessageHandler(filters.Regex("^Reply"), add_reply_command))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, message_collector))
     app.add_handler(CallbackQueryHandler(button_handler))
+    app.add_handler(CallbackQueryHandler(start_edit_reply, pattern="^edit_"))
 
     # ======================= 📘 راهنمای قابل ویرایش =======================
     app.add_handler(MessageHandler(filters.Regex("^ثبت راهنما$"), save_custom_help))
@@ -1103,16 +1105,14 @@ if __name__ == "__main__":
     app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome))
 
     # ======================= ⚙️ مغز یادگیری و پاسخ =======================
-    # ⚙️ ابتدا پاسخ‌های گفت‌وگو و یادگیری
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, reply))
-    # ⚙️ سپس پاسخ خودکار هوشمند (پایان زنجیره)
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, auto_reply))
 
     # ======================= 🚀 هنگام استارت =======================
     async def on_startup(app):
         await notify_admin_on_startup(app)
         app.create_task(auto_backup(app.bot))
-        app.create_task(start_auto_brain_loop(app.bot))  # 🧠 مغز خودکار
+        app.create_task(start_auto_brain_loop(app.bot))
         print("🌙 [SYSTEM] Startup tasks scheduled ✅")
 
     app.post_init = on_startup
