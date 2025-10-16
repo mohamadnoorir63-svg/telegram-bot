@@ -458,6 +458,14 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ======================= 💬 پاسخ و هوش مصنوعی =======================
 async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # 🚫 جلوگیری از پاسخ در پیوی (فقط جوک و فال مجازند)
+    if update.effective_chat.type == "private":
+        text = update.message.text.strip().lower()
+        allowed = ["جوک", "فال"]
+
+        # اگه پیام جزو مجازها نیست، نادیده بگیر
+        if text not in allowed:
+            return
     """پاسخ‌دهی اصلی هوش مصنوعی و سیستم یادگیری"""
     if not update.message or not update.message.text:
         return
