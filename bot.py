@@ -1147,7 +1147,7 @@ app.add_handler(
         filters.TEXT
         & ~filters.COMMAND
         & ~filters.Regex(r"^Reply(\s|$)"),  # جلوگیری از تداخل با ساخت Reply جدید
-        reply
+        reply,
     ),
     group=0
 )
@@ -1157,7 +1157,7 @@ app.add_handler(
 app.add_handler(
     MessageHandler(
         filters.TEXT & ~filters.COMMAND,
-        rp_auto_reply
+        rp_auto_reply,
     ),
     group=1
 )
