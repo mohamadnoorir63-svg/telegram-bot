@@ -1612,7 +1612,8 @@ if __name__ == "__main__":
     app = ApplicationBuilder().token(TOKEN).build()
     app.add_error_handler(handle_error)
 
-    # =================== 🔒 Group Protector Handlers ===================
+    # =========================================================
+    # 🔒 محافظ گروه و دستورات مدیریتی
     app.add_handler(CommandHandler("ban", cmd_ban))
     app.add_handler(CommandHandler("unban", cmd_unban))
     app.add_handler(CommandHandler("kick", cmd_kick))
@@ -1627,17 +1628,12 @@ if __name__ == "__main__":
     app.add_handler(CommandHandler("alias", cmd_alias))
     app.add_handler(CommandHandler("unalias", cmd_unalias))
 
-    # 🧠 سیستم alias بدون / باید قبل از reply قرار بگیره
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, alias_message_router))
-
-    # ================================================================
-    # 🔹 دستورات اصلی
+    # =========================================================
+    # 🔹 دستورات اصلی ربات
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("help", help_command))
     app.add_handler(CommandHandler("toggle", toggle))
     app.add_handler(CommandHandler("welcome", toggle_welcome))
-    app.add_handler(CommandHandler("lock", lock_learning))
-    app.add_handler(CommandHandler("unlock", unlock_learning))
     app.add_handler(CommandHandler("mode", mode_change))
     app.add_handler(CommandHandler("stats", stats))
     app.add_handler(CommandHandler("fullstats", fullstats))
@@ -1650,30 +1646,35 @@ if __name__ == "__main__":
     app.add_handler(CommandHandler("leave", leave))
     app.add_handler(CommandHandler("reply", toggle_reply_mode))
 
-    # 🔹 پنل اصلی و قابلیت‌ها
-    app.add_handler(MessageHandler(filters.Regex("^ثبت قابلیت$"), save_features))
-    app.add_handler(CallbackQueryHandler(feature_button_handler, pattern="^feature_"))
-
-    # 🔹 سیستم خوشامد پویا و پنل گرافیکی
+    # =========================================================
+    # 👋 پنل خوشامد و تنظیمات ورود
     app.add_handler(MessageHandler(filters.Regex("^خوشامد$"), open_welcome_panel), group=-1)
     app.add_handler(CallbackQueryHandler(welcome_panel_buttons, pattern="^welcome_"), group=-1)
     app.add_handler(MessageHandler(filters.Regex("^ثبت خوشامد$"), set_welcome_text), group=-1)
     app.add_handler(MessageHandler(filters.Regex("^ثبت عکس خوشامد$"), set_welcome_media), group=-1)
-    app.add_handler(MessageHandler(filters.Regex(r"^تنظیم قوانین"), set_rules_link))
-    app.add_handler(MessageHandler(filters.Regex(r"^تنظیم حذف"), set_welcome_timer))
+    app.add_handler(MessageHandler(filters.Regex(r"^تنظیم قوانین"), set_rules_link), group=-1)
+    app.add_handler(MessageHandler(filters.Regex(r"^تنظیم حذف"), set_welcome_timer), group=-1)
     app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome), group=-1)
 
-    # 🔹 راهنمای قابل ویرایش
+    # =========================================================
+    # 📘 راهنمای قابل ویرایش
     app.add_handler(MessageHandler(filters.Regex("^ثبت راهنما$"), save_custom_help))
     app.add_handler(MessageHandler(filters.Regex("^راهنما$"), show_custom_help))
 
-    # 🔹 پیام‌ها و اسناد
+    # =========================================================
+    # 📁 اسناد و فایل‌ها
     app.add_handler(MessageHandler(filters.Document.ALL, handle_document))
 
-    # 🔹 هندلر عمومیِ آخر
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, reply))
+    # =========================================================
+    # ⚙️ alias router باید بعد از همه دستورها ولی قبل از reply باشه
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, alias_message_router), group=0)
 
-    # 🔹 هنگام استارت
+    # =========================================================
+    # 💬 ربات سخنگو (باید آخرین هندلر باشه)
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, reply), group=1)
+
+    # =========================================================
+    # 🌙 هنگام استارت
     async def on_startup(app):
         await notify_admin_on_startup(app)
         app.create_task(auto_backup(app.bot))
@@ -1682,4 +1683,3 @@ if __name__ == "__main__":
 
     app.post_init = on_startup
     app.run_polling(allowed_updates=Update.ALL_TYPES)
-    
