@@ -1091,31 +1091,31 @@ if __name__ == "__main__":
     app.add_handler(CommandHandler("reply", toggle_reply_mode))
 
     # 🧠 Reply Panel Pro++
-    # app.add_handler(MessageHandler(filters.Regex("^مدیریت پاسخ‌ها$"), manage_replies))
-# app.add_handler(CallbackQueryHandler(start_edit_reply, pattern="^edit_"))
+    app.add_handler(MessageHandler(filters.Regex("^افزودن پاسخ"), add_reply_command))
+    app.add_handler(MessageHandler(filters.Regex("^مدیریت پاسخ‌ها$"), manage_replies))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, message_collector))
     app.add_handler(CallbackQueryHandler(button_handler))
     app.add_handler(CallbackQueryHandler(start_edit_reply, pattern="^edit_"))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, message_collector))
 
-    # 🔹 راهنمای قابل ویرایش (برای همه)
+    # 🔹 راهنمای قابل ویرایش
     app.add_handler(MessageHandler(filters.Regex("^ثبت راهنما$"), save_custom_help))
     app.add_handler(MessageHandler(filters.Regex("^راهنما$"), show_custom_help))
 
-    # 🔹 پیام‌ها و اسناد
+    # 🔹 اسناد و عضویت جدید
     app.add_handler(MessageHandler(filters.Document.ALL, handle_document))
     app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome))
 
-    # ⚙️ پاسخ هوشمند و گفت‌وگو — این باید آخرین فیلتر متنی باشد!
+    # ⚙️ پاسخ هوشمند (مغز یادگیری)
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, reply))
 
-    # ⚙️ پاسخ خودکار (باید در انتها بیاد)
+    # ⚙️ پاسخ خودکار (پایانی‌ترین فیلتر)
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, auto_reply))
 
     # 🔹 هنگام استارت
     async def on_startup(app):
         await notify_admin_on_startup(app)
         app.create_task(auto_backup(app.bot))
-        app.create_task(start_auto_brain_loop(app.bot))  # 🧠 فعال‌سازی مغز خودکار
+        app.create_task(start_auto_brain_loop(app.bot))
         print("🌙 [SYSTEM] Startup tasks scheduled ✅")
 
     app.post_init = on_startup
