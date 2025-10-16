@@ -1071,7 +1071,7 @@ if __name__ == "__main__":
     app = ApplicationBuilder().token(TOKEN).build()
     app.add_error_handler(handle_error)
 
-    # 🔹 دستورات اصلی
+# 🔹 دستورات اصلی
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("help", help_command))
     app.add_handler(CommandHandler("toggle", toggle))
@@ -1104,6 +1104,9 @@ if __name__ == "__main__":
 
     # ⚙️ پاسخ هوشمند و گفت‌وگو — این باید آخرین فیلتر متنی باشد!
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, reply))
+
+    # ⚙️ پاسخ خودکار (باید در انتها بیاد)
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, auto_reply))
 
     # 🔹 هنگام استارت
     async def on_startup(app):
