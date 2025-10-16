@@ -119,6 +119,25 @@ async def handle_group_reply_mode(update: Update, context: ContextTypes.DEFAULT_
             if not update.message.reply_to_message or update.message.reply_to_message.from_user.id != context.bot.id:
                 return True  # یعنی بقیه تابع reply اجرا نشود
     return False
+# ======================= 🧾 ثبت کاربر =======================
+import json, os
+
+USERS_FILE = "users.json"
+
+async def register_user(user):
+    """ذخیره آیدی و نام کاربر در فایل users.json"""
+    data = []
+    if os.path.exists(USERS_FILE):
+        try:
+            with open(USERS_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+        except:
+            data = []
+
+    if user.id not in [u["id"] for u in data]:
+        data.append({"id": user.id, "name": user.first_name})
+        with open(USERS_FILE, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
 # ======================= ✳️ شروع و پیام فعال‌سازی =======================
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
