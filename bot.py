@@ -1611,24 +1611,26 @@ if __name__ == "__main__":
 
     app = ApplicationBuilder().token(TOKEN).build()
     app.add_error_handler(handle_error)
-# =================== 🔒 Group Protector Handlers ===================
-app.add_handler(CommandHandler("ban", cmd_ban))
-app.add_handler(CommandHandler("unban", cmd_unban))
-app.add_handler(CommandHandler("kick", cmd_kick))
-app.add_handler(CommandHandler("mute", cmd_mute))
-app.add_handler(CommandHandler("unmute", cmd_unmute))
-app.add_handler(CommandHandler("warn", cmd_warn))
-app.add_handler(CommandHandler("unwarn", cmd_unwarn))
-app.add_handler(CommandHandler("del", cmd_del))
-app.add_handler(CommandHandler("purge", cmd_purge))
-app.add_handler(CommandHandler("lock", cmd_lock))
-app.add_handler(CommandHandler("unlock", cmd_unlock))
-app.add_handler(CommandHandler("alias", cmd_alias))
-app.add_handler(CommandHandler("unalias", cmd_unalias))
 
-# 🧠 سیستم alias بدون / باید قبل از reply قرار بگیره
-app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, alias_message_router))
-# ================================================================
+    # =================== 🔒 Group Protector Handlers ===================
+    app.add_handler(CommandHandler("ban", cmd_ban))
+    app.add_handler(CommandHandler("unban", cmd_unban))
+    app.add_handler(CommandHandler("kick", cmd_kick))
+    app.add_handler(CommandHandler("mute", cmd_mute))
+    app.add_handler(CommandHandler("unmute", cmd_unmute))
+    app.add_handler(CommandHandler("warn", cmd_warn))
+    app.add_handler(CommandHandler("unwarn", cmd_unwarn))
+    app.add_handler(CommandHandler("del", cmd_del))
+    app.add_handler(CommandHandler("purge", cmd_purge))
+    app.add_handler(CommandHandler("lock", cmd_lock))
+    app.add_handler(CommandHandler("unlock", cmd_unlock))
+    app.add_handler(CommandHandler("alias", cmd_alias))
+    app.add_handler(CommandHandler("unalias", cmd_unalias))
+
+    # 🧠 سیستم alias بدون / باید قبل از reply قرار بگیره
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, alias_message_router))
+
+    # ================================================================
     # 🔹 دستورات اصلی
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("help", help_command))
@@ -1652,7 +1654,7 @@ app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, alias_message_ro
     app.add_handler(MessageHandler(filters.Regex("^ثبت قابلیت$"), save_features))
     app.add_handler(CallbackQueryHandler(feature_button_handler, pattern="^feature_"))
 
-    # 🔹 سیستم خوشامد پویا و پنل گرافیکی (⭐️ قبل از هندلر عمومی متن + با priority -1)
+    # 🔹 سیستم خوشامد پویا و پنل گرافیکی
     app.add_handler(MessageHandler(filters.Regex("^خوشامد$"), open_welcome_panel), group=-1)
     app.add_handler(CallbackQueryHandler(welcome_panel_buttons, pattern="^welcome_"), group=-1)
     app.add_handler(MessageHandler(filters.Regex("^ثبت خوشامد$"), set_welcome_text), group=-1)
@@ -1668,14 +1670,14 @@ app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, alias_message_ro
     # 🔹 پیام‌ها و اسناد
     app.add_handler(MessageHandler(filters.Document.ALL, handle_document))
 
-    # 🔹 هندلر عمومیِ آخر (بعد از همهٔ موارد اختصاصی)
+    # 🔹 هندلر عمومیِ آخر
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, reply))
 
     # 🔹 هنگام استارت
     async def on_startup(app):
         await notify_admin_on_startup(app)
         app.create_task(auto_backup(app.bot))
-        app.create_task(start_auto_brain_loop(app.bot))  # 🧠 فعال‌سازی مغز خودکار
+        app.create_task(start_auto_brain_loop(app.bot))
         print("🌙 [SYSTEM] Startup tasks scheduled ✅")
 
     app.post_init = on_startup
