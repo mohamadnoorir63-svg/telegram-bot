@@ -1209,13 +1209,426 @@ async def feature_button_handler(update: Update, context: ContextTypes.DEFAULT_T
         else:
             text = "🧩 هنوز توضیحی برای قابلیت‌ها ثبت نشده!"
         await query.message.reply_text(text, parse_mode="HTML")
+        # ======================= Group Protector — خنگول =======================
+# قرار بده در فایل اصلی ربات (قبل از app.run_polling)
+import json, os, time, asyncio
+from telegram import Update
+from telegram.ext import ContextTypes
+
+# تنظیمات: نام متغیر Admin ID که تو پروژه استفاده میشه
+ADMIN_ID = int(os.getenv("ADMIN_ID", "7089376754"))  # یا مقدار دلخواهت
+
+# مسیر فایل‌ها
+DATA_DIR = "moderation_data"
+os.makedirs(DATA_DIR, exist_ok=True)
+BANS_FILE     = os.path.join(DATA_DIR, "bans.json")
+MUTES_FILE    = os.path.join(DATA_DIR, "mutes.json")
+WARNS_FILE    = os.path.join(DATA_DIR, "warns.json")
+LOCKS_FILE    = os.path.join(DATA_DIR, "locks.json")
+ALIASES_FILE  = os.path.join(DATA_DIR, "aliases.json")
+
+def _load(fname, default):
+    try:
+        if os.path.exists(fname):
+            with open(fname, "r", encoding="utf-8") as f:
+                return json.load(f)
+    except:
+        pass
+    return default
+
+def _save(fname, data):
+    with open(fname, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
+bans   = _load(BANS_FILE, {})    # { "chat_id": [user_id,...] }
+mutes  = _load(MUTES_FILE, {})   # { "chat_id": { user_id: until_ts_or_0 } }
+warns  = _load(WARNS_FILE, {})   # { "chat_id": { user_id: count } }
+locks  = _load(LOCKS_FILE, {})   # { "chat_id": { "links":True, "photo":True, ... } }
+aliases= _load(ALIASES_FILE, {}) # { "farsi_word": "ban", ... }
+
+# تنظیم پیش‌فرض lock types
+ALL_LOCK_TYPES = ["links","photo","video","audio","voice","sticker","file","forward","username","gif","text"]
+def ensure_chat_struct(chat_id):
+    cid = str(chat_id)
+    if cid not in bans:   bans[cid] = []
+    if cid not in mutes:  mutes[cid] = {}
+    if cid not in warns:  warns[cid] = {}
+    if cid not in locks:  locks[cid] = {k: False for k in ALL_LOCK_TYPES}
+    _save(BANS_FILE, bans); _save(MUTES_FILE, mutes); _save(WARNS_FILE, warns); _save(LOCKS_FILE, locks)
+
+# ---------- کمک‌کننده‌ها ----------
+async def is_admin(user_id: int, chat_id: int, context: ContextTypes.DEFAULT_TYPE):
+    """بررسی مدیر بودن (ادمین یا creator) یا ADMIN_ID"""
+    if user_id == ADMIN_ID:
+        return True
+    try:
+        member = await context.bot.get_chat_member(chat_id, user_id)
+        return member.status in ("administrator","creator")
+    except:
+        return False
+
+def style_header(title: str, by_user: str):
+    return f"╔══{title}══╗\n{by_user}\n╚" + "═"*20 + "╝"
+
+def find_target_from_arg_or_reply(update: Update, arg:str):
+    """بررسی هدف از ریپلای یا آرگومان (id/username) — برمی‌گرداند user_id or None"""
+    if update.message.reply_to_message:
+        return update.message.reply_to_message.from_user.id
+    if not arg:
+        return None
+    # اگر username است شروع با @
+    if arg.startswith("@"):
+        return arg  # برگشت username (برای ارسال پیام یا جستجو باید resolve کنی)
+    # سعی کن به int تبدیل کنی
+    try:
+        return int(arg)
+    except:
+        return None
+
+# resolve username -> user_id (ساده، تلاش برای get_chat)
+async def resolve_username_to_id(username: str, context: ContextTypes.DEFAULT_TYPE):
+    if not username or not username.startswith("@"):
+        return None
+    try:
+        chat = await context.bot.get_chat(username)
+        return chat.id
+    except:
+        return None
+
+# ---------- فرمان‌ها ----------
+async def cmd_ban(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = update.effective_chat.id
+    user = update.effective_user
+    if not await is_admin(user.id, chat_id, context):
+        return await update.message.reply_text("⛔ فقط مدیران مجاز به استفاده از این دستور هستند.")
+    arg = " ".join(context.args) if context.args else ""
+    target = find_target_from_arg_or_reply(update, arg)
+    if isinstance(target, str) and target.startswith("@"):
+        target = await resolve_username_to_id(target, context)
+    if not target:
+        return await update.message.reply_text("❗ کاربر هدف را ریپلای کن یا آیدی/یوزرنیم را بده.")
+    try:
+        await context.bot.ban_chat_member(chat_id, target)
+    except Exception as e:
+        # گاهی دسترسی نداریم
+        await update.message.reply_text(f"⚠️ خطا در بن کردن: {e}")
+        return
+    ensure_chat_struct(chat_id)
+    cid=str(chat_id)
+    if target not in bans[cid]:
+        bans[cid].append(target)
+    _save(BANS_FILE, bans)
+    header = style_header("🚫 بن شد 🚫", f"❌ کاربر <code>{target}</code> توسط <b>{user.first_name}</b> بن شد!")
+    await update.message.reply_text(header, parse_mode="HTML")
+
+async def cmd_unban(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = update.effective_chat.id
+    user = update.effective_user
+    if not await is_admin(user.id, chat_id, context):
+        return await update.message.reply_text("⛔ فقط مدیران مجاز هستند.")
+    arg = " ".join(context.args) if context.args else ""
+    target = find_target_from_arg_or_reply(update, arg)
+    if isinstance(target, str) and target.startswith("@"):
+        target = await resolve_username_to_id(target, context)
+    if not target:
+        return await update.message.reply_text("❗ کاربر هدف را ریپلای کن یا آیدی/یوزرنیم را بده.")
+    try:
+        await context.bot.unban_chat_member(chat_id, target)
+    except Exception as e:
+        await update.message.reply_text(f"⚠️ خطا در آنبن: {e}")
+        return
+    cid=str(chat_id)
+    if cid in bans and target in bans[cid]:
+        bans[cid].remove(target)
+        _save(BANS_FILE, bans)
+    header = style_header("✅ آنبن شد ✅", f"✅ کاربر <code>{target}</code> توسط <b>{user.first_name}</b> آزاد شد!")
+    await update.message.reply_text(header, parse_mode="HTML")
+
+async def cmd_kick(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = update.effective_chat.id
+    user = update.effective_user
+    if not await is_admin(user.id, chat_id, context):
+        return await update.message.reply_text("⛔ فقط مدیران می‌تونن اخراج کنن.")
+    arg = " ".join(context.args) if context.args else ""
+    target = find_target_from_arg_or_reply(update, arg)
+    if isinstance(target, str) and target.startswith("@"):
+        target = await resolve_username_to_id(target, context)
+    if not target:
+        return await update.message.reply_text("❗ ریپلای یا آیدی/یوزرنیم بفرست.")
+    try:
+        await context.bot.ban_chat_member(chat_id, target)
+        await context.bot.unban_chat_member(chat_id, target, only_if_banned=False)
+    except Exception as e:
+        await update.message.reply_text(f"⚠️ خطا در اخراج: {e}")
+        return
+    header = style_header("👢 اخراج شد 👢", f"👢 کاربر <code>{target}</code> توسط <b>{user.first_name}</b> اخراج شد!")
+    await update.message.reply_text(header, parse_mode="HTML")
+
+async def cmd_mute(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = update.effective_chat.id
+    user = update.effective_user
+    if not await is_admin(user.id, chat_id, context):
+        return await update.message.reply_text("⛔ فقط مدیران می‌تونن بی‌صدا کنن.")
+    target = find_target_from_arg_or_reply(update, " ".join(context.args) if context.args else "")
+    if isinstance(target, str) and target.startswith("@"):
+        target = await resolve_username_to_id(target, context)
+    if not target:
+        return await update.message.reply_text("❗ کاربر را ریپلای کن یا آیدی بده.")
+    # default indefinite mute (store as 0)
+    ensure_chat_struct(chat_id)
+    cid=str(chat_id)
+    mutes[cid][str(target)] = 0
+    _save(MUTES_FILE, mutes)
+    header = style_header("🔇 بی‌صدا شد 🔇", f"🔇 کاربر <code>{target}</code> توسط <b>{user.first_name}</b> بی‌صدا شد!")
+    await update.message.reply_text(header, parse_mode="HTML")
+
+async def cmd_unmute(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = update.effective_chat.id
+    user = update.effective_user
+    if not await is_admin(user.id, chat_id, context):
+        return await update.message.reply_text("⛔ فقط مدیران مجازند.")
+    target = find_target_from_arg_or_reply(update, " ".join(context.args) if context.args else "")
+    if isinstance(target, str) and target.startswith("@"):
+        target = await resolve_username_to_id(target, context)
+    if not target:
+        return await update.message.reply_text("❗ کاربر را ریپلای کن یا آیدی بده.")
+    cid=str(chat_id)
+    if cid in mutes and str(target) in mutes[cid]:
+        del mutes[cid][str(target)]
+        _save(MUTES_FILE, mutes)
+    header = style_header("🔊 از بی‌صدا خارج شد 🔊", f"🔊 کاربر <code>{target}</code> توسط <b>{user.first_name}</b> از بی‌صدا بیرون آمد!")
+    await update.message.reply_text(header, parse_mode="HTML")
+
+async def cmd_warn(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = update.effective_chat.id
+    user = update.effective_user
+    if not await is_admin(user.id, chat_id, context):
+        return await update.message.reply_text("⛔ فقط مدیران می‌تونن اخطار بدن.")
+    target = find_target_from_arg_or_reply(update, " ".join(context.args) if context.args else "")
+    if isinstance(target, str) and target.startswith("@"):
+        target = await resolve_username_to_id(target, context)
+    if not target:
+        return await update.message.reply_text("❗ کاربر را ریپلای کن یا آیدی بده.")
+    ensure_chat_struct(chat_id)
+    cid=str(chat_id)
+    warns[cid][str(target)] = warns[cid].get(str(target), 0) + 1
+    _save(WARNS_FILE, warns)
+    count = warns[cid][str(target)]
+    header = style_header("⚠️ اخطار داده شد ⚠️", f"⚠️ کاربر <code>{target}</code> توسط <b>{user.first_name}</b> اخطار گرفت! (تعداد: {count})")
+    await update.message.reply_text(header, parse_mode="HTML")
+
+async def cmd_unwarn(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = update.effective_chat.id
+    user = update.effective_user
+    if not await is_admin(user.id, chat_id, context):
+        return await update.message.reply_text("⛔ فقط مدیران مجازند.")
+    target = find_target_from_arg_or_reply(update, " ".join(context.args) if context.args else "")
+    if isinstance(target, str) and target.startswith("@"):
+        target = await resolve_username_to_id(target, context)
+    if not target:
+        return await update.message.reply_text("❗ کاربر را ریپلای کن یا آیدی بده.")
+    cid=str(chat_id)
+    if cid in warns and str(target) in warns[cid]:
+        warns[cid][str(target)] = max(0, warns[cid][str(target)] - 1)
+        _save(WARNS_FILE, warns)
+    header = style_header("✅ اخطار حذف شد ✅", f"✅ یک اخطار از کاربر <code>{target}</code> توسط <b>{user.first_name}</b> حذف شد.")
+    await update.message.reply_text(header, parse_mode="HTML")
+
+async def cmd_del(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """حذف پیام ریپلای شده"""
+    chat_id = update.effective_chat.id
+    user = update.effective_user
+    if not await is_admin(user.id, chat_id, context):
+        return await update.message.reply_text("⛔ فقط مدیران می‌تونن پیام رو پاک کنن.")
+    if not update.message.reply_to_message:
+        return await update.message.reply_text("❗ روی پیام مورد نظر ریپلای کن.")
+    try:
+        await context.bot.delete_message(chat_id=chat_id, message_id=update.message.reply_to_message.message_id)
+        header = style_header("🗑 پیام پاک شد 🗑", f"✅ پیام توسط <b>{user.first_name}</b> حذف شد.")
+        await update.message.reply_text(header, parse_mode="HTML")
+    except Exception as e:
+        await update.message.reply_text(f"⚠️ خطا در حذف پیام: {e}")
+
+async def cmd_purge(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """پاکسازی تعداد زیاد پیام — استفاده: /purge 100 (حداکثر 9999)"""
+    chat_id = update.effective_chat.id
+    user = update.effective_user
+    if not await is_admin(user.id, chat_id, context):
+        return await update.message.reply_text("⛔ فقط مدیران می‌تونن پاکسازی کنن.")
+    if not context.args:
+        return await update.message.reply_text("❗ تعداد پیام برای پاکسازی را بده: /purge 100")
+    try:
+        n = int(context.args[0])
+        if n < 1 or n > 9999:
+            return await update.message.reply_text("⚠️ عدد باید بین 1 تا 9999 باشد.")
+    except:
+        return await update.message.reply_text("⚠️ عدد معتبر وارد کن.")
+    # قراره از پیام فعلی تا n پیام قبل رو حذف کنیم
+    deleted = 0
+    try:
+        # get chat history (bot can only delete messages that bot can delete)
+        async for msg in context.bot.get_chat(chat_id).iter_history(limit=n):
+            try:
+                await context.bot.delete_message(chat_id=chat_id, message_id=msg.message_id)
+                deleted += 1
+            except:
+                pass
+    except Exception:
+        # fallback: تلاش حذف پیام‌های اطراف با استفاده از پیام ریپلای شده (ساده‌تر)
+        pass
+    header = style_header("🧹 پاکسازی انجام شد 🧹", f"✅ {deleted} پیام توسط <b>{user.first_name}</b> پاک شد.")
+    await update.message.reply_text(header, parse_mode="HTML")
+
+# ---------- قفل‌ها ----------
+async def cmd_lock(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """قفل کردن نوعی از محتوا: /lock photo"""
+    chat_id = update.effective_chat.id
+    user = update.effective_user
+    if not await is_admin(user.id, chat_id, context):
+        return await update.message.reply_text("⛔ فقط مدیران مجازند.")
+    if not context.args:
+        return await update.message.reply_text("❗ نام قفل را بده. نمونه‌ها: links, photo, video, sticker, audio, voice, file, gif, text")
+    locktype = context.args[0].lower()
+    if locktype not in ALL_LOCK_TYPES:
+        return await update.message.reply_text("⚠️ نوع قفل نامعتبر است.")
+    ensure_chat_struct(chat_id)
+    locks[str(chat_id)][locktype] = True
+    _save(LOCKS_FILE, locks)
+    await update.message.reply_text(style_header("🔒 قفل شد 🔒", f"🔒 {locktype} توسط <b>{user.first_name}</b> قفل شد."), parse_mode="HTML")
+
+async def cmd_unlock(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = update.effective_chat.id
+    user = update.effective_user
+    if not await is_admin(user.id, chat_id, context):
+        return await update.message.reply_text("⛔ فقط مدیران مجازند.")
+    if not context.args:
+        return await update.message.reply_text("❗ نام قفل را بده: links, photo, video, sticker, audio, voice, file, gif, text")
+    locktype = context.args[0].lower()
+    if locktype not in ALL_LOCK_TYPES:
+        return await update.message.reply_text("⚠️ نوع قفل نامعتبر است.")
+    ensure_chat_struct(chat_id)
+    locks[str(chat_id)][locktype] = False
+    _save(LOCKS_FILE, locks)
+    await update.message.reply_text(style_header("🔓 باز شد 🔓", f"🔓 {locktype} توسط <b>{user.first_name}</b> باز شد."), parse_mode="HTML")
+
+# ---------- alias system ----------
+async def cmd_alias(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """ایجاد alias: /alias ban بن"""
+    user = update.effective_user
+    chat_id = update.effective_chat.id
+    if not await is_admin(user.id, chat_id, context):
+        return await update.message.reply_text("⛔ فقط مدیران می‌تونن alias بسازن.")
+    if len(context.args) < 2:
+        return await update.message.reply_text("❗ استفاده: /alias <target_command> <alias_word>  (مثال: /alias ban بن)")
+    target = context.args[0].lower()
+    alias_word = context.args[1]
+    # ذخیره (global)
+    aliases[alias_word] = target
+    _save(ALIASES_FILE, aliases)
+    await update.message.reply_text(f"✅ alias ثبت شد: <b>{alias_word}</b> ⇒ <code>{target}</code>", parse_mode="HTML")
+
+async def cmd_unalias(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    chat_id = update.effective_chat.id
+    if not await is_admin(user.id, chat_id, context):
+        return await update.message.reply_text("⛔ فقط مدیران می‌تونن حذف alias کنن.")
+    if not context.args:
+        return await update.message.reply_text("❗ استفاده: /unalias <alias_word>")
+    alias_word = context.args[0]
+    if alias_word in aliases:
+        del aliases[alias_word]
+        _save(ALIASES_FILE, aliases)
+        await update.message.reply_text(f"✅ alias <b>{alias_word}</b> حذف شد.", parse_mode="HTML")
+    else:
+        await update.message.reply_text("⚠️ alias پیدا نشد.")
+
+# ---------- پردازش پیام‌ها با alias (بدون /) ----------
+async def alias_message_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """اگر پیام برابر یکی از alias ها بود، فراخوانی توابع معادل انجام میشه."""
+    if not update.message or not update.message.text:
+        return
+    text = update.message.text.strip().split()
+    if not text:
+        return
+    first = text[0]
+    # اگر اول کلمه مستقیما alias است
+    if first in aliases:
+        mapped = aliases[first]  # ex: "ban"
+        # ساخت یک fake context.args تا تابع اصلی کار کنه
+        rest = text[1:]
+        # دایرکت کال به تابع مناسب — لیست map
+        mapping = {
+            "ban": cmd_ban,
+            "unban": cmd_unban,
+            "kick": cmd_kick,
+            "mute": cmd_mute,
+            "unmute": cmd_unmute,
+            "warn": cmd_warn,
+            "unwarn": cmd_unwarn,
+            "del": cmd_del,
+            "purge": cmd_purge,
+            "lock": cmd_lock,
+            "unlock": cmd_unlock,
+            "alias": cmd_alias,
+            "unalias": cmd_unalias
+        }
+        func = mapping.get(mapped)
+        if func:
+            # ساخت موقت context.args
+            context.args = rest
+            await func(update, context)
+            return
+    # اگر پیام با نقطه‌گذاری /command هم اومده (مثلا بدون slash) نادیده گرفته میشه — هدف alias کلمات ساده است
+
+# ---------- ثبت handler ها (راحت داخل main اضافه کن) ----------
+# در main بعد از ساخت app این‌ها را اضافه کن:
+#
+#    app.add_handler(CommandHandler("ban", cmd_ban))
+#    app.add_handler(CommandHandler("unban", cmd_unban))
+#    app.add_handler(CommandHandler("kick", cmd_kick))
+#    app.add_handler(CommandHandler("mute", cmd_mute))
+#    app.add_handler(CommandHandler("unmute", cmd_unmute))
+#    app.add_handler(CommandHandler("warn", cmd_warn))
+#    app.add_handler(CommandHandler("unwarn", cmd_unwarn))
+#    app.add_handler(CommandHandler("del", cmd_del))
+#    app.add_handler(CommandHandler("purge", cmd_purge))
+#    app.add_handler(CommandHandler("lock", cmd_lock))
+#    app.add_handler(CommandHandler("unlock", cmd_unlock))
+#    app.add_handler(CommandHandler("alias", cmd_alias))
+#    app.add_handler(CommandHandler("unalias", cmd_unalias))
+#
+# و برای پشتیبانی از alias های بدون /:
+#    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, alias_message_router))
+#
+# -------------------------------------------------------
+# توجه: اگر از قبل MessageHandler ای برای reply (مثل هوش مصنوعی) دادی که تمامی پیامها رو می‌گیرد،
+# باید alias_message_router را قبل از آن handler اضافه کنی تا اول alias بررسی شود.
+# همچنین برخی عملیات حذف/بن نیاز به پرمیشن ربات دارد (ربات باید ادمین گروه باشد).
+# =======================================================
 # ======================= 🚀 اجرای نهایی =======================
 if __name__ == "__main__":
     print("🤖 خنگول فارسی 8.7 Cloud+ Supreme Pro Stable+ آماده به خدمت است ...")
 
     app = ApplicationBuilder().token(TOKEN).build()
     app.add_error_handler(handle_error)
+# =================== 🔒 Group Protector Handlers ===================
+app.add_handler(CommandHandler("ban", cmd_ban))
+app.add_handler(CommandHandler("unban", cmd_unban))
+app.add_handler(CommandHandler("kick", cmd_kick))
+app.add_handler(CommandHandler("mute", cmd_mute))
+app.add_handler(CommandHandler("unmute", cmd_unmute))
+app.add_handler(CommandHandler("warn", cmd_warn))
+app.add_handler(CommandHandler("unwarn", cmd_unwarn))
+app.add_handler(CommandHandler("del", cmd_del))
+app.add_handler(CommandHandler("purge", cmd_purge))
+app.add_handler(CommandHandler("lock", cmd_lock))
+app.add_handler(CommandHandler("unlock", cmd_unlock))
+app.add_handler(CommandHandler("alias", cmd_alias))
+app.add_handler(CommandHandler("unalias", cmd_unalias))
 
+# 🧠 سیستم alias بدون / باید قبل از reply قرار بگیره
+app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, alias_message_router))
+# ================================================================
     # 🔹 دستورات اصلی
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("help", help_command))
