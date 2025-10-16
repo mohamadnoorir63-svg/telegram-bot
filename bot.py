@@ -1244,8 +1244,8 @@ if __name__ == "__main__":
     app.add_handler(CallbackQueryHandler(welcome_panel_buttons, pattern="^welcome_"), group=-1)
     app.add_handler(MessageHandler(filters.Regex("^ثبت خوشامد$"), set_welcome_text), group=-1)
     app.add_handler(MessageHandler(filters.Regex("^ثبت عکس خوشامد$"), set_welcome_media), group=-1)
-    app.add_handler(MessageHandler(filters.Regex("^تنظیم قوانین$"), set_rules_link), group=-1)
-    app.add_handler(MessageHandler(filters.Regex("^تنظیم حذف$"), set_welcome_timer), group=-1)
+    app.add_handler(MessageHandler(filters.Regex(r"^تنظیم قوانین"), set_rules_link))
+    app.add_handler(MessageHandler(filters.Regex(r"^تنظیم حذف"), set_welcome_timer))
     app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome), group=-1)
 
     # 🔹 راهنمای قابل ویرایش
