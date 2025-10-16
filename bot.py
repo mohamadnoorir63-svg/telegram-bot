@@ -14,6 +14,8 @@ from telegram.ext import (
 from telegram.ext import CallbackQueryHandler
 
 import aiofiles
+# 🧠 پنل پاسخ حرفه‌ای
+from reply_panel_pro import add_reply_command, message_collector, button_handler, auto_reply
 
 # 📦 ماژول‌ها
 from memory_manager import (
