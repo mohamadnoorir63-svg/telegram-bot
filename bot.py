@@ -1233,26 +1233,28 @@ if __name__ == "__main__":
     app.add_handler(CommandHandler("leave", leave))
     app.add_handler(CommandHandler("reply", toggle_reply_mode))
 
+    # 🔹 پنل اصلی و قابلیت‌ها
+    app.add_handler(MessageHandler(filters.Regex("^ثبت قابلیت$"), save_features))
+    app.add_handler(CallbackQueryHandler(feature_button_handler, pattern="^feature_"))
+
+    # 🔹 سیستم خوشامد پویا و پنل گرافیکی (⭐️ قبل از هندلر عمومی متن + با priority -1)
+    app.add_handler(MessageHandler(filters.Regex("^خوشامد$"), open_welcome_panel), group=-1)
+    app.add_handler(CallbackQueryHandler(welcome_panel_buttons, pattern="^welcome_"), group=-1)
+    app.add_handler(MessageHandler(filters.Regex("^ثبت خوشامد$"), set_welcome_text), group=-1)
+    app.add_handler(MessageHandler(filters.Regex("^ثبت عکس خوشامد$"), set_welcome_media), group=-1)
+    app.add_handler(MessageHandler(filters.Regex("^تنظیم قوانین$"), set_rules_link), group=-1)
+    app.add_handler(MessageHandler(filters.Regex("^تنظیم حذف$"), set_welcome_timer), group=-1)
+    app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome), group=-1)
+
     # 🔹 راهنمای قابل ویرایش
     app.add_handler(MessageHandler(filters.Regex("^ثبت راهنما$"), save_custom_help))
     app.add_handler(MessageHandler(filters.Regex("^راهنما$"), show_custom_help))
 
     # 🔹 پیام‌ها و اسناد
     app.add_handler(MessageHandler(filters.Document.ALL, handle_document))
+
+    # 🔹 هندلر عمومیِ آخر (بعد از همهٔ موارد اختصاصی)
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, reply))
-
-    # 🔹 پنل اصلی و قابلیت‌ها
-    app.add_handler(MessageHandler(filters.Regex("^ثبت قابلیت$"), save_features))
-    app.add_handler(CallbackQueryHandler(feature_button_handler, pattern="^feature_"))
-
-    # 🔹 سیستم خوشامد پویا و پنل گرافیکی (فارسی بدون /)
-    app.add_handler(MessageHandler(filters.Regex("^خوشامد$"), open_welcome_panel))
-    app.add_handler(CallbackQueryHandler(welcome_panel_buttons, pattern="^welcome_"))
-    app.add_handler(MessageHandler(filters.Regex("^ثبت خوشامد$"), set_welcome_text))
-    app.add_handler(MessageHandler(filters.Regex("^ثبت عکس خوشامد$"), set_welcome_media))
-    app.add_handler(MessageHandler(filters.Regex("^تنظیم قوانین$"), set_rules_link))
-    app.add_handler(MessageHandler(filters.Regex("^تنظیم حذف$"), set_welcome_timer))
-    app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome))
 
     # 🔹 هنگام استارت
     async def on_startup(app):
@@ -1263,4 +1265,3 @@ if __name__ == "__main__":
 
     app.post_init = on_startup
     app.run_polling(allowed_updates=Update.ALL_TYPES)
-    
