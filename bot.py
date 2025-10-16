@@ -1098,6 +1098,7 @@ app.post_init = on_startup
 
 # 🚀 اجرای ربات
 print("🤖 خنگول فارسی 8.7 Cloud+ Supreme Pro Stable+ آماده به خدمت است ...")
+
 # ======================= 🧠 Reply Panel Pro++ اتصال بی‌تداخل =======================
 from reply_panel_pro import (
     add_reply_command as rp_add_reply_command,
@@ -1140,6 +1141,7 @@ app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome))
 
 # ======================= ⚙️ مغز یادگیری و پاسخ =======================
 # ترتیب دقیق تا تداخلی بین هوش نرمال و Reply Panel نباشد
+
 # 1️⃣ مغز اصلی هوش مصنوعی
 app.add_handler(
     MessageHandler(
@@ -1168,5 +1170,4 @@ async def on_startup(app):
 app.post_init = on_startup
 
 # 🚀 اجرای ربات
-print("🤖 خنگول فارسی 8.7 Cloud+ Supreme Pro Stable+ آماده به خدمت است ...")
 app.run_polling(allowed_updates=Update.ALL_TYPES)
