@@ -11,6 +11,7 @@ from telegram.ext import (
     ContextTypes,
     filters
 )
+from telegram.ext import CallbackQueryHandler
 import aiofiles
 
 # 📦 ماژول‌ها
