@@ -42,8 +42,39 @@ status = {
     "welcome": True,
     "locked": False
 }
+async def toggle_reply_mode(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """تغییر وضعیت ریپلی مود — فقط برای مدیران گروه و سودو مجاز است"""
+    chat = update.effective_chat
+    user = update.effective_user
 
-# ======================= 💬 ریپلی مود =======================
+    # چک اینکه داخل گروه هست یا نه
+    if chat.type not in ["group", "supergroup"]:
+        return await update.message.reply_text("⚠️ فقط داخل گروه می‌تونی ریپلی مود رو تنظیم کنی!")
+
+    # بررسی سودو یا ادمین گروه
+    is_sudo_user = is_sudo(user.id)
+    is_group_admin = False
+
+    try:
+        member = await context.bot.get_chat_member(chat.id, user.id)
+        if member.status in ["creator", "administrator"]:
+            is_group_admin = True
+    except:
+        pass
+
+    if not (is_sudo_user or is_group_admin):
+        return await update.message.reply_text("⛔ فقط مدیران گروه یا سودو می‌تونن این تنظیم رو تغییر بدن!")
+
+    # تغییر وضعیت فقط برای همان گروه
+    group_id = str(chat.id)
+    current = reply_status.get(group_id, {}).get("enabled", False)
+    reply_status[group_id] = {"enabled": not current}
+    save_reply_status(reply_status)
+
+    if reply_status[group_id]["enabled"]:
+        await update.message.reply_text("💬 ریپلی مود در این گروه فعال شد!\nفقط با ریپلای به پیام‌های من چت کنید 😄")
+    else:
+        await update.message.reply_text("🗨️ ریپلی مود در این گروه غیرفعال شد!\nالان به همه پیام‌ها جواب می‌دم 😎")
 
 # ======================= ✳️ شروع و پیام فعال‌سازی =======================
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -391,12 +422,15 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
     uid = update.effective_user.id
     chat_id = update.effective_chat.id
-# 🧠 بررسی حالت ریپلی مود
-    if reply_status.get("enabled"):
-        # اگه کسی گفت "خنگول کجایی؟"
+# 🧠 بررسی حالت ریپلی مود گروهی
+if update.effective_chat.type in ["group", "supergroup"]:
+    chat_id = update.effective_chat.id
+    if is_group_reply_enabled(chat_id):
+        # فقط در گروهی که ریپلی مود فعاله، محدودیت اعمال می‌شود
         if text.lower() in ["خنگول کجایی", "خنگول کجایی؟", "کجایی خنگول"]:
             return await update.message.reply_text("😄 من اینجام! برای صحبت، فقط روی پیام‌هام ریپلای کن 💬")
-        # فقط به پیام‌هایی که به خودش ریپلای شده پاسخ بده
+
+        # اگر پیام ریپلای به خود ربات نباشد، پاسخی نده
         if not update.message.reply_to_message or update.message.reply_to_message.from_user.id != context.bot.id:
             return
 
