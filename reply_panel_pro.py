@@ -225,3 +225,42 @@ async def auto_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await msg.reply_text(reply_text)
     except Exception as e:
         await msg.reply_text(f"⚠️ خطا در ارسال پاسخ: {e}")
+        # ======================= ⚙️ مدیریت پاسخ‌ها (لیست و ویرایش) =======================
+async def manage_replies(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """نمایش لیست پاسخ‌های ذخیره‌شده"""
+    data = load_replies().get("replies", {})
+    if not data:
+        return await update.message.reply_text("ℹ️ هنوز هیچ پاسخی ذخیره نشده.")
+
+    keyboard = []
+    for key in data.keys():
+        keyboard.append([InlineKeyboardButton(f"✏️ {key}", callback_data=f"edit_{key}")])
+
+    await update.message.reply_text(
+        "📋 لیست پاسخ‌های ذخیره‌شده:\nیکی را برای ویرایش انتخاب کن 👇",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+
+# ======================= 📝 ویرایش پاسخ =======================
+async def start_edit_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """باز کردن صفحه ویرایش پاسخ انتخاب‌شده"""
+    query = update.callback_query
+    key = query.data.replace("edit_", "")
+    data = load_replies().get("replies", {})
+
+    if key not in data:
+        return await query.edit_message_text("⚠️ پاسخ موردنظر پیدا نشد!")
+
+    replies = data[key]
+    text_preview = ""
+    for i, r in enumerate(replies, 1):
+        texts = "\n".join(r.get("text", [])) or "— بدون متن —"
+        medias = len(r.get("media", []))
+        text_preview += f"🧩 پاسخ {i}:\n{texts}\n🎞 رسانه‌ها: {medias}\n\n"
+
+    keyboard = [[InlineKeyboardButton("🗑 حذف کل", callback_data=f"delete_{key}")]]
+    await query.edit_message_text(
+        f"✏️ ویرایش پاسخ: <b>{key}</b>\n\n{text_preview}",
+        parse_mode="HTML",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+        )
