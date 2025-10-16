@@ -910,13 +910,121 @@ async def leave(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id == ADMIN_ID:
         await update.message.reply_text("🫡 خدافظ! تا دیدار بعدی 😂")
         await context.bot.leave_chat(update.message.chat.id)
+# ======================= 🌟 پنل اصلی خنگول (استارت + قابلیت‌ها طلایی) =======================
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+import datetime, aiofiles, os, asyncio
 
+FEATURES_FILE = "features.txt"
+
+# ======================= 🎨 نمایش پنل =======================
+async def show_main_panel(update: Update, context: ContextTypes.DEFAULT_TYPE, edit=False):
+    """نمایش پنل اصلی برای همه کاربران"""
+    # 📖 متن معرفی یا قابلیت‌های سفارشی
+    if os.path.exists(FEATURES_FILE):
+        async with aiofiles.open(FEATURES_FILE, "r", encoding="utf-8") as f:
+            about_text = await f.read()
+    else:
+        about_text = (
+            "✨ <b>خنگول فارسی 8.7 Cloud+ Supreme Pro</b>\n"
+            "🤖 هوش اجتماعی، شوخ‌طبعی و احساس واقعی در یک ربات!\n"
+            "💬 همراهی با خنده، فال، و هوش اجتماعی بی‌نظیر 🌙"
+        )
+
+    keyboard = [
+        [InlineKeyboardButton("💬 ارتباط با سازنده", url="https://t.me/NOORI_NOOR")],
+        [InlineKeyboardButton("💭 گروه پشتیبانی", url="https://t.me/Poshtibahni")],
+        [InlineKeyboardButton("⏰ آیدی و ساعت", callback_data="feature_info")],
+        [InlineKeyboardButton("🔮 فال امروز", callback_data="feature_fortune")],
+        [InlineKeyboardButton("😂 جوک تصادفی", callback_data="feature_joke")],
+        [InlineKeyboardButton("➕ افزودن به گروه", url="https://t.me/Khenqol_bot?startgroup=true")],
+        [InlineKeyboardButton("🧩 قابلیت ربات", callback_data="feature_about")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    if edit:
+        await update.callback_query.edit_message_text(about_text, reply_markup=reply_markup, parse_mode="HTML")
+    else:
+        await update.message.reply_text(about_text, reply_markup=reply_markup, parse_mode="HTML")
+
+
+# ======================= 🚀 استارت با انیمیشن لوکس =======================
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """انیمیشن خوش‌آمد + نمایش پنل اصلی"""
+    msg = await update.message.reply_text("⏳ <b>در حال بارگذاری سیستم خنگول...</b>", parse_mode="HTML")
+    await asyncio.sleep(1.7)
+
+    welcome_text = (
+        f"🌙 <b>سلام {update.effective_user.first_name}!</b>\n"
+        f"🤖 من <b>خنگول فارسی 8.7 Cloud+ Supreme Pro</b> هستم.\n"
+        f"✨ رباتی با احساس، شوخ‌طبعی و حافظه‌ی اجتماعی 😄"
+    )
+
+    await msg.edit_text(welcome_text, parse_mode="HTML")
+    await asyncio.sleep(1.2)
+
+    # 🔹 نمایش منوی اصلی (پیام جدا)
+    await show_main_panel(update, context, edit=False)
+
+
+# ======================= 🧩 ویرایش قابلیت‌ها (فقط ادمین) =======================
+async def save_features(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """ثبت یا ویرایش متن قابلیت‌ها فقط برای مدیر اصلی"""
+    if update.effective_user.id != ADMIN_ID:
+        return await update.message.reply_text("⛔ فقط مدیر اصلی می‌تونه متن قابلیت‌ها رو تغییر بده!")
+
+    if not update.message.reply_to_message or not update.message.reply_to_message.text:
+        return await update.message.reply_text("❗ باید روی یک پیام متنی ریپلای بزنی!")
+
+    text = update.message.reply_to_message.text
+    async with aiofiles.open(FEATURES_FILE, "w", encoding="utf-8") as f:
+        await f.write(text)
+
+    await update.message.reply_text("✅ متن قابلیت‌ها با موفقیت ذخیره شد!")
+
+
+# ======================= 🎛 دکمه‌های تعاملی =======================
+async def feature_button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+
+    if query.data == "feature_info":
+        user = query.from_user
+        now = datetime.datetime.now().strftime("%Y/%m/%d - %H:%M:%S")
+        text = (
+            f"🆔 آیدی شما: <code>{user.id}</code>\n"
+            f"👤 نام: <b>{user.first_name}</b>\n"
+            f"📅 تاریخ و ساعت فعلی: <b>{now}</b>"
+        )
+        try:
+            photos = await context.bot.get_user_profile_photos(user.id, limit=1)
+            if photos.total_count > 0:
+                file_id = photos.photos[0][-1].file_id
+                await query.message.reply_photo(file_id, caption=text, parse_mode="HTML")
+            else:
+                await query.message.reply_text(text, parse_mode="HTML")
+        except:
+            await query.message.reply_text(text, parse_mode="HTML")
+
+    elif query.data == "feature_joke":
+        await query.message.reply_text("😂 برای دیدن جوک بنویس:\n<b>جوک</b>", parse_mode="HTML")
+
+    elif query.data == "feature_fortune":
+        await query.message.reply_text("🔮 برای دیدن فال بنویس:\n<b>فال</b>", parse_mode="HTML")
+
+    elif query.data == "feature_about":
+        if os.path.exists(FEATURES_FILE):
+            async with aiofiles.open(FEATURES_FILE, "r", encoding="utf-8") as f:
+                text = await f.read()
+        else:
+            text = "🧩 هنوز توضیحی برای قابلیت‌ها ثبت نشده!"
+        await query.message.reply_text(text, parse_mode="HTML")
 # ======================= 🚀 اجرای نهایی =======================
 if __name__ == "__main__":
     print("🤖 خنگول فارسی 8.5.1 Cloud+ Supreme Pro Stable+ آماده به خدمت است ...")
 
     app = ApplicationBuilder().token(TOKEN).build()
     app.add_error_handler(handle_error)
+
 
     # 🔹 دستورات اصلی
     app.add_handler(CommandHandler("start", start))
@@ -945,7 +1053,9 @@ if __name__ == "__main__":
     app.add_handler(MessageHandler(filters.Document.ALL, handle_document))
     app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, reply))
-
+# 🔹 پنل اصلی و قابلیت‌ها
+app.add_handler(MessageHandler(filters.Regex("^ثبت قابلیت$"), save_features))
+app.add_handler(CallbackQueryHandler(feature_button_handler, pattern="^feature_"))
     # 🔹 هنگام استارت
     async def on_startup(app):
         await notify_admin_on_startup(app)
