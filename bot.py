@@ -449,28 +449,19 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
     uid = update.effective_user.id
     chat_id = update.effective_chat.id
-# 🧠 بررسی حالت ریپلی مود گروهی
-if update.effective_chat.type in ["group", "supergroup"]:
-    chat_id = update.effective_chat.id
-    if is_group_reply_enabled(chat_id):
-        # فقط در گروهی که ریپلی مود فعاله، محدودیت اعمال می‌شود
-        if text.lower() in ["خنگول کجایی", "خنگول کجایی؟", "کجایی خنگول"]:
-            return await update.message.reply_text("😄 من اینجام! برای صحبت، فقط روی پیام‌هام ریپلای کن 💬")
+    
 
-        # اگر پیام ریپلای به خود ربات نباشد، پاسخی نده
-        if not update.message.reply_to_message or update.message.reply_to_message.from_user.id != context.bot.id:
-            return
+    # 🧠 بررسی حالت ریپلی مود گروهی
+    if update.effective_chat.type in ["group", "supergroup"]:
+        chat_id = update.effective_chat.id
+        if is_group_reply_enabled(chat_id):
+            # فقط در گروهی که ریپلی مود فعاله، محدودیت اعمال می‌شود
+            if text.lower() in ["خنگول کجایی", "خنگول کجایی؟", "کجایی خنگول"]:
+                return await update.message.reply_text("😄 من اینجام! برای صحبت، فقط روی پیام‌هام ریپلای کن 💬")
 
-    # ثبت کاربر و گروه
-    register_user(uid)
-    register_group_activity(chat_id, uid)
-
-    if not status["locked"]:
-        auto_learn_from_text(text)
-
-    if not status["active"]:
-        shadow_learn(text, "")
-        return
+            # اگر پیام ریپلای به خود ربات نباشد، پاسخی نده
+            if not update.message.reply_to_message or update.message.reply_to_message.from_user.id != context.bot.id:
+                return
 
     # ✅ درصد هوش منطقی
     if text.lower() == "درصد هوش":
