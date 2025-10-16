@@ -1236,7 +1236,7 @@ if __name__ == "__main__":
     app = ApplicationBuilder().token(TOKEN).build()
     app.add_error_handler(handle_error)
 
-    # 🔹 دستورات اصلی
+   # 🔹 دستورات اصلی
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("help", help_command))
     app.add_handler(CommandHandler("toggle", toggle))
@@ -1271,6 +1271,60 @@ if __name__ == "__main__":
     # 🔹 راهنمای قابل ویرایش
     app.add_handler(MessageHandler(filters.Regex("^ثبت راهنما$"), save_custom_help))
     app.add_handler(MessageHandler(filters.Regex("^راهنما$"), show_custom_help))
+
+
+    # ======================= 📦 هندلر فایل‌ها برای بازیابی بک‌آپ =======================
+    async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """پردازش فایل ZIP و بازیابی ایمن با پوشه موقتی"""
+        if not context.user_data.get("await_restore"):
+            return
+
+        doc = update.message.document
+        if not doc or not doc.file_name.lower().endswith(".zip"):
+            return await update.message.reply_text("❗ لطفاً یک فایل ZIP معتبر بفرست.")
+
+        restore_zip = "restore.zip"
+        restore_dir = "restore_temp"
+
+        try:
+            tg_file = await doc.get_file()
+            await update.message.reply_text("📥 در حال دریافت فایل بک‌آپ ... (20%)")
+            await tg_file.download_to_drive(restore_zip)
+
+            await update.message.reply_text("📂 در حال آماده‌سازی پوشه بازگردانی ... (40%)")
+            if os.path.exists(restore_dir):
+                shutil.rmtree(restore_dir)
+            os.makedirs(restore_dir, exist_ok=True)
+
+            await update.message.reply_text("📦 در حال استخراج فایل‌ها ... (60%)")
+            with zipfile.ZipFile(restore_zip, "r") as zip_ref:
+                zip_ref.extractall(restore_dir)
+
+            important_files = ["memory.json", "group_data.json", "jokes.json", "fortunes.json"]
+            moved_any = False
+            for fname in important_files:
+                src = os.path.join(restore_dir, fname)
+                if os.path.exists(src):
+                    shutil.move(src, fname)
+                    moved_any = True
+
+            init_files()
+            await update.message.reply_text("✅ عملیات نهایی‌سازی در حال انجام ... (90%)")
+
+            if moved_any:
+                await update.message.reply_text("🎉 بازیابی با موفقیت انجام شد! (100%)")
+            else:
+                await update.message.reply_text("ℹ️ فایل‌های داده‌ای یافت نشدند، ZIP ممکن است اشتباه باشد.")
+
+        except Exception as e:
+            await update.message.reply_text(f"⚠️ خطا در بازیابی:\n{e}")
+        finally:
+            if os.path.exists(restore_zip):
+                os.remove(restore_zip)
+            if os.path.exists(restore_dir):
+                shutil.rmtree(restore_dir)
+            context.user_data["await_restore"] = False
+
 
     # 🔹 پیام‌ها و اسناد
     app.add_handler(MessageHandler(filters.Document.ALL, handle_document))
