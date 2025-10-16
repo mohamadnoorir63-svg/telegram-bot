@@ -1,6 +1,6 @@
-# ========================= ✳️ Reply Panel Pro++ 8.5.3 =========================
-# نسخه جدید با قابلیت ویرایش، حذف، مشاهده و افزودن پاسخ‌ها
-# طراحی‌شده برای ربات خنگول Cloud+ Supreme Pro Stable+
+# ========================= ✳️ Reply Panel Pro++ 8.5.4 =========================
+# نسخه جدید با پشتیبانی از چند پاسخ، حالت تصادفی و ویرایش پاسخ تکی
+# مخصوص ربات خنگول Cloud+ Supreme Pro Stable+
 # ------------------------------------------------------------
 
 import os
@@ -43,42 +43,19 @@ async def add_reply_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data["reply_data"] = {"text": [], "media": []}
 
     keyboard = [
-        [InlineKeyboardButton("💾 ذخیره", callback_data="save_reply")],
+        [InlineKeyboardButton("💾 ذخیره پاسخ جدید", callback_data="save_reply")],
         [InlineKeyboardButton("❌ انصراف", callback_data="cancel_reply")]
     ]
 
     await message.reply_text(
         f"🧠 در حال افزودن پاسخ برای: <b>{text}</b>\n"
-        "پیام‌هات (متن یا عکس و...) رو بفرست.\n"
-        "وقتی تموم شد روی 💾 ذخیره بزن.",
+        "می‌تونی چند پیام (متن یا مدیا) بفرستی.\n"
+        "در پایان روی 💾 بزن تا ذخیره شه.",
         parse_mode="HTML",
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
 
-# ---------------------- ✏️ ویرایش پاسخ ----------------------
-async def start_edit_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """فعال‌سازی حالت ویرایش برای پاسخ انتخاب‌شده"""
-    query = update.callback_query
-    key = query.data.replace("edit_", "")
-
-    context.user_data["reply_mode"] = "edit"
-    context.user_data["reply_key"] = key
-    context.user_data["reply_data"] = {"text": [], "media": []}
-
-    keyboard = [
-        [InlineKeyboardButton("💾 ذخیره تغییرات", callback_data="save_reply_edit")],
-        [InlineKeyboardButton("❌ انصراف", callback_data="cancel_reply")]
-    ]
-
-    await query.edit_message_text(
-        f"✏️ در حال ویرایش پاسخ <b>{key}</b>\n"
-        "پیام جدیدت (متن یا مدیا) رو بفرست.\n"
-        "وقتی تموم شد روی 💾 ذخیره تغییرات بزن.",
-        parse_mode="HTML",
-        reply_markup=InlineKeyboardMarkup(keyboard)
-    )
-
-# ---------------------- 📨 جمع‌آوری پیام ----------------------
+# ---------------------- 📨 ذخیره پیام‌ها ----------------------
 async def message_collector(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """ذخیره موقت پیام‌های کاربر"""
     if "reply_key" not in context.user_data:
@@ -102,9 +79,9 @@ async def message_collector(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif msg.sticker:
         data["media"].append(("sticker", msg.sticker.file_id))
 
-    await msg.reply_text("✅ پیام ذخیره شد. بعد از اتمام روی 💾 بزن.")
+    await msg.reply_text("✅ پیام موقتاً ذخیره شد. بعد از اتمام، روی 💾 بزن.")
 
-# ---------------------- 🧮 دکمه‌ها ----------------------
+# ---------------------- 🧮 کنترل دکمه‌ها ----------------------
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -116,75 +93,103 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data.clear()
         return await query.edit_message_text("❌ عملیات لغو شد.")
 
-    # ذخیره پاسخ جدید
+    # 💾 ذخیره پاسخ جدید
     if query.data == "save_reply":
-        if "reply_key" not in context.user_data:
-            return await query.edit_message_text("⛔ حالت افزودن فعال نیست!")
+        key = context.user_data.get("reply_key")
+        reply_data = context.user_data.get("reply_data")
 
-        key = context.user_data["reply_key"]
-        reply_data = context.user_data["reply_data"]
+        if not key or not reply_data:
+            return await query.edit_message_text("⚠️ پاسخی برای ذخیره وجود ندارد!")
+
         if key not in replies:
             replies[key] = []
+
         replies[key].append(reply_data)
         data["replies"] = replies
         save_replies(data)
         context.user_data.clear()
 
-        return await query.edit_message_text(f"✅ پاسخ '{key}' ذخیره شد!")
+        return await query.edit_message_text(f"✅ پاسخ جدید برای '{key}' ذخیره شد!")
 
-    # ذخیره ویرایش
-    if query.data == "save_reply_edit":
-        key = context.user_data.get("reply_key")
-        reply_data = context.user_data["reply_data"]
+    # ✏️ ذخیره ویرایش پاسخ تکی
+    if query.data.startswith("save_edit_"):
+        key, index = query.data.replace("save_edit_", "").split("_")
+        index = int(index)
+        reply_data = context.user_data.get("reply_data")
 
-        if not key or key not in replies:
-            return await query.edit_message_text("⚠️ پاسخ مورد نظر یافت نشد.")
+        if not reply_data:
+            return await query.edit_message_text("⚠️ پاسخی برای ذخیره وجود ندارد!")
 
-        # جایگزین محتوای قبلی با جدید
-        replies[key] = [reply_data]
-        data["replies"] = replies
+        replies[key][index] = reply_data
         save_replies(data)
         context.user_data.clear()
-        return await query.edit_message_text(f"✅ پاسخ '{key}' ویرایش شد!")
+        return await query.edit_message_text(f"✅ پاسخ شماره {index+1} برای '{key}' ویرایش شد!")
 
-    # حذف
+    # 🗑 حذف پاسخ تکی
+    if query.data.startswith("del_item_"):
+        key, index = query.data.replace("del_item_", "").split("_")
+        index = int(index)
+
+        if key in replies and index < len(replies[key]):
+            del replies[key][index]
+            if not replies[key]:
+                del replies[key]
+            save_replies(data)
+            return await query.edit_message_text(f"🗑 پاسخ شماره {index+1} از '{key}' حذف شد!")
+        return await query.edit_message_text("⚠️ پاسخ مورد نظر یافت نشد.")
+
+    # 🗑 حذف کامل کلید
     if query.data.startswith("delete_"):
         key = query.data.replace("delete_", "")
         if key in replies:
             del replies[key]
             save_replies(data)
-            await query.edit_message_text(f"🗑 پاسخ '{key}' حذف شد.")
-        else:
-            await query.edit_message_text("⚠️ پاسخی با این نام وجود ندارد.")
-
-    # پیش‌نمایش
-    if query.data.startswith("preview_"):
-        key = query.data.replace("preview_", "")
-        if key not in replies:
-            return await query.edit_message_text("⚠️ پاسخی یافت نشد.")
-        reply = replies[key][-1]
-        txt = "\n".join(reply.get("text", [])) or "—"
-        await query.message.reply_text(f"📋 پیش‌نمایش پاسخ '{key}':\n\n{txt}")
+            return await query.edit_message_text(f"🗑 تمام پاسخ‌های '{key}' حذف شدند.")
+        return await query.edit_message_text("⚠️ کلید یافت نشد.")
 
 # ---------------------- 🧭 مدیریت پاسخ‌ها ----------------------
 async def manage_replies(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """نمایش لیست تمام پاسخ‌ها با دکمه ویرایش"""
-    data = load_replies()
-    replies = data.get("replies", {})
-
-    if not replies:
-        return await update.message.reply_text("ℹ️ هنوز هیچ پاسخی ثبت نشده!")
+    """لیست همه‌ی کلیدها"""
+    data = load_replies().get("replies", {})
+    if not data:
+        return await update.message.reply_text("ℹ️ هنوز پاسخی ثبت نشده.")
 
     keyboard = []
-    for key in replies.keys():
+    for key in data.keys():
         keyboard.append([
             InlineKeyboardButton(f"📋 {key}", callback_data=f"preview_{key}"),
             InlineKeyboardButton("✏️ ویرایش", callback_data=f"edit_{key}"),
-            InlineKeyboardButton("❌ حذف", callback_data=f"delete_{key}")
+            InlineKeyboardButton("🗑 حذف", callback_data=f"delete_{key}")
         ])
 
     await update.message.reply_text(
         "🧩 لیست پاسخ‌های ذخیره‌شده:",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+
+# ---------------------- ✏️ باز کردن منوی ویرایش ----------------------
+async def start_edit_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """ویرایش پاسخ تکی از یک کلید"""
+    query = update.callback_query
+    key = query.data.replace("edit_", "")
+    data = load_replies().get("replies", {})
+
+    if key not in data:
+        return await query.edit_message_text("⚠️ پاسخی پیدا نشد!")
+
+    keyboard = []
+    preview = f"✏️ <b>{key}</b> — پاسخ‌ها:\n\n"
+    for i, r in enumerate(data[key]):
+        text_preview = "\n".join(r.get("text", [])) or "— بدون متن —"
+        preview += f"{i+1}. {text_preview}\n"
+        keyboard.append([
+            InlineKeyboardButton("✏️ ویرایش", callback_data=f"edit_item_{key}_{i}"),
+            InlineKeyboardButton("🗑 حذف", callback_data=f"del_item_{key}_{i}")
+        ])
+
+    await query.edit_message_text(
+        preview,
+        parse_mode="HTML",
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
 
@@ -196,13 +201,11 @@ async def auto_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     text = msg.text.strip()
-    data = load_replies()
-    replies = data.get("replies", {})
-
-    if text not in replies:
+    data = load_replies().get("replies", {})
+    if text not in data:
         return
 
-    entry = random.choice(replies[text])
+    entry = random.choice(data[text])  # 🎲 انتخاب تصادفی از بین چند پاسخ
     reply_text = "\n".join(entry.get("text", [])) if entry.get("text") else ""
     media = entry.get("media", [])
 
@@ -225,42 +228,3 @@ async def auto_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await msg.reply_text(reply_text)
     except Exception as e:
         await msg.reply_text(f"⚠️ خطا در ارسال پاسخ: {e}")
-        # ======================= ⚙️ مدیریت پاسخ‌ها (لیست و ویرایش) =======================
-async def manage_replies(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """نمایش لیست پاسخ‌های ذخیره‌شده"""
-    data = load_replies().get("replies", {})
-    if not data:
-        return await update.message.reply_text("ℹ️ هنوز هیچ پاسخی ذخیره نشده.")
-
-    keyboard = []
-    for key in data.keys():
-        keyboard.append([InlineKeyboardButton(f"✏️ {key}", callback_data=f"edit_{key}")])
-
-    await update.message.reply_text(
-        "📋 لیست پاسخ‌های ذخیره‌شده:\nیکی را برای ویرایش انتخاب کن 👇",
-        reply_markup=InlineKeyboardMarkup(keyboard)
-    )
-
-# ======================= 📝 ویرایش پاسخ =======================
-async def start_edit_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """باز کردن صفحه ویرایش پاسخ انتخاب‌شده"""
-    query = update.callback_query
-    key = query.data.replace("edit_", "")
-    data = load_replies().get("replies", {})
-
-    if key not in data:
-        return await query.edit_message_text("⚠️ پاسخ موردنظر پیدا نشد!")
-
-    replies = data[key]
-    text_preview = ""
-    for i, r in enumerate(replies, 1):
-        texts = "\n".join(r.get("text", [])) or "— بدون متن —"
-        medias = len(r.get("media", []))
-        text_preview += f"🧩 پاسخ {i}:\n{texts}\n🎞 رسانه‌ها: {medias}\n\n"
-
-    keyboard = [[InlineKeyboardButton("🗑 حذف کل", callback_data=f"delete_{key}")]]
-    await query.edit_message_text(
-        f"✏️ ویرایش پاسخ: <b>{key}</b>\n\n{text_preview}",
-        parse_mode="HTML",
-        reply_markup=InlineKeyboardMarkup(keyboard)
-        )
