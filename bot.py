@@ -1139,15 +1139,22 @@ app.add_handler(MessageHandler(filters.Document.ALL, handle_document))
 app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome))
 
 # ======================= ⚙️ مغز یادگیری و پاسخ =======================
+# ترتیب اجرا و فیلترها به‌صورت دقیق تنظیم شده تا پاسخ‌های نرمال و Reply Panel با هم تداخل نداشته باشن
+
+# 1️⃣ اول: مغز اصلی هوش مصنوعی (پاسخ‌های یادگیری و نرمال)
+# نکته: وقتی کاربر در حال ساخت Reply جدید است، این قسمت نباید فعال شود.
 app.add_handler(
     MessageHandler(
         filters.TEXT
         & ~filters.COMMAND
-        & ~filters.Regex(r"^Reply(\s|$)"),
+        & ~filters.Regex(r"^Reply(\s|$)"),  # جلوگیری از تداخل با ساخت Reply جدید
         reply,
     ),
     group=0
 )
+
+# 2️⃣ دوم: سیستم Reply Panel Pro++ (پاسخ‌های شخصی تعریف‌شده توسط ادمین)
+# این هندلر مخصوص پاسخ‌های ذخیره‌شده در memory.json پنل است.
 app.add_handler(
     MessageHandler(
         filters.TEXT & ~filters.COMMAND,
