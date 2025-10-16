@@ -1070,50 +1070,71 @@ if __name__ == "__main__":
     app = ApplicationBuilder().token(TOKEN).build()
     app.add_error_handler(handle_error)
 
-    # 🔹 دستورات اصلی
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("help", help_command))
-    app.add_handler(CommandHandler("toggle", toggle))
-    app.add_handler(CommandHandler("welcome", toggle_welcome))
-    app.add_handler(CommandHandler("lock", lock_learning))
-    app.add_handler(CommandHandler("unlock", unlock_learning))
-    app.add_handler(CommandHandler("mode", mode_change))
-    app.add_handler(CommandHandler("stats", stats))
-    app.add_handler(CommandHandler("fullstats", fullstats))
-    app.add_handler(CommandHandler("backup", backup))
-    app.add_handler(CommandHandler("restore", restore))
-    app.add_handler(CommandHandler("reset", reset_memory))
-    app.add_handler(CommandHandler("reload", reload_memory))
-    app.add_handler(CommandHandler("broadcast", broadcast))
-    app.add_handler(CommandHandler("cloudsync", cloudsync))
-    app.add_handler(CommandHandler("leave", leave))
-    app.add_handler(CommandHandler("replymode", toggle_reply_mode))
+    # ======================= 🧠 Reply Panel Pro++ اتصال بی‌تداخل =======================
+# مهم: برای جلوگیری از تداخل نام‌ها، ماژول پنل را با alias وارد می‌کنیم
+from reply_panel_pro import (
+    add_reply_command as rp_add_reply_command,
+    message_collector as rp_message_collector,
+    button_handler as rp_button_handler,
+    auto_reply as rp_auto_reply,
+    register_edit_handlers,   # این تابع همه‌ی هندلرهای ویرایش/حذف را اضافه می‌کند
+)
 
-    # ======================= 🧠 Reply Panel Pro++ (بدون /) =======================
-    # فعال‌سازی با نوشتن "Reply <کلمه>"
-    app.add_handler(MessageHandler(filters.Regex("^Reply"), add_reply_command))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, message_collector))
-    app.add_handler(CallbackQueryHandler(button_handler))
-    app.add_handler(CallbackQueryHandler(start_edit_reply, pattern="^edit_"))
+# 🔹 دستورات اصلی
+app.add_handler(CommandHandler("start", start))
+app.add_handler(CommandHandler("help", help_command))
+app.add_handler(CommandHandler("toggle", toggle))
+app.add_handler(CommandHandler("welcome", toggle_welcome))
+app.add_handler(CommandHandler("lock", lock_learning))
+app.add_handler(CommandHandler("unlock", unlock_learning))
+app.add_handler(CommandHandler("mode", mode_change))
+app.add_handler(CommandHandler("stats", stats))
+app.add_handler(CommandHandler("fullstats", fullstats))
+app.add_handler(CommandHandler("backup", backup))
+app.add_handler(CommandHandler("restore", restore))
+app.add_handler(CommandHandler("reset", reset_memory))
+app.add_handler(CommandHandler("reload", reload_memory))
+app.add_handler(CommandHandler("broadcast", broadcast))
+app.add_handler(CommandHandler("cloudsync", cloudsync))
+app.add_handler(CommandHandler("leave", leave))
+app.add_handler(CommandHandler("replymode", toggle_reply_mode))
 
-    # ======================= 📘 راهنمای قابل ویرایش =======================
-    app.add_handler(MessageHandler(filters.Regex("^ثبت راهنما$"), save_custom_help))
-    app.add_handler(MessageHandler(filters.Regex("^راهنما$"), show_custom_help))
+# ======================= 🧠 Reply Panel Pro++ (بدون /) =======================
+# فعال‌سازی با نوشتن:  Reply <کلمه>
+# نکته: Regex را طوری نوشتیم که فقط وقتی پیام با "Reply" شروع می‌شود عمل کند.
+app.add_handler(MessageHandler(filters.Regex(r"^Reply(\s|$)"), rp_add_reply_command))
 
-    # ======================= 🗂 اسناد و عضویت جدید =======================
-    app.add_handler(MessageHandler(filters.Document.ALL, handle_document))
-    app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome))
+# جمع‌آوری پیام‌های محتوایی برای پاسخِ در حال ساخت (متن/مدیا)
+# این هندلر فقط وقتی context.user_data['reply_key'] ست شده باشد عملی می‌شود (داخل خود تابع چک دارد)
+app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, rp_message_collector))
 
-    # ======================= ⚙️ مغز یادگیری و پاسخ =======================
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, reply))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, auto_reply))
+# دکمه‌های پنل
+app.add_handler(CallbackQueryHandler(rp_button_handler))
 
-    # ======================= 🚀 هنگام استارت =======================
-    async def on_startup(app):
-        await notify_admin_on_startup(app)
-        app.create_task(auto_backup(app.bot))
-        app.create_task(start_auto_brain_loop(app.bot))
-        print("🌙 [SYSTEM] Startup tasks scheduled ✅")
+# ✅ همه‌ی هندلرهای ویرایش/حذف/تغییر متن را یکجا اضافه کن
+register_edit_handlers(app)
 
-    app.post_init = on_startup
-    app.run_polling(allowed_updates=Update.ALL_TYPES)
+# ======================= 📘 راهنمای قابل ویرایش =======================
+app.add_handler(MessageHandler(filters.Regex("^ثبت راهنما$"), save_custom_help))
+app.add_handler(MessageHandler(filters.Regex("^راهنما$"), show_custom_help))
+
+# ======================= 🗂 اسناد و عضویت جدید =======================
+app.add_handler(MessageHandler(filters.Document.ALL, handle_document))
+app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome))
+
+# ======================= ⚙️ مغز یادگیری و پاسخ =======================
+# 1) اول مغز اصلی تا پاسخ نرمال همیشه کار کند
+app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, reply))
+
+# 2) بعد از آن، پنل Reply تا کلیدهای سفارشی کار کنند
+app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, rp_auto_reply))
+
+# ======================= 🚀 هنگام استارت =======================
+async def on_startup(app):
+    await notify_admin_on_startup(app)
+    app.create_task(auto_backup(app.bot))
+    app.create_task(start_auto_brain_loop(app.bot))
+    print("🌙 [SYSTEM] Startup tasks scheduled ✅")
+
+app.post_init = on_startup
+app.run_polling(allowed_updates=Update.ALL_TYPES)
