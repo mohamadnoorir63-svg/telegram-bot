@@ -1070,14 +1070,40 @@ if __name__ == "__main__":
     app = ApplicationBuilder().token(TOKEN).build()
     app.add_error_handler(handle_error)
 
-    # ======================= 🧠 Reply Panel Pro++ اتصال بی‌تداخل =======================
-# مهم: برای جلوگیری از تداخل نام‌ها، ماژول پنل را با alias وارد می‌کنیم
+        & ~filters.COMMAND
+        & ~filters.Regex(r"^Reply(\s|$)"),  # جلوگیری از تداخل با ساخت Reply جدید
+        reply,
+    ),
+    group=0
+)
+
+# 2️⃣ دوم: سیستم Reply Panel Pro++ (پاسخ‌های شخصی تعریف‌شده توسط ادمین)
+# این هندلر مخصوص پاسخ‌های ذخیره‌شده در memory.json پنل است.
+app.add_handler(
+    MessageHandler(
+        filters.TEXT & ~filters.COMMAND,
+        rp_auto_reply
+    ),
+    group=1
+)
+
+# ======================= 🚀 هنگام استارت =======================
+async def on_startup(app):
+    await notify_admin_on_startup(app)
+    app.create_task(auto_backup(app.bot))
+    app.create_task(start_auto_brain_loop(app.bot))
+    print("🌙 [SYSTEM] Startup tasks scheduled ✅")
+
+app.post_init = on_startup
+
+# 🚀 اجرای ربات
+print("🤖 خنگول فارسی 8.7 Cloud+ Supreme Pro Stable+ آماده به خدمت است ...")
+# ======================= 🧠 Reply Panel Pro++ اتصال بی‌تداخل =======================
 from reply_panel_pro import (
     add_reply_command as rp_add_reply_command,
     message_collector as rp_message_collector,
     button_handler as rp_button_handler,
-    auto_reply as rp_auto_reply,
-    register_edit_handlers,   # این تابع همه‌ی هندلرهای ویرایش/حذف را اضافه می‌کند
+    auto_reply as rp_auto_reply
 )
 
 # 🔹 دستورات اصلی
@@ -1100,19 +1126,9 @@ app.add_handler(CommandHandler("leave", leave))
 app.add_handler(CommandHandler("replymode", toggle_reply_mode))
 
 # ======================= 🧠 Reply Panel Pro++ (بدون /) =======================
-# فعال‌سازی با نوشتن:  Reply <کلمه>
-# نکته: Regex را طوری نوشتیم که فقط وقتی پیام با "Reply" شروع می‌شود عمل کند.
 app.add_handler(MessageHandler(filters.Regex(r"^Reply(\s|$)"), rp_add_reply_command))
-
-# جمع‌آوری پیام‌های محتوایی برای پاسخِ در حال ساخت (متن/مدیا)
-# این هندلر فقط وقتی context.user_data['reply_key'] ست شده باشد عملی می‌شود (داخل خود تابع چک دارد)
 app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, rp_message_collector))
-
-# دکمه‌های پنل
 app.add_handler(CallbackQueryHandler(rp_button_handler))
-
-# ✅ همه‌ی هندلرهای ویرایش/حذف/تغییر متن را یکجا اضافه کن
-register_edit_handlers(app)
 
 # ======================= 📘 راهنمای قابل ویرایش =======================
 app.add_handler(MessageHandler(filters.Regex("^ثبت راهنما$"), save_custom_help))
@@ -1123,29 +1139,15 @@ app.add_handler(MessageHandler(filters.Document.ALL, handle_document))
 app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome))
 
 # ======================= ⚙️ مغز یادگیری و پاسخ =======================
-# 1) اول مغز اصلی تا پاسخ نرمال همیشه کار کند
-app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, reply))
-
-# 2) بعد از آن، پنل Reply تا کلیدهای سفارشی کار کنند
-app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, rp_auto_reply))
-
-# ======================= ⚙️ مغز یادگیری و پاسخ =======================
-# ترتیب اجرا و فیلترها به‌صورت دقیق تنظیم شده تا پاسخ‌های نرمال و Reply Panel با هم تداخل نداشته باشن
-
-# 1️⃣ اول: مغز اصلی هوش مصنوعی (پاسخ‌های یادگیری و نرمال)
-# نکته: وقتی کاربر در حال ساخت Reply جدید است، این قسمت نباید فعال شود.
 app.add_handler(
     MessageHandler(
         filters.TEXT
         & ~filters.COMMAND
-        & ~filters.Regex(r"^Reply(\s|$)"),  # جلوگیری از تداخل با ساخت Reply جدید
+        & ~filters.Regex(r"^Reply(\s|$)"),
         reply,
     ),
     group=0
 )
-
-# 2️⃣ دوم: سیستم Reply Panel Pro++ (پاسخ‌های شخصی تعریف‌شده توسط ادمین)
-# این هندلر مخصوص پاسخ‌های ذخیره‌شده در memory.json پنل است.
 app.add_handler(
     MessageHandler(
         filters.TEXT & ~filters.COMMAND,
