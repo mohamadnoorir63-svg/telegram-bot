@@ -465,6 +465,10 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     uid = update.effective_user.id
     chat_id = update.effective_chat.id
 
+    # 🧠 بررسی حالت ریپلی مود گروهی
+    if await handle_group_reply_mode(update, context):
+        return
+
     # ثبت کاربر و گروه
     register_user(uid)
     register_group_activity(chat_id, uid)
