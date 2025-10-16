@@ -1,18 +1,19 @@
 # ========================= ✳️ Reply Panel Pro =========================
 # نسخه حرفه‌ای هماهنگ با Khenqol Cloud+ Supreme Pro 8.5.1
 # پشتیبانی از: متن، عکس، ویدیو، موزیک، استیکر، ویدیو‌نوت، ویس
-# طراحی شده برای سیستم ذخیره پاسخ‌های پیشرفته با پنل انتخاب
+# طراحی شده برای سیستم ذخیره پاسخ‌های پیشرفته با پنل انتخاب و حالت تصادفی
 
 import os
 import json
 import random
-from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton, InputFile
+from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import ContextTypes
 
 REPLY_FILE = "memory.json"
 
 # ---------------------- 📂 توابع پایه ----------------------
 def load_replies():
+    """بارگذاری پاسخ‌ها از فایل حافظه"""
     if not os.path.exists(REPLY_FILE):
         return {"replies": {}}
     with open(REPLY_FILE, "r", encoding="utf-8") as f:
@@ -25,17 +26,19 @@ def load_replies():
             return {"replies": {}}
 
 def save_replies(data):
+    """ذخیره پاسخ‌ها در حافظه"""
     with open(REPLY_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
 # ---------------------- 🎯 افزودن پاسخ ----------------------
 async def add_reply_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """شروع ساخت پاسخ جدید با پنل انتخاب"""
+    """شروع ساخت پاسخ جدید با پنل تنظیمات"""
     message = update.message
     text = message.text.replace("افزودن پاسخ", "").strip()
     if not text:
         return await message.reply_text("❗ لطفاً بعد از دستور بنویس: افزودن پاسخ <نام>")
 
+    # ذخیره وضعیت در حافظه موقت کاربر
     context.user_data["reply_key"] = text
     context.user_data["reply_data"] = {
         "media": [],
@@ -47,65 +50,72 @@ async def add_reply_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # ساخت پنل تنظیمات
     keyboard = [
-        [InlineKeyboardButton("👥 همه ✅", callback_data="access_all"),
-         InlineKeyboardButton("👑 ادمین", callback_data="access_admin")],
-        [InlineKeyboardButton("📢 گروه", callback_data="send_group"),
-         InlineKeyboardButton("👤 شخصی", callback_data="send_private")],
-        [InlineKeyboardButton("🎲 تصادفی", callback_data="random_toggle"),
-         InlineKeyboardButton("💾 ذخیره", callback_data="save_reply")],
+        [
+            InlineKeyboardButton("👥 همه ✅", callback_data="access_all"),
+            InlineKeyboardButton("👑 ادمین", callback_data="access_admin")
+        ],
+        [
+            InlineKeyboardButton("📢 گروه", callback_data="send_group"),
+            InlineKeyboardButton("👤 شخصی", callback_data="send_private")
+        ],
+        [
+            InlineKeyboardButton("🎲 تصادفی", callback_data="random_toggle"),
+            InlineKeyboardButton("💾 ذخیره", callback_data="save_reply")
+        ],
         [InlineKeyboardButton("🗑 حذف", callback_data="delete_reply")]
     ]
+
     await message.reply_text(
         f"🧠 در حال ساخت پاسخ جدید برای: <b>{text}</b>\n\n"
         "📌 روی پیامی (متنی یا رسانه‌ای) ریپلای کن تا ذخیره شود.\n"
-        "سپس با دکمه‌ها تنظیمات را انتخاب کن و ذخیره بزن.",
+        "وقتی تموم شد از دکمه‌های پایین تنظیمات را انتخاب کن و روی 💾 ذخیره بزن.",
         parse_mode="HTML",
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
 
-# ---------------------- 📨 دریافت فایل‌ها ----------------------
+# ---------------------- 📨 دریافت انواع فایل ----------------------
 async def message_collector(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """دریافت هر نوع پیام برای ذخیره موقت"""
+    """دریافت هر نوع پیام و ذخیره موقت آن در حافظه کاربر"""
     if "reply_key" not in context.user_data:
         return  # در حالت افزودن نیست
 
     data = context.user_data["reply_data"]
     msg = update.message
 
-    # ذخیره متن
+    # 📄 متن
     if msg.text:
         data["text"].append(msg.text.strip())
 
-    # ذخیره عکس
+    # 🖼 عکس
     elif msg.photo:
-        photo = msg.photo[-1].file_id
-        data["media"].append(("photo", photo))
+        file_id = msg.photo[-1].file_id
+        data["media"].append(("photo", file_id))
 
-    # ذخیره ویدیو
+    # 🎬 ویدیو
     elif msg.video:
         data["media"].append(("video", msg.video.file_id))
 
-    # ذخیره موزیک
+    # 🎵 موزیک
     elif msg.audio:
         data["media"].append(("audio", msg.audio.file_id))
 
-    # ذخیره ویس
+    # 🎙 ویس
     elif msg.voice:
         data["media"].append(("voice", msg.voice.file_id))
 
-    # ذخیره ویدیو‌نوت
+    # 📹 ویدیو‌نوت
     elif msg.video_note:
         data["media"].append(("video_note", msg.video_note.file_id))
 
-    # ذخیره استیکر
+    # 💬 استیکر
     elif msg.sticker:
         data["media"].append(("sticker", msg.sticker.file_id))
 
     await msg.reply_text("✅ پیام موقتاً ذخیره شد. بعد از اتمام، دکمه 💾 ذخیره را بزن.")
 
-# ---------------------- 🧮 کنترل پنل ----------------------
+# ---------------------- 🧮 مدیریت پنل ----------------------
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """مدیریت دکمه‌های انتخاب پنل"""
+    """مدیریت کلیک روی دکمه‌های پنل"""
     query = update.callback_query
     await query.answer()
 
@@ -117,7 +127,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data = load_replies()
     replies = data.get("replies", {})
 
-    # تغییرات تنظیمات
+    # ⚙️ تغییر تنظیمات
     if query.data == "access_all":
         reply_data["access"] = "همه"
     elif query.data == "access_admin":
@@ -129,7 +139,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif query.data == "random_toggle":
         reply_data["random_mode"] = not reply_data["random_mode"]
 
-    # ذخیره
+    # 💾 ذخیره
     elif query.data == "save_reply":
         if key not in replies:
             replies[key] = []
@@ -149,7 +159,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"✅ پاسخ برای '{key}' با موفقیت ذخیره شد و پنل بسته شد."
         )
 
-    # حذف
+    # 🗑 حذف پاسخ
     elif query.data == "delete_reply":
         if key in replies:
             del replies[key]
@@ -159,67 +169,84 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else:
             return await query.edit_message_text("⚠️ پاسخی برای حذف وجود ندارد.")
 
-    # بازسازی پنل با وضعیت جدید
+    # 🔄 به‌روزرسانی وضعیت دکمه‌ها
     random_state = "✅" if reply_data["random_mode"] else ""
     keyboard = [
-        [InlineKeyboardButton("👥 همه ✅" if reply_data["access"] == "همه" else "👥 همه", callback_data="access_all"),
-         InlineKeyboardButton("👑 ادمین ✅" if reply_data["access"] == "ادمین" else "👑 ادمین", callback_data="access_admin")],
-        [InlineKeyboardButton("📢 گروه ✅" if reply_data["send_mode"] == "گروه" else "📢 گروه", callback_data="send_group"),
-         InlineKeyboardButton("👤 شخصی ✅" if reply_data["send_mode"] == "شخصی" else "👤 شخصی", callback_data="send_private")],
-        [InlineKeyboardButton(f"🎲 تصادفی {random_state}", callback_data="random_toggle"),
-         InlineKeyboardButton("💾 ذخیره", callback_data="save_reply")],
+        [
+            InlineKeyboardButton(
+                "👥 همه ✅" if reply_data["access"] == "همه" else "👥 همه",
+                callback_data="access_all"
+            ),
+            InlineKeyboardButton(
+                "👑 ادمین ✅" if reply_data["access"] == "ادمین" else "👑 ادمین",
+                callback_data="access_admin"
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                "📢 گروه ✅" if reply_data["send_mode"] == "گروه" else "📢 گروه",
+                callback_data="send_group"
+            ),
+            InlineKeyboardButton(
+                "👤 شخصی ✅" if reply_data["send_mode"] == "شخصی" else "👤 شخصی",
+                callback_data="send_private"
+            )
+        ],
+        [
+            InlineKeyboardButton(f"🎲 تصادفی {random_state}", callback_data="random_toggle"),
+            InlineKeyboardButton("💾 ذخیره", callback_data="save_reply")
+        ],
         [InlineKeyboardButton("🗑 حذف", callback_data="delete_reply")]
     ]
     await query.edit_message_reply_markup(reply_markup=InlineKeyboardMarkup(keyboard))
 
 # ---------------------- 💬 پاسخ خودکار ----------------------
 async def auto_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """ارسال پاسخ هنگام دریافت کلید ذخیره‌شده"""
-    text = update.message.text.strip()
-    data = load_replies().get("replies", {})
-
-    if text not in data:
+    """ارسال پاسخ هنگام دریافت کلید ذخیره‌شده (پشتیبانی از متن و رسانه)"""
+    msg = update.message
+    if not msg or not msg.text:
         return
 
-    replies = data[text]
-    if not replies:
+    text = msg.text.strip()
+    all_data = load_replies()
+    replies = all_data.get("replies", {})
+
+    if text not in replies:
         return
 
-    # انتخاب پاسخ تصادفی
-    selected = random.choice(replies)
+    options = replies[text]
+    if not options:
+        return
+
+    # 🎲 انتخاب پاسخ (تصادفی یا معمولی)
+    selected = random.choice(options)
     if selected.get("random"):
-        # اگر چند پاسخ دارد، یکی از آن‌ها را انتخاب کن
-        if selected["text"]:
-            reply_text = random.choice(selected["text"])
-        else:
-            reply_text = ""
+        reply_text = random.choice(selected.get("text", []) or [""])
         media_list = selected.get("media", [])
-        if media_list:
-            media = random.choice(media_list)
-        else:
-            media = None
+        media = random.choice(media_list) if media_list else None
     else:
-        # اولین پاسخ کامل را بفرست
-        reply_text = "\n".join(selected.get("text", []))
-        media = selected["media"][0] if selected["media"] else None
+        reply_text = "\n".join(selected.get("text", []) or [])
+        media = selected.get("media", [None])[0]
 
-    # ارسال
-    if media:
-        t, fid = media
-        try:
-            if t == "photo":
-                await update.message.reply_photo(fid, caption=reply_text or None)
-            elif t == "video":
-                await update.message.reply_video(fid, caption=reply_text or None)
-            elif t == "audio":
-                await update.message.reply_audio(fid, caption=reply_text or None)
-            elif t == "voice":
-                await update.message.reply_voice(fid, caption=reply_text or None)
-            elif t == "video_note":
-                await update.message.reply_video_note(fid)
-            elif t == "sticker":
-                await update.message.reply_sticker(fid)
-        except Exception as e:
-            await update.message.reply_text(f"⚠️ خطا در ارسال رسانه: {e}")
-    elif reply_text:
-        await update.message.reply_text(reply_text)
+    # 🚀 ارسال پیام
+    try:
+        if media:
+            mtype, fid = media
+            if mtype == "photo":
+                await msg.reply_photo(fid, caption=reply_text or None)
+            elif mtype == "video":
+                await msg.reply_video(fid, caption=reply_text or None)
+            elif mtype == "audio":
+                await msg.reply_audio(fid, caption=reply_text or None)
+            elif mtype == "voice":
+                await msg.reply_voice(fid, caption=reply_text or None)
+            elif mtype == "video_note":
+                await msg.reply_video_note(fid)
+            elif mtype == "sticker":
+                await msg.reply_sticker(fid)
+            else:
+                await msg.reply_text(reply_text or "⚠️ نوع رسانه پشتیبانی نمی‌شود.")
+        elif reply_text:
+            await msg.reply_text(reply_text)
+    except Exception as e:
+        await msg.reply_text(f"⚠️ خطا در ارسال پاسخ: {e}")
