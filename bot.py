@@ -897,44 +897,48 @@ async def leave(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ======================= 🚀 اجرای نهایی =======================
 if __name__ == "__main__":
     print("🤖 خنگول فارسی 8.5.1 Cloud+ Supreme Pro Stable+ آماده به خدمت است ...")
+app = ApplicationBuilder().token(TOKEN).build()
+app.add_error_handler(handle_error)
 
-    app = ApplicationBuilder().token(TOKEN).build()
-    app.add_error_handler(handle_error)
+# 🔹 دستورات اصلی
+app.add_handler(CommandHandler("start", start))
+app.add_handler(CommandHandler("help", help_command))
+app.add_handler(CommandHandler("toggle", toggle))
+app.add_handler(CommandHandler("welcome", toggle_welcome))
+app.add_handler(CommandHandler("lock", lock_learning))
+app.add_handler(CommandHandler("unlock", unlock_learning))
+app.add_handler(CommandHandler("mode", mode_change))
+app.add_handler(CommandHandler("stats", stats))
+app.add_handler(CommandHandler("fullstats", fullstats))
+app.add_handler(CommandHandler("backup", backup))
+app.add_handler(CommandHandler("restore", restore))
+app.add_handler(CommandHandler("reset", reset_memory))
+app.add_handler(CommandHandler("reload", reload_memory))
+app.add_handler(CommandHandler("broadcast", broadcast))
+app.add_handler(CommandHandler("cloudsync", cloudsync))
+app.add_handler(CommandHandler("leave", leave))
+app.add_handler(CommandHandler("reply", toggle_reply_mode))
 
-    # 🔹 دستورات اصلی
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("help", help_command))
-    app.add_handler(CommandHandler("toggle", toggle))
-    app.add_handler(CommandHandler("welcome", toggle_welcome))
-    app.add_handler(CommandHandler("lock", lock_learning))
-    app.add_handler(CommandHandler("unlock", unlock_learning))
-    app.add_handler(CommandHandler("mode", mode_change))
-    app.add_handler(CommandHandler("stats", stats))
-    app.add_handler(CommandHandler("fullstats", fullstats))
-    app.add_handler(CommandHandler("backup", backup))
-    app.add_handler(CommandHandler("restore", restore))
-    app.add_handler(CommandHandler("reset", reset_memory))
-    app.add_handler(CommandHandler("reload", reload_memory))
-    app.add_handler(CommandHandler("broadcast", broadcast))
-    app.add_handler(CommandHandler("cloudsync", cloudsync))
-    app.add_handler(CommandHandler("leave", leave))
-    app.add_handler(CommandHandler("reply", toggle_reply_mode))
+# 🔹 پنل اصلی و قابلیت‌ها
+app.add_handler(MessageHandler(filters.Regex("^ثبت قابلیت$"), save_features))
+app.add_handler(CallbackQueryHandler(feature_button_handler, pattern="^feature_"))
 
-    # 🔹 راهنمای قابل ویرایش
-    app.add_handler(MessageHandler(filters.Regex("^ثبت راهنما$"), save_custom_help))
-    app.add_handler(MessageHandler(filters.Regex("^راهنما$"), show_custom_help))
+# 🔹 راهنمای قابل ویرایش
+app.add_handler(MessageHandler(filters.Regex("^ثبت راهنما$"), save_custom_help))
+app.add_handler(MessageHandler(filters.Regex("^راهنما$"), show_custom_help))
 
-    # 🔹 پیام‌ها و اسناد
-    app.add_handler(MessageHandler(filters.Document.ALL, handle_document))
-    app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, reply))
+# 🔹 پیام‌ها و اسناد
+app.add_handler(MessageHandler(filters.Document.ALL, handle_document))
+app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome))
+app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, reply))
 
-    # 🔹 هنگام استارت
-    async def on_startup(app):
-        await notify_admin_on_startup(app)
-        app.create_task(auto_backup(app.bot))
-        app.create_task(start_auto_brain_loop(app.bot))  # 🧠 فعال‌سازی مغز خودکار
-        print("🌙 [SYSTEM] Startup tasks scheduled ✅")
+# 🔹 هنگام استارت
+async def on_startup(app):
+    await notify_admin_on_startup(app)
+    app.create_task(auto_backup(app.bot))
+    app.create_task(start_auto_brain_loop(app.bot))  # 🧠 فعال‌سازی مغز خودکار
+    print("🌙 [SYSTEM] Startup tasks scheduled ✅")
 
-    app.post_init = on_startup
-    app.run_polling(allowed_updates=Update.ALL_TYPES)
+app.post_init = on_startup
+app.run_polling(allowed_updates=Update.ALL_TYPES)
+    
