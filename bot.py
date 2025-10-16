@@ -1064,14 +1064,13 @@ async def leave(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("🫡 خدافظ! تا دیدار بعدی 😂")
         await context.bot.leave_chat(update.message.chat.id)
 
-# ======================= 🚀 اجرای نهایی =======================
 if __name__ == "__main__":
     print("🤖 خنگول فارسی 8.5.1 Cloud+ Supreme Pro Stable+ آماده به خدمت است ...")
 
     app = ApplicationBuilder().token(TOKEN).build()
     app.add_error_handler(handle_error)
 
-# 🔹 دستورات اصلی
+    # 🔹 دستورات اصلی
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("help", help_command))
     app.add_handler(CommandHandler("toggle", toggle))
@@ -1088,13 +1087,12 @@ if __name__ == "__main__":
     app.add_handler(CommandHandler("broadcast", broadcast))
     app.add_handler(CommandHandler("cloudsync", cloudsync))
     app.add_handler(CommandHandler("leave", leave))
-    app.add_handler(CommandHandler("reply", toggle_reply_mode))
+    app.add_handler(CommandHandler("replymode", toggle_reply_mode))
 
     # ======================= 🧠 Reply Panel Pro++ =======================
-    # افزودن پاسخ و مدیریت‌ها
-    app.add_handler(MessageHandler(filters.Regex("^افزودن پاسخ"), add_reply_command))
-    app.add_handler(MessageHandler(filters.Regex("^مدیریت پاسخ‌ها$"), manage_replies))
-    
+    app.add_handler(CommandHandler("reply", add_reply_command))
+    app.add_handler(MessageHandler(filters.ALL, message_collector))
+    app.add_handler(CallbackQueryHandler(button_handler))
 
     # ======================= 📘 راهنمای قابل ویرایش =======================
     app.add_handler(MessageHandler(filters.Regex("^ثبت راهنما$"), save_custom_help))
@@ -1104,11 +1102,10 @@ if __name__ == "__main__":
     app.add_handler(MessageHandler(filters.Document.ALL, handle_document))
     app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome))
 
-    # ======================= ⚙️ مغز اصلی یادگیری و پاسخ‌دهی =======================
-    # ⚙️ ابتدا پاسخ‌های یادگیری و گفت‌وگو
+    # ======================= ⚙️ مغز یادگیری و پاسخ =======================
+    # ⚙️ ابتدا پاسخ‌های گفت‌وگو و یادگیری
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, reply))
-
-    # ⚙️ سپس پاسخ خودکار (آخرین مرحله - نباید بالاتر بیاد)
+    # ⚙️ سپس پاسخ خودکار هوشمند (پایان زنجیره)
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, auto_reply))
 
     # ======================= 🚀 هنگام استارت =======================
