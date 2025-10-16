@@ -1129,6 +1129,31 @@ app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, reply))
 # 2) بعد از آن، پنل Reply تا کلیدهای سفارشی کار کنند
 app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, rp_auto_reply))
 
+# ======================= ⚙️ مغز یادگیری و پاسخ =======================
+# ترتیب اجرا و فیلترها به‌صورت دقیق تنظیم شده تا پاسخ‌های نرمال و Reply Panel با هم تداخل نداشته باشن
+
+# 1️⃣ اول: مغز اصلی هوش مصنوعی (پاسخ‌های یادگیری و نرمال)
+# نکته: وقتی کاربر در حال ساخت Reply جدید است، این قسمت نباید فعال شود.
+app.add_handler(
+    MessageHandler(
+        filters.TEXT
+        & ~filters.COMMAND
+        & ~filters.Regex(r"^Reply(\s|$)"),  # جلوگیری از تداخل با ساخت Reply جدید
+        reply,
+    ),
+    group=0
+)
+
+# 2️⃣ دوم: سیستم Reply Panel Pro++ (پاسخ‌های شخصی تعریف‌شده توسط ادمین)
+# این هندلر مخصوص پاسخ‌های ذخیره‌شده در memory.json پنل است.
+app.add_handler(
+    MessageHandler(
+        filters.TEXT & ~filters.COMMAND,
+        rp_auto_reply
+    ),
+    group=1
+)
+
 # ======================= 🚀 هنگام استارت =======================
 async def on_startup(app):
     await notify_admin_on_startup(app)
@@ -1137,4 +1162,7 @@ async def on_startup(app):
     print("🌙 [SYSTEM] Startup tasks scheduled ✅")
 
 app.post_init = on_startup
+
+# 🚀 اجرای ربات
+print("🤖 خنگول فارسی 8.7 Cloud+ Supreme Pro Stable+ آماده به خدمت است ...")
 app.run_polling(allowed_updates=Update.ALL_TYPES)
