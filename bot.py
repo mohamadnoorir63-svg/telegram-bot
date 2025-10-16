@@ -304,21 +304,21 @@ async def fullstats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         await update.message.reply_text(f"⚠️ خطا در آمار گروه‌ها:\n{e}")
 
-# ======================= 👋 سیستم خوشامد پویا برای هر گروه =======================
-from telegram import InlineKeyboardMarkup, InlineKeyboardButton
+ # ======================= 👋 سیستم خوشامد پویا برای هر گروه =======================
+from telegram import InlineKeyboardMarkup, InlineKeyboardButton, Update
+from telegram.ext import ContextTypes
 import datetime, json, os, asyncio
 
 WELCOME_FILE = "welcome_settings.json"
 
+# ✅ بارگذاری و ذخیره‌سازی تنظیمات
 def load_welcome_settings():
-    """خواندن تنظیمات خوشامد از فایل"""
     if os.path.exists(WELCOME_FILE):
         with open(WELCOME_FILE, "r", encoding="utf-8") as f:
             return json.load(f)
     return {}
 
 def save_welcome_settings(data):
-    """ذخیره تنظیمات خوشامد در فایل"""
     with open(WELCOME_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
@@ -328,9 +328,8 @@ welcome_settings = load_welcome_settings()
 async def open_welcome_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat = update.effective_chat
     user = update.effective_user
-
-    # بررسی مدیر بودن
     member = await context.bot.get_chat_member(chat.id, user.id)
+
     if member.status not in ["administrator", "creator"] and user.id != ADMIN_ID:
         return await update.message.reply_text("⛔ فقط مدیران یا ادمین اصلی می‌تونن خوشامد رو تنظیم کنن!")
 
@@ -342,38 +341,48 @@ async def open_welcome_panel(update: Update, context: ContextTypes.DEFAULT_TYPE)
         [InlineKeyboardButton("📎 تنظیم لینک قوانین", callback_data="welcome_setrules")],
         [InlineKeyboardButton("⏳ تنظیم حذف خودکار", callback_data="welcome_setdelete")]
     ]
-    await update.message.reply_text("👋 تنظیمات خوشامد برای این گروه:", reply_markup=InlineKeyboardMarkup(keyboard))
+    await update.message.reply_text(
+        "👋 تنظیمات خوشامد برای این گروه:",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
 
-# ✅ عملکرد دکمه‌های پنل خوشامد
+# ✅ دکمه‌های پنل
 async def welcome_panel_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     chat_id = str(query.message.chat.id)
     await query.answer()
 
     if chat_id not in welcome_settings:
-        welcome_settings[chat_id] = {"enabled": False, "text": None, "media": None, "rules": None, "delete_after": 0}
+        welcome_settings[chat_id] = {
+            "enabled": False,
+            "text": None,
+            "media": None,
+            "rules": None,
+            "delete_after": 0
+        }
 
-    if query.data == "welcome_enable":
+    data = query.data
+    msg = "❗ گزینه نامعتبر"
+
+    if data == "welcome_enable":
         welcome_settings[chat_id]["enabled"] = True
         msg = "✅ خوشامد برای این گروه فعال شد!"
-    elif query.data == "welcome_disable":
+    elif data == "welcome_disable":
         welcome_settings[chat_id]["enabled"] = False
         msg = "🚫 خوشامد برای این گروه غیرفعال شد!"
-    elif query.data == "welcome_setmedia":
-        msg = "🖼 عکس یا گیف خوشامد را بفرست و بنویس:\n<b>ثبت عکس خوشامد</b>"
-    elif query.data == "welcome_settext":
-        msg = "📜 متن خوشامد را بفرست و بنویس:\n<b>ثبت خوشامد</b>"
-    elif query.data == "welcome_setrules":
-        msg = "📎 لینک قوانین گروه را با دستور زیر بفرست:\n/تنظیم_قوانین [لینک]"
-    elif query.data == "welcome_setdelete":
-        msg = "⏳ زمان حذف خودکار خوشامد را تنظیم کن:\nمثلاً:\n/تنظیم_حذف 60 (به ثانیه)"
-    else:
-        msg = "❗ گزینه نامعتبر"
+    elif data == "welcome_setmedia":
+        msg = "🖼 روی عکس یا گیف ریپلای کن و بنویس:\n<b>ثبت عکس خوشامد</b>"
+    elif data == "welcome_settext":
+        msg = "📜 روی پیام متنی ریپلای کن و بنویس:\n<b>ثبت خوشامد</b>"
+    elif data == "welcome_setrules":
+        msg = "📎 لینک قوانین گروه را بفرست:\nمثلاً:\nتنظیم قوانین https://t.me/example"
+    elif data == "welcome_setdelete":
+        msg = "⏳ زمان حذف خودکار خوشامد را بنویس:\nمثلاً:\nتنظیم حذف 60 (به ثانیه)"
 
     save_welcome_settings(welcome_settings)
     await query.message.reply_text(msg, parse_mode="HTML")
 
-# ✅ ثبت متن خوشامد با ریپلای
+# ✅ ثبت متن خوشامد
 async def set_welcome_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = str(update.effective_chat.id)
     user = update.effective_user
@@ -386,9 +395,7 @@ async def set_welcome_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return await update.message.reply_text("❗ باید روی پیام متنی ریپلای بزنی!")
 
     text = update.message.reply_to_message.text
-    if chat_id not in welcome_settings:
-        welcome_settings[chat_id] = {}
-    welcome_settings[chat_id]["text"] = text
+    welcome_settings.setdefault(chat_id, {})["text"] = text
     save_welcome_settings(welcome_settings)
     await update.message.reply_text("✅ متن خوشامد با موفقیت ذخیره شد!")
 
@@ -412,60 +419,56 @@ async def set_welcome_media(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         return await update.message.reply_text("⚠️ فقط عکس یا گیف قابل تنظیم است!")
 
-    if chat_id not in welcome_settings:
-        welcome_settings[chat_id] = {}
-    welcome_settings[chat_id]["media"] = file_id
+    welcome_settings.setdefault(chat_id, {})["media"] = file_id
     save_welcome_settings(welcome_settings)
     await update.message.reply_text("✅ عکس خوشامد ذخیره شد!")
 
-# ✅ تنظیم لینک قوانین
+# ✅ تنظیم لینک قوانین (بدون /)
 async def set_rules_link(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = str(update.effective_chat.id)
     user = update.effective_user
-    if user.id != ADMIN_ID:
-        member = await context.bot.get_chat_member(chat_id, user.id)
-        if member.status not in ["administrator", "creator"]:
-            return await update.message.reply_text("⛔ فقط مدیران می‌تونن قوانین تنظیم کنن!")
+    member = await context.bot.get_chat_member(chat_id, user.id)
 
-    if not context.args:
-        return await update.message.reply_text("📎 لطفاً لینک قوانین را بعد از دستور بنویس:\n/تنظیم_قوانین [لینک]")
+    if member.status not in ["administrator", "creator"] and user.id != ADMIN_ID:
+        return await update.message.reply_text("⛔ فقط مدیران می‌تونن قوانین رو تنظیم کنن!")
 
-    link = context.args[0]
-    if chat_id not in welcome_settings:
-        welcome_settings[chat_id] = {}
-    welcome_settings[chat_id]["rules"] = link
+    text = update.message.text.strip().split(maxsplit=2)
+    if len(text) < 3:
+        return await update.message.reply_text("📎 لطفاً لینک قوانین را بنویس، مثلاً:\nتنظیم قوانین https://t.me/example")
+
+    link = text[2]
+    welcome_settings.setdefault(chat_id, {})["rules"] = link
     save_welcome_settings(welcome_settings)
-    await update.message.reply_text("✅ لینک قوانین ذخیره شد!")
+    await update.message.reply_text(f"✅ لینک قوانین ذخیره شد:\n{link}")
 
-# ✅ تنظیم حذف خودکار
+# ✅ تنظیم حذف خودکار (بدون /)
 async def set_welcome_timer(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = str(update.effective_chat.id)
     user = update.effective_user
-    if user.id != ADMIN_ID:
-        member = await context.bot.get_chat_member(chat_id, user.id)
-        if member.status not in ["administrator", "creator"]:
-            return await update.message.reply_text("⛔ فقط مدیران مجازند!")
+    member = await context.bot.get_chat_member(chat_id, user.id)
 
-    if not context.args:
-        return await update.message.reply_text("⚙️ استفاده درست:\n/تنظیم_حذف 60 (عدد به ثانیه)")
+    if member.status not in ["administrator", "creator"] and user.id != ADMIN_ID:
+        return await update.message.reply_text("⛔ فقط مدیران مجازند!")
+
+    text = update.message.text.strip().split()
+    if len(text) < 3:
+        return await update.message.reply_text("⚙️ لطفاً عدد زمان حذف را بنویس، مثلاً:\nتنظیم حذف 60 (به ثانیه)")
 
     try:
-        seconds = int(context.args[0])
-        if seconds < 10 or seconds > 86400:
+        seconds = int(text[2])
+        if not 10 <= seconds <= 86400:
             return await update.message.reply_text("⏳ عدد باید بین 10 تا 86400 باشه!")
     except:
         return await update.message.reply_text("⚠️ لطفاً عدد معتبر وارد کن!")
 
-    if chat_id not in welcome_settings:
-        welcome_settings[chat_id] = {}
-    welcome_settings[chat_id]["delete_after"] = seconds
+    welcome_settings.setdefault(chat_id, {})["delete_after"] = seconds
     save_welcome_settings(welcome_settings)
     await update.message.reply_text(f"✅ پیام خوشامد بعد از {seconds} ثانیه حذف خواهد شد!")
 
-# ✅ ارسال خوشامد هنگام ورود
+# ✅ ارسال خوشامد
 async def welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = str(update.effective_chat.id)
-    if chat_id not in welcome_settings or not welcome_settings[chat_id].get("enabled"):
+    if not welcome_settings.get(chat_id, {}).get("enabled"):
         return
 
     cfg = welcome_settings[chat_id]
@@ -491,7 +494,6 @@ async def welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
             else:
                 msg = await update.message.reply_text(message_text, parse_mode="HTML")
 
-            # حذف خودکار در صورت فعال بودن
             if delete_after > 0:
                 await asyncio.sleep(delete_after)
                 await context.bot.delete_message(chat_id=update.effective_chat.id, message_id=msg.message_id)
