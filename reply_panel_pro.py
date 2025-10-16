@@ -9,7 +9,8 @@ import random
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import ContextTypes
 
-REPLY_FILE = "memory.json"
+# 📍 مسیر مطلق فایل حافظه (در کنار bot.py)
+REPLY_FILE = os.path.join(os.path.dirname(__file__), "memory.json")
 
 # ---------------------- 📂 توابع پایه ----------------------
 def load_replies():
@@ -153,9 +154,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         }
 
         replies[key].append(entry)
-        # 🧩 خط حیاتی که باعث می‌شود داده واقعاً ذخیره شود
-        data["replies"] = replies
-
+        data["replies"] = replies  # ← حیاتی برای ذخیره درست
         save_replies(data)
         context.user_data.clear()
         return await query.edit_message_text(
@@ -166,7 +165,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif query.data == "delete_reply":
         if key in replies:
             del replies[key]
-            data["replies"] = replies  # همزمان حذف در داده‌ی اصلی
+            data["replies"] = replies
             save_replies(data)
             context.user_data.clear()
             return await query.edit_message_text(f"🗑 پاسخ '{key}' حذف شد و پنل بسته شد.")
