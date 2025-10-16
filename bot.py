@@ -25,7 +25,7 @@ from memory_manager import (
 from jokes_manager import save_joke, list_jokes
 from fortune_manager import save_fortune, list_fortunes
 from group_manager import register_group_activity, get_group_stats
-from reply_panel_pro import add_reply_command, message_collector, button_handler, auto_reply
+from reply_panel_pro import add_reply_command, message_collector, button_handler, auto_reply, manage_replies, start_edit_reply
 from ai_learning import auto_learn_from_text
 from smart_reply import detect_emotion, smart_response
 from emotion_memory import remember_emotion, get_last_emotion, emotion_context_reply
