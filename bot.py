@@ -103,12 +103,12 @@ async def toggle_reply_mode(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("💬 ریپلی مود در این گروه فعال شد!\nفقط با ریپلای به پیام‌های من چت کنید 😄")
     else:
         await update.message.reply_text("🗨️ ریپلی مود در این گروه غیرفعال شد!\nالان به همه پیام‌ها جواب می‌دم 😎")
+
 # ======================= ✳️ شروع و پیام فعال‌سازی =======================
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "🤖 خنگول فارسی 8.5.1 Cloud+ Supreme Pro Stable+\n"
         "📘 برای دیدن لیست دستورات بنویس: راهنما"
-    )
 
 async def notify_admin_on_startup(app):
     """ارسال پیام فعال‌سازی به ادمین هنگام استارت"""
