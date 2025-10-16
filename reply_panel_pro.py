@@ -153,6 +153,9 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         }
 
         replies[key].append(entry)
+        # 🧩 خط حیاتی که باعث می‌شود داده واقعاً ذخیره شود
+        data["replies"] = replies
+
         save_replies(data)
         context.user_data.clear()
         return await query.edit_message_text(
@@ -163,6 +166,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif query.data == "delete_reply":
         if key in replies:
             del replies[key]
+            data["replies"] = replies  # همزمان حذف در داده‌ی اصلی
             save_replies(data)
             context.user_data.clear()
             return await query.edit_message_text(f"🗑 پاسخ '{key}' حذف شد و پنل بسته شد.")
