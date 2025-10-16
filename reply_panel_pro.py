@@ -1,5 +1,7 @@
-# ========================= ✳️ Reply Panel Pro++ 8.6.5 (Classic Patrick Style) =========================
-# نسخه‌ی کاملاً منطبق با پنل نمایشی قدیمی (همه ✅ ادمین ✅ گروه ✅ شخصی ✅ تصادفی ✅ ارسال برای همه ✅)
+# ========================= ✳️ Reply Panel Pro++ 8.7 (Classic Patrick Fix Edition) =========================
+# ✅ بدون / در دستور (به جای /reply از "Reply" استفاده کنید)
+# ✅ رفع خطای Message is not modified
+# ✅ جلوگیری از تکرار پیام ذخیره‌شده
 # ---------------------------------------------------------------------------------
 
 import os
@@ -28,20 +30,20 @@ def save_replies(data):
     with open(REPLY_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
-# ---------------------- 🧭 دستور /reply ----------------------
+# ---------------------- 🧭 دستور Reply ----------------------
 async def add_reply_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     if user.id != ADMIN_ID:
         return await update.message.reply_text("⛔ فقط مدیر اصلی می‌تونه پاسخ جدید بسازه.")
 
     msg = update.message
-    key = msg.text.replace("/reply", "").strip()
+    key = msg.text.replace("Reply", "").strip()
     if not key:
-        return await msg.reply_text("❗ بنویس: /reply <کلمه>")
+        return await msg.reply_text("❗ بنویس: Reply <کلمه>")
 
     context.user_data.clear()
     context.user_data["reply_key"] = key
-    context.user_data["reply_data"] = {"text": [], "media": []}
+    context.user_data["reply_data"] = {"text": [], "media": [], "saved_once": False}
     context.user_data["meta"] = {
         "access": "همه",
         "scope": "گروه",
@@ -50,7 +52,7 @@ async def add_reply_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     }
 
     await msg.reply_text(
-        f"شما اکنون در حال ساخت پاسخ شخصی برای /{key} هستید\n\n"
+        f"شما اکنون در حال ساخت پاسخ شخصی برای «{key}» هستید\n\n"
         "- انتخاب کنید چه کسانی می‌توانند دستور را فراخوانی کنند\n"
         "- انتخاب کنید که ریلِی ربات به کجا ارسال شود\n"
         "- مشخص کنید که همه ریلِی‌ها باهم ارسال شوند یا فقط یکی تصادفی\n\n"
@@ -88,18 +90,24 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
 
     if "meta" not in context.user_data:
-        return await query.edit_message_text("⛔ ابتدا باید /reply اجرا شود.")
+        return await query.edit_message_text("⛔ ابتدا باید Reply اجرا شود.")
 
     meta = context.user_data["meta"]
     data = load_replies()
 
+    # تغییر تنظیمات با جلوگیری از خطای "Message is not modified"
     if "_" in query.data:
         group, value = query.data.split("_", 1)
         if group in ["access", "scope", "mode"]:
             meta[group] = value
-        await query.edit_message_reply_markup(InlineKeyboardMarkup(build_panel(meta)))
+
+        new_markup = InlineKeyboardMarkup(build_panel(meta))
+        old_markup = query.message.reply_markup
+        if not old_markup or old_markup.to_dict() != new_markup.to_dict():
+            await query.edit_message_reply_markup(new_markup)
         return
 
+    # ذخیره پاسخ
     if query.data == "save_reply":
         key = context.user_data["reply_key"]
         reply_data = context.user_data["reply_data"]
@@ -110,9 +118,10 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         data["replies"][key].append(reply_data)
         save_replies(data)
         context.user_data.clear()
-        await query.edit_message_text(f"✅ دستور {key} ذخیره شد!")
+        await query.edit_message_text(f"✅ پاسخ '{key}' با موفقیت ذخیره شد!")
         return
 
+    # لغو
     if query.data == "cancel":
         context.user_data.clear()
         await query.edit_message_text("❌ عملیات لغو شد.")
@@ -125,6 +134,10 @@ async def message_collector(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     msg = update.message
     reply_data = context.user_data["reply_data"]
+
+    # جلوگیری از تکرار ذخیره
+    if reply_data.get("saved_once"):
+        return
 
     if msg.text:
         reply_data["text"].append(msg.text.strip())
@@ -141,6 +154,7 @@ async def message_collector(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif msg.video_note:
         reply_data["media"].append(("video_note", msg.video_note.file_id))
 
+    reply_data["saved_once"] = True
     await msg.reply_text("✅ پیام برای پاسخ ذخیره شد. حالا از پنل پایین تنظیم کن 👇")
 
 # ---------------------- 💬 پاسخ خودکار ----------------------
