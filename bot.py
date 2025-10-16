@@ -1083,3 +1083,4 @@ app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome))
 
     app.post_init = on_startup
     app.run_polling(allowed_updates=Update.ALL_TYPES)
+        
