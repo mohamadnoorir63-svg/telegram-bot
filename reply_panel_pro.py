@@ -8,8 +8,7 @@ import os
 import json
 import random
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import ContextTypes
-
+from telegram.ext import ContextTypes, CallbackQueryHandler, MessageHandler, filters
 REPLY_FILE = "memory.json"
 ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))
 
