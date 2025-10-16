@@ -1066,7 +1066,14 @@ if __name__ == "__main__":
     # 🔹 پنل اصلی و قابلیت‌ها
     app.add_handler(MessageHandler(filters.Regex("^ثبت قابلیت$"), save_features))
     app.add_handler(CallbackQueryHandler(feature_button_handler, pattern="^feature_"))
-
+# 🔹 سیستم خوشامد پویا و پنل گرافیکی
+app.add_handler(CommandHandler("خوشامد", open_welcome_panel))
+app.add_handler(CallbackQueryHandler(welcome_panel_buttons, pattern="^welcome_"))
+app.add_handler(MessageHandler(filters.Regex("^ثبت خوشامد$"), set_welcome_text))
+app.add_handler(MessageHandler(filters.Regex("^ثبت عکس خوشامد$"), set_welcome_media))
+app.add_handler(CommandHandler("تنظیم_قوانین", set_rules_link))
+app.add_handler(CommandHandler("تنظیم_حذف", set_welcome_timer))
+app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome))
     # 🔹 هنگام استارت
     async def on_startup(app):
         await notify_admin_on_startup(app)
