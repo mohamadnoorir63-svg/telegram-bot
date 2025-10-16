@@ -1232,7 +1232,7 @@ if __name__ == "__main__":
     app.add_handler(MessageHandler(filters.Regex("^ثبت خوشامد$"), set_welcome_text))
     app.add_handler(MessageHandler(filters.Regex("^ثبت عکس خوشامد$"), set_welcome_media))
     app.add_handler(MessageHandler(filters.Regex("^تنظیم قوانین$"), set_rules_link))
-app.add_handler(MessageHandler(filters.Regex("^تنظیم حذف$"), set_welcome_timer))
+    app.add_handler(MessageHandler(filters.Regex("^تنظیم حذف$"), set_welcome_timer))
     app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome))
 
     # 🔹 هنگام استارت
@@ -1244,5 +1244,4 @@ app.add_handler(MessageHandler(filters.Regex("^تنظیم حذف$"), set_welcome
 
     app.post_init = on_startup
     app.run_polling(allowed_updates=Update.ALL_TYPES)
-
     
