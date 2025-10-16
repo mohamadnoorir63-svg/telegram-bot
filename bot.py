@@ -15,14 +15,7 @@ from telegram.ext import (
 import aiofiles
 
 # 🧠 پنل پاسخ حرفه‌ای (Reply Panel Pro++)
-from reply_panel_pro import (
-    add_reply_command,
-    message_collector,
-    button_handler,
-    auto_reply,
-    manage_replies,
-    start_edit_reply
-)
+from reply_panel_pro import add_reply_command, message_collector, button_handler, auto_reply
 
 # 📦 ماژول‌های هوش و حافظه
 from memory_manager import (
@@ -1101,10 +1094,7 @@ if __name__ == "__main__":
     # افزودن پاسخ و مدیریت‌ها
     app.add_handler(MessageHandler(filters.Regex("^افزودن پاسخ"), add_reply_command))
     app.add_handler(MessageHandler(filters.Regex("^مدیریت پاسخ‌ها$"), manage_replies))
-    # فقط وقتی در حالت افزودن پاسخ هست پیام جمع می‌کند
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, message_collector))
-    app.add_handler(CallbackQueryHandler(button_handler))
-    app.add_handler(CallbackQueryHandler(start_edit_reply, pattern="^edit_"))
+    
 
     # ======================= 📘 راهنمای قابل ویرایش =======================
     app.add_handler(MessageHandler(filters.Regex("^ثبت راهنما$"), save_custom_help))
