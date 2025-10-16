@@ -1137,7 +1137,6 @@ app.add_handler(MessageHandler(filters.Regex("^راهنما$"), show_custom_help
 # ======================= 🗂 اسناد و عضویت جدید =======================
 app.add_handler(MessageHandler(filters.Document.ALL, handle_document))
 app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome))
-
 # ======================= ⚙️ مغز یادگیری و پاسخ =======================
 # ترتیب اجرا و فیلترها به‌صورت دقیق تنظیم شده تا پاسخ‌های نرمال و Reply Panel با هم تداخل نداشته باشن
 
@@ -1148,7 +1147,7 @@ app.add_handler(
         filters.TEXT
         & ~filters.COMMAND
         & ~filters.Regex(r"^Reply(\s|$)"),  # جلوگیری از تداخل با ساخت Reply جدید
-        reply,
+        reply
     ),
     group=0
 )
