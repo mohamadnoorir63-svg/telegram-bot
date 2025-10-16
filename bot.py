@@ -1090,32 +1090,35 @@ if __name__ == "__main__":
     app.add_handler(CommandHandler("leave", leave))
     app.add_handler(CommandHandler("reply", toggle_reply_mode))
 
-    # 🧠 Reply Panel Pro++
+    # ======================= 🧠 Reply Panel Pro++ =======================
+    # افزودن پاسخ و مدیریت‌ها
     app.add_handler(MessageHandler(filters.Regex("^افزودن پاسخ"), add_reply_command))
     app.add_handler(MessageHandler(filters.Regex("^مدیریت پاسخ‌ها$"), manage_replies))
+    # فقط وقتی در حالت افزودن پاسخ هست پیام جمع می‌کند
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, message_collector))
     app.add_handler(CallbackQueryHandler(button_handler))
     app.add_handler(CallbackQueryHandler(start_edit_reply, pattern="^edit_"))
 
-    # 🔹 راهنمای قابل ویرایش
+    # ======================= 📘 راهنمای قابل ویرایش =======================
     app.add_handler(MessageHandler(filters.Regex("^ثبت راهنما$"), save_custom_help))
     app.add_handler(MessageHandler(filters.Regex("^راهنما$"), show_custom_help))
 
-    # 🔹 اسناد و عضویت جدید
+    # ======================= 🗂 اسناد و عضویت جدید =======================
     app.add_handler(MessageHandler(filters.Document.ALL, handle_document))
     app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome))
 
-    # ⚙️ پاسخ هوشمند (مغز یادگیری)
+    # ======================= ⚙️ مغز اصلی یادگیری و پاسخ‌دهی =======================
+    # ⚙️ ابتدا پاسخ‌های یادگیری و گفت‌وگو
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, reply))
 
-    # ⚙️ پاسخ خودکار (پایانی‌ترین فیلتر)
+    # ⚙️ سپس پاسخ خودکار (آخرین مرحله - نباید بالاتر بیاد)
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, auto_reply))
 
-    # 🔹 هنگام استارت
+    # ======================= 🚀 هنگام استارت =======================
     async def on_startup(app):
         await notify_admin_on_startup(app)
         app.create_task(auto_backup(app.bot))
-        app.create_task(start_auto_brain_loop(app.bot))
+        app.create_task(start_auto_brain_loop(app.bot))  # 🧠 مغز خودکار
         print("🌙 [SYSTEM] Startup tasks scheduled ✅")
 
     app.post_init = on_startup
