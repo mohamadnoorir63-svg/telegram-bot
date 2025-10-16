@@ -1,4 +1,3 @@
-import asyncio
 import os
 import random
 import zipfile
@@ -28,13 +27,8 @@ from auto_brain.auto_brain import start_auto_brain_loop
 
 # 🎯 تنظیمات پایه
 TOKEN = os.getenv("BOT_TOKEN")
-SUDO_ID = int(os.getenv("SUDO_ID", "7089376754"))  # آیدی سودو اصلی
+ADMIN_ID = int(os.getenv("ADMIN_ID", "7089376754"))
 init_files()
-
-# ======================= 👑 کنترل دسترسی سودو =======================
-def is_sudo(user_id):
-    """بررسی اینکه آیا کاربر سودو (مدیر اصلی) است یا نه"""
-    return user_id == SUDO_ID
 
 status = {
     "active": True,
