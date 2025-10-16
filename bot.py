@@ -1419,9 +1419,6 @@ async def cmd_purgeall(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await context.bot.send_photo(chat_id, InputFile(CLEAN_DONE_PHOTO), caption=caption, parse_mode="HTML")
     else:
         await context.bot.send_message(chat_id, caption, parse_mode="HTML")
-# ======================= 🚀 اجرای نهایی =======================
-if __name__ == "__main__":
-    print("🤖 خنگول فارسی 8.7 Cloud+ Supreme Pro Stable+ آماده به خدمت است ...")
 
 # ======================= 🚀 اجرای نهایی =======================
 if __name__ == "__main__":
