@@ -107,9 +107,9 @@ async def toggle_reply_mode(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ======================= ✳️ شروع و پیام فعال‌سازی =======================
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "🤖 خنگول فارسی 8.5.1 Cloud+ Supreme Pro Stable+\n"
-        "📘 برای دیدن لیست دستورات بنویس: راهنما"
-
+    "🤖 خنگول فارسی 8.5.1 Cloud+ Supreme Pro Stable+\n"
+    "📘 برای دیدن لیست دستورات بنویس: راهنما"
+    )
 async def notify_admin_on_startup(app):
     """ارسال پیام فعال‌سازی به ادمین هنگام استارت"""
     try:
