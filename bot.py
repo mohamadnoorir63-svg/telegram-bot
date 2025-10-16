@@ -1,3 +1,4 @@
+import asyncio
 import os
 import random
 import zipfile
@@ -36,94 +37,43 @@ status = {
     "welcome": True,
     "locked": False
 }
-
-# ======================= 💬 ریپلی مود گروهی و محدود به مدیران =======================
+# ======================= 💬 ریپلی مود =======================
 REPLY_FILE = "reply_status.json"
 
 def load_reply_status():
-    """خواندن وضعیت ریپلی مود برای تمام گروه‌ها"""
-    import json, os
+    """وضعیت ریپلی را از فایل بخوان"""
     if os.path.exists(REPLY_FILE):
         try:
+            import json
             with open(REPLY_FILE, "r", encoding="utf-8") as f:
                 return json.load(f)
         except:
-            pass
-    return {}  # ساختار: { "group_id": {"enabled": True/False} }
-
+            return {"enabled": False}
+    return {"enabled": False}
 
 def save_reply_status(data):
-    """ذخیره وضعیت ریپلی برای همه گروه‌ها"""
+    """ذخیره وضعیت ریپلی در فایل"""
     import json
     with open(REPLY_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
-
 reply_status = load_reply_status()
 
-
-def is_group_reply_enabled(chat_id):
-    """بررسی فعال بودن ریپلی مود در گروه خاص"""
-    return reply_status.get(str(chat_id), {}).get("enabled", False)
-
-
 async def toggle_reply_mode(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """تغییر وضعیت ریپلی مود — فقط مدیران گروه یا ادمین اصلی مجازند"""
-    chat = update.effective_chat
-    user = update.effective_user
-
-    # فقط در گروه قابل استفاده است
-    if chat.type not in ["group", "supergroup"]:
-        return await update.message.reply_text("⚠️ فقط داخل گروه می‌تونی ریپلی مود رو تنظیم کنی!")
-
-    # بررسی ادمین اصلی یا مدیر گروه بودن
-    is_group_admin = False
-    is_main_admin = user.id == ADMIN_ID
-
-    try:
-        member = await context.bot.get_chat_member(chat.id, user.id)
-        if member.status in ["creator", "administrator"]:
-            is_group_admin = True
-    except:
-        pass
-
-    if not (is_main_admin or is_group_admin):
-        return await update.message.reply_text("⛔ فقط مدیران گروه یا ادمین اصلی می‌تونن این تنظیم رو تغییر بدن!")
-
-    # تغییر وضعیت مخصوص همین گروه
-    group_id = str(chat.id)
-    current = reply_status.get(group_id, {}).get("enabled", False)
-    reply_status[group_id] = {"enabled": not current}
+    """تغییر وضعیت ریپلی مود"""
+    reply_status["enabled"] = not reply_status.get("enabled", False)
     save_reply_status(reply_status)
-
-    if reply_status[group_id]["enabled"]:
-        await update.message.reply_text("💬 ریپلی مود در این گروه فعال شد!\nفقط با ریپلای به پیام‌های من چت کنید 😄")
+    if reply_status["enabled"]:
+        await update.message.reply_text("💬 ریپلی مود فعال شد!\nفقط با ریپلای به پیام‌های من چت کن 😄")
     else:
-        await update.message.reply_text("🗨️ ریپلی مود در این گروه غیرفعال شد!\nالان به همه پیام‌ها جواب می‌دم 😎")
-
-
-# ======================= 🧠 بررسی حالت ریپلی مود گروهی =======================
-async def handle_group_reply_mode(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """اگر ریپلی مود فعال باشد، فقط در صورت ریپلای به ربات پاسخ بده"""
-    if update.effective_chat.type in ["group", "supergroup"]:
-        chat_id = update.effective_chat.id
-        if is_group_reply_enabled(chat_id):
-            text = update.message.text.strip()
-
-            # اگر فقط پیام چک شدنی بود
-            if text.lower() in ["خنگول کجایی", "خنگول کجایی؟", "کجایی خنگول"]:
-                return await update.message.reply_text("😄 من اینجام! فقط روی پیام‌هام ریپلای کن 💬")
-
-            # اگر پیام ریپلای به خود ربات نبود، پاسخی نده
-            if not update.message.reply_to_message or update.message.reply_to_message.from_user.id != context.bot.id:
-                return True  # یعنی پردازش پیام متوقف شود
-    return False  # یعنی ادامه بده
+        await update.message.reply_text("🗨️ ریپلی مود غیرفعال شد!\nالان به همه پیام‌ها جواب می‌دم 😎")
 # ======================= ✳️ شروع و پیام فعال‌سازی =======================
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-    "🤖 خنگول فارسی 8.5.1 Cloud+ Supreme Pro Stable+\n"
-    "📘 برای دیدن لیست دستورات بنویس: راهنما"
+        "🤖 خنگول فارسی 8.5.1 Cloud+ Supreme Pro Stable+\n"
+        "📘 برای دیدن لیست دستورات بنویس: راهنما"
     )
+
 async def notify_admin_on_startup(app):
     """ارسال پیام فعال‌سازی به ادمین هنگام استارت"""
     try:
@@ -463,19 +413,25 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
     uid = update.effective_user.id
     chat_id = update.effective_chat.id
-    
+# 🧠 بررسی حالت ریپلی مود
+    if reply_status.get("enabled"):
+        # اگه کسی گفت "خنگول کجایی؟"
+        if text.lower() in ["خنگول کجایی", "خنگول کجایی؟", "کجایی خنگول"]:
+            return await update.message.reply_text("😄 من اینجام! برای صحبت، فقط روی پیام‌هام ریپلای کن 💬")
+        # فقط به پیام‌هایی که به خودش ریپلای شده پاسخ بده
+        if not update.message.reply_to_message or update.message.reply_to_message.from_user.id != context.bot.id:
+            return
 
-    # 🧠 بررسی حالت ریپلی مود گروهی
-    if update.effective_chat.type in ["group", "supergroup"]:
-        chat_id = update.effective_chat.id
-        if is_group_reply_enabled(chat_id):
-            # فقط در گروهی که ریپلی مود فعاله، محدودیت اعمال می‌شود
-            if text.lower() in ["خنگول کجایی", "خنگول کجایی؟", "کجایی خنگول"]:
-                return await update.message.reply_text("😄 من اینجام! برای صحبت، فقط روی پیام‌هام ریپلای کن 💬")
+    # ثبت کاربر و گروه
+    register_user(uid)
+    register_group_activity(chat_id, uid)
 
-            # اگر پیام ریپلای به خود ربات نباشد، پاسخی نده
-            if not update.message.reply_to_message or update.message.reply_to_message.from_user.id != context.bot.id:
-                return
+    if not status["locked"]:
+        auto_learn_from_text(text)
+
+    if not status["active"]:
+        shadow_learn(text, "")
+        return
 
     # ✅ درصد هوش منطقی
     if text.lower() == "درصد هوش":
@@ -907,163 +863,48 @@ async def leave(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id == ADMIN_ID:
         await update.message.reply_text("🫡 خدافظ! تا دیدار بعدی 😂")
         await context.bot.leave_chat(update.message.chat.id)
-# ======================= 🌟 پنل اصلی خنگول (استارت + قابلیت‌ها طلایی) =======================
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, InputFile
-from telegram.ext import CallbackQueryHandler
-import asyncio, aiofiles, datetime, os
 
-FEATURES_FILE = "features.txt"
-
-# ======================= 🎨 پنل اصلی =======================
-async def show_main_panel(update: Update, context: ContextTypes.DEFAULT_TYPE, edit=False):
-    """نمایش پنل اصلی ربات"""
-    # 📖 متن معرفی یا متن سفارشی ذخیره‌شده
-    if os.path.exists(FEATURES_FILE):
-        async with aiofiles.open(FEATURES_FILE, "r", encoding="utf-8") as f:
-            about_text = await f.read()
-    else:
-        about_text = (
-            "✨ <b>خنگول فارسی 8.7 Cloud+ Supreme Pro</b>\n"
-            "🤖 هوش اجتماعی، احساس، شوخ‌طبعی و فال روزانه در یک ربات!\n"
-            "💬 ارتباط، خنده و همراهی واقعی با شما 🌙"
-        )
-
-    keyboard = [
-        [InlineKeyboardButton("💬 ارتباط با سازنده", url="https://t.me/NOORI_NOOR")],
-        [InlineKeyboardButton("💭 گروه پشتیبانی", url="https://t.me/Poshtibahni")],
-        [InlineKeyboardButton("⏰ آیدی و ساعت", callback_data="feature_info")],
-        [InlineKeyboardButton("🔮 فال امروز", callback_data="feature_fortune")],
-        [InlineKeyboardButton("😂 جوک تصادفی", callback_data="feature_joke")],
-        [InlineKeyboardButton("➕ افزودن به گروه", url="https://t.me/Khenqol_bot?startgroup=true")],
-        [InlineKeyboardButton("🧩 قابلیت ربات", callback_data="feature_about")]
-    ]
-
-    reply_markup = InlineKeyboardMarkup(keyboard)
-
-    if edit:
-        await update.edit_message_text(about_text, reply_markup=reply_markup, parse_mode="HTML")
-    else:
-        await update.message.reply_text(about_text, reply_markup=reply_markup, parse_mode="HTML")
-
-
-# ======================= 🚀 استارت با انیمیشن لوکس =======================
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """انیمیشن خوش‌آمد + نمایش پنل اصلی"""
-    msg = await update.message.reply_text("⏳ <b>در حال بارگذاری سیستم خنگول...</b>", parse_mode="HTML")
-    await asyncio.sleep(1.7)
-
-    text = (
-        f"🌙 <b>سلام {update.effective_user.first_name}!</b>\n"
-        f"🤖 من <b>خنگول فارسی 8.7 Cloud+ Supreme Pro</b> هستم.\n"
-        f"✨ رباتی با احساسات واقعی، شوخ‌طبعی و حافظه اجتماعی هوشمند 😄"
-    )
-
-    await msg.edit_text(text, parse_mode="HTML")
-    await asyncio.sleep(1.2)
-
-    # نمایش منوی اصلی
-    fake_update = update
-    fake_update.message = msg
-    await show_main_panel(fake_update, context, edit=True)
-
-
-# ======================= 🧩 قابلیت ربات (ویرایش توسط سودو) =======================
-async def save_features(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """ثبت یا ویرایش قابلیت‌ها فقط برای سودو"""
-    if update.effective_user.id != SUDO_ID:
-        return await update.message.reply_text("⛔ فقط مدیر اصلی می‌تونه متن قابلیت‌ها رو تغییر بده!")
-
-    if not update.message.reply_to_message or not update.message.reply_to_message.text:
-        return await update.message.reply_text("❗ باید روی یک پیام متنی ریپلای بزنی!")
-
-    text = update.message.reply_to_message.text
-    async with aiofiles.open(FEATURES_FILE, "w", encoding="utf-8") as f:
-        await f.write(text)
-
-    await update.message.reply_text("✅ متن قابلیت‌ها با موفقیت ذخیره شد!")
-
-
-# ======================= 🎛 عملکرد دکمه‌ها =======================
-async def feature_button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-
-    if query.data == "feature_info":
-        user = query.from_user
-        now = datetime.datetime.now().strftime("%Y/%m/%d - %H:%M:%S")
-        text = (
-            f"🆔 آیدی شما: <code>{user.id}</code>\n"
-            f"👤 نام: <b>{user.first_name}</b>\n"
-            f"📅 تاریخ و ساعت فعلی: <b>{now}</b>"
-        )
-        try:
-            photos = await context.bot.get_user_profile_photos(user.id, limit=1)
-            if photos.total_count > 0:
-                file_id = photos.photos[0][-1].file_id
-                await query.message.reply_photo(file_id, caption=text, parse_mode="HTML")
-            else:
-                await query.message.reply_text(text, parse_mode="HTML")
-        except:
-            await query.message.reply_text(text, parse_mode="HTML")
-
-    elif query.data == "feature_joke":
-        await query.message.reply_text("😂 برای دریافت جوک بنویس:\n<b>جوک</b>", parse_mode="HTML")
-
-    elif query.data == "feature_fortune":
-        await query.message.reply_text("🔮 برای فال امروز بنویس:\n<b>فال</b>", parse_mode="HTML")
-
-    elif query.data == "feature_about":
-        if os.path.exists(FEATURES_FILE):
-            async with aiofiles.open(FEATURES_FILE, "r", encoding="utf-8") as f:
-                text = await f.read()
-        else:
-            text = "🧩 هنوز توضیحی برای قابلیت‌ها ثبت نشده!"
-        await query.message.reply_text(text, parse_mode="HTML")
 # ======================= 🚀 اجرای نهایی =======================
 if __name__ == "__main__":
     print("🤖 خنگول فارسی 8.5.1 Cloud+ Supreme Pro Stable+ آماده به خدمت است ...")
-app = ApplicationBuilder().token(TOKEN).build()
-app.add_error_handler(handle_error)
 
-# 🔹 دستورات اصلی
-app.add_handler(CommandHandler("start", start))
-app.add_handler(CommandHandler("help", help_command))
-app.add_handler(CommandHandler("toggle", toggle))
-app.add_handler(CommandHandler("welcome", toggle_welcome))
-app.add_handler(CommandHandler("lock", lock_learning))
-app.add_handler(CommandHandler("unlock", unlock_learning))
-app.add_handler(CommandHandler("mode", mode_change))
-app.add_handler(CommandHandler("stats", stats))
-app.add_handler(CommandHandler("fullstats", fullstats))
-app.add_handler(CommandHandler("backup", backup))
-app.add_handler(CommandHandler("restore", restore))
-app.add_handler(CommandHandler("reset", reset_memory))
-app.add_handler(CommandHandler("reload", reload_memory))
-app.add_handler(CommandHandler("broadcast", broadcast))
-app.add_handler(CommandHandler("cloudsync", cloudsync))
-app.add_handler(CommandHandler("leave", leave))
-app.add_handler(CommandHandler("reply", toggle_reply_mode))
+    app = ApplicationBuilder().token(TOKEN).build()
+    app.add_error_handler(handle_error)
 
-# 🔹 پنل اصلی و قابلیت‌ها
-app.add_handler(MessageHandler(filters.Regex("^ثبت قابلیت$"), save_features))
-app.add_handler(CallbackQueryHandler(feature_button_handler, pattern="^feature_"))
+    # 🔹 دستورات اصلی
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("help", help_command))
+    app.add_handler(CommandHandler("toggle", toggle))
+    app.add_handler(CommandHandler("welcome", toggle_welcome))
+    app.add_handler(CommandHandler("lock", lock_learning))
+    app.add_handler(CommandHandler("unlock", unlock_learning))
+    app.add_handler(CommandHandler("mode", mode_change))
+    app.add_handler(CommandHandler("stats", stats))
+    app.add_handler(CommandHandler("fullstats", fullstats))
+    app.add_handler(CommandHandler("backup", backup))
+    app.add_handler(CommandHandler("restore", restore))
+    app.add_handler(CommandHandler("reset", reset_memory))
+    app.add_handler(CommandHandler("reload", reload_memory))
+    app.add_handler(CommandHandler("broadcast", broadcast))
+    app.add_handler(CommandHandler("cloudsync", cloudsync))
+    app.add_handler(CommandHandler("leave", leave))
+    app.add_handler(CommandHandler("reply", toggle_reply_mode))
 
-# 🔹 راهنمای قابل ویرایش
-app.add_handler(MessageHandler(filters.Regex("^ثبت راهنما$"), save_custom_help))
-app.add_handler(MessageHandler(filters.Regex("^راهنما$"), show_custom_help))
+    # 🔹 راهنمای قابل ویرایش
+    app.add_handler(MessageHandler(filters.Regex("^ثبت راهنما$"), save_custom_help))
+    app.add_handler(MessageHandler(filters.Regex("^راهنما$"), show_custom_help))
 
-# 🔹 پیام‌ها و اسناد
-app.add_handler(MessageHandler(filters.Document.ALL, handle_document))
-app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome))
-app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, reply))
+    # 🔹 پیام‌ها و اسناد
+    app.add_handler(MessageHandler(filters.Document.ALL, handle_document))
+    app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, reply))
 
-# 🔹 هنگام استارت
-async def on_startup(app):
-    await notify_admin_on_startup(app)
-    app.create_task(auto_backup(app.bot))
-    app.create_task(start_auto_brain_loop(app.bot))  # 🧠 فعال‌سازی مغز خودکار
-    print("🌙 [SYSTEM] Startup tasks scheduled ✅")
+    # 🔹 هنگام استارت
+    async def on_startup(app):
+        await notify_admin_on_startup(app)
+        app.create_task(auto_backup(app.bot))
+        app.create_task(start_auto_brain_loop(app.bot))  # 🧠 فعال‌سازی مغز خودکار
+        print("🌙 [SYSTEM] Startup tasks scheduled ✅")
 
-app.post_init = on_startup
-app.run_polling(allowed_updates=Update.ALL_TYPES)
-    
+    app.post_init = on_startup
+    app.run_polling(allowed_updates=Update.ALL_TYPES)
