@@ -1,80 +1,144 @@
-# ======================= ☁️ NOORI Secure Backup v12.1 (Cloud+ Heroku Edition) =======================
-import io, shutil, base64, qrcode, os, zipfile, asyncio, math, time
-from PIL import Image, ImageDraw, ImageFont
+# ======================= ☁️ NOORI Secure QR Backup v12.2 — Self-Healing Edition =======================
+import io, os, re, json, shutil, base64, zipfile, asyncio
 from datetime import datetime
-from telegram import Update, InputFile
+import qrcode
+from PIL import Image, ImageDraw, ImageFont
+from telegram import Update, InputFile, Bot
 from telegram.ext import ContextTypes
 
-# 📁 مسیر ذخیره بک‌آپ‌ها
+# 📁 مسیر پوشه‌ی بک‌آپ
 BACKUP_DIR = "backups"
 os.makedirs(BACKUP_DIR, exist_ok=True)
 
-# 📄 فایل‌های مهم برای بازیابی
+# ⚙️ فایل‌های حیاتی برای بررسی و بک‌آپ
 IMPORTANT_FILES = [
     "memory.json", "group_data.json", "jokes.json",
     "fortunes.json", "warnings.json", "aliases.json"
 ]
 
-# 🎯 انتخاب فایل‌هایی که در بک‌آپ ذخیره می‌شوند
-def _should_include_in_backup(path: str) -> bool:
-    skip_dirs = ["__pycache__", ".git", "venv", "restore_temp", "backups"]
-    lowered = path.lower()
-    if any(sd in lowered for sd in skip_dirs): return False
-    if lowered.endswith(".zip"): return False
-    return lowered.endswith((".json", ".jpg", ".png", ".webp", ".mp3", ".ogg"))
+# 🔑 اطلاعات ادمین و توکن برای گزارش‌دهی
+ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))
+BOT_TOKEN = os.getenv("BOT_TOKEN")
 
-# 🧩 ساخت فایل ZIP
+
+# ======================= 🩺 سیستم تعمیر خودکار JSON =======================
+async def fix_json(file_path):
+    """تعمیر خودکار فایل JSON خراب و ارسال گزارش تلگرام"""
+    if not os.path.exists(file_path):
+        return False
+
+    try:
+        with open(file_path, "r", encoding="utf-8") as f:
+            json.load(f)
+        print(f"✅ {file_path} سالم است.")
+        return True
+    except json.JSONDecodeError as e:
+        print(f"🚨 خطا در {file_path}: {e}")
+
+        # 🗂 ساخت بک‌آپ از فایل خراب
+        backup_path = file_path + ".bak"
+        shutil.copy(file_path, backup_path)
+        print(f"💾 نسخه پشتیبان ساخته شد: {backup_path}")
+
+        with open(file_path, "r", encoding="utf-8") as f:
+            content = f.read()
+
+        fixed = content.strip()
+        fixed = re.sub(r'^[^\{\[]+', '', fixed)
+        fixed = re.sub(r'[^\}\]]+$', '', fixed)
+        fixed = re.sub(r',\s*([\}\]])', r'\1', fixed)
+
+        if not fixed.startswith("{") and not fixed.startswith("["):
+            fixed = '{"data": {}, "users": []}'
+
+        # بستن آکولاد و براکت ناقص
+        if fixed.count("{") > fixed.count("}"):
+            fixed += "}" * (fixed.count("{") - fixed.count("}"))
+        if fixed.count("[") > fixed.count("]"):
+            fixed += "]" * (fixed.count("[") - fixed.count("]"))
+
+        try:
+            data = json.loads(fixed)
+            with open(file_path, "w", encoding="utf-8") as f:
+                json.dump(data, f, ensure_ascii=False, indent=2)
+            await notify_admin(file_path, True, str(e))
+            print(f"✅ فایل {file_path} تعمیر شد.")
+            return True
+        except Exception as e2:
+            await notify_admin(file_path, False, str(e2))
+            print(f"❌ خطا در تعمیر {file_path}: {e2}")
+            return False
+
+
+async def notify_admin(file_name, success=True, details=""):
+    """ارسال گزارش تعمیر به ادمین تلگرام"""
+    if not BOT_TOKEN or ADMIN_ID == 0:
+        return
+    try:
+        bot = Bot(token=BOT_TOKEN)
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        status = "✅ تعمیر موفق" if success else "❌ خطا در تعمیر"
+        msg = (
+            f"🧩 گزارش سیستم تعمیر:\n\n"
+            f"📁 فایل: {file_name}\n"
+            f"📅 زمان: {now}\n"
+            f"🔧 وضعیت: {status}\n"
+            f"📝 جزئیات: {details}"
+        )
+        await bot.send_message(chat_id=ADMIN_ID, text=msg)
+    except Exception as e:
+        print(f"⚠️ ارسال گزارش به ادمین ممکن نشد: {e}")
+
+
+# ======================= 💎 تعمیر خودکار پیش از بک‌آپ =======================
+async def check_and_fix_all():
+    """بررسی و تعمیر همه فایل‌های مهم قبل از بک‌آپ"""
+    print("🔍 بررسی سلامت فایل‌ها قبل از بک‌آپ...")
+    repaired = 0
+    for f in IMPORTANT_FILES:
+        if os.path.exists(f):
+            result = await fix_json(f)
+            if result:
+                repaired += 1
+        else:
+            print(f"⚠️ فایل {f} یافت نشد.")
+    print(f"🩺 بررسی کامل شد ({repaired} فایل بررسی شد).")
+
+
+# ======================= 🧩 ساخت فایل ZIP بک‌آپ =======================
 def create_zip_backup():
     now = datetime.now().strftime("%Y-%m-%d_%H-%M")
     filename = f"backup_{now}.zip"
     zip_path = os.path.join(BACKUP_DIR, filename)
-    start = time.time()
-    count = 0
 
-    with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as zipf:
+    with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED) as zipf:
         for root, _, files in os.walk("."):
             for file in files:
                 full_path = os.path.join(root, file)
                 if _should_include_in_backup(full_path):
                     arcname = os.path.relpath(full_path, ".")
                     zipf.write(full_path, arcname=arcname)
-                    count += 1
+    return zip_path, now
 
-    duration = round(time.time() - start, 2)
-    size_mb = os.path.getsize(zip_path) / (1024 * 1024)
-    print(f"[ZIP] Created backup with {count} files in {duration}s ({size_mb:.2f} MB)")
-    return zip_path, now, count, size_mb, duration
 
-# ✂️ تقسیم فایل ZIP به پارت‌های کوچکتر
-def split_file(filepath, part_size_mb=45):
-    parts = []
-    part_size = part_size_mb * 1024 * 1024
-    filesize = os.path.getsize(filepath)
-    total_parts = math.ceil(filesize / part_size)
+def _should_include_in_backup(path: str) -> bool:
+    skip_dirs = ["__pycache__", ".git", "venv", "restore_temp", "backups"]
+    lowered = path.lower()
+    if any(sd in lowered for sd in skip_dirs):
+        return False
+    if lowered.endswith(".zip"):
+        return False
+    return lowered.endswith((".json", ".jpg", ".png", ".webp", ".mp3", ".ogg"))
 
-    with open(filepath, "rb") as f:
-        for i in range(total_parts):
-            part_name = f"{filepath}.part{i+1:02d}"
-            with open(part_name, "wb") as part:
-                chunk = f.read(part_size)
-                if not chunk:
-                    break
-                part.write(chunk)
-            parts.append(part_name)
-    return parts
 
-# 🧠 QR برای امضای بک‌آپ
-def generate_qr_image(signature_text, timestamp):
-    short_text = signature_text[:400]
-    qr = qrcode.QRCode(
-        version=5, error_correction=qrcode.constants.ERROR_CORRECT_M,
-        box_size=10, border=2
-    )
-    qr.add_data(short_text)
-    qr.make(fit=True)
+# ======================= 🧠 QR کد بک‌آپ =======================
+def generate_qr_image(text, timestamp):
+    safe_text = text[:800]
+    qr = qrcode.QRCode(version=5, error_correction=qrcode.constants.ERROR_CORRECT_M, box_size=10, border=2)
+    qr.add_data(safe_text)
+    qr.make(fit=False)
     qr_img = qr.make_image(fill_color="#0044cc", back_color="white").convert("RGB")
 
-    # لوگوی نوری
     shield = Image.new("RGBA", (120, 120), (0, 0, 0, 0))
     draw = ImageDraw.Draw(shield)
     draw.ellipse((0, 0, 120, 120), fill="#0044cc")
@@ -84,7 +148,6 @@ def generate_qr_image(signature_text, timestamp):
     shield = shield.resize((qr_w // 4, qr_h // 4))
     qr_img.paste(shield, ((qr_w - shield.size[0]) // 2, (qr_h - shield.size[1]) // 2), mask=shield)
 
-    # عنوان پایین
     canvas = Image.new("RGB", (qr_w, qr_h + 80), "white")
     canvas.paste(qr_img, (0, 0))
     draw = ImageDraw.Draw(canvas)
@@ -101,83 +164,54 @@ def generate_qr_image(signature_text, timestamp):
     output.seek(0)
     return output
 
-# 💾 بک‌آپ دستی کامل
+
+# ======================= ☁️ بک‌آپ دستی =======================
 async def backup(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))
     if update.effective_user.id != ADMIN_ID:
         return await update.message.reply_text("⛔ فقط مدیر اصلی مجازه!")
 
-    msg = await update.message.reply_text("⏳ در حال ساخت بک‌آپ حجیم... لطفاً صبر کنید...")
+    await check_and_fix_all()  # 🧩 بررسی و تعمیر قبل از بک‌آپ
 
-    zip_path, timestamp, count, size_mb, duration = create_zip_backup()
-    parts = split_file(zip_path)
-    total_parts = len(parts)
-
+    zip_path, timestamp = create_zip_backup()
     with open(zip_path, "rb") as f:
-        encoded = base64.b64encode(f.read()).decode("utf-8")
+        encoded = base64.b64encode(f.read()).decode("utf-8")[:800]
     qr_img = generate_qr_image(encoded, timestamp)
 
-    await msg.edit_text(f"☁️ بک‌آپ ساخته شد ✅\n"
-                        f"📦 فایل‌ها: {count}\n"
-                        f"💾 حجم: {size_mb:.2f} MB\n"
-                        f"🕓 زمان فشرده‌سازی: {duration}s\n"
-                        f"📂 پارت‌ها: {total_parts}")
-
-    await update.message.reply_photo(photo=qr_img, caption=f"🔹 NOORI Backup {timestamp}")
-
-    # ارسال پارت‌ها
-    for i, part in enumerate(parts, start=1):
-        size = os.path.getsize(part) / (1024 * 1024)
-        await update.message.reply_document(InputFile(part),
-            caption=f"📦 پارت {i}/{total_parts} — {size:.2f} MB")
-        print(f"[UPLOAD] Sent part {i}/{total_parts} ({size:.2f} MB)")
-        os.remove(part)
-
+    await update.message.reply_photo(photo=qr_img, caption=f"☁️ بک‌آپ ساخته شد ✅\n🕓 {timestamp}")
+    await update.message.reply_document(InputFile(zip_path))
     os.remove(zip_path)
-    await update.message.reply_text("✅ بک‌آپ کامل ارسال شد!\n📤 آماده برای بازیابی در هر زمان.")
 
-# ☁️ بک‌آپ ابری (ارسال مستقیم به ادمین)
+
+# ======================= ☁️ بک‌آپ ابری خودکار =======================
 async def cloudsync(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))
     if update.effective_user.id != ADMIN_ID:
         return await update.message.reply_text("⛔ فقط مدیر اصلی مجازه!")
 
-    zip_path, timestamp, count, size_mb, duration = create_zip_backup()
-    parts = split_file(zip_path)
-    total_parts = len(parts)
+    await check_and_fix_all()
 
+    zip_path, timestamp = create_zip_backup()
     with open(zip_path, "rb") as f:
-        encoded = base64.b64encode(f.read()).decode("utf-8")
+        encoded = base64.b64encode(f.read()).decode("utf-8")[:800]
     qr_img = generate_qr_image(encoded, timestamp)
 
-    await context.bot.send_photo(chat_id=ADMIN_ID, photo=qr_img,
-        caption=f"☁️ Cloud Backup — {timestamp}\n📦 فایل‌ها: {count}\n💾 {size_mb:.2f} MB در {total_parts} پارت")
-
-    for i, part in enumerate(parts, start=1):
-        size = os.path.getsize(part) / (1024 * 1024)
-        await context.bot.send_document(chat_id=ADMIN_ID,
-            document=InputFile(part),
-            caption=f"📦 پارت {i}/{total_parts} — {size:.2f} MB — {timestamp}")
-        print(f"[CLOUD] Sent part {i}/{total_parts} ({size:.2f} MB)")
-        os.remove(part)
-
+    await context.bot.send_photo(chat_id=ADMIN_ID, photo=qr_img, caption=f"☁️ Cloud Backup — {timestamp}")
+    await context.bot.send_document(chat_id=ADMIN_ID, document=InputFile(zip_path))
     os.remove(zip_path)
-    print(f"[CLOUD BACKUP] Done {timestamp}")
 
-# ♻️ بازیابی از بک‌آپ ZIP تکی
+
+# ======================= ♻️ بازیابی ZIP با نوار درصد =======================
 async def restore(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))
     if update.effective_user.id != ADMIN_ID:
         return await update.message.reply_text("⛔ فقط مدیر اصلی مجازه!")
-    if not update.message.reply_to_message or not update.message.reply_to_message.document:
-        return await update.message.reply_text("📎 فایل ZIP بک‌آپ را ریپلای کن و سپس /restore بزن.")
 
-    msg = await update.message.reply_text("♻️ در حال بازیابی از بک‌آپ...")
+    if not update.message.reply_to_message or not update.message.reply_to_message.document:
+        return await update.message.reply_text("📎 فایل ZIP بک‌آپ را ریپلای کن و بعد /restore بزن.")
 
     file = await update.message.reply_to_message.document.get_file()
     path = os.path.join(BACKUP_DIR, "restore_temp.zip")
     await file.download_to_drive(path)
 
+    msg = await update.message.reply_text("♻️ شروع بازیابی...\n0% [▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒]")
     restore_dir = "restore_temp"
     if os.path.exists(restore_dir):
         shutil.rmtree(restore_dir)
@@ -186,13 +220,12 @@ async def restore(update: Update, context: ContextTypes.DEFAULT_TYPE):
     with zipfile.ZipFile(path, "r") as zip_ref:
         files = zip_ref.namelist()
         total = len(files)
-        done = 0
-        for file in files:
+        for i, file in enumerate(files):
             zip_ref.extract(file, restore_dir)
-            done += 1
-            percent = int(done / total * 100)
-            bars = "█" * (percent // 5) + "▒" * (20 - percent // 5)
-            await msg.edit_text(f"♻️ بازیابی {percent}% [{bars}]")
+            percent = int((i + 1) / total * 100)
+            bars = int(percent / 5)
+            bar = "█" * bars + "▒" * (20 - bars)
+            await msg.edit_text(f"♻️ بازیابی {percent}% [{bar}]")
             await asyncio.sleep(0.1)
 
     moved = 0
@@ -206,31 +239,20 @@ async def restore(update: Update, context: ContextTypes.DEFAULT_TYPE):
     os.remove(path)
     await msg.edit_text(f"✅ بازیابی کامل شد!\n📦 {moved} فایل بازگردانی گردید.\n🤖 سیستم آماده است.")
 
-# 🕓 بک‌آپ خودکار هر ۶ ساعت
+
+# ======================= 🔁 بک‌آپ خودکار هر ۶ ساعت =======================
 async def auto_backup(bot):
-    ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))
     while True:
         try:
-            zip_path, timestamp, count, size_mb, duration = create_zip_backup()
-            parts = split_file(zip_path)
-            total_parts = len(parts)
-
+            await check_and_fix_all()
+            zip_path, timestamp = create_zip_backup()
             with open(zip_path, "rb") as f:
-                encoded = base64.b64encode(f.read()).decode("utf-8")
+                encoded = base64.b64encode(f.read()).decode("utf-8")[:800]
             qr_img = generate_qr_image(encoded, timestamp)
-
-            await bot.send_photo(chat_id=ADMIN_ID, photo=qr_img,
-                caption=f"🤖 Auto Backup — {timestamp}\n📦 {count} فایل\n💾 {size_mb:.2f} MB\n📂 {total_parts} پارت")
-
-            for i, part in enumerate(parts, start=1):
-                size = os.path.getsize(part) / (1024 * 1024)
-                await bot.send_document(chat_id=ADMIN_ID,
-                    document=InputFile(part),
-                    caption=f"📦 Auto پارت {i}/{total_parts} — {size:.2f} MB — {timestamp}")
-                os.remove(part)
-
+            await bot.send_photo(chat_id=ADMIN_ID, photo=qr_img, caption=f"🤖 Auto Backup — {timestamp}")
+            await bot.send_document(chat_id=ADMIN_ID, document=InputFile(zip_path))
             os.remove(zip_path)
-            print(f"[AUTO BACKUP] {timestamp} complete ✅")
+            print(f"[AUTO BACKUP] {timestamp} ✅")
         except Exception as e:
             print(f"[AUTO BACKUP ERROR] {e}")
-        await asyncio.sleep(21600)  # هر 6 ساعت
+        await asyncio.sleep(21600)
