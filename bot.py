@@ -918,6 +918,35 @@ async def feature_button_handler(update: Update, context: ContextTypes.DEFAULT_T
         else:
             text = "🧩 هنوز توضیحی برای قابلیت‌ها ثبت نشده!"
         await query.message.reply_text(text, parse_mode="HTML")
+        async def fullstats(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """نمایش آمار کامل گروه‌ها"""
+    try:
+        data = load_data("group_data.json")
+        groups = data.get("groups", {})
+
+        if not groups:
+            return await update.message.reply_text("ℹ️ هنوز هیچ گروهی ثبت نشده.")
+
+        text = "📈 آمار کامل گروه‌ها:\n\n"
+        if isinstance(groups, list):
+            for g in groups:
+                title = g.get("title", "نامشخص")
+                members = len(g.get("members", []))
+                last_active = g.get("last_active", "نامشخص")
+                text += f"🏠 گروه: {title}\n👥 اعضا: {members}\n🕓 آخرین فعالیت: {last_active}\n\n"
+        else:
+            for gid, info in groups.items():
+                title = info.get("title", "نامشخص")
+                members = len(info.get("members", []))
+                last_active = info.get("last_active", "نامشخص")
+                text += f"🏠 گروه: {title}\n👥 اعضا: {members}\n🕓 آخرین فعالیت: {last_active}\n\n"
+
+        if len(text) > 4000:
+            text = text[:3990] + "..."
+
+        await update.message.reply_text(text)
+    except Exception as e:
+        await update.message.reply_text(f"⚠️ خطا در نمایش آمار:\n{e}")
 # ======================= 🚀 اجرای نهایی ربات =======================
 if __name__ == "__main__":
     print("🤖 خنگول فارسی 8.7 Cloud+ Supreme Pro Stable+ آماده به خدمت است ...")
