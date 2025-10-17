@@ -821,7 +821,7 @@ async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"👤 کاربران: {len(users)} | 👥 گروه‌ها: {len(group_ids)}\n"
         f"✅ موفق: {sent} | ⚠️ ناموفق: {failed}"
     )
-
+    
 # ======================= 🚪 خروج از گروه =======================
 async def leave(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id == ADMIN_ID:
