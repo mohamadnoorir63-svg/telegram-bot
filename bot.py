@@ -224,23 +224,40 @@ async def unlock_learning(update: Update, context: ContextTypes.DEFAULT_TYPE):
     status["locked"] = False
     await update.message.reply_text("🔓 یادگیری باز شد!")
 
-# ======================= 📊 آمار خلاصه =======================
+
+# ======================= 📊 آمار خنگول واقعی =======================
 async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data = get_stats()
-    memory = load_data("memory.json")
-    groups = len(load_data("group_data.json").get("groups", []))
-    users = len(memory.get("users", []))
+    groups_data = load_data("group_data.json").get("groups", [])
 
+    # ✅ شمارش گروه‌ها (سازگار با دیکشنری یا لیست)
+    if isinstance(groups_data, dict):
+        groups = len(groups_data)
+    else:
+        groups = len(groups_data)
+
+    # ✅ شمارش کاربران از users.json
+    users_list = []
+    if os.path.exists("users.json"):
+        try:
+            import json
+            with open("users.json", "r", encoding="utf-8") as f:
+                users_list = json.load(f)
+        except:
+            users_list = []
+    users = len(users_list)
+
+    # ✅ ساخت پیام نهایی
     msg = (
-        f"📊 آمار خنگول:\n"
-        f"👤 کاربران: {users}\n"
-        f"👥 گروه‌ها: {groups}\n"
-        f"🧩 جملات: {data['phrases']}\n"
-        f"💬 پاسخ‌ها: {data['responses']}\n"
-        f"🎭 مود فعلی: {data['mode']}"
+        f"📊 <b>آمار کلی خنگول:</b>\n\n"
+        f"👤 کاربران واقعی: <b>{users}</b>\n"
+        f"👥 گروه‌های فعال: <b>{groups}</b>\n"
+        f"🧩 جملات ذخیره‌شده: <b>{data['phrases']}</b>\n"
+        f"💬 پاسخ‌های یادگرفته: <b>{data['responses']}</b>\n"
+        f"🎭 مود فعلی: <b>{data['mode']}</b>"
     )
-    await update.message.reply_text(msg)
 
+    await update.message.reply_text(msg, parse_mode="HTML")
 # ======================= 📊 آمار کامل گروه‌ها =======================
 async def fullstats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """نمایش آمار کامل گروه‌ها (سازگار با ساختار جدید و قدیمی group_data.json)"""
