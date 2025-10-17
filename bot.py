@@ -1181,7 +1181,7 @@ async def feature_button_handler(update: Update, context: ContextTypes.DEFAULT_T
 
     if query.data == "feature_info":
         user = query.from_user
-        now = datetime.datetime.now().strftime("%Y/%m/%d - %H:%M:%S")
+        now = datetime.now().strftime("%Y/%m/%d - %H:%M:%S")
         text = (
             f"🆔 آیدی شما: <code>{user.id}</code>\n"
             f"👤 نام: <b>{user.first_name}</b>\n"
