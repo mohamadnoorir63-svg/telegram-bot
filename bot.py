@@ -817,7 +817,7 @@ async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
             failed += 1
 
     await update.message.reply_text(
-        f"📨 ارسال همگانی انجام شد ✅\n"
+        f"📨 ارسال همگانی انجام شد ✅\n
         f"👤 کاربران: {len(users)} | 👥 گروه‌ها: {len(group_ids)}\n"
         f"✅ موفق: {sent} | ⚠️ ناموفق: {failed}"
     )
@@ -950,6 +950,21 @@ async def fullstats(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(text)
     except Exception as e:
         await update.message.reply_text(f"⚠️ خطا در نمایش آمار:\n{e}")
+        # ======================= 📘 راهنمای قابل ویرایش (نمایش برای همه) =======================
+HELP_FILE = "custom_help.txt"
+
+async def show_custom_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """نمایش متن راهنما برای همه کاربران"""
+    if not os.path.exists(HELP_FILE):
+        return await update.message.reply_text(
+            "ℹ️ هنوز هیچ متنی برای راهنما ثبت نشده.\n"
+            "مدیر اصلی می‌تونه با ریپلای و نوشتن «ثبت راهنما» تنظیمش کنه."
+        )
+
+    async with aiofiles.open(HELP_FILE, "r", encoding="utf-8") as f:
+        text = await f.read()
+
+    await update.message.reply_text(text)
 # ======================= 🚀 اجرای نهایی ربات =======================
 if __name__ == "__main__":
     print("🤖 خنگول فارسی 8.7 Cloud+ Supreme Pro Stable+ آماده به خدمت است ...")
