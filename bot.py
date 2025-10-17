@@ -1460,8 +1460,9 @@ if __name__ == "__main__":
     # 🔹 پنل اصلی و قابلیت‌ها
     app.add_handler(MessageHandler(filters.Regex("^ثبت قابلیت$"), save_features))
     app.add_handler(CallbackQueryHandler(feature_button_handler, pattern="^feature_"))
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, font_maker))
-    application.add_handler(CallbackQueryHandler(next_font, pattern="^next_font:"))
+    # 🎨 فونت‌ساز خنگول
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, font_maker))
+    app.add_handler(CallbackQueryHandler(next_font, pattern="^next_font:"))
 
     # 🔹 سیستم خوشامد پویا و پنل گرافیکی (⭐️ قبل از هندلر عمومی متن + با priority -1)
     app.add_handler(MessageHandler(filters.Regex("^خوشامد$"), open_welcome_panel), group=-1)
