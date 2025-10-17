@@ -919,7 +919,7 @@ async def feature_button_handler(update: Update, context: ContextTypes.DEFAULT_T
             text = "🧩 هنوز توضیحی برای قابلیت‌ها ثبت نشده!"
         await query.message.reply_text(text, parse_mode="HTML")
 # ======================= 🚀 اجرای نهایی ربات =======================
-if name == "main":
+if __name__ == "__main__":
     print("🤖 خنگول فارسی 8.7 Cloud+ Supreme Pro Stable+ آماده به خدمت است ...")
 
     app = ApplicationBuilder().token(TOKEN).build()
