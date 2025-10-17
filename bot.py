@@ -1173,8 +1173,8 @@ async def save_features(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text("✅ متن قابلیت‌ها با موفقیت ذخیره شد!")
 
-
 # ======================= 🎛 دکمه‌های تعاملی =======================
+
 async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data = get_stats()
     memory = load_data("memory.json")
@@ -1200,8 +1200,10 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"🎭 مود فعلی: {data['mode']}"
     )
     await update.message.reply_text(msg)
-    
-    async def feature_button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+
+# ======================= 🎛 دکمه‌های تعاملی پنل اصلی =======================
+async def feature_button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
 
@@ -1236,6 +1238,7 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else:
             text = "🧩 هنوز توضیحی برای قابلیت‌ها ثبت نشده!"
         await query.message.reply_text(text, parse_mode="HTML")
+
 # ======================= 🚀 اجرای نهایی =======================
 if __name__ == "__main__":
     print("🤖 خنگول فارسی 8.7 Cloud+ Supreme Pro Stable+ آماده به خدمت است ...")
