@@ -918,7 +918,6 @@ async def feature_button_handler(update: Update, context: ContextTypes.DEFAULT_T
         else:
             text = "🧩 هنوز توضیحی برای قابلیت‌ها ثبت نشده!"
         await query.message.reply_text(text, parse_mode="HTML")
-        
         async def fullstats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """نمایش آمار کامل گروه‌ها"""
     try:
@@ -948,7 +947,6 @@ async def feature_button_handler(update: Update, context: ContextTypes.DEFAULT_T
         await update.message.reply_text(text)
     except Exception as e:
         await update.message.reply_text(f"⚠️ خطا در نمایش آمار:\n{e}")
-        
 # ======================= 🚀 اجرای نهایی ربات =======================
 if __name__ == "__main__":
     print("🤖 خنگول فارسی 8.7 Cloud+ Supreme Pro Stable+ آماده به خدمت است ...")
