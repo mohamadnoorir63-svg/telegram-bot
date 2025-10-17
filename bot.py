@@ -1102,8 +1102,8 @@ async def leave(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("🫡 خدافظ! تا دیدار بعدی 😂")
         await context.bot.leave_chat(update.message.chat.id)
 # ======================= 🌟 پنل اصلی خنگول (استارت + قابلیت‌ها طلایی) =======================
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-import datetime, aiofiles, os, asyncio
+from datetime import datetime
+import aiofiles, os, asyncio
 
 FEATURES_FILE = "features.txt"
 
