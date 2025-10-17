@@ -505,32 +505,31 @@ async def welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 
-# ======================= ☁️ NOORI Secure QR Backup v11.1 =======================
-import os, io, shutil, base64, zipfile, asyncio
-import qrcode
+ 
+# ======================= ☁️ NOORI Secure QR Backup v11.2 (Stable) =======================
+import io, shutil, base64, qrcode
 from PIL import Image, ImageDraw, ImageFont
 from datetime import datetime
-from telegram import InputFile, Update
+import os, zipfile, asyncio
+from telegram import Update, InputFile
 from telegram.ext import ContextTypes
 
-# 📁 مسیر پوشه ذخیره‌ی بک‌آپ‌ها
+# 📁 پوشه مخصوص بک‌آپ‌ها
 BACKUP_DIR = "backups"
 os.makedirs(BACKUP_DIR, exist_ok=True)
 
-# 📄 فایل‌های مهم برای بازیابی
+# 📄 فایل‌های حیاتی برای بازیابی
 IMPORTANT_FILES = [
     "memory.json", "group_data.json", "jokes.json",
     "fortunes.json", "warnings.json", "aliases.json"
 ]
 
-# 🎯 انتخاب فایل‌هایی که باید در بک‌آپ ذخیره شوند
+# 🎯 فقط فایل‌های ضروری در بک‌آپ قرار می‌گیرند
 def _should_include_in_backup(path: str) -> bool:
     skip_dirs = ["__pycache__", ".git", "venv", "restore_temp", "backups"]
     lowered = path.lower()
-    if any(sd in lowered for sd in skip_dirs):
-        return False
-    if lowered.endswith(".zip"):
-        return False
+    if any(sd in lowered for sd in skip_dirs): return False
+    if lowered.endswith(".zip"): return False
     return lowered.endswith((".json", ".jpg", ".png", ".webp", ".mp3", ".ogg"))
 
 # 🧩 ساخت فایل ZIP بک‌آپ
@@ -538,7 +537,6 @@ def create_zip_backup():
     now = datetime.now().strftime("%Y-%m-%d_%H-%M")
     filename = f"backup_{now}.zip"
     zip_path = os.path.join(BACKUP_DIR, filename)
-
     with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED) as zipf:
         for root, _, files in os.walk("."):
             for file in files:
@@ -546,37 +544,37 @@ def create_zip_backup():
                 if _should_include_in_backup(full_path):
                     arcname = os.path.relpath(full_path, ".")
                     zipf.write(full_path, arcname=arcname)
-
     return zip_path, now
 
 # 🧠 ساخت QR زیبا با لوگوی نوری
 def generate_qr_image(text, timestamp):
-    qr = qrcode.QRCode(version=2, error_correction=qrcode.constants.ERROR_CORRECT_H, box_size=10, border=2)
+    # ❗ نسخه QR حداکثر تا 40 مجاز است → از 10 استفاده می‌کنیم تا خطای version رفع شود
+    qr = qrcode.QRCode(version=10, error_correction=qrcode.constants.ERROR_CORRECT_H, box_size=10, border=2)
     qr.add_data(text)
     qr.make(fit=True)
     qr_img = qr.make_image(fill_color="#0044cc", back_color="white").convert("RGB")
 
-    # لوگوی نوری وسط QR
+    # 🔹 لوگوی نوری در وسط QR
     shield = Image.new("RGBA", (120, 120), (0, 0, 0, 0))
     draw = ImageDraw.Draw(shield)
     draw.ellipse((0, 0, 120, 120), fill="#0044cc")
-    draw.polygon([(60, 20), (100, 50), (85, 95), (35, 95), (20, 50)], fill="white")
+    draw.polygon([(60, 20), (95, 50), (85, 95), (35, 95), (25, 50)], fill="white")
 
     qr_w, qr_h = qr_img.size
-    shield = shield.resize((qr_w // 3, qr_h // 3))
+    shield = shield.resize((qr_w // 4, qr_h // 4))
     qr_img.paste(shield, ((qr_w - shield.size[0]) // 2, (qr_h - shield.size[1]) // 2), mask=shield)
 
-    # اضافه کردن عنوان زیر QR
+    # 🖼 اضافه‌کردن عنوان زیر QR
     canvas = Image.new("RGB", (qr_w, qr_h + 80), "white")
     canvas.paste(qr_img, (0, 0))
     draw = ImageDraw.Draw(canvas)
     try:
-        font = ImageFont.truetype("arial.ttf", 26)
+        font = ImageFont.truetype("arial.ttf", 24)
     except:
         font = ImageFont.load_default()
-    label = f"Backup @NOORI — {timestamp}"
+    label = f"Backup — {timestamp}"
     w, h = draw.textsize(label, font=font)
-    draw.text(((qr_w - w) // 2, qr_h + 20), label, fill="#0044cc", font=font)
+    draw.text(((qr_w - w) // 2, qr_h + 25), label, fill="#0044cc", font=font)
 
     output = io.BytesIO()
     canvas.save(output, format="PNG")
@@ -592,8 +590,8 @@ async def backup(update: Update, context: ContextTypes.DEFAULT_TYPE):
     zip_path, timestamp = create_zip_backup()
     with open(zip_path, "rb") as f:
         encoded = base64.b64encode(f.read()).decode("utf-8")[:1500]
-
     qr_img = generate_qr_image(encoded, timestamp)
+
     await update.message.reply_photo(photo=qr_img, caption=f"☁️ بک‌آپ ساخته شد ✅\n🕓 {timestamp}")
     await update.message.reply_document(InputFile(zip_path))
     os.remove(zip_path)
@@ -607,33 +605,31 @@ async def cloudsync(update: Update, context: ContextTypes.DEFAULT_TYPE):
     zip_path, timestamp = create_zip_backup()
     with open(zip_path, "rb") as f:
         encoded = base64.b64encode(f.read()).decode("utf-8")[:1500]
-
     qr_img = generate_qr_image(encoded, timestamp)
+
     await context.bot.send_photo(chat_id=ADMIN_ID, photo=qr_img, caption=f"☁️ Cloud Backup — {timestamp}")
     await context.bot.send_document(chat_id=ADMIN_ID, document=InputFile(zip_path))
     os.remove(zip_path)
 
-# ♻️ بازیابی از ZIP با نوار درصد
+# ♻️ بازیابی با نوار درصد
 async def restore(update: Update, context: ContextTypes.DEFAULT_TYPE):
     ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))
     if update.effective_user.id != ADMIN_ID:
         return await update.message.reply_text("⛔ فقط مدیر اصلی می‌تونه بازیابی کنه!")
-
     if not update.message.reply_to_message or not update.message.reply_to_message.document:
         return await update.message.reply_text("📎 فایل ZIP بک‌آپ را ریپلای کن و بعد دستور /restore بزن.")
 
     file = await update.message.reply_to_message.document.get_file()
-    zip_path = os.path.join(BACKUP_DIR, "restore_temp.zip")
-    await file.download_to_drive(zip_path)
+    path = os.path.join(BACKUP_DIR, "restore_temp.zip")
+    await file.download_to_drive(path)
 
     msg = await update.message.reply_text("♻️ شروع بازیابی...\n0% [▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒]")
     restore_dir = "restore_temp"
-
     if os.path.exists(restore_dir):
         shutil.rmtree(restore_dir)
     os.makedirs(restore_dir, exist_ok=True)
 
-    with zipfile.ZipFile(zip_path, "r") as zip_ref:
+    with zipfile.ZipFile(path, "r") as zip_ref:
         files = zip_ref.namelist()
         total = len(files)
         done = 0
@@ -654,10 +650,10 @@ async def restore(update: Update, context: ContextTypes.DEFAULT_TYPE):
             moved += 1
 
     shutil.rmtree(restore_dir)
-    os.remove(zip_path)
+    os.remove(path)
     await msg.edit_text(f"✅ بازیابی کامل شد!\n📦 {moved} فایل بازگردانی گردید.\n🤖 سیستم آماده است.")
 
-# 🔁 بک‌آپ خودکار هر ۶ ساعت
+# 🕓 بک‌آپ خودکار هر ۶ ساعت
 async def auto_backup(bot):
     ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))
     while True:
@@ -665,16 +661,14 @@ async def auto_backup(bot):
             zip_path, timestamp = create_zip_backup()
             with open(zip_path, "rb") as f:
                 encoded = base64.b64encode(f.read()).decode("utf-8")[:1500]
-
             qr_img = generate_qr_image(encoded, timestamp)
             await bot.send_photo(chat_id=ADMIN_ID, photo=qr_img, caption=f"🤖 Auto Backup — {timestamp}")
             await bot.send_document(chat_id=ADMIN_ID, document=InputFile(zip_path))
-            print(f"[AUTO BACKUP] {timestamp} sent ✅")
             os.remove(zip_path)
+            print(f"[AUTO BACKUP] {timestamp} sent ✅")
         except Exception as e:
             print(f"[AUTO BACKUP ERROR] {e}")
         await asyncio.sleep(21600)
-
 
 # ======================= 💬 پاسخ و هوش مصنوعی =======================
 async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
