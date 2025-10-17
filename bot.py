@@ -10,6 +10,7 @@ from telegram.ext import (
     MessageHandler,
     ContextTypes,
     filters
+from font_maker import font_maker, next_font
 )
 from telegram.ext import CallbackQueryHandler
 import aiofiles
