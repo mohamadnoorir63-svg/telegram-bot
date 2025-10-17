@@ -1290,9 +1290,7 @@ if __name__ == "__main__":
     app.add_handler(MessageHandler(filters.Regex("^ثبت راهنما$"), save_custom_help))
     app.add_handler(MessageHandler(filters.Regex("^راهنما$"), show_custom_help))
 
-    # 🔹 پیام‌ها و اسناد
-    app.add_handler(MessageHandler(filters.Document.ALL, handle_document))
-
+    
     # 🔹 هندلر عمومیِ آخر (بعد از همهٔ موارد اختصاصی)
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, reply))
 
