@@ -144,6 +144,18 @@ async def register_user(user):
 
 
 # ======================= 🚀 استارت سینمایی خفن خنگول =======================
+# ======================= 📢 اطلاع به ادمین هنگام استارت =======================
+async def notify_admin_on_startup(app):
+    """ارسال پیام فعال‌سازی به ادمین هنگام استارت"""
+    ADMIN_ID = int(os.getenv("ADMIN_ID", "7089376754"))  # اگر از قبل داری، خطش رو تکرار نکن
+    try:
+        await app.bot.send_message(
+            chat_id=ADMIN_ID,
+            text="🚀 ربات خنگول با موفقیت راه‌اندازی شد ✅"
+        )
+        print("[INFO] Startup notification sent ✅")
+    except Exception as e:
+        print(f"[ERROR] Failed to notify admin: {e}")
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     from datetime import datetime
 
