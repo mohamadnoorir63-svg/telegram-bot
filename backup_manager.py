@@ -1,4 +1,4 @@
-# ======================= ☁️ NOORI Secure QR Backup v11.3 (Auto-Smart) =======================
+# ======================= ☁️ NOORI Secure QR Backup v11.4 (SafeQR Edition) =======================
 import io, shutil, base64, qrcode
 from PIL import Image, ImageDraw, ImageFont
 from datetime import datetime
@@ -16,7 +16,7 @@ IMPORTANT_FILES = [
     "fortunes.json", "warnings.json", "aliases.json"
 ]
 
-# فیلتر فایل‌های مهم برای بک‌آپ
+# انتخاب فایل‌هایی که باید در بک‌آپ باشند
 def _should_include_in_backup(path: str) -> bool:
     skip_dirs = ["__pycache__", ".git", "venv", "restore_temp", "backups"]
     lowered = path.lower()
@@ -26,7 +26,7 @@ def _should_include_in_backup(path: str) -> bool:
         return False
     return lowered.endswith((".json", ".jpg", ".png", ".webp", ".mp3", ".ogg"))
 
-# ساخت فایل ZIP بک‌آپ
+# 🧩 ساخت فایل ZIP بک‌آپ
 def create_zip_backup():
     now = datetime.now().strftime("%Y-%m-%d_%H-%M")
     filename = f"backup_{now}.zip"
@@ -40,11 +40,10 @@ def create_zip_backup():
                     zipf.write(full_path, arcname=arcname)
     return zip_path, now
 
-# ساخت QR با تشخیص خودکار نسخه
+# 🧠 ساخت QR با سیستم خودکار و امن
 def generate_qr_image(text, timestamp):
     version = 10
     qr = None
-    # اگر QR بزرگ بود، خودکار نسخه رو پایین میاره
     while version >= 1:
         try:
             qr = qrcode.QRCode(
@@ -59,12 +58,13 @@ def generate_qr_image(text, timestamp):
         except Exception as e:
             print(f"[QR WARNING] version {version} failed: {e}")
             version -= 1
+
     if not qr:
         raise Exception("❌ QR generation failed at all versions")
 
     qr_img = qr.make_image(fill_color="#0044cc", back_color="white").convert("RGB")
 
-    # آیکون مرکزی (سپر)
+    # آیکون مرکزی (سپر آبی)
     shield = Image.new("RGBA", (120, 120), (0, 0, 0, 0))
     draw = ImageDraw.Draw(shield)
     draw.ellipse((0, 0, 120, 120), fill="#0044cc")
@@ -73,7 +73,7 @@ def generate_qr_image(text, timestamp):
     shield = shield.resize((qr_w // 4, qr_h // 4))
     qr_img.paste(shield, ((qr_w - shield.size[0]) // 2, (qr_h - shield.size[1]) // 2), mask=shield)
 
-    # اضافه کردن متن پایین QR
+    # نوشتن متن پایین QR
     canvas = Image.new("RGB", (qr_w, qr_h + 80), "white")
     canvas.paste(qr_img, (0, 0))
     draw = ImageDraw.Draw(canvas)
@@ -98,7 +98,7 @@ async def backup(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     zip_path, timestamp = create_zip_backup()
     with open(zip_path, "rb") as f:
-        encoded = base64.b64encode(f.read()).decode("utf-8")[:1500]
+        encoded = base64.b64encode(f.read()).decode("utf-8")[:800]  # ⚙️ Safe limit
     qr_img = generate_qr_image(encoded, timestamp)
 
     await update.message.reply_photo(photo=qr_img, caption=f"☁️ بک‌آپ ساخته شد ✅\n🕓 {timestamp}")
@@ -113,7 +113,7 @@ async def cloudsync(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     zip_path, timestamp = create_zip_backup()
     with open(zip_path, "rb") as f:
-        encoded = base64.b64encode(f.read()).decode("utf-8")[:1500]
+        encoded = base64.b64encode(f.read()).decode("utf-8")[:800]  # ⚙️ Safe limit
     qr_img = generate_qr_image(encoded, timestamp)
 
     await context.bot.send_photo(chat_id=ADMIN_ID, photo=qr_img, caption=f"☁️ Cloud Backup — {timestamp}")
@@ -169,7 +169,7 @@ async def auto_backup(bot):
         try:
             zip_path, timestamp = create_zip_backup()
             with open(zip_path, "rb") as f:
-                encoded = base64.b64encode(f.read()).decode("utf-8")[:1500]
+                encoded = base64.b64encode(f.read()).decode("utf-8")[:800]  # ⚙️ Safe limit
             qr_img = generate_qr_image(encoded, timestamp)
             await bot.send_photo(chat_id=ADMIN_ID, photo=qr_img, caption=f"🤖 Auto Backup — {timestamp}")
             await bot.send_document(chat_id=ADMIN_ID, document=InputFile(zip_path))
