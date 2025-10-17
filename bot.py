@@ -14,6 +14,9 @@ from telegram.ext import (
 from telegram.ext import CallbackQueryHandler
 import aiofiles
 
+# 💾 سیستم بک‌آپ امن نوری
+from backup_manager import backup, restore, cloudsync, auto_backup
+
 # 📦 ماژول‌ها
 from memory_manager import (
     init_files, load_data, save_data, learn, shadow_learn, get_reply,
