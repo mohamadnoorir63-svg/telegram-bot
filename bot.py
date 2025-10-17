@@ -1339,11 +1339,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = await update.message.reply_text("⏳ <b>در حال بارگذاری سیستم خنگول...</b>", parse_mode="HTML")
     await asyncio.sleep(1.7)
 
-    welcome_text = (
-        f"🌙 <b>سلام {update.effective_user.first_name}!</b>\n"
-        f"🤖 من <b>خنگول فارسی 8.7 Cloud+ Supreme Pro</b> هستم.\n"
-        f"✨ رباتی با احساس، شوخ‌طبعی و حافظه‌ی اجتماعی 😄"
-    )
+ 
 
     await msg.edit_text(welcome_text, parse_mode="HTML")
     await asyncio.sleep(1.2)
