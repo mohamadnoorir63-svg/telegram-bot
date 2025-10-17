@@ -1,4 +1,4 @@
-# ======================= ☁️ NOORI Secure QR Backup v11.4 (SafeQR Edition) =======================
+# ======================= ☁️ NOORI Secure QR Backup v11.5 (AutoLimit Edition) =======================
 import io, shutil, base64, qrcode
 from PIL import Image, ImageDraw, ImageFont
 from datetime import datetime
@@ -6,17 +6,14 @@ import os, zipfile, asyncio
 from telegram import Update, InputFile
 from telegram.ext import ContextTypes
 
-# 📁 مسیر پوشه بک‌آپ
 BACKUP_DIR = "backups"
 os.makedirs(BACKUP_DIR, exist_ok=True)
 
-# فایل‌های مهم برای بازیابی
 IMPORTANT_FILES = [
     "memory.json", "group_data.json", "jokes.json",
     "fortunes.json", "warnings.json", "aliases.json"
 ]
 
-# انتخاب فایل‌هایی که باید در بک‌آپ باشند
 def _should_include_in_backup(path: str) -> bool:
     skip_dirs = ["__pycache__", ".git", "venv", "restore_temp", "backups"]
     lowered = path.lower()
@@ -26,7 +23,6 @@ def _should_include_in_backup(path: str) -> bool:
         return False
     return lowered.endswith((".json", ".jpg", ".png", ".webp", ".mp3", ".ogg"))
 
-# 🧩 ساخت فایل ZIP بک‌آپ
 def create_zip_backup():
     now = datetime.now().strftime("%Y-%m-%d_%H-%M")
     filename = f"backup_{now}.zip"
@@ -40,11 +36,11 @@ def create_zip_backup():
                     zipf.write(full_path, arcname=arcname)
     return zip_path, now
 
-# 🧠 ساخت QR با سیستم خودکار و امن
+# 🧠 QR هوشمند با محدودکننده خودکار
 def generate_qr_image(text, timestamp):
+    safe_text = text
     version = 10
-    qr = None
-    while version >= 1:
+    while True:
         try:
             qr = qrcode.QRCode(
                 version=version,
@@ -52,19 +48,21 @@ def generate_qr_image(text, timestamp):
                 box_size=10,
                 border=2
             )
-            qr.add_data(text)
+            qr.add_data(safe_text)
             qr.make(fit=True)
             break
         except Exception as e:
-            print(f"[QR WARNING] version {version} failed: {e}")
-            version -= 1
-
-    if not qr:
-        raise Exception("❌ QR generation failed at all versions")
+            # اگر طول متن زیاد بود → نصفش می‌کنیم تا در QR جا بشه
+            print(f"[QR AUTO-LIMIT] version={version} failed ({len(safe_text)} chars) → reducing")
+            safe_text = safe_text[: int(len(safe_text) * 0.8)]
+            if version > 1:
+                version -= 1
+            if len(safe_text) < 100:
+                raise Exception("❌ Text too long for QR even after reduction!")
 
     qr_img = qr.make_image(fill_color="#0044cc", back_color="white").convert("RGB")
 
-    # آیکون مرکزی (سپر آبی)
+    # آیکون مرکزی
     shield = Image.new("RGBA", (120, 120), (0, 0, 0, 0))
     draw = ImageDraw.Draw(shield)
     draw.ellipse((0, 0, 120, 120), fill="#0044cc")
@@ -73,7 +71,6 @@ def generate_qr_image(text, timestamp):
     shield = shield.resize((qr_w // 4, qr_h // 4))
     qr_img.paste(shield, ((qr_w - shield.size[0]) // 2, (qr_h - shield.size[1]) // 2), mask=shield)
 
-    # نوشتن متن پایین QR
     canvas = Image.new("RGB", (qr_w, qr_h + 80), "white")
     canvas.paste(qr_img, (0, 0))
     draw = ImageDraw.Draw(canvas)
@@ -98,7 +95,7 @@ async def backup(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     zip_path, timestamp = create_zip_backup()
     with open(zip_path, "rb") as f:
-        encoded = base64.b64encode(f.read()).decode("utf-8")[:800]  # ⚙️ Safe limit
+        encoded = base64.b64encode(f.read()).decode("utf-8")
     qr_img = generate_qr_image(encoded, timestamp)
 
     await update.message.reply_photo(photo=qr_img, caption=f"☁️ بک‌آپ ساخته شد ✅\n🕓 {timestamp}")
@@ -113,14 +110,14 @@ async def cloudsync(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     zip_path, timestamp = create_zip_backup()
     with open(zip_path, "rb") as f:
-        encoded = base64.b64encode(f.read()).decode("utf-8")[:800]  # ⚙️ Safe limit
+        encoded = base64.b64encode(f.read()).decode("utf-8")
     qr_img = generate_qr_image(encoded, timestamp)
 
     await context.bot.send_photo(chat_id=ADMIN_ID, photo=qr_img, caption=f"☁️ Cloud Backup — {timestamp}")
     await context.bot.send_document(chat_id=ADMIN_ID, document=InputFile(zip_path))
     os.remove(zip_path)
 
-# ♻️ بازیابی با نوار درصد
+# ♻️ بازیابی
 async def restore(update: Update, context: ContextTypes.DEFAULT_TYPE):
     ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))
     if update.effective_user.id != ADMIN_ID:
@@ -169,7 +166,7 @@ async def auto_backup(bot):
         try:
             zip_path, timestamp = create_zip_backup()
             with open(zip_path, "rb") as f:
-                encoded = base64.b64encode(f.read()).decode("utf-8")[:800]  # ⚙️ Safe limit
+                encoded = base64.b64encode(f.read()).decode("utf-8")
             qr_img = generate_qr_image(encoded, timestamp)
             await bot.send_photo(chat_id=ADMIN_ID, photo=qr_img, caption=f"🤖 Auto Backup — {timestamp}")
             await bot.send_document(chat_id=ADMIN_ID, document=InputFile(zip_path))
