@@ -1,4 +1,4 @@
-# ======================= ☁️ NOORI Secure QR Backup v11.5 (AutoLimit Edition) =======================
+# ======================= ☁️ NOORI Secure QR Backup v11.7 (Safe & Stable) =======================
 import io, shutil, base64, qrcode
 from PIL import Image, ImageDraw, ImageFont
 from datetime import datetime
@@ -6,23 +6,25 @@ import os, zipfile, asyncio
 from telegram import Update, InputFile
 from telegram.ext import ContextTypes
 
+# مسیر پوشه‌ی ذخیره‌سازی بک‌آپ‌ها
 BACKUP_DIR = "backups"
 os.makedirs(BACKUP_DIR, exist_ok=True)
 
+# فایل‌های مهم برای بازگردانی
 IMPORTANT_FILES = [
     "memory.json", "group_data.json", "jokes.json",
     "fortunes.json", "warnings.json", "aliases.json"
 ]
 
+# فقط فایل‌های مهم رو داخل ZIP قرار بده
 def _should_include_in_backup(path: str) -> bool:
     skip_dirs = ["__pycache__", ".git", "venv", "restore_temp", "backups"]
     lowered = path.lower()
-    if any(sd in lowered for sd in skip_dirs):
-        return False
-    if lowered.endswith(".zip"):
-        return False
+    if any(sd in lowered for sd in skip_dirs): return False
+    if lowered.endswith(".zip"): return False
     return lowered.endswith((".json", ".jpg", ".png", ".webp", ".mp3", ".ogg"))
 
+# ساخت فایل ZIP بک‌آپ
 def create_zip_backup():
     now = datetime.now().strftime("%Y-%m-%d_%H-%M")
     filename = f"backup_{now}.zip"
@@ -36,41 +38,32 @@ def create_zip_backup():
                     zipf.write(full_path, arcname=arcname)
     return zip_path, now
 
-# 🧠 QR هوشمند با محدودکننده خودکار
+# ساخت QR با محدودیت امن
 def generate_qr_image(text, timestamp):
-    safe_text = text
-    version = 10
-    while True:
-        try:
-            qr = qrcode.QRCode(
-                version=version,
-                error_correction=qrcode.constants.ERROR_CORRECT_H,
-                box_size=10,
-                border=2
-            )
-            qr.add_data(safe_text)
-            qr.make(fit=True)
-            break
-        except Exception as e:
-            # اگر طول متن زیاد بود → نصفش می‌کنیم تا در QR جا بشه
-            print(f"[QR AUTO-LIMIT] version={version} failed ({len(safe_text)} chars) → reducing")
-            safe_text = safe_text[: int(len(safe_text) * 0.8)]
-            if version > 1:
-                version -= 1
-            if len(safe_text) < 100:
-                raise Exception("❌ Text too long for QR even after reduction!")
+    safe_text = text[:700]  # محدودسازی خودکار تا اندازه مجاز
+
+    qr = qrcode.QRCode(
+        version=5,  # نسخه امن (1 تا 40 مجاز است)
+        error_correction=qrcode.constants.ERROR_CORRECT_M,
+        box_size=10,
+        border=2
+    )
+    qr.add_data(safe_text)
+    qr.make(fit=False)  # از افزایش خودکار نسخه جلوگیری می‌کند
 
     qr_img = qr.make_image(fill_color="#0044cc", back_color="white").convert("RGB")
 
-    # آیکون مرکزی
+    # آیکون سپر ساده
     shield = Image.new("RGBA", (120, 120), (0, 0, 0, 0))
     draw = ImageDraw.Draw(shield)
     draw.ellipse((0, 0, 120, 120), fill="#0044cc")
     draw.polygon([(60, 25), (95, 50), (85, 95), (35, 95), (25, 50)], fill="white")
+
     qr_w, qr_h = qr_img.size
     shield = shield.resize((qr_w // 4, qr_h // 4))
     qr_img.paste(shield, ((qr_w - shield.size[0]) // 2, (qr_h - shield.size[1]) // 2), mask=shield)
 
+    # افزودن نوشته پایین QR
     canvas = Image.new("RGB", (qr_w, qr_h + 80), "white")
     canvas.paste(qr_img, (0, 0))
     draw = ImageDraw.Draw(canvas)
@@ -117,7 +110,7 @@ async def cloudsync(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await context.bot.send_document(chat_id=ADMIN_ID, document=InputFile(zip_path))
     os.remove(zip_path)
 
-# ♻️ بازیابی
+# ♻️ بازیابی فایل ZIP
 async def restore(update: Update, context: ContextTypes.DEFAULT_TYPE):
     ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))
     if update.effective_user.id != ADMIN_ID:
