@@ -659,9 +659,10 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # 🧠 بررسی حالت ریپلی مود گروهی
     if await handle_group_reply_mode(update, context):
         return
+        
 # ثبت کاربر و گروه
-await register_user(update.effective_user)
-register_group_activity(chat_id, uid)
+    await register_user(update.effective_user)
+    register_group_activity(chat_id, uid)
 
     if not status["locked"]:
         auto_learn_from_text(text)
