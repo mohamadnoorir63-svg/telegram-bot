@@ -141,12 +141,12 @@ async def register_user(user):
         with open(USERS_FILE, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
 # ======================= ✳️ شروع و پیام فعال‌سازی =======================
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(
-        "🤖 خنگول فارسی 8.5.1 Cloud+ Supreme Pro Stable+\n"
-        "📘 برای دیدن لیست دستورات بنویس: راهنما"
-    )
 
+# ======================= 🚀 استارت با پنل فارسی =======================
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    msg = await update.message.reply_text("⏳ در حال بارگذاری سیستم خنگول...", parse_mode="HTML")
+    await asyncio.sleep(1.2)
+    await show_main_panel(update, context)
 async def notify_admin_on_startup(app):
     """ارسال پیام فعال‌سازی به ادمین هنگام استارت"""
     try:
