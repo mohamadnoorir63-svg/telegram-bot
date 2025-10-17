@@ -1451,6 +1451,8 @@ if __name__ == "__main__":
 
     # 🔹 پیام‌ها و اسناد
     app.add_handler(MessageHandler(filters.Document.ALL, handle_document))
+    # 🌟 پنل اصلی (نوری پلاس)
+    app.add_handler(CallbackQueryHandler(panel_handler))
 
     # 🎭 سخنگوی اصلی ربات (آخر از همه تا تداخلی پیش نیاد)
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, reply), group=0)
