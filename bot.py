@@ -1062,40 +1062,103 @@ async def reload_memory(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ======================= 📨 ارسال همگانی =======================
 async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_ID:
-        return
-    msg = " ".join(context.args)
-    if not msg:
-        return await update.message.reply_text("❗ بعد از /broadcast پیام را بنویس.")
+        return await update.message.reply_text("⛔ فقط مدیر اصلی می‌تونه پیام همگانی بفرسته!")
 
-    users = load_data("memory.json").get("users", [])
+    msg_text = " ".join(context.args)
+    if not msg_text:
+        return await update.message.reply_text("❗ بعد از /broadcast پیام مورد نظر رو بنویس.")
+
+    import json, os
+
+    # ✅ خواندن کاربران از users.json
+    users = []
+    user_names = []
+    if os.path.exists("users.json"):
+        try:
+            with open("users.json", "r", encoding="utf-8") as f:
+                data = json.load(f)
+                users = [u["id"] for u in data]
+                user_names = [u.get("name", str(u["id"])) for u in data]
+        except:
+            pass
+
+    # ✅ خواندن گروه‌ها از group_data.json (سازگار با هر دو ساختار)
     groups_data = load_data("group_data.json").get("groups", {})
-    group_ids = []
-
+    group_ids, group_names = [], []
     if isinstance(groups_data, dict):
-        group_ids = list(groups_data.keys())
+        for gid, info in groups_data.items():
+            group_ids.append(gid)
+            group_names.append(info.get("title", f"Group_{gid}"))
     elif isinstance(groups_data, list):
-        group_ids = [g.get("id") for g in groups_data if "id" in g]
+        for g in groups_data:
+            if "id" in g:
+                group_ids.append(g["id"])
+                group_names.append(g.get("title", f"Group_{g['id']}"))
 
-    sent, failed = 0, 0
-    for uid in users:
-        try:
-            await context.bot.send_message(chat_id=uid, text=msg)
-            sent += 1
-        except:
-            failed += 1
-    for gid in group_ids:
-        try:
-            await context.bot.send_message(chat_id=int(gid), text=msg)
-            sent += 1
-        except:
-            failed += 1
+    total_targets = len(users) + len(group_ids)
+    if total_targets == 0:
+        return await update.message.reply_text("⚠️ هیچ کاربر یا گروهی برای ارسال پیدا نشد!")
 
-    await update.message.reply_text(
-        f"📨 ارسال همگانی انجام شد ✅\n"
+    # 🕓 پیام اولیه
+    progress_msg = await update.message.reply_text(
+        f"📨 در حال ارسال همگانی...\n"
         f"👤 کاربران: {len(users)} | 👥 گروه‌ها: {len(group_ids)}\n"
-        f"✅ موفق: {sent} | ⚠️ ناموفق: {failed}"
+        f"📊 پیشرفت: 0%"
     )
 
+    sent, failed = 0, 0
+    last_percent = 0
+
+    async def update_progress():
+        percent = int(((sent + failed) / total_targets) * 100)
+        nonlocal last_percent
+        if percent - last_percent >= 10 or percent == 100:
+            last_percent = percent
+            try:
+                await progress_msg.edit_text(
+                    f"📨 در حال ارسال همگانی...\n"
+                    f"👤 کاربران: {len(users)} | 👥 گروه‌ها: {len(group_ids)}\n"
+                    f"📊 پیشرفت: {percent}%"
+                )
+            except:
+                pass
+
+    # 🔸 ارسال به کاربران
+    for uid in users:
+        try:
+            await context.bot.send_message(chat_id=uid, text=msg_text)
+            sent += 1
+        except:
+            failed += 1
+        await update_progress()
+        await asyncio.sleep(0.3)
+
+    # 🔸 ارسال به گروه‌ها
+    for gid in group_ids:
+        try:
+            await context.bot.send_message(chat_id=int(gid), text=msg_text)
+            sent += 1
+        except:
+            failed += 1
+        await update_progress()
+        await asyncio.sleep(0.3)
+
+    # ✅ نتیجه نهایی با لیست نمونه
+    example_users = "، ".join(user_names[:3]) if user_names else "—"
+    example_groups = "، ".join(group_names[:3]) if group_names else "—"
+
+    result = (
+        "✅ <b>ارسال همگانی با موفقیت انجام شد!</b>\n\n"
+        f"👤 کاربران: <b>{len(users)}</b>\n"
+        f"👥 گروه‌ها: <b>{len(group_ids)}</b>\n"
+        f"📦 مجموع گیرندگان: <b>{total_targets}</b>\n"
+        f"📤 موفق: <b>{sent}</b>\n"
+        f"⚠️ ناموفق: <b>{failed}</b>\n\n"
+        f"👤 نمونه کاربران: <i>{example_users}</i>\n"
+        f"🏠 نمونه گروه‌ها: <i>{example_groups}</i>"
+    )
+
+    await progress_msg.edit_text(result, parse_mode="HTML")
 # ======================= 🚪 خروج از گروه =======================
 async def leave(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id == ADMIN_ID:
