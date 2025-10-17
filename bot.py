@@ -1460,11 +1460,12 @@ if __name__ == "__main__":
     # 🔹 پنل اصلی و قابلیت‌ها
     app.add_handler(MessageHandler(filters.Regex("^ثبت قابلیت$"), save_features))
     app.add_handler(CallbackQueryHandler(feature_button_handler, pattern="^feature_"))
-    # 🎨 فونت‌ساز خنگول
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, font_maker))
+
+    # 🎨 فونت‌ساز خنگول (با اولویت پایین‌تر تا جلوی بقیه رو نگیره)
+    app.add_handler(MessageHandler(filters.Regex("^فونت "), font_maker), group=-2)
     app.add_handler(CallbackQueryHandler(next_font, pattern="^next_font:"))
 
-    # 🔹 سیستم خوشامد پویا و پنل گرافیکی (⭐️ قبل از هندلر عمومی متن + با priority -1)
+    # 🔹 سیستم خوشامد پویا و پنل گرافیکی
     app.add_handler(MessageHandler(filters.Regex("^خوشامد$"), open_welcome_panel), group=-1)
     app.add_handler(CallbackQueryHandler(welcome_panel_buttons, pattern="^welcome_"), group=-1)
     app.add_handler(MessageHandler(filters.Regex("^ثبت خوشامد$"), set_welcome_text), group=-1)
@@ -1480,8 +1481,8 @@ if __name__ == "__main__":
     # 🔹 پیام‌ها و اسناد
     app.add_handler(MessageHandler(filters.Document.ALL, handle_document))
 
-    # 🔹 هندلر عمومیِ آخر (بعد از همهٔ موارد اختصاصی)
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, reply))
+    # 🎭 سخنگوی اصلی ربات (آخر از همه تا تداخلی پیش نیاد)
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, reply), group=0)
 
     # 🔹 هنگام استارت
     async def on_startup(app):
