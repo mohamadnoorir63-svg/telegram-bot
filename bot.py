@@ -1430,9 +1430,7 @@ if __name__ == "__main__":
     app.add_handler(CommandHandler("leave", leave))
     app.add_handler(CommandHandler("reply", toggle_reply_mode))
 
-    # 🔹 پنل اصلی و قابلیت‌ها
-    app.add_handler(MessageHandler(filters.Regex("^ثبت قابلیت$"), save_features))
-    app.add_handler(CallbackQueryHandler(feature_button_handler, pattern="^feature_"))
+    
 
     # 🎨 فونت‌ساز خنگول (با اولویت پایین‌تر تا جلوی بقیه رو نگیره)
     app.add_handler(MessageHandler(filters.Regex("^فونت "), font_maker), group=-2)
