@@ -1297,139 +1297,112 @@ async def leave(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id == ADMIN_ID:
         await update.message.reply_text("🫡 خدافظ! تا دیدار بعدی 😂")
         await context.bot.leave_chat(update.message.chat.id)
-# ======================= 🌟 پنل اصلی خنگول (استارت + قابلیت‌ها طلایی) =======================
+# ======================= 🌟 پنل نوری پلاس =======================
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-from datetime import datetime
 import aiofiles, os, asyncio
+from datetime import datetime
 
-FEATURES_FILE = "features.txt"
+TEXTS_PATH = "texts"
 
-# ======================= 🎨 نمایش پنل =======================
+async def load_text(file_name, default_text):
+    path = os.path.join(TEXTS_PATH, file_name)
+    if os.path.exists(path):
+        async with aiofiles.open(path, "r", encoding="utf-8") as f:
+            return await f.read()
+    return default_text
+
+
 async def show_main_panel(update: Update, context: ContextTypes.DEFAULT_TYPE, edit=False):
-    """نمایش پنل اصلی برای همه کاربران"""
-    # 📖 متن معرفی یا قابلیت‌های سفارشی
-    if os.path.exists(FEATURES_FILE):
-        async with aiofiles.open(FEATURES_FILE, "r", encoding="utf-8") as f:
-            about_text = await f.read()
-    else:
-        about_text = (
-            "✨ <b>خنگول فارسی 8.7 Cloud+ Supreme Pro</b>\n"
-            "🤖 هوش اجتماعی، شوخ‌طبعی و احساس واقعی در یک ربات!\n"
-            "💬 همراهی با خنده، فال، و هوش اجتماعی بی‌نظیر 🌙"
-        )
+    about = await load_text("about_khengol.txt",
+        "✨ <b>خنگول فارسی</b>\n🤖 هوش، شوخ‌طبعی و احساس واقعی در یک ربات!\n💬 همراه با خنده، فال، و پاسخ‌های باحال!")
 
     keyboard = [
-        [InlineKeyboardButton("💬 ارتباط با سازنده", url="https://t.me/NOORI_NOOR")],
-        [InlineKeyboardButton("💭 گروه پشتیبانی", url="https://t.me/Poshtibahni")],
-        [InlineKeyboardButton("⏰ آیدی و ساعت", callback_data="feature_info")],
-        [InlineKeyboardButton("🔮 فال امروز", callback_data="feature_fortune")],
-        [InlineKeyboardButton("😂 جوک تصادفی", callback_data="feature_joke")],
-        [InlineKeyboardButton("➕ افزودن به گروه", url="https://t.me/Khenqol_bot?startgroup=true")],
-        [InlineKeyboardButton("🧩 قابلیت ربات", callback_data="feature_about")]
+        [InlineKeyboardButton("💬 ارتباط با سازنده", url="https://t.me/NOORI_NOOR"),
+         InlineKeyboardButton("💭 گروه پشتیبانی", url="https://t.me/Poshtibahni")],
+        [InlineKeyboardButton("➕ افزودن به گروه", url="https://t.me/Khenqol_bot?startgroup=true"),
+         InlineKeyboardButton("🧩 قابلیت‌های ربات", callback_data="panel_features")],
+        [InlineKeyboardButton("🤖 درباره خنگول", callback_data="panel_about"),
+         InlineKeyboardButton("👨‍💻 درباره تیم ما", callback_data="panel_team")],
+        [InlineKeyboardButton("🔮 فال امروز", callback_data="panel_fortune"),
+         InlineKeyboardButton("😂 جوک خنده‌دار", callback_data="panel_joke")],
+        [InlineKeyboardButton("🎨 فونت‌ساز حرفه‌ای", callback_data="panel_font"),
+         InlineKeyboardButton("📊 آمار ربات", callback_data="panel_stats")]
     ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
+    markup = InlineKeyboardMarkup(keyboard)
 
     if edit:
-        await update.callback_query.edit_message_text(about_text, reply_markup=reply_markup, parse_mode="HTML")
+        await update.callback_query.edit_message_text(about, reply_markup=markup, parse_mode="HTML")
     else:
-        await update.message.reply_text(about_text, reply_markup=reply_markup, parse_mode="HTML")
+        await update.message.reply_text(about, reply_markup=markup, parse_mode="HTML")
 
 
-# ======================= 🚀 استارت با انیمیشن لوکس =======================
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """انیمیشن خوش‌آمد + نمایش پنل اصلی"""
-    msg = await update.message.reply_text("⏳ <b>در حال بارگذاری سیستم خنگول...</b>", parse_mode="HTML")
-    await asyncio.sleep(1.7)
+# ======================= 🎛 کنترل پنل =======================
+async def panel_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
 
- 
+    user = query.from_user
+    now = datetime.now().strftime("%Y/%m/%d - %H:%M:%S")
 
-    await msg.edit_text(welcome_text, parse_mode="HTML")
-    await asyncio.sleep(1.2)
+    panels = {
+        "panel_about": ("about_khengol.txt", "💫 درباره خنگول"),
+        "panel_team": ("team_noori.txt", "👨‍💻 تیم نوری"),
+        "panel_features": ("features.txt", "🧩 قابلیت‌های ربات"),
+    }
 
-    # 🔹 نمایش منوی اصلی (پیام جدا)
-    await show_main_panel(update, context, edit=False)
+    if query.data in panels:
+        file_name, title = panels[query.data]
+        text = await load_text(file_name, f"❗ هنوز {title} ثبت نشده!")
+        text += "\n\n🔙 برای بازگشت، روی دکمه زیر بزن:"
+        back_btn = [[InlineKeyboardButton("🔙 بازگشت", callback_data="back_main")]]
+        await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(back_btn), parse_mode="HTML")
+
+    elif query.data == "panel_fortune":
+        await query.message.reply_text("🔮 برای دیدن فال بنویس:\n<b>فال</b>", parse_mode="HTML")
+    elif query.data == "panel_joke":
+        await query.message.reply_text("😂 برای دیدن جوک بنویس:\n<b>جوک</b>", parse_mode="HTML")
+    elif query.data == "panel_font":
+        await query.message.reply_text("🎨 برای ساخت فونت بنویس:\n<b>فونت اسم‌ت</b>", parse_mode="HTML")
+    elif query.data == "panel_stats":
+        stats_msg = (
+            f"📊 آمار کلی ربات:\n"
+            f"👤 کاربر: <b>{user.first_name}</b>\n"
+            f"🆔 آیدی: <code>{user.id}</code>\n"
+            f"📅 زمان فعلی: {now}"
+        )
+        await query.message.reply_text(stats_msg, parse_mode="HTML")
+    elif query.data == "back_main":
+        await show_main_panel(update, context, edit=True)
 
 
-# ======================= 🧩 ویرایش قابلیت‌ها (فقط ادمین) =======================
-async def save_features(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """ثبت یا ویرایش متن قابلیت‌ها فقط برای مدیر اصلی"""
+# ======================= 🔐 ثبت فایل‌ها فقط توسط مدیر اصلی =======================
+async def save_panel_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_ID:
-        return await update.message.reply_text("⛔ فقط مدیر اصلی می‌تونه متن قابلیت‌ها رو تغییر بده!")
+        return await update.message.reply_text("⛔ فقط مدیر اصلی می‌تونه متن‌ها رو تغییر بده!")
 
     if not update.message.reply_to_message or not update.message.reply_to_message.text:
         return await update.message.reply_text("❗ باید روی یک پیام متنی ریپلای بزنی!")
 
-    text = update.message.reply_to_message.text
-    async with aiofiles.open(FEATURES_FILE, "w", encoding="utf-8") as f:
-        await f.write(text)
+    parts = update.message.text.strip().split(maxsplit=1)
+    if len(parts) < 2:
+        return await update.message.reply_text("❗ بنویس: ثبت درباره یا ثبت تیم")
 
-    await update.message.reply_text("✅ متن قابلیت‌ها با موفقیت ذخیره شد!")
+    cmd = parts[1]
+    filename = None
+    if cmd == "درباره":
+        filename = "about_khengol.txt"
+    elif cmd == "تیم":
+        filename = "team_noori.txt"
+    elif cmd == "قابلیت":
+        filename = "features.txt"
 
-# ======================= 🎛 دکمه‌های تعاملی =======================
-
-async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    data = get_stats()
-    memory = load_data("memory.json")
-    groups = len(load_data("group_data.json").get("groups", []))
-
-    # ✅ کاربران را از users.json بخوان
-    users_list = []
-    if os.path.exists("users.json"):
-        try:
-            import json
-            with open("users.json", "r", encoding="utf-8") as f:
-                users_list = json.load(f)
-        except:
-            users_list = []
-    users = len(users_list)
-
-    msg = (
-        f"📊 آمار خنگول:\n"
-        f"👤 کاربران: {users}\n"
-        f"👥 گروه‌ها: {groups}\n"
-        f"🧩 جملات: {data['phrases']}\n"
-        f"💬 پاسخ‌ها: {data['responses']}\n"
-        f"🎭 مود فعلی: {data['mode']}"
-    )
-    await update.message.reply_text(msg)
-
-
-# ======================= 🎛 دکمه‌های تعاملی پنل اصلی =======================
-async def feature_button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-
-    if query.data == "feature_info":
-        user = query.from_user
-        now = datetime.now().strftime("%Y/%m/%d - %H:%M:%S")
-        text = (
-            f"🆔 آیدی شما: <code>{user.id}</code>\n"
-            f"👤 نام: <b>{user.first_name}</b>\n"
-            f"📅 تاریخ و ساعت فعلی: <b>{now}</b>"
-        )
-        try:
-            photos = await context.bot.get_user_profile_photos(user.id, limit=1)
-            if photos.total_count > 0:
-                file_id = photos.photos[0][-1].file_id
-                await query.message.reply_photo(file_id, caption=text, parse_mode="HTML")
-            else:
-                await query.message.reply_text(text, parse_mode="HTML")
-        except:
-            await query.message.reply_text(text, parse_mode="HTML")
-
-    elif query.data == "feature_joke":
-        await query.message.reply_text("😂 برای دیدن جوک بنویس:\n<b>جوک</b>", parse_mode="HTML")
-
-    elif query.data == "feature_fortune":
-        await query.message.reply_text("🔮 برای دیدن فال بنویس:\n<b>فال</b>", parse_mode="HTML")
-
-    elif query.data == "feature_about":
-        if os.path.exists(FEATURES_FILE):
-            async with aiofiles.open(FEATURES_FILE, "r", encoding="utf-8") as f:
-                text = await f.read()
-        else:
-            text = "🧩 هنوز توضیحی برای قابلیت‌ها ثبت نشده!"
-        await query.message.reply_text(text, parse_mode="HTML")
+    if filename:
+        os.makedirs(TEXTS_PATH, exist_ok=True)
+        async with aiofiles.open(os.path.join(TEXTS_PATH, filename), "w", encoding="utf-8") as f:
+            await f.write(update.message.reply_to_message.text)
+        await update.message.reply_text(f"✅ متن «{cmd}» ذخیره شد!")
+    else:
+        await update.message.reply_text("❗ دستور اشتباه است — باید یکی از این‌ها باشد:\nثبت درباره / ثبت تیم / ثبت قابلیت")
 
 # ======================= 🚀 اجرای نهایی =======================
 if __name__ == "__main__":
