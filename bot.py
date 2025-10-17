@@ -478,7 +478,7 @@ async def welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
     delete_after = cfg.get("delete_after", 0)
 
     for member in update.message.new_chat_members:
-        now = datetime.datetime.now().strftime("%Y/%m/%d ⏰ %H:%M")
+        now = datetime.now().strftime("%Y/%m/%d ⏰ %H:%M")
         message_text = (
             f"🌙 <b>سلام {member.first_name}!</b>\n"
             f"📅 تاریخ و ساعت: <b>{now}</b>\n"
