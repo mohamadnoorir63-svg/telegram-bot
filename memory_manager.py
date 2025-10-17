@@ -2,11 +2,10 @@ import json
 import os
 import random
 from datetime import datetime
-from fix_memory import fix_json
+# ❌ از اینجا خط fix_memory حذف شد
 
 # 🧩 فایل‌های حافظه اصلی
 FILES = ["memory.json", "shadow_memory.json", "group_data.json"]
-
 # ========================= 📂 آماده‌سازی اولیه =========================
 def init_files():
     """بررسی و ایجاد فایل‌های حافظه در صورت نبود"""
