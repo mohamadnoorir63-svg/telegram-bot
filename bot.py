@@ -1335,8 +1335,7 @@ async def show_main_panel(update: Update, context: ContextTypes.DEFAULT_TYPE, ed
         [InlineKeyboardButton("🔮 فال امروز", callback_data="panel_fortune"),
          InlineKeyboardButton("😂 جوک خنده‌دار", callback_data="panel_joke")],
         [InlineKeyboardButton("🎨 فونت‌ساز حرفه‌ای", callback_data="panel_font"),
-         InlineKeyboardButton( 📅📜ID",callback_data="panel_stats")]
-    ]
+         InlineKeyboardButton("📅📜ID", callback_data="panel_stats")
     markup = InlineKeyboardMarkup(keyboard)
 
     if edit:
