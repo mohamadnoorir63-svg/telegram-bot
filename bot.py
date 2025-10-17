@@ -1175,18 +1175,31 @@ async def save_features(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 # ======================= 🎛 دکمه‌های تعاملی =======================
-async def feature_button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
+async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    data = get_stats()
+    memory = load_data("memory.json")
+    groups = len(load_data("group_data.json").get("groups", []))
 
-    if query.data == "feature_info":
-        user = query.from_user
-        now = datetime.now().strftime("%Y/%m/%d - %H:%M:%S")
-        text = (
-            f"🆔 آیدی شما: <code>{user.id}</code>\n"
-            f"👤 نام: <b>{user.first_name}</b>\n"
-            f"📅 تاریخ و ساعت فعلی: <b>{now}</b>"
-        )
+    # ✅ کاربران را از users.json بخوان
+    users_list = []
+    if os.path.exists("users.json"):
+        try:
+            import json
+            with open("users.json", "r", encoding="utf-8") as f:
+                users_list = json.load(f)
+        except:
+            users_list = []
+    users = len(users_list)
+
+    msg = (
+        f"📊 آمار خنگول:\n"
+        f"👤 کاربران: {users}\n"
+        f"👥 گروه‌ها: {groups}\n"
+        f"🧩 جملات: {data['phrases']}\n"
+        f"💬 پاسخ‌ها: {data['responses']}\n"
+        f"🎭 مود فعلی: {data['mode']}"
+    )
+    await update.message.reply_text(msg)
         try:
             photos = await context.bot.get_user_profile_photos(user.id, limit=1)
             if photos.total_count > 0:
