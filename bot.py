@@ -1326,18 +1326,27 @@ async def show_main_panel(update: Update, context: ContextTypes.DEFAULT_TYPE, ed
         "✨ <b>خنگول فارسی</b>\n🤖 هوش، شوخ‌طبعی و احساس واقعی در یک ربات!\n💬 همراه با خنده، فال، و پاسخ‌های باحال!")
 
     keyboard = [
-        [InlineKeyboardButton("💬 ارتباط با سازنده", url="https://t.me/NOORI_NOOR"),
-         InlineKeyboardButton("💭 گروه پشتیبانی", url="https://t.me/Poshtibahni")],
-        [InlineKeyboardButton("➕ افزودن به گروه", url="https://t.me/Khenqol_bot?startgroup=true"),
-         InlineKeyboardButton("🧩 قابلیت‌های ربات", callback_data="panel_features")],
-        [InlineKeyboardButton("🤖 درباره خنگول", callback_data="panel_about"),
-         InlineKeyboardButton("👨‍💻 درباره تیم ما", callback_data="panel_team")],
-        [InlineKeyboardButton("🔮 فال امروز", callback_data="panel_fortune"),
-         InlineKeyboardButton("😂 جوک خنده‌دار", callback_data="panel_joke")],
-        [InlineKeyboardButton("🎨 فونت‌ساز حرفه‌ای", callback_data="panel_font"),
-         InlineKeyboardButton("💳 آیدی خنگولی من", callback_data="panel_stats")]
-    markup = InlineKeyboardMarkup(keyboard)
-
+    [
+        InlineKeyboardButton("💬 ارتباط با سازنده", url="https://t.me/NOORI_NOOR"),
+        InlineKeyboardButton("💭 گروه پشتیبانی", url="https://t.me/Poshtibahni")
+    ],
+    [
+        InlineKeyboardButton("➕ افزودن به گروه", url="https://t.me/Khenqol_bot?startgroup=true"),
+        InlineKeyboardButton("🧩 قابلیت‌های ربات", callback_data="panel_features")
+    ],
+    [
+        InlineKeyboardButton("🤖 درباره خنگول", callback_data="panel_about"),
+        InlineKeyboardButton("👨‍💻 درباره تیم ما", callback_data="panel_team")
+    ],
+    [
+        InlineKeyboardButton("🔮 فال امروز", callback_data="panel_fortune"),
+        InlineKeyboardButton("😂 جوک خنده‌دار", callback_data="panel_joke")
+    ],
+    [
+        InlineKeyboardButton("🎨 فونت‌ساز حرفه‌ای", callback_data="panel_font"),
+        InlineKeyboardButton("💳 آیدی خنگولی من", callback_data="panel_stats")
+    ]
+    ]
     if edit:
         await update.callback_query.edit_message_text(about, reply_markup=markup, parse_mode="HTML")
     else:
