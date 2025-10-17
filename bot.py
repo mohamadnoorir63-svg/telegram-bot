@@ -258,59 +258,52 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
     await update.message.reply_text(msg, parse_mode="HTML")
-# ======================= 📊 آمار کامل گروه‌ها =======================
+
+# ======================= 📊 آمار کامل گروه‌ها (اصلاح‌شده) =======================
 async def fullstats(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """نمایش آمار کامل گروه‌ها (سازگار با ساختار جدید و قدیمی group_data.json)"""
+    """نمایش آمار فقط برای گروه‌ها (فیلتر کاربران از group_data.json)"""
     try:
         data = load_data("group_data.json")
         groups = data.get("groups", {})
 
-        if isinstance(groups, list):
-            if not groups:
-                return await update.message.reply_text("ℹ️ هنوز هیچ گروهی ثبت نشده.")
+        text = "📈 آمار کامل گروه‌ها:\n\n"
 
-            text = "📈 آمار کامل گروه‌ها:\n\n"
-            for g in groups:
-                group_id = g.get("id", "نامشخص")
+        # حالت 1: اگر groups لیست باشه
+        if isinstance(groups, list):
+            valid_groups = [g for g in groups if str(g.get("id", "")).startswith("-")]
+            if not valid_groups:
+                return await update.message.reply_text("ℹ️ هنوز هیچ گروهی ثبت نشده.")
+            for g in valid_groups:
+                group_id = g.get("id")
                 title = g.get("title", f"Group_{group_id}")
                 members = len(g.get("members", []))
                 last_active = g.get("last_active", "نامشخص")
 
                 try:
                     chat = await context.bot.get_chat(group_id)
-                    if chat.title:
-                        title = chat.title
-                except Exception:
+                    title = chat.title or title
+                except:
                     pass
 
-                text += (
-                    f"🏠 گروه: {title}\n"
-                    f"👥 اعضا: {members}\n"
-                    f"🕓 آخرین فعالیت: {last_active}\n\n"
-                )
+                text += f"🏠 گروه: {title}\n👥 اعضا: {members}\n🕓 آخرین فعالیت: {last_active}\n\n"
 
+        # حالت 2: اگر groups دیکشنری باشه
         elif isinstance(groups, dict):
-            if not groups:
+            valid_items = {gid: info for gid, info in groups.items() if str(gid).startswith("-")}
+            if not valid_items:
                 return await update.message.reply_text("ℹ️ هنوز هیچ گروهی ثبت نشده.")
-
-            text = "📈 آمار کامل گروه‌ها:\n\n"
-            for group_id, info in groups.items():
-                title = info.get("title", f"Group_{group_id}")
+            for gid, info in valid_items.items():
+                title = info.get("title", f"Group_{gid}")
                 members = len(info.get("members", []))
                 last_active = info.get("last_active", "نامشخص")
 
                 try:
-                    chat = await context.bot.get_chat(group_id)
-                    if chat.title:
-                        title = chat.title
-                except Exception:
+                    chat = await context.bot.get_chat(gid)
+                    title = chat.title or title
+                except:
                     pass
 
-                text += (
-                    f"🏠 گروه: {title}\n"
-                    f"👥 اعضا: {members}\n"
-                    f"🕓 آخرین فعالیت: {last_active}\n\n"
-                )
+                text += f"🏠 گروه: {title}\n👥 اعضا: {members}\n🕓 آخرین فعالیت: {last_active}\n\n"
 
         else:
             return await update.message.reply_text("⚠️ ساختار فایل group_data.json نامعتبر است!")
@@ -322,7 +315,6 @@ async def fullstats(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     except Exception as e:
         await update.message.reply_text(f"⚠️ خطا در آمار گروه‌ها:\n{e}")
-
  # ======================= 👋 سیستم خوشامد پویا برای هر گروه =======================
 from telegram import InlineKeyboardMarkup, InlineKeyboardButton, Update
 from telegram.ext import ContextTypes
