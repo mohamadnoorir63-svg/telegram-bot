@@ -1046,18 +1046,149 @@ async def show_custom_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(text)
 
 # ======================= 🧹 ریست و ریلود =======================
+import asyncio, os, json, random
+from datetime import datetime
+
+# ======================= 🧹 ریست و 🔄 ریلود لوکس خنگول با افکت =======================
 async def reset_memory(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """پاکسازی کامل مغز خنگول فقط برای مدیر اصلی"""
     if update.effective_user.id != ADMIN_ID:
         return await update.message.reply_text("⛔ فقط مدیر اصلی مجازه!")
-    for f in ["memory.json", "group_data.json", "stickers.json", "jokes.json", "fortunes.json"]:
-        if os.path.exists(f):
-            os.remove(f)
-    init_files()
-    await update.message.reply_text("🧹 تمام داده‌ها با موفقیت پاک شدند!")
 
-async def reload_memory(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    loading_text = "🧠 <b>در حال پاکسازی کامل مغز خنگول...</b>\n"
+    msg = await update.message.reply_text(loading_text, parse_mode="HTML")
+
+    steps = [
+        "🧹 حذف حافظه جملات...",
+        "🗑 پاکسازی داده‌های گروهی...",
+        "💾 حذف فایل‌های جوک و فال...",
+        "👤 حذف کاربران ذخیره‌شده...",
+        "🧩 بازسازی ساختار حافظه جدید...",
+        "🤖 آماده‌سازی مغز تازه...",
+        "🌙 نهایی‌سازی سیستم هوش مصنوعی..."
+    ]
+
+    files_to_remove = ["memory.json", "group_data.json", "stickers.json", "jokes.json", "fortunes.json", "users.json"]
+
+    for i, step in enumerate(steps, start=1):
+        percent = int((i / len(steps)) * 100)
+        bar_len = 12
+        filled = "█" * int(bar_len * (percent / 100))
+        empty = "░" * (bar_len - len(filled))
+        bar = f"[{filled}{empty}] {percent}%"
+
+        await asyncio.sleep(random.uniform(0.5, 1.0))
+        try:
+            await msg.edit_text(f"{loading_text}\n{bar}\n\n{step}", parse_mode="HTML")
+        except:
+            pass
+
+        # حذف مرحله‌ای فایل‌ها
+        if i <= len(files_to_remove):
+            f = files_to_remove[i - 1]
+            if os.path.exists(f):
+                os.remove(f)
+
     init_files()
-    await update.message.reply_text("🔄 حافظه بارگذاری مجدد شد!")
+
+    await asyncio.sleep(1.2)
+    await msg.edit_text(
+        "✅ <b>پاکسازی مغز خنگول کامل شد!</b>\n"
+        "🧠 حافظه جدید ساخته شد و آماده‌ی بوت است.\n\n"
+        "🔄 اکنون دستور <b>/reload</b> را برای راه‌اندازی سیستم بفرست.",
+        parse_mode="HTML"
+    )
+
+# ======================= 🔄 بوت هوش مصنوعی + افکت نوری =======================
+async def reload_memory(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """بوت سیستم خنگول با افکت نوری و گزارش نهایی — فقط برای مدیر اصلی"""
+    if update.effective_user.id != ADMIN_ID:
+        return await update.message.reply_text("⛔ فقط مدیر اصلی می‌تونه سیستم رو بوت کنه!")
+
+    loading_text = "🤖 <b>در حال بوت سیستم هوش مصنوعی خنگول...</b>\n"
+    msg = await update.message.reply_text(loading_text, parse_mode="HTML")
+
+    steps = [
+        "📡 اتصال به هسته‌ی هوش مصنوعی...",
+        "🔍 بررسی سلامت فایل‌های حافظه...",
+        "🧩 بازسازی ساختار داده‌ها...",
+        "💬 بارگذاری پاسخ‌ها و جملات...",
+        "👥 شناسایی کاربران و گروه‌ها...",
+        "🧠 فعال‌سازی هوش اجتماعی و شوخ‌طبعی...",
+        "⚙️ همگام‌سازی با مغز ابری Cloud+...",
+        "🚀 نهایی‌سازی سیستم خنگول..."
+    ]
+
+    colors = ["🔵", "🟢", "🟣", "🟡", "🔴"]
+    for i, step in enumerate(steps, start=1):
+        percent = int((i / len(steps)) * 100)
+        color = random.choice(colors)
+        bar_len = 14
+        filled = "█" * int(bar_len * (percent / 100))
+        empty = "░" * (bar_len - len(filled))
+        bar = f"{color}[{filled}{empty}] {percent}%"
+
+        await asyncio.sleep(random.uniform(0.6, 1.2))
+        try:
+            await msg.edit_text(f"{loading_text}\n{bar}\n\n{step}", parse_mode="HTML")
+        except:
+            pass
+
+    # بازسازی فایل‌ها
+    init_files()
+
+    # محاسبه آمار
+    def count_items(file):
+        if not os.path.exists(file):
+            return 0
+        try:
+            data = load_data(file)
+            if isinstance(data, dict):
+                return len(data)
+            elif isinstance(data, list):
+                return len(data)
+        except:
+            return 0
+        return 0
+
+    phrases = len(load_data("memory.json").get("phrases", {}))
+    responses = sum(len(v) for v in load_data("memory.json").get("phrases", {}).values())
+    groups = len(load_data("group_data.json").get("groups", []))
+    users = count_items("users.json")
+    jokes = count_items("jokes.json")
+    fortunes = count_items("fortunes.json")
+
+    await asyncio.sleep(1.3)
+    now = datetime.now().strftime("%Y/%m/%d - %H:%M:%S")
+
+    final_text = (
+        "✨ <b>سیستم با موفقیت بوت شد!</b>\n\n"
+        "💻 <b>گزارش نهایی خنگول:</b>\n"
+        f"🧠 جملات: {phrases}\n"
+        f"💬 پاسخ‌ها: {responses}\n"
+        f"👤 کاربران: {users}\n"
+        f"👥 گروه‌ها: {groups}\n"
+        f"😂 جوک‌ها: {jokes}\n"
+        f"🔮 فال‌ها: {fortunes}\n\n"
+        f"🕓 زمان اجرا: <i>{now}</i>\n"
+        "🌙 <b>اتصال به مغز مرکزی برقرار شد.</b>\n"
+        "🤖 هوش اجتماعی و شوخ‌طبعی فعال شدند.\n"
+        "✅ <b>سیستم خنگول Cloud+ آماده‌ به‌ خدمت است!</b>"
+    )
+
+    await msg.edit_text(final_text, parse_mode="HTML")
+
+    # 🎬 افکت نهایی — ارسال استیکر یا انیمیشن
+    try:
+        stickers = [
+            "CAACAgUAAxkBAAIKf2aGZOkzDgP0xldu-7nKn3E7VnyjAAJgAwACGvSIVVRS9HZ5QbPoNgQ",  # برق مغز
+            "CAACAgQAAxkBAAIKfmaGZOmEDEsNbdR7IZNmb0LsvhH7AAKGAQAC-8E0BvZ-QTzM2m0GNgQ",  # سیستم فعال شد
+            "CAACAgIAAxkBAAIKfWaGZOnC7fMZr1bWPSGfOpg8UVltAAI4AAPANk8TfgAAAY7e1LoeNgQ",  # سلام دوباره
+        ]
+        await asyncio.sleep(1.5)
+        await context.bot.send_sticker(chat_id=update.effective_chat.id, sticker=random.choice(stickers))
+    except Exception as e:
+        print(f"[Sticker Error] {e}")
 
 # ======================= 📨 ارسال همگانی =======================
 async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
