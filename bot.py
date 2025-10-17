@@ -1200,6 +1200,18 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"🎭 مود فعلی: {data['mode']}"
     )
     await update.message.reply_text(msg)
+    async def feature_button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+
+    if query.data == "feature_info":
+        user = query.from_user
+        now = datetime.now().strftime("%Y/%m/%d - %H:%M:%S")
+        text = (
+            f"🆔 آیدی شما: <code>{user.id}</code>\n"
+            f"👤 نام: <b>{user.first_name}</b>\n"
+            f"📅 تاریخ و ساعت فعلی: <b>{now}</b>"
+        )
         try:
             photos = await context.bot.get_user_profile_photos(user.id, limit=1)
             if photos.total_count > 0:
