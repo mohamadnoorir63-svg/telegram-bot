@@ -503,63 +503,6 @@ async def welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except Exception as e:
             print(f"[WELCOME ERROR] {e}")
 
-# ======================= ☁️ بک‌آپ خودکار و دستی (نسخه امن) =======================
-import shutil
-
-async def auto_backup(bot):
-    """بک‌آپ خودکار هر ۱۲ ساعت"""
-    while True:
-        await asyncio.sleep(43200)
-        await cloudsync_internal(bot, "Auto Backup")
-
-def _should_include_in_backup(path: str) -> bool:
-    """فقط فایل‌های داده‌ای مهم داخل بک‌آپ بروند"""
-    lowered = path.lower()
-    # پوشه‌ها و فایل‌هایی که باید نادیده بگیریم
-    skip_dirs = ["__pycache__", ".git", "venv", "restore_temp"]
-    if any(sd in lowered for sd in skip_dirs):
-        return False
-    # خودِ فایل‌های zip و بک‌آپ‌های قبلی نه!
-    if lowered.endswith(".zip") or os.path.basename(lowered).startswith("backup_"):
-        return False
-    # فقط پسوندهای داده‌ای
-    return lowered.endswith((".json", ".jpg", ".png", ".webp", ".mp3", ".ogg"))
-
-async def cloudsync_internal(bot, reason="Manual Backup"):
-    """ایجاد و ارسال فایل بک‌آپ به ادمین (Cloud Safe)"""
-    now = datetime.now().strftime("%Y-%m-%d_%H-%M")
-    filename = f"backup_{now}.zip"
-
-    try:
-        with zipfile.ZipFile(filename, "w", compression=zipfile.ZIP_DEFLATED) as zipf:
-            for root, _, files in os.walk("."):
-                for file in files:
-                    full_path = os.path.join(root, file)
-                    if _should_include_in_backup(full_path):
-                        # مسیر داخل آرشیو رو نسبی بنویس تا بازگردانی ساده باشد
-                        arcname = os.path.relpath(full_path, ".")
-                        zipf.write(full_path, arcname=arcname)
-
-        # ارسال بک‌آپ
-        with open(filename, "rb") as f:
-            await bot.send_document(chat_id=ADMIN_ID, document=f, filename=filename)
-        await bot.send_message(chat_id=ADMIN_ID, text=f"☁️ {reason} انجام شد ✅")
-
-    except Exception as e:
-        print(f"[CLOUD BACKUP ERROR] {e}")
-        try:
-            await bot.send_message(chat_id=ADMIN_ID, text=f"⚠️ خطا در Cloud Backup:\n{e}")
-        except:
-            pass
-    finally:
-        if os.path.exists(filename):
-            os.remove(filename)
-
-async def cloudsync(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """اجرای دستی بک‌آپ ابری"""
-    if update.effective_user.id != ADMIN_ID:
-        return await update.message.reply_text("⛔ فقط مدیر اصلی مجازه!")
-    await cloudsync_internal(context.bot, "Manual Cloud Backup")
 
 
 # ======================= ☁️ NOORI Secure QR Backup v11.1 =======================
