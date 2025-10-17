@@ -918,7 +918,10 @@ async def feature_button_handler(update: Update, context: ContextTypes.DEFAULT_T
         else:
             text = "🧩 هنوز توضیحی برای قابلیت‌ها ثبت نشده!"
         await query.message.reply_text(text, parse_mode="HTML")
-        async def fullstats(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+
+# 🔹 تابع کامل آمار گروه‌ها باید جدا از بالا باشه (نه داخلش!)
+async def fullstats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """نمایش آمار کامل گروه‌ها"""
     try:
         data = load_data("group_data.json")
