@@ -1364,13 +1364,28 @@ async def panel_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif query.data == "panel_font":
         await query.message.reply_text("🎨 برای ساخت فونت بنویس:\n<b>فونت اسم‌ت</b>", parse_mode="HTML")
     elif query.data == "panel_stats":
-        stats_msg = (
-            f"📊 آمار کلی ربات:\n"
-            f"👤 کاربر: <b>{user.first_name}</b>\n"
+        user = query.from_user
+        now = datetime.now().strftime("%Y/%m/%d - %H:%M:%S")
+
+        text = (
+            f"📊 <b>اطلاعات کاربر:</b>\n\n"
+            f"👤 نام: <b>{user.first_name}</b>\n"
             f"🆔 آیدی: <code>{user.id}</code>\n"
-            f"📅 زمان فعلی: {now}"
+            f"📅 تاریخ و ساعت فعلی: <b>{now}</b>"
         )
-        await query.message.reply_text(stats_msg, parse_mode="HTML")
+
+        try:
+            # 📸 اگر عکس پروفایل دارد، نمایش بده
+            photos = await context.bot.get_user_profile_photos(user.id, limit=1)
+            if photos.total_count > 0:
+                file_id = photos.photos[0][-1].file_id
+                await query.message.reply_photo(photo=file_id, caption=text, parse_mode="HTML")
+            else:
+                await query.message.reply_text(text, parse_mode="HTML")
+        except Exception as e:
+            # اگر خطا یا محدودیت بود، فقط متن بفرست
+            await query.message.reply_text(text, parse_mode="HTML")
+
     elif query.data == "back_main":
         await show_main_panel(update, context, edit=True)
 
