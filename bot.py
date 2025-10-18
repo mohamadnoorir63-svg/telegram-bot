@@ -624,13 +624,14 @@ async def welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 
-
-# ======================= ☁️ بک‌آپ خودکار و دستی (نسخه نهایی و هماهنگ) =======================
+# ======================= ☁️ بک‌آپ خودکار و دستی (نسخه هماهنگ با bot.py) =======================
 import os
 import zipfile
 import shutil
 import asyncio
 from datetime import datetime
+from telegram import Update
+from telegram.ext import ContextTypes
 
 # 🧩 تنظیمات پایه
 BACKUP_FOLDER = "backups"
@@ -762,6 +763,7 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if os.path.exists(restore_dir):
             shutil.rmtree(restore_dir)
         context.user_data["await_restore"] = False
+
 # ======================= 💬 پاسخ و هوش مصنوعی =======================
 async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # 🚫 جلوگیری از پاسخ در پیوی (فقط جوک و فال مجازند)
