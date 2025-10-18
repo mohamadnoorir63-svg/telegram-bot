@@ -1420,6 +1420,16 @@ async def show_main_panel(update: Update, context: ContextTypes.DEFAULT_TYPE, ed
         await update.callback_query.edit_message_text(about, reply_markup=markup, parse_mode="HTML")
     else:
         await update.message.reply_text(about, reply_markup=markup, parse_mode="HTML")
+        # ======================= 🎛 بازگشت از منوی فونت یا سایر قابلیت‌ها =======================
+async def feature_back(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+
+    # ✅ اگر از منوی فونت یا هر بخش دیگه برگشته
+    if query and query.message:
+        await show_main_panel(query, context, edit=True)
+    else:
+        await show_main_panel(update, context, edit=True)
 # ======================= 🎛 کنترل پنل =======================
 async def panel_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -1534,8 +1544,7 @@ if __name__ == "__main__":
     # 🎨 فونت‌ساز خنگول (با اولویت پایین‌تر تا جلوی بقیه رو نگیره)
     app.add_handler(MessageHandler(filters.Regex("^فونت "), font_maker), group=-2)
     app.add_handler(CallbackQueryHandler(next_font, pattern="^next_font:"))
-    app.add_handler(CallbackQueryHandler(feature_back, pattern="^feature_back$"))
-
+    
     # 🔹 سیستم خوشامد پویا و پنل گرافیکی
     app.add_handler(MessageHandler(filters.Regex("^خوشامد$"), open_welcome_panel), group=-1)
     app.add_handler(CallbackQueryHandler(welcome_panel_buttons, pattern="^welcome_"), group=-1)
