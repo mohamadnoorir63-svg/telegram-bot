@@ -1614,7 +1614,39 @@ async def show_custom_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(text)
 
-# ======================= 🧩 ادغام و گسترش حافظه (فقط برای سودو) =======================
+    
+    
+# ======================= 🧠 راهنمای فنی مخصوص مدیر (دستور /help) =======================
+async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """راهنمای مخصوص مدیر برای کنترل و نگهداری ربات"""
+    ADMIN_ID = int(os.getenv("ADMIN_ID", "7089376754"))
+    user_id = update.effective_user.id
+
+    # 🚫 برای کاربران عادی هیچ پاسخی ارسال نکن
+    if user_id != ADMIN_ID:
+        return
+
+    text = (
+        "🧠 <b>راهنمای فنی خنگول</b>\n\n"
+        "📘 <b>دستورات مدیریتی:</b>\n"
+        "/backup — گرفتن بک‌آپ کامل\n"
+        "/restore — بازیابی بک‌آپ\n"
+        "/cloudsync — بک‌آپ ابری برای ادمین\n"
+        "/reset — پاکسازی حافظه ربات\n"
+        "/reload — بوت مجدد مغز\n"
+        "/broadcast پیام — ارسال همگانی\n"
+        "/stats — نمایش آمار کلی\n"
+        "/fullstats — آمار گروه‌ها\n"
+        "/reply — فعال یا غیرفعال کردن ریپلای مود\n"
+        "/mode شوخ/بی‌ادب/غمگین/نرمال — تغییر مود پاسخ‌ها\n"
+        "/welcome — کنترل خوشامد گروهی\n"
+        "/toggle — روشن/خاموش کردن ربات\n"
+        "/lock /unlock — قفل یا بازکردن یادگیری\n\n"
+        "💡 کاربران عادی از واژه 'راهنما' برای کمک استفاده کنن."
+    )
+
+    await update.message.reply_text(text, parse_mode="HTML")
+    # ======================= 🧩 ادغام و گسترش حافظه (فقط برای سودو) =======================
 import io, zipfile, tempfile, time, json, random, os
 from telegram import InputFile, Update
 from telegram.ext import ContextTypes
@@ -1702,7 +1734,7 @@ async def mergezip(update: Update, context: ContextTypes.DEFAULT_TYPE):
         _save_memory_dict(cur_mem)
         after = len(cur_phrases)
 
-        out_name = f"backup_merged_{after}.zip"
+        out_name = os.path.join(os.getcwd(), f"backup_merged_{after}.zip")
         with zipfile.ZipFile(out_name, "w", compression=zipfile.ZIP_DEFLATED) as z:
             z.writestr("memory.json", json.dumps(cur_mem, ensure_ascii=False, indent=2))
 
@@ -1744,13 +1776,14 @@ async def inflate(update: Update, context: ContextTypes.DEFAULT_TYPE):
     _save_memory_dict(mem)
     after = len(phrases)
 
-    # 🔹 ساخت فایل memory.json روی دیسک
-    with open("memory.json", "w", encoding="utf-8") as f:
+    # 🔹 مسیر دقیق برای Heroku
+    json_path = os.path.join(os.getcwd(), "memory.json")
+    with open(json_path, "w", encoding="utf-8") as f:
         f.write(json.dumps(mem, ensure_ascii=False, indent=2))
 
-    out_name = f"backup_inflated_{after}.zip"
+    out_name = os.path.join(os.getcwd(), f"backup_inflated_{after}.zip")
     with zipfile.ZipFile(out_name, "w", compression=zipfile.ZIP_DEFLATED) as z:
-        z.write("memory.json", arcname="memory.json")
+        z.write(json_path, arcname="memory.json")
 
     await update.message.reply_document(
         InputFile(out_name),
@@ -1763,37 +1796,6 @@ async def inflate(update: Update, context: ContextTypes.DEFAULT_TYPE):
         pass
 
 # ---- پایان کد واقعی ----
-    
-# ======================= 🧠 راهنمای فنی مخصوص مدیر (دستور /help) =======================
-async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """راهنمای مخصوص مدیر برای کنترل و نگهداری ربات"""
-    ADMIN_ID = int(os.getenv("ADMIN_ID", "7089376754"))
-    user_id = update.effective_user.id
-
-    # 🚫 برای کاربران عادی هیچ پاسخی ارسال نکن
-    if user_id != ADMIN_ID:
-        return
-
-    text = (
-        "🧠 <b>راهنمای فنی خنگول</b>\n\n"
-        "📘 <b>دستورات مدیریتی:</b>\n"
-        "/backup — گرفتن بک‌آپ کامل\n"
-        "/restore — بازیابی بک‌آپ\n"
-        "/cloudsync — بک‌آپ ابری برای ادمین\n"
-        "/reset — پاکسازی حافظه ربات\n"
-        "/reload — بوت مجدد مغز\n"
-        "/broadcast پیام — ارسال همگانی\n"
-        "/stats — نمایش آمار کلی\n"
-        "/fullstats — آمار گروه‌ها\n"
-        "/reply — فعال یا غیرفعال کردن ریپلای مود\n"
-        "/mode شوخ/بی‌ادب/غمگین/نرمال — تغییر مود پاسخ‌ها\n"
-        "/welcome — کنترل خوشامد گروهی\n"
-        "/toggle — روشن/خاموش کردن ربات\n"
-        "/lock /unlock — قفل یا بازکردن یادگیری\n\n"
-        "💡 کاربران عادی از واژه 'راهنما' برای کمک استفاده کنن."
-    )
-
-    await update.message.reply_text(text, parse_mode="HTML")
     
 
 
