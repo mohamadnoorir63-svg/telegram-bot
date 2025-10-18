@@ -28,6 +28,7 @@ from ai_learning import auto_learn_from_text
 from smart_reply import detect_emotion, smart_response
 from emotion_memory import remember_emotion, get_last_emotion, emotion_context_reply
 from auto_brain.auto_brain import start_auto_brain_loop
+from selective_backup import selective_backup_menu, selective_backup_buttons
 
 # 🎯 تنظیمات پایه
 TOKEN = os.getenv("BOT_TOKEN")
@@ -1671,6 +1672,8 @@ if __name__ == "__main__":
     app.add_handler(CommandHandler("stats", stats))
     app.add_handler(CommandHandler("fullstats", fullstats))
     app.add_handler(CommandHandler("backup", backup))
+    app.add_handler(CommandHandler("selectivebackup", selective_backup_menu))
+    app.add_handler(CallbackQueryHandler(selective_backup_buttons, pattern="^selbk_"))
     app.add_handler(CommandHandler("restore", restore))
     app.add_handler(CommandHandler("reset", reset_memory))
     app.add_handler(CommandHandler("reload", reload_memory))
