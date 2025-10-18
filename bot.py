@@ -1615,19 +1615,38 @@ async def show_custom_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(text)
 
 # ======================= 🧩 ادغام و گسترش حافظه (فقط برای سودو) =======================
-import io, zipfile, tempfile, time, json, random
-from telegram import InputFile
+import io, zipfile, tempfile, time, json, random, os
+from telegram import InputFile, Update
 from telegram.ext import ContextTypes
 
 # ---- شروع کد واقعی ----
+
 _MEGA_MOODS = {
-    "😎 شوخ": ["عه جدی گفتی؟ 😂", "تو خیلی باحالی 😎"],
-    "🫶 احساسی": ["من کنارتم 💫", "خیلی قشنگ گفتی 💖"],
-    "😡 تند": ["مواظب لحن باش 😑", "چرا اینقد تیکه می‌ندازی؟ 😒"],
-    "🧠 عادی": ["متوجه شدم ✅", "درسته 🙂"]
+    "😎 شوخ": [
+        "عه جدی گفتی؟ 😂", "تو خیلی باحالی 😎", "دارم از خنده می‌میرم 🤣",
+        "شوخی‌ت ترکوند! 😅", "دمت گرم، باحال بود! 😎"
+    ],
+    "🫶 احساسی": [
+        "من کنارتم 💫", "خیلی قشنگ گفتی 💖", "حواسم بهت هست 🤗",
+        "آروم باش، همه‌چی درست می‌شه ✨", "تو خاصی برای من 🌙"
+    ],
+    "😡 تند": [
+        "مواظب لحن باش 😑", "چرا اینقد تیکه می‌ندازی؟ 😒",
+        "حرفتو قشنگ بزن 😤", "الان وقت دعوا نیست 😐"
+    ],
+    "🧠 عادی": [
+        "متوجه شدم ✅", "جالبه 🤔", "باشه ادامه بده…",
+        "درسته 🙂", "اوکی، یادداشت شد 📝"
+    ]
 }
 
-_MEGA_BASES = ["سلام", "خوبی", "دوستت دارم", "کجایی", "چته"]
+_MEGA_BASES = [
+    "سلام", "خوبی", "چیکار می‌کنی", "دوستت دارم", "چته", "کجایی", "برو بخواب",
+    "صبح بخیر", "شب بخیر", "حوصلم سر رفته", "می‌خوام بخندم", "چرا ناراحتی",
+    "چقدر حرف می‌زنی", "دوست داری منو", "چرا دیر جواب می‌دی", "عاشقتم",
+    "چی گفتی", "من کیم", "تو کی هستی", "حالت چطوره", "منو یادت هست",
+    "داری چیکار می‌کنی", "از من بدت میاد", "بزن بریم", "چ خبر", "امروز چطوری گذشت"
+]
 
 def _load_memory_dict():
     from memory_manager import load_data, save_data
@@ -1646,6 +1665,7 @@ def _save_memory_dict(mem_dict):
     from memory_manager import save_data
     save_data("memory.json", mem_dict)
 
+# ------------------- ادغام حافظه -------------------
 async def mergezip(update: Update, context: ContextTypes.DEFAULT_TYPE):
     ADMIN_ID = int(os.getenv("ADMIN_ID", "7089376754"))
     if update.effective_user.id != ADMIN_ID:
@@ -1686,7 +1706,10 @@ async def mergezip(update: Update, context: ContextTypes.DEFAULT_TYPE):
         with zipfile.ZipFile(out_name, "w", compression=zipfile.ZIP_DEFLATED) as z:
             z.writestr("memory.json", json.dumps(cur_mem, ensure_ascii=False, indent=2))
 
-        await update.message.reply_document(InputFile(out_name), caption=f"✅ ادغام شد! قبل: {before} | بعد: {after} | جدید: {added}")
+        await update.message.reply_document(
+            InputFile(out_name),
+            caption=f"✅ ادغام شد! قبل: {before:,} | بعد: {after:,} | جدید: {added:,}"
+        )
         await msg.delete()
         os.remove(out_name)
     except Exception as e:
@@ -1694,30 +1717,53 @@ async def mergezip(update: Update, context: ContextTypes.DEFAULT_TYPE):
     finally:
         os.remove(tmp_zip.name)
 
+# ------------------- تولید جملات جدید -------------------
 async def inflate(update: Update, context: ContextTypes.DEFAULT_TYPE):
     ADMIN_ID = int(os.getenv("ADMIN_ID", "7089376754"))
     if update.effective_user.id != ADMIN_ID:
         return
+
     try:
         n = int(context.args[0]) if context.args else 50000
     except:
         n = 50000
+
+    msg = await update.message.reply_text(f"🧠 در حال ساخت {n:,} جمله جدید...")
+
     mem, phrases = _load_memory_dict()
     before = len(phrases)
+
     for i in range(n):
         base = random.choice(_MEGA_BASES)
         mood = random.choice(list(_MEGA_MOODS.keys()))
         resp = random.choice(_MEGA_MOODS[mood])
-        phrases[f"{base}_{i}_{int(time.time()*1000)%99999999}"] = [resp]
+        key = f"{base}_{i}_{int(time.time()*1000)%99999999}"
+        phrases[key] = [resp]
+
     mem["phrases"] = phrases
     _save_memory_dict(mem)
     after = len(phrases)
+
+    # 🔹 ساخت فایل memory.json روی دیسک
+    with open("memory.json", "w", encoding="utf-8") as f:
+        f.write(json.dumps(mem, ensure_ascii=False, indent=2))
+
     out_name = f"backup_inflated_{after}.zip"
     with zipfile.ZipFile(out_name, "w", compression=zipfile.ZIP_DEFLATED) as z:
-        z.writestr("memory.json", json.dumps(mem, ensure_ascii=False, indent=2))
-    await update.message.reply_document(InputFile(out_name), caption=f"✅ جملات جدید اضافه شد! ({after - before})")
-    os.remove(out_name)
+        z.write("memory.json", arcname="memory.json")
+
+    await update.message.reply_document(
+        InputFile(out_name),
+        caption=f"✅ جملات جدید اضافه شد! (+{after - before:,})"
+    )
+
+    try:
+        os.remove(out_name)
+    except:
+        pass
+
 # ---- پایان کد واقعی ----
+    
 # ======================= 🧠 راهنمای فنی مخصوص مدیر (دستور /help) =======================
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """راهنمای مخصوص مدیر برای کنترل و نگهداری ربات"""
@@ -1748,6 +1794,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
     await update.message.reply_text(text, parse_mode="HTML")
+    
 
 
 # ======================= 🚀 اجرای نهایی =======================
