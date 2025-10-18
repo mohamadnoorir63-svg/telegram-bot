@@ -1666,7 +1666,8 @@ if __name__ == "__main__":
 
     # ⚙️ مدیریت خطاهای کلی
     app.add_error_handler(handle_error)
-    # 📥 ذخیره و حذف دستور
+    
+# 📥 ذخیره و حذف دستور
     application.add_handler(CommandHandler("save", save_command))
     application.add_handler(CommandHandler("del", delete_command))
 
@@ -1676,7 +1677,6 @@ if __name__ == "__main__":
 
     # 🧩 واکنش به دستورهای ذخیره‌شده (هر پیامی که به عنوان دستور شناخته شود)
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_custom_command))
-
 
     # 👑 شناسایی ورود و خروج سازنده
     app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, detect_admin_movement))
