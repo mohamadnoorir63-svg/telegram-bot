@@ -1,8 +1,10 @@
 import re
 import random
 from memory_manager import learn, load_data, save_data, shadow_learn
-from smart_reply import detect_emotion  # 🧠 برای تشخیص احساس کاربر
-
+def auto_learn_from_text(text: str):
+    """یادگیری خودکار از گفت‌وگوهای طبیعی کاربران"""
+    from smart_reply import detect_emotion  # ⬅️ انتقال import به داخل تابع
+    ...
 # ===============================================================
 # 🤖 یادگیری خودکار خنگول Cloud+ — نسخه‌ی هوشمند و احساسی
 # ===============================================================
