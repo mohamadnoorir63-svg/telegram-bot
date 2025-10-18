@@ -1647,27 +1647,20 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(text, parse_mode="HTML")
 
 
-# ... آخرین فانکشن‌ها
-
-# ======================= 🧩 ادغام و گسترش حافظه (فقط برای سودو) =======================
-import io, zipfile, tempfile, time, json, random
-from telegram import InputFile
-
-# (کل اون کدی که قبلاً برات فرستادم...)
-
 # ======================= 🚀 اجرای نهایی =======================
 if __name__ == "__main__":
     print("🤖 خنگول فارسی 8.7 Cloud+ Supreme Pro Stable+ آماده به خدمت است ...")
-    ...
-    
+
+    # 🧩 ساخت اپلیکیشن اصلی تلگرام
     app = ApplicationBuilder().token(TOKEN).build()
+
+    # ⚙️ مدیریت خطاهای کلی
     app.add_error_handler(handle_error)
-    
-   # 🧩 ادغام و گسترش حافظه
+
+    # 🧠 ادغام و گسترش حافظه
     app.add_handler(CommandHandler("mergezip", mergezip))
-    
     app.add_handler(CommandHandler("inflate", inflate))
-    
+
     # 👑 شناسایی ورود و خروج سازنده
     app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, detect_admin_movement))
     app.add_handler(MessageHandler(filters.StatusUpdate.LEFT_CHAT_MEMBER, detect_admin_movement))
@@ -1700,7 +1693,7 @@ if __name__ == "__main__":
     app.add_handler(MessageHandler(filters.Regex("^فونت "), font_maker), group=-2)
     app.add_handler(CallbackQueryHandler(next_font, pattern="^next_font:"))
     app.add_handler(CallbackQueryHandler(feature_back, pattern="^feature_back$"))
-    
+
     # 🔹 خوشامد پویا و تنظیماتش
     app.add_handler(MessageHandler(filters.Regex("^خوشامد$"), open_welcome_panel), group=-1)
     app.add_handler(CallbackQueryHandler(welcome_panel_buttons, pattern="^welcome_"), group=-1)
@@ -1728,5 +1721,8 @@ if __name__ == "__main__":
         app.create_task(start_auto_brain_loop(app.bot))
         print("🌙 [SYSTEM] Startup tasks scheduled ✅")
 
+    # 🟢 ثبت وظیفه استارتاپ
     app.post_init = on_startup
+
+    # 🚀 اجرای نهایی ربات
     app.run_polling(allowed_updates=Update.ALL_TYPES)
