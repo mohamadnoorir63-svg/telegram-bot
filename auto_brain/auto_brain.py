@@ -5,14 +5,10 @@ import random
 from datetime import datetime
 
 from memory_manager import (
-    load_data, save_data, generate_sentence
+    load_data, save_data, generate_sentence, evaluate_intelligence, reinforce_learning
 )
 from ai_learning import clean_duplicates  # 🧹 پاکسازی هوشمند حافظه
 from ai_learning import auto_learn_from_text  # 🧠 هماهنگی کامل یادگیری لحظه‌ای
-try:
-    from ai_learning import reinforce_learning  # 🌱 تقویت حافظه پاسخ‌های مفید (در صورت وجود)
-except ImportError:
-    reinforce_learning = None  # اگر هنوز ساخته نشده باشه، نادیده گرفته میشه
 
 ADMIN_ID = int(os.getenv("ADMIN_ID", "7089376754"))
 BRAIN_STATS_FILE = "auto_brain/brain_stats.json"
@@ -29,6 +25,7 @@ def load_stats():
 def save_stats(stats):
     with open(BRAIN_STATS_FILE, "w", encoding="utf-8") as f:
         json.dump(stats, f, ensure_ascii=False, indent=2)
+
 
 # ===============================================================
 # 🔁 ادغام حافظه سایه با حافظه اصلی
@@ -62,6 +59,7 @@ def merge_shadow_memory():
 
     return merged_phrases, added_responses
 
+
 # ===============================================================
 # 🧠 تحلیل و رشد خودکار هوش خنگول
 # ===============================================================
@@ -81,12 +79,12 @@ async def analyze_and_grow(bot=None):
     except Exception as e:
         print(f"[AutoBrain] Clean failed: {e}")
 
-    # 🌱 تقویت حافظه (در صورت فعال بودن تابع)
-    if reinforce_learning:
-        try:
-            reinforce_learning()
-        except Exception as e:
-            print(f"[AutoBrain] Reinforce failed: {e}")
+    # 🌱 تقویت حافظه پاسخ‌های مفید
+    reinforce_data = {"strengthened": 0, "removed": 0}
+    try:
+        reinforce_data = reinforce_learning(verbose=False)
+    except Exception as e:
+        print(f"[AutoBrain] Reinforce failed: {e}")
 
     # 📈 بروزرسانی آمار فعلی
     from memory_manager import get_stats
@@ -97,7 +95,6 @@ async def analyze_and_grow(bot=None):
     for _ in range(random.randint(2, 5)):
         s = generate_sentence()
         creative.append(s)
-        # یادگیری خودکار از جمله ساخته‌شده
         try:
             auto_learn_from_text(s)
         except Exception as e:
@@ -112,6 +109,12 @@ async def analyze_and_grow(bot=None):
     diff_phrases = current["phrases"] - before["phrases"]
     diff_responses = current["responses"] - before["responses"]
 
+    # 🧩 ارزیابی هوش خودکار (AI IQ)
+    try:
+        aiq = evaluate_intelligence()
+    except Exception as e:
+        aiq = {"iq": 0, "level": "❌ خطا در تحلیل هوش", "summary": str(e)}
+
     # 🧾 ذخیره وضعیت رشد جدید
     stats = {
         "phrases": current["phrases"],
@@ -123,25 +126,31 @@ async def analyze_and_grow(bot=None):
 
     # 💬 گزارش تحلیلی رشد مغز
     report = (
-        f"🧠 <b>گزارش رشد هوش خودکار خنگول</b>\n\n"
+        f"🤖 <b>گزارش رشد هوش خودکار خنگول</b>\n\n"
         f"🧩 جملات جدید ادغام‌شده: <b>{merged_phrases}</b>\n"
         f"💬 پاسخ‌های تازه از حافظه سایه: <b>{added_responses}</b>\n"
-        f"✨ جملات خلاق تولیدشده: <b>{len(creative)}</b>\n\n"
+        f"✨ جملات خلاق تولید‌شده: <b>{len(creative)}</b>\n"
+        f"🧠 پاسخ‌های تقویت‌شده: <b>{reinforce_data['strengthened']}</b>\n"
+        f"🗑 پاسخ‌های حذف‌شده: <b>{reinforce_data['removed']}</b>\n\n"
         f"📈 جملات: {before['phrases']} → {current['phrases']} (+{diff_phrases})\n"
         f"💭 پاسخ‌ها: {before['responses']} → {current['responses']} (+{diff_responses})\n\n"
+        f"🤯 <b>نمره هوش خودکار:</b> <code>{aiq['iq']}</code>\n"
+        f"🌟 <b>سطح:</b> {aiq['level']}\n"
+        f"{aiq['summary']}\n\n"
         f"🕓 آخرین بروزرسانی: <code>{stats['last_update']}</code>\n"
         f"🔁 دفعات اجرای خودکار: <b>{stats['runs']}</b>\n"
-        f"⚙️ نسخه: <i>AutoBrain+ EmotionSync v2.9</i>"
+        f"⚙️ نسخه: <i>AutoBrain+ EmotionSync v3.5</i>"
     )
 
     print(report)
 
-    # ارسال گزارش برای ادمین (در صورت فعال بودن bot)
+    # 📤 ارسال گزارش برای ادمین
     if bot:
         try:
             await bot.send_message(chat_id=ADMIN_ID, text=report, parse_mode="HTML")
         except Exception as e:
             print(f"[Brain Report Error] {e}")
+
 
 # ===============================================================
 # 🔄 لوپ اصلی رشد خودکار مغز — هر ۶ ساعت یکبار
