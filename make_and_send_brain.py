@@ -1,16 +1,12 @@
-# make_and_send_brain.py
 import os, json, zipfile, random, asyncio, datetime
 from telegram import Bot, InputFile
 
-# مسیر فایل‌ها
 BASE = os.path.dirname(os.path.abspath(__file__))
 OUT_JSON = os.path.join(BASE, "memory.json")
-
-# 🧠 نام فایل ZIP با تاریخ جدید تا کش تلگرام نشود
 timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-OUT_ZIP  = os.path.join(BASE, f"khengol_brain_{timestamp}.zip")
+OUT_ZIP = os.path.join(BASE, f"khengol_brain_{timestamp}.zip")
 
-# ================== حالت‌ها ==================
+# ===== حالت‌ها =====
 MOODS = {
     "😎 شوخ": ["😂 خندیدم به حرفت!", "عه جدی گفتی؟ 😂", "تو خیلی باحالی 😎", "دارم از خنده می‌میرم 🤣", "خنگی ولی دوست‌داشتنی 😂"],
     "🫶 احساسی": ["دلم برات تنگ شده بود 😢", "تو همیشه خاصی برای من 💖", "چقدر حس خوبی دادی 😍", "آروم باش، من کنارت‌ام 💫", "ای کاش می‌تونستم بغلت کنم 🤗"],
@@ -18,7 +14,6 @@ MOODS = {
     "🧠 عادی": ["آره، متوجه شدم 🙂", "باشه، ادامه بده...", "جالبه 🤔", "منم همین فکرو می‌کردم 😌", "درسته ✅"],
 }
 
-# ================== جمله‌های پایه ==================
 BASE_PHRASES = [
     "سلام","خوبی","چیکار می‌کنی","دوستت دارم","چته","خفه شو","کجایی","برو بخواب","دلت برام تنگ شده","چی خوردی",
     "چرا ساکتی","صبح بخیر","شب بخیر","حوصلم سر رفته","می‌خوام بخندم","چرا ناراحتی","چقدر حرف می‌زنی","بیکاری",
@@ -26,21 +21,19 @@ BASE_PHRASES = [
     "حالت چطوره","می‌خوای حرف بزنیم","منو یادت هست","دوست داری سکوت کنیم","داری چیکار می‌کنی","از من بدت میاد",
 ]
 
-# ================== یادگیری خودکار ==================
-def auto_learn_from_text(text: str) -> str:
+def auto_learn_from_text(text: str):
     mood = random.choice(list(MOODS.keys()))
-    pattern = random.choice([
+    patterns = [
         f"{text}؟ جالبه 🤔",
         f"{text}! عجب 😅",
         f"تو گفتی: {text}؟ منم همینه رو حس کردم {random.choice(['😏','😅','😂'])}",
         f"{text} رو گفتی؟ منم هم موافقم!",
         f"می‌دونی؟ {text} باعث شد لبخند بزنم 😄",
-    ])
-    return f"{pattern} ({mood})"
+    ]
+    return f"{random.choice(patterns)} ({mood})"
 
-# ================== ساخت مغز ==================
-def build_brain(n=40000):
-    print("🧠 در حال ساخت مغز خِنگول... کمی صبر کن 💪")
+def build_brain(n=8000):  # ← سبک‌تر برای Heroku
+    print("🧠 ساخت مغز خِنگول در حال اجراست...")
     phrases = {}
     for i in range(n):
         base = random.choice(BASE_PHRASES)
@@ -50,35 +43,33 @@ def build_brain(n=40000):
             resp = auto_learn_from_text(base)
         phrases[f"{base}_{i}"] = [resp]
 
+    # ذخیره فایل JSON
     with open(OUT_JSON, "w", encoding="utf-8") as f:
         json.dump({"phrases": phrases}, f, ensure_ascii=False, indent=2)
 
-    with zipfile.ZipFile(OUT_ZIP, "w", compression=zipfile.ZIP_DEFLATED) as z:
-        z.write(OUT_JSON, arcname="memory.json")
+    # ساخت ZIP سالم
+    with zipfile.ZipFile(OUT_ZIP, "w", zipfile.ZIP_DEFLATED) as z:
+        z.write(OUT_JSON, "memory.json")
 
     size = os.path.getsize(OUT_ZIP)
-    print(f"✅ ساخته شد: {OUT_ZIP} ({size/1024/1024:.2f} MB)")
+    print(f"✅ فایل ساخته شد ({size/1024/1024:.2f} MB): {OUT_ZIP}")
     return OUT_ZIP, size
 
-# ================== ارسال برای سودو ==================
-async def send_zip(path: str):
+async def send_zip(path):
     token = os.getenv("BOT_TOKEN")
     admin = int(os.getenv("ADMIN_ID", "7089376754"))
-    if not token:
-        raise RuntimeError("BOT_TOKEN در Config Vars تنظیم نشده.")
     bot = Bot(token=token)
     await bot.send_document(
         chat_id=admin,
         document=InputFile(path),
-        caption=f"🧠 مغز خِنگول آماده‌ست!\n📦 فایل ZIP: <code>{os.path.basename(path)}</code>\nاین فایل رو مستقیم برای ربات بفرست و /restore بزن ❤️",
+        caption=f"🧠 مغز خِنگول آماده‌ست!\n📦 ZIP: <code>{os.path.basename(path)}</code>\nاین فایل رو مستقیم برای ربات بفرست و /restore بزن ❤️",
         parse_mode="HTML"
     )
-    print("📨 فایل برای سودو ارسال شد.")
+    print("📨 ارسال برای سودو انجام شد.")
 
-# ================== اجرای اصلی ==================
 if __name__ == "__main__":
-    zip_path, size = build_brain(n=40000)
-    if size < 50000:
-        print("⚠️ ZIP خیلی کوچک است؛ احتمالاً ساخت خراب شده.")
-    else:
+    zip_path, size = build_brain()
+    if size > 1000:
         asyncio.run(send_zip(zip_path))
+    else:
+        print("⚠️ فایل خراب یا ناقص است.")
