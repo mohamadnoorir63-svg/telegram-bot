@@ -8,7 +8,6 @@ from fix_memory import fix_json  # ✅ برای تعمیر خودکار JSON خ�
 FILES = ["memory.json", "shadow_memory.json", "group_data.json"]
 
 # ========================= 📂 آماده‌سازی اولیه =========================
-
 def init_files():
     """بررسی و ایجاد فایل‌های حافظه در صورت نبود"""
     for f in FILES:
@@ -44,6 +43,7 @@ def save_data(file, data):
 
 # ========================= 🧠 یادگیری هوشمند با وزن =========================
 def learn(phrase, *responses):
+    """یادگیری و ثبت پاسخ‌ها با خروجی نمایشی و رنگی"""
     data = load_data("memory.json")
 
     if "data" not in data:
@@ -53,13 +53,19 @@ def learn(phrase, *responses):
     responses = [r.strip() for r in responses if r.strip()]
 
     if not responses:
-        return "❗ هیچ پاسخی برای یادگیری ارسال نشد."
+        return "⚠️ <b>هیچ پاسخی برای یادگیری ارسال نشد.</b>"
 
+    # ✅ جمله‌ی جدید
     if phrase not in data["data"]:
         data["data"][phrase] = [{"text": r, "weight": 1} for r in responses]
         save_data("memory.json", data)
-        return f"🧠 یاد گرفتم {len(responses)} پاسخ برای '{phrase}'!"
+        return (
+            f"🧠 <b>یادگیری جدید!</b>\n"
+            f"➕ جمله: <code>{phrase}</code>\n"
+            f"💬 پاسخ‌ها: {len(responses)} عدد ثبت شد ✅"
+        )
 
+    # 🧩 جمله‌ی تکراری ولی پاسخ‌های جدید
     existing = data["data"][phrase]
     existing_texts = [r["text"] for r in existing]
     added = 0
@@ -72,13 +78,18 @@ def learn(phrase, *responses):
     save_data("memory.json", data)
 
     if added > 0:
-        return f"😏 اینو بلد بودم ولی {added} پاسخ جدید هم اضافه شد!"
+        return (
+            f"😏 <b>خاطره‌ی قدیمی به‌روزرسانی شد!</b>\n"
+            f"➕ پاسخ‌های تازه: {added}\n"
+            f"✨ خنگول باهوش‌تر شد!"
+        )
     else:
-        return "😅 اینو قبلاً یاد گرفته بودم."
+        return "😅 <b>این جمله رو از قبل بلد بودم!</b>"
 
 
 # ========================= 🌙 یادگیری خودکار در سایه =========================
 def shadow_learn(phrase, response):
+    """ذخیره موقت در حافظه سایه"""
     if not phrase or not response:
         return
 
@@ -100,6 +111,7 @@ def shadow_learn(phrase, response):
 
 # ========================= 💬 پاسخ‌دهی وزنی =========================
 def get_reply(text):
+    """پیدا کردن پاسخ از حافظه با سیستم وزن‌دهی"""
     mem = load_data("memory.json")
     data = mem.get("data", {})
 
@@ -110,6 +122,7 @@ def get_reply(text):
     key = random.choice(matches)
     responses = data[key]
 
+    # پشتیبانی از ساختار قدیمی
     if isinstance(responses[0], str):
         responses = [{"text": r, "weight": 1} for r in responses]
         data[key] = responses
@@ -125,6 +138,7 @@ def get_reply(text):
 
 # ========================= 🧼 تمیزسازی حافظه =========================
 def clean_memory():
+    """حذف پاسخ‌های تکراری، کوتاه و بی‌فایده"""
     data = load_data("memory.json")
     changed = 0
 
@@ -173,11 +187,12 @@ def set_mode(mode):
 def enhance_sentence(sentence):
     if not sentence:
         return "🤔 نمی‌دونم چی بگم!"
-    extras = ["🙂", "😂", "😎", "🤖", "😅", "😉", "✨", "😄"]
+    extras = ["🙂", "😂", "😎", "🤖", "😅", "😉", "✨", "😄", "💬", "❤️"]
     return sentence + " " + random.choice(extras)
 
 
 def generate_sentence():
+    """ترکیب دو جمله تصادفی برای ساخت پاسخ جدید"""
     mem = load_data("memory.json")
     data = mem.get("data", {})
     if not data:
@@ -198,22 +213,27 @@ def generate_sentence():
     return f"{p1} ولی {t1}، بعدش {t2}"
 
 
-# ========================= 📋 نمایش لیست جملات =========================
+# ========================= 📋 لیست زیبا از جملات =========================
 def list_phrases(limit=50):
+    """نمایش فهرست جملات با فرمت مرتب و زیبا"""
     mem = load_data("memory.json")
     phrases = list(mem.get("data", {}).keys())
+
     if not phrases:
         return "😅 هنوز چیزی یاد نگرفتم!"
+
     show = phrases[:limit]
-    return "🧾 جملات یادگرفته‌شده:\n\n" + "\n".join(show)
+    text = "<b>🧾 فهرست جملات یادگرفته‌شده:</b>\n\n"
+
+    for i, phrase in enumerate(show, 1):
+        text += f"{i}. <code>{phrase}</code>\n"
+
+    text += f"\n📦 <i>در مجموع {len(phrases)} جمله در حافظه وجود دارد.</i>"
+    return text
 
 
-# ========================= 🧠 تقویت هوشمند حافظه (پیشرفته) =========================
+# ========================= 🧠 تقویت حافظه (پیشرفته) =========================
 def reinforce_learning(verbose=True):
-    """
-    تقویت پاسخ‌های مفید و حذف پاسخ‌های ضعیف یا منقضی‌شده
-    - بازمی‌گرداند: dict شامل آمار تقویت و حذف پاسخ‌ها
-    """
     mem = load_data("memory.json")
     data = mem.get("data", {})
     changed = False
@@ -256,7 +276,7 @@ def reinforce_learning(verbose=True):
 
     if verbose:
         if strengthened or removed:
-            print(f"🧠 حافظه تقویت شد → ↑{strengthened} پاسخ قوی‌تر، ↓{removed} پاسخ حذف شد.")
+            print(f"🧠 حافظه تقویت شد → ➕{strengthened} پاسخ قوی‌تر، ➖{removed} پاسخ حذف شد.")
         else:
             print("💤 حافظه نیازی به تقویت نداشت (بهینه بود).")
 
@@ -265,16 +285,14 @@ def reinforce_learning(verbose=True):
 
 # ========================= 🧩 ارزیابی هوش خودکار (AI IQ) =========================
 def evaluate_intelligence():
-    """
-    تحلیل وضعیت مغز ربات و محاسبه‌ی نمره هوش (AI IQ)
-    بر اساس:
-    - تعداد جملات و پاسخ‌ها
-    - میانگین وزن پاسخ‌ها
-    """
     mem = load_data("memory.json")
     data = mem.get("data", {})
     if not data:
-        return {"iq": 0, "level": "🍼 تازه متولد شده!", "summary": "هیچ داده‌ای هنوز وجود ندارد."}
+        return {
+            "iq": 0,
+            "level": "🍼 تازه متولد شده!",
+            "summary": "هنوز چیزی یاد نگرفته‌ام..."
+        }
 
     total_phrases = len(data)
     total_responses = sum(len(v) for v in data.values())
