@@ -114,8 +114,9 @@ async def save_fortune(update: Update):
         await update.message.reply_text(f"⚠️ خطا در ذخیره فال: {e}")
 
 # ========================= ارسال فال تصادفی =========================
+                
 async def send_random_fortune(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """یکی از فال‌های ذخیره‌شده را به‌صورت رندومی و به‌شکل صحیح ارسال می‌کند."""
+    """یکی از فال‌های ذخیره‌شده را به‌صورت رندومی ارسال می‌کند (با بررسی مسیرهای امن)."""
     data = load_fortunes()
     if not data:
         return await update.message.reply_text("📭 هنوز فالی ذخیره نشده 😔")
@@ -125,58 +126,57 @@ async def send_random_fortune(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     for k in keys:
         v = data[k]
-        t = v.get("type", "text")
-        raw = v.get("value", "")
+        t = v.get("type", "text").strip()
+        raw = (v.get("value") or "").strip()
+
+        # ⛔ اگر مقدار خالی یا نامعتبر بود، برو سراغ بعدی
+        if not raw:
+            continue
+
+        val = _abs_media_path(raw)
 
         try:
+            # 🔹 فال متنی
             if t == "text":
-                val = (raw or "").strip()
-                if val:
-                    return await update.message.reply_text(f"🔮 {val}")
-                else:
-                    continue
+                return await update.message.reply_text(f"🔮 {raw}")
 
-            # عکس
-            if t == "photo":
-                val = _abs_media_path(raw)
+            # 🔹 عکس
+            elif t == "photo":
                 if _is_valid_url(val):
                     return await update.message.reply_photo(photo=val, caption=f"🔮 فال {k}")
                 elif os.path.exists(val):
-                    return await update.message.reply_photo(photo=InputFile(val), caption=f"🔮 فال {k}")
+                    return await update.message.reply_photo(photo=open(val, "rb"), caption=f"🔮 فال {k}")
                 else:
                     continue
 
-            # ویدیو
-            if t == "video":
-                val = _abs_media_path(raw)
+            # 🔹 ویدیو
+            elif t == "video":
                 if _is_valid_url(val):
                     return await update.message.reply_video(video=val, caption=f"🎥 فال {k}")
                 elif os.path.exists(val):
-                    return await update.message.reply_video(video=InputFile(val), caption=f"🎥 فال {k}")
+                    return await update.message.reply_video(video=open(val, "rb"), caption=f"🎥 فال {k}")
                 else:
                     continue
 
-            # استیکر
-            if t == "sticker":
-                val = _abs_media_path(raw)
+            # 🔹 استیکر
+            elif t == "sticker":
                 if _is_valid_url(val):
                     return await update.message.reply_sticker(sticker=val)
                 elif os.path.exists(val):
-                    return await update.message.reply_sticker(sticker=InputFile(val))
+                    return await update.message.reply_sticker(sticker=open(val, "rb"))
                 else:
                     continue
 
         except Exception as e:
-            # اگر یکی خراب بود، بعدی را امتحان کن
-            print(f"[Fortune Error] id={k} type={t} err={e}")
+            print(f"[Fortune Error] ❌ id={k}, type={t}, err={e}")
             continue
 
-    await update.message.reply_text("😅 هیچ فالی قابل ارسال نبود (شاید فایل‌ها حذف شده باشند).")
+    await update.message.reply_text("⚠️ هیچ فالی قابل ارسال نبود — شاید مسیر فایل‌ها تغییر کرده باشه.")
 
 # ========================= لیست فال‌ها (آخرین ۱۰ تا) =========================
 async def list_fortunes(update: Update):
     data = load_fortunes()
-    if not data:
+    if not data: 
         return await update.message.reply_text("هنوز هیچ فالی ثبت نشده 😔")
 
     await update.message.reply_text(f"📜 تعداد کل فال‌ها: {len(data)}")
