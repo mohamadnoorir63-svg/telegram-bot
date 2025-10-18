@@ -1,10 +1,11 @@
 import random
 import re
 from memory_manager import get_reply, enhance_sentence, shadow_learn
-from ai_learning import auto_learn_from_text
 from emotion_memory import remember_emotion, get_last_emotion, emotion_context_reply
 
-# ======================= 😄 تشخیص احساس =======================
+# ===============================================================
+# 😄 تشخیص احساس — Emotion Engine
+# ===============================================================
 def detect_emotion(text: str) -> str:
     """تحلیل احساس برای واکنش طبیعی‌تر"""
     if not text:
@@ -17,7 +18,7 @@ def detect_emotion(text: str) -> str:
         "sad": ["😔", "😢", "غمگینم", "بدم میاد", "دلم گرفته", "افسرده"],
         "angry": ["😡", "لعنتی", "حرصم", "عصبانی", "بدبخت", "خفه شو"],
         "love": ["دوستت دارم", "❤️", "😘", "عاشقتم", "عشق", "قلبم"],
-        "question": ["?", "چرا", "چیه", "چی شد", "کجایی", "کجا", "چطوری"]
+        "question": ["?", "چرا", "چیه", "چی شد", "کجایی", "کجا", "چطوری"],
     }
 
     for emo, words in emotions.items():
@@ -27,7 +28,10 @@ def detect_emotion(text: str) -> str:
 
     return "neutral"
 
-# ======================= 💬 پاسخ هوشمند و احساسی =======================
+
+# ===============================================================
+# 💬 پاسخ هوشمند و احساسی — Smart Reply System
+# ===============================================================
 def smart_response(text: str, user_id: int) -> str:
     """پاسخ پویا و احساسی بر اساس حافظه و وضعیت کاربر"""
     if not text:
@@ -46,10 +50,14 @@ def smart_response(text: str, user_id: int) -> str:
     # ۳️⃣ ثبت احساس فعلی در حافظه
     remember_emotion(user_id, emotion)
 
-    # ۴️⃣ یادگیری خودکار از متن
-    auto_learn_from_text(text)
+    # ⚙️ وارد کردن auto_learn در لحظه (جلوگیری از circular import)
+    try:
+        from ai_learning import auto_learn_from_text
+        auto_learn_from_text(text)
+    except Exception as e:
+        print(f"[Smart Reply] Auto learn skipped: {e}")
 
-    # ۵️⃣ پاسخ‌های پایه برای هر احساس
+    # ۴️⃣ پاسخ‌های پایه برای هر احساس
     responses = {
         "happy": [
             "😂 خوشحالم حالت خوبه!",
@@ -88,20 +96,20 @@ def smart_response(text: str, user_id: int) -> str:
         ],
     }
 
-    # ۶️⃣ تلاش برای یافتن پاسخ از حافظه
+    # ۵️⃣ تلاش برای یافتن پاسخ از حافظه
     mem_reply = get_reply(text)
     if mem_reply:
         shadow_learn(text, mem_reply)
         return enhance_sentence(mem_reply)
 
-    # ۷️⃣ در نبود پاسخ در حافظه، پاسخ انسانی بساز
+    # ۶️⃣ در نبود پاسخ در حافظه، پاسخ انسانی بساز
     if random.random() < 0.3:
         emotion = "neutral"
 
     base = random.choice(responses.get(emotion, responses["neutral"]))
     reply = enhance_sentence(base)
 
-    # ۸️⃣ ثبت پاسخ در حافظه سایه برای آموزش آینده
+    # ۷️⃣ ثبت پاسخ در حافظه سایه برای آموزش آینده
     shadow_learn(text, reply)
 
     return reply
