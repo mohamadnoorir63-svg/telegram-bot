@@ -1,9 +1,10 @@
-# ======================= 💎 Khenqol FontMaster 40.0 — Fantasy & Artline Extended Edition =======================
+# ======================= 💎 Khenqol FontMaster 30.0 — Persian & English Pro Edition =======================
 import random
 import re
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
-# 🎨 تابع اصلی ساخت فونت
+
+# 🎨 تابع اصلی تولید فونت
 async def font_maker(update, context):
     text = update.message.text.strip()
     if not text.startswith("فونت "):
@@ -15,117 +16,131 @@ async def font_maker(update, context):
 
     # تشخیص فارسی یا انگلیسی
     is_english = bool(re.search(r"[a-zA-Z]", name))
-    result = generate_english_fonts(name) if is_english else generate_persian_fonts(name)
+    fonts = generate_english_fonts(name) if is_english else generate_persian_fonts(name)
 
-    await update.message.reply_text(result["text"], parse_mode="HTML", reply_markup=result["keyboard"])
+    # اولین دسته فونت‌ها
+    await update.message.reply_text(fonts[0]["text"], parse_mode="HTML", reply_markup=fonts[0]["keyboard"])
+    context.user_data["font_pages"] = fonts  # ذخیره برای صفحه‌های بعدی
+    context.user_data["font_index"] = 0
     return True
 
 
-# ======================= 🎭 فونت فارسی فانتزی و کشیده =======================
+# ======================= 🎭 تولید فونت فارسی =======================
 def generate_persian_fonts(name):
-    base = [
-        f"━───━━━ {name} ━━━───━",
-        f"╭━━━═─═━╮\n{name}\n╰━━━═─═━╯",
-        f"═──═ {name} ═──═",
-        f"⋆═╬═──═╬═ {name} ╬═──═╬═⋆",
-        f"⟪ {name} ⟫",
-        f"⋆━━━━━ {name} ━━━━━⋆",
-        f"╔═══✦═══╗\n{name}\n╚═══✦═══╝",
-        f"⋆✧ {name} ✧⋆",
-        f"╰═══〘 {name} 〙═══╯",
-        f"⋆─╬═──═╬─⋆ {name} ⋆─╬═──═╬─⋆",
-        f"◈──── {name} ────◈",
-        f"⋆⸙̩̩͙⊱ {name} ⊰⸙̩̩͙⋆",
-        f"╭────── {name} ──────╮",
+    styles = [
+        f"─═〘 {name} 〙═─",
         f"⋆⁺₊⋆ {name} ⋆₊⁺⋆",
-        f"╔═══ஓ๑♡๑ஓ═══╗\n{name}\n╚═══ஓ๑♡๑ஓ═══╝",
-        f"═╬═══ {name} ═══╬═",
-        f"⋆━─━─━─ {name} ─━─━─━⋆",
-        f"═──⋆ {name} ⋆──═",
-        f"⋆━━═ {name} ═━━⋆",
-        f"⋆═╬═ {name} ╬═⋆",
+        f"•—– {name} –—•",
+        f"╭━━━ {name} ━━━╮",
+        f"═━═ {name} ═━═",
+        f"⋆✦ {name} ✦⋆",
+        f"⋆═══ {name} ═══⋆",
+        f"✦━─━─━ {name} ━─━─━✦",
+        f"⋆⸙̩̩͙⊱ {name} ⊰⸙̩̩͙⋆",
+        f"✦⋆ {name} ⋆✦",
+        f"═━━═ {name} ═━━═",
+        f"⋆╭─ {name} ─╮⋆",
+        f"⋆╰─ {name} ─╯⋆",
+        f"╰═─ {name} ─═╯",
+        f"⋆━── {name} ──━⋆",
+        f"•⟡•° {name} °•⟡•",
+        f"⋆⁺ {name} ⁺⋆",
+        f"◈───────◈ {name} ◈───────◈",
         f"╔═══ {name} ═══╗",
-        f"╰─═══ {name} ═══─╯",
-        f"⋆═━━═ {name} ═━━═⋆",
-        f"⋆═══╬═══ {name} ═══╬═══⋆",
-        f"╭═══╬═══╮\n{name}\n╰═══╬═══╯",
-        f"⋆⋆⋆ {name} ⋆⋆⋆",
-        f"⋆━╍╍╍╍ {name} ╍╍╍╍━⋆",
-        f"══⋆═ {name} ═⋆══",
+        f"⋆━⋆━ {name} ━⋆━⋆",
         f"⋆──═ {name} ═──⋆",
-        f"⋆──═╬═──⋆ {name} ⋆──═╬═──⋆",
-        f"╭────────╮\n{name}\n╰────────╯",
-        f"⋆✦━─━─━─ {name} ─━─━─━✦⋆",
-        f"═╬═╬═ {name} ╬═╬═",
-        f"⋆═━━╬━━═⋆ {name} ⋆═━━╬━━═⋆",
-        f"═╬═╬═╬═ {name} ╬═╬═╬═╬═",
+        f"━⋆━━ {name} ━━⋆━",
+        f"⋆═──═ {name} ═──═⋆",
+        f"┈┈✦ {name} ✦┈┈",
+        f"╭─────────────╮\n{name}\n╰─────────────╯",
+        f"⋆═───══ {name} ═══───═⋆",
+        f"╔═━━═ {name} ═━━═╗",
+        f"⋆━╬━ {name} ━╬━⋆",
+        f"⋆═══╬═══ {name} ═══╬═══⋆",
+        f"═⋆═╬═ {name} ╬═⋆═",
+        f"⋆══╬══ {name} ══╬══⋆",
         f"⋆═══⋆═══ {name} ═══⋆═══⋆",
-        f"╭────✦────╮\n{name}\n╰────✦────╯",
-        f"═⋆═──═ {name} ═──═⋆═",
-        f"⋆═━──━═ {name} ═━──━═⋆",
-        f"⋆━═══ {name} ═══━⋆",
-        f"╭═────═══ {name} ═══────═╮",
+        f"╭───❖───╮\n{name}\n╰───❖───╯",
     ]
 
-    fonts = base * 10  # افزایش تنوع تا حدود 400 ترکیب
-    selected_fonts = random.sample(fonts, 10)
-
-    text = f"<b>فونت‌های فانتزی و کشیده برای:</b> <i>{name}</i>\n\n"
-    for i, style in enumerate(selected_fonts, start=1):
-        text += f"{i}. <code>{style}</code>\n\n"
-
-    keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton("🔁 فونت‌های جدید", callback_data=f"next_font:{name}")],
-        [InlineKeyboardButton("🔙 بازگشت به منوی اصلی", callback_data="feature_back")]
-    ])
-    return {"text": text, "keyboard": keyboard}
+    # هر صفحه شامل 30 فونت است
+    return make_pages(name, styles)
 
 
-# ======================= ✨ فونت انگلیسی فانتزی و آرلاین =======================
+# ======================= ✨ تولید فونت انگلیسی =======================
 def generate_english_fonts(name):
-    styles = [
+    fancy_trans = [
         str.maketrans("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz",
                       "𝓐𝓑𝓒𝓓𝓔𝓕𝓖𝓗𝓘𝓙𝓚𝓛𝓜𝓝𝓞𝓟𝓠𝓡𝓢𝓣𝓤𝓥𝓦𝓧𝓨𝓩𝓪𝓫𝓬𝓭𝓮𝓯𝓰𝓱𝓲𝓳𝓴𝓵𝓶𝓷𝓸𝓹𝓺𝓻𝓼𝓽𝓾𝓿𝔀𝔁𝔂𝔃"),
         str.maketrans("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz",
-                      "𝐀𝐁𝐂𝐃𝐄𝐅𝐆𝐇𝐈𝐉𝐊𝐋𝐌𝐍𝐎𝐏𝐐𝐑𝐒𝐓𝐔𝐕𝐖𝐗𝐘𝐙𝐚𝐛𝐜𝐝𝐞𝐟𝐠𝐡𝐢𝐣𝐤𝐥𝐦𝐧𝐨𝐩𝐪𝐫𝐬𝐭𝐮𝐯𝐰𝐱𝐲𝐳"),
+                      "𝗔𝗕𝗖𝗗𝗘𝗙𝗚𝗛𝗜𝗝𝗞𝗟𝗠𝗡𝗢𝗣𝗤𝗥𝗦𝗧𝗨𝗩𝗪𝗫𝗬𝗭𝗮𝗯𝗰𝗱𝗲𝗳𝗴𝗵𝗶𝗷𝗸𝗹𝗺𝗻𝗼𝗽𝗾𝗿𝘀𝘵𝘶𝘷𝘄𝘅𝘆𝘇"),
         str.maketrans("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz",
-                      "𝘈𝘉𝘊𝘋𝘌𝘍𝘎𝘏𝘐𝘑𝘒𝘓𝘔𝘕𝘖𝘗𝘘𝘙𝘚𝘛𝘜𝘝𝘞𝘟𝘠𝘡𝘢𝘣𝘤𝘥𝘦𝘧𝘨𝘩𝘪𝘫𝘬𝘭𝘮𝘯𝘰𝘱𝘲𝘳𝘴𝘵𝘶𝘷𝘸𝘹𝘺𝘻"),
+                      "ＡＢＣＤＥＦＧＨＩＪＫＬＭＮＯＰＱＲＳＴＵＶＷＸＹＺａｂｃｄｅｆｇｈｉｊｋｌｍｎｏｐｑｒｓｔｕｖｗｘｙｚ"),
+        str.maketrans("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz",
+                      "𝔄𝔅ℭ𝔇𝔈𝔉𝔊ℌℑ𝔍𝔎𝔏𝔐𝔑𝔒𝔓𝔔ℜ𝔖𝔗𝔘𝔙𝔚𝔛𝔜ℨ𝔞𝔟𝔠𝔡𝔢𝔣𝔤𝔥𝔦𝔧𝔨𝔩𝔪𝔫𝔬𝔭𝔮𝔯𝔰𝔱𝔲𝔳𝔴𝔵𝔶𝔷"),
     ]
+
     frames = [
-        lambda t: f"═─── {t} ───═",
-        lambda t: f"⋆━━━ {t} ━━━⋆",
+        lambda t: f"═── {t} ──═",
+        lambda t: f"⋆━── {t} ──━⋆",
         lambda t: f"⋆✦ {t} ✦⋆",
-        lambda t: f"═╬═ {t} ╬═",
-        lambda t: f"⋆═══ {t} ═══⋆",
-        lambda t: f"⋆⟪ {t} ⟫⋆",
-        lambda t: f"⋆✧━ {t} ━✧⋆",
         lambda t: f"⟪ {t} ⟫",
-        lambda t: f"⋆═══╬═══ {t} ═══╬═══⋆",
-        lambda t: f"═⋆═──═ {t} ═──═⋆═",
+        lambda t: f"═━━═ {t} ═━━═",
+        lambda t: f"⋆═══ {t} ═══⋆",
+        lambda t: f"⌜ {t} ⌟",
+        lambda t: f"• {t} •",
+        lambda t: f"╭── {t} ──╮",
+        lambda t: f"╰── {t} ──╯",
+        lambda t: f"《 {t} 》",
+        lambda t: f"〈 {t} 〉",
     ]
 
-    results = []
-    for _ in range(10):
-        style = random.choice(styles)
-        framed = random.choice(frames)
-        results.append(framed(name.translate(style)))
+    fonts = []
+    for tr in fancy_trans:
+        for frame in frames:
+            fonts.append(frame(name.translate(tr)))
 
-    text = f"<b>Artline & Fancy Fonts for:</b> <i>{name}</i>\n\n"
-    for i, style in enumerate(results, start=1):
-        text += f"{i}. <code>{style}</code>\n\n"
-
-    keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton("🔁 New Fonts", callback_data=f"next_font:{name}")],
-        [InlineKeyboardButton("🔙 Back to Main Menu", callback_data="feature_back")]
-    ])
-    return {"text": text, "keyboard": keyboard}
+    return make_pages(name, fonts)
 
 
-# ======================= 🔁 دکمه تولید مجدد =======================
+# ======================= 📄 تقسیم فونت‌ها به صفحات =======================
+def make_pages(name, all_fonts, page_size=30):
+    pages = []
+    chunks = [all_fonts[i:i + page_size] for i in range(0, len(all_fonts), page_size)]
+
+    for idx, chunk in enumerate(chunks):
+        text = f"<b>🎨 فونت‌های خاص برای:</b> <i>{name}</i>\n\n"
+        for i, style in enumerate(chunk, start=1):
+            text += f"{i}. <code>{style}</code>\n\n"
+        text += f"📄 صفحه {idx + 1} از {len(chunks)}"
+
+        buttons = []
+        if idx > 0:
+            buttons.append(InlineKeyboardButton("⬅️ قبلی", callback_data=f"prev_font:{idx - 1}"))
+        if idx < len(chunks) - 1:
+            buttons.append(InlineKeyboardButton("➡️ بعدی", callback_data=f"next_font:{idx + 1}"))
+
+        nav_buttons = [buttons] if buttons else []
+        nav_buttons.append([InlineKeyboardButton("🔙 بازگشت به منوی اصلی", callback_data="feature_back")])
+
+        pages.append({
+            "text": text,
+            "keyboard": InlineKeyboardMarkup(nav_buttons)
+        })
+
+    return pages
+
+
+# ======================= 🔁 کنترل صفحات فونت =======================
 async def next_font(update, context):
     query = update.callback_query
     await query.answer()
-    name = query.data.split(":")[1]
-    is_english = bool(re.search(r"[a-zA-Z]", name))
-    result = generate_english_fonts(name) if is_english else generate_persian_fonts(name)
-    await query.edit_message_text(result["text"], parse_mode="HTML", reply_markup=result["keyboard"])
+
+    index = int(query.data.split(":")[1])
+    fonts = context.user_data.get("font_pages", [])
+    if 0 <= index < len(fonts):
+        await query.edit_message_text(
+            fonts[index]["text"],
+            parse_mode="HTML",
+            reply_markup=fonts[index]["keyboard"]
+    )
