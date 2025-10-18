@@ -30,6 +30,10 @@ from emotion_memory import remember_emotion, get_last_emotion, emotion_context_r
 from auto_brain.auto_brain import start_auto_brain_loop
 from selective_backup import selective_backup_menu, selective_backup_buttons
 from auto_brain import auto_backup
+# ===== دستورات شخصی و پنل تنظیمات =====
+from auto_brain.command_manager import save_command, handle_custom_command, delete_command
+from auto_brain.command_panel import show_panel, panel_callback
+from telegram.ext import CommandHandler, MessageHandler, CallbackQueryHandler, filters
 
 # 🎯 تنظیمات پایه
 TOKEN = os.getenv("BOT_TOKEN")
@@ -1662,6 +1666,16 @@ if __name__ == "__main__":
 
     # ⚙️ مدیریت خطاهای کلی
     app.add_error_handler(handle_error)
+    # 📥 ذخیره و حذف دستور
+    application.add_handler(CommandHandler("save", save_command))
+    application.add_handler(CommandHandler("del", delete_command))
+
+    # ⚙️ پنل تنظیمات
+    application.add_handler(CommandHandler("panel", show_panel))
+    application.add_handler(CallbackQueryHandler(panel_callback))
+
+    # 🧩 واکنش به دستورهای ذخیره‌شده (هر پیامی که به عنوان دستور شناخته شود)
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_custom_command))
 
 
     # 👑 شناسایی ورود و خروج سازنده
