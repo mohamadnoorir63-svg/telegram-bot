@@ -1,10 +1,10 @@
-import os
-import asyncio
+# send_brain.py (اصلاح شده)
+import os, asyncio
 from telegram import Bot, InputFile
 
 TOKEN = os.getenv("BOT_TOKEN")
 ADMIN_ID = int(os.getenv("ADMIN_ID", "7089376754"))
-BRAIN_PATH = "/app/khengol_brain_4moods.zip"  # مسیر درست فایل مغز
+BRAIN_PATH = "/app/khengol_brain_4moods.zip"  # ← مسیر درست
 
 async def main():
     bot = Bot(token=TOKEN)
