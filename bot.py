@@ -1061,19 +1061,41 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # ✅ لیست جملات
     if text == "لیست":
-        await update.message.reply_text(list_phrases())
+        await update.message.reply_text(list_phrases(), parse_mode="HTML")
         return
 
-    # ✅ یادگیری دستی
+    # ✅ یادگیری دستی با استایل زیبا و خروجی حرفه‌ای
     if text.startswith("یادبگیر "):
         parts = text.replace("یادبگیر ", "").split("\n")
+
         if len(parts) > 1:
             phrase = parts[0].strip()
             responses = [p.strip() for p in parts[1:] if p.strip()]
+
             msg = learn(phrase, *responses)
-            await update.message.reply_text(msg)
+
+            # 🎨 ساخت خروجی نمایشی با جزئیات و اموجی‌ها
+            visual = (
+                f"🧠 <b>خنگول یاد گرفت!</b>\n"
+                f"💬 <b>جمله:</b> <code>{phrase}</code>\n"
+                f"✨ <b>تعداد پاسخ‌ها:</b> {len(responses)}\n"
+                f"➕ <i>{msg}</i>\n\n"
+                f"📘 حالا هوش خنگول باهوش‌تر شد 🤖💫"
+            )
+
+            await update.message.reply_text(visual, parse_mode="HTML")
+
+            # 💾 یادگیری سایه برای تقویت حافظه
+            for r in responses:
+                shadow_learn(phrase, r)
+
         else:
-            await update.message.reply_text("❗ بعد از 'یادبگیر' جمله و پاسخ‌هاش رو با خط جدید بنویس.")
+            await update.message.reply_text(
+                "❗ بعد از 'یادبگیر' جمله و پاسخ‌هاش رو در خطوط جدا بنویس.\n\n"
+                "📘 مثال:\n"
+                "<code>یادبگیر سلام\nسلام خنگول 😄</code>",
+                parse_mode="HTML"
+            )
         return
 
     # ✅ جمله تصادفی
