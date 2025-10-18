@@ -5,24 +5,37 @@ from datetime import datetime, timedelta
 # 📁 مسیر فایل حافظه احساسات
 EMOTION_FILE = "emotion_memory.json"
 
+
 # ========================= ⚙️ آماده‌سازی =========================
 def init_emotion_memory():
     """بررسی و ساخت فایل احساسات در صورت نبود"""
     if not os.path.exists(EMOTION_FILE):
         with open(EMOTION_FILE, "w", encoding="utf-8") as f:
             json.dump({}, f, ensure_ascii=False, indent=2)
+        print("✅ فایل emotion_memory.json ساخته شد.")
+
 
 # ========================= 💾 خواندن و ذخیره =========================
 def load_emotions():
     try:
         with open(EMOTION_FILE, "r", encoding="utf-8") as f:
             return json.load(f)
-    except:
+    except json.JSONDecodeError:
+        print("⚠️ فایل احساسات خراب بود — بازنشانی شد.")
+        save_emotions({})
+        return {}
+    except Exception as e:
+        print(f"❌ خطا در بارگذاری emotion_memory.json: {e}")
         return {}
 
+
 def save_emotions(data):
-    with open(EMOTION_FILE, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
+    try:
+        with open(EMOTION_FILE, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        print(f"❌ خطا در ذخیره احساسات: {e}")
+
 
 # ========================= 💖 ثبت احساس جدید =========================
 def remember_emotion(user_id: int, emotion: str):
@@ -37,6 +50,7 @@ def remember_emotion(user_id: int, emotion: str):
 
     save_emotions(data)
 
+
 # ========================= 🔍 واکشی احساس قبلی =========================
 def get_last_emotion(user_id: int) -> str:
     """برگرداندن آخرین احساس ذخیره‌شده کاربر"""
@@ -46,14 +60,19 @@ def get_last_emotion(user_id: int) -> str:
     if not info:
         return "neutral"
 
-    last_time = datetime.fromisoformat(info["last_update"])
-    if datetime.now() - last_time > timedelta(minutes=30):
-        # اگر بیشتر از ۳۰ دقیقه گذشته باشه، احساسش ریست میشه
+    try:
+        last_time = datetime.fromisoformat(info.get("last_update", ""))
+    except Exception:
         return "neutral"
 
-    return info["emotion"]
+    # اگر بیشتر از ۳۰ دقیقه گذشته باشه، احساس ریست میشه
+    if datetime.now() - last_time > timedelta(minutes=30):
+        return "neutral"
 
-# ========================= ✨ بررسی و واکنش به احساس =========================
+    return info.get("emotion", "neutral")
+
+
+# ========================= ✨ بررسی و واکنش به تغییر احساس =========================
 def emotion_context_reply(current_emotion: str, last_emotion: str) -> str:
     """ایجاد پاسخ بر اساس تغییر احساس کاربر"""
     if last_emotion == "sad" and current_emotion == "happy":
@@ -65,6 +84,6 @@ def emotion_context_reply(current_emotion: str, last_emotion: str) -> str:
     if last_emotion == "neutral" and current_emotion == "love":
         return "😍 اوه! یه حسی خاص پیدا کردی انگار!"
     if last_emotion == current_emotion:
-        return None  # همون احساس، نیازی به واکنش نیست
+        return None  # احساس تغییری نکرده
 
     return None
