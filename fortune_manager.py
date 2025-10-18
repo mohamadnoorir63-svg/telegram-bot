@@ -114,9 +114,8 @@ async def save_fortune(update: Update):
         await update.message.reply_text(f"⚠️ خطا در ذخیره فال: {e}")
 
 # ========================= ارسال فال تصادفی =========================
-                
 async def send_random_fortune(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """یکی از فال‌های ذخیره‌شده را به‌صورت رندومی ارسال می‌کند (با بررسی مسیرهای امن)."""
+    """ارسال فال تصادفی با بررسی مسیرهای واقعی و حذف فال‌های خراب از فایل."""
     data = load_fortunes()
     if not data:
         return await update.message.reply_text("📭 هنوز فالی ذخیره نشده 😔")
@@ -124,54 +123,66 @@ async def send_random_fortune(update: Update, context: ContextTypes.DEFAULT_TYPE
     keys = list(data.keys())
     random.shuffle(keys)
 
+    cleaned_data = {}  # برای ذخیره فقط فال‌های سالم
+
     for k in keys:
-        v = data[k]
+        v = data.get(k, {})
         t = v.get("type", "text").strip()
         raw = (v.get("value") or "").strip()
 
-        # ⛔ اگر مقدار خالی یا نامعتبر بود، برو سراغ بعدی
+        # 🧹 حذف فال‌های بی‌مقدار
         if not raw:
+            print(f"[Cleaned] فال {k} حذف شد (value خالی)")
             continue
 
         val = _abs_media_path(raw)
 
-        try:
-            # 🔹 فال متنی
-            if t == "text":
-                return await update.message.reply_text(f"🔮 {raw}")
-
-            # 🔹 عکس
-            elif t == "photo":
-                if _is_valid_url(val):
-                    return await update.message.reply_photo(photo=val, caption=f"🔮 فال {k}")
-                elif os.path.exists(val):
-                    return await update.message.reply_photo(photo=open(val, "rb"), caption=f"🔮 فال {k}")
-                else:
-                    continue
-
-            # 🔹 ویدیو
-            elif t == "video":
-                if _is_valid_url(val):
-                    return await update.message.reply_video(video=val, caption=f"🎥 فال {k}")
-                elif os.path.exists(val):
-                    return await update.message.reply_video(video=open(val, "rb"), caption=f"🎥 فال {k}")
-                else:
-                    continue
-
-            # 🔹 استیکر
-            elif t == "sticker":
-                if _is_valid_url(val):
-                    return await update.message.reply_sticker(sticker=val)
-                elif os.path.exists(val):
-                    return await update.message.reply_sticker(sticker=open(val, "rb"))
-                else:
-                    continue
-
-        except Exception as e:
-            print(f"[Fortune Error] ❌ id={k}, type={t}, err={e}")
+        # 🧹 حذف مسیرهای اشتباه یا فایل‌های پاک‌شده
+        if not _is_valid_url(val) and not os.path.exists(val) and t != "text":
+            print(f"[Cleaned] فال {k} حذف شد (فایل پیدا نشد: {val})")
             continue
 
-    await update.message.reply_text("⚠️ هیچ فالی قابل ارسال نبود — شاید مسیر فایل‌ها تغییر کرده باشه.")
+        # فال سالم نگه داشته میشه
+        cleaned_data[k] = v
+
+        try:
+            if t == "text":
+                await update.message.reply_text(f"🔮 {raw}")
+                break
+
+            elif t == "photo":
+                if _is_valid_url(val):
+                    await update.message.reply_photo(photo=val, caption=f"🔮 فال {k}")
+                else:
+                    await update.message.reply_photo(photo=open(val, "rb"), caption=f"🔮 فال {k}")
+                break
+
+            elif t == "video":
+                if _is_valid_url(val):
+                    await update.message.reply_video(video=val, caption=f"🎥 فال {k}")
+                else:
+                    await update.message.reply_video(video=open(val, "rb"), caption=f"🎥 فال {k}")
+                break
+
+            elif t == "sticker":
+                if _is_valid_url(val):
+                    await update.message.reply_sticker(sticker=val)
+                else:
+                    await update.message.reply_sticker(sticker=open(val, "rb"))
+                break
+
+        except Exception as e:
+            print(f"[Fortune Error] id={k} type={t} err={e}")
+            continue
+
+    # ✅ بازنویسی فال‌ها بدون موارد خراب
+    if len(cleaned_data) != len(data):
+        save_fortunes(cleaned_data)
+        print(f"🧹 فال‌های خراب حذف شدند ({len(data) - len(cleaned_data)} مورد).")
+
+    if not cleaned_data:
+        await update.message.reply_text("⚠️ هیچ فالی سالم برای ارسال پیدا نشد 😔")
+
 
 # ========================= لیست فال‌ها (آخرین ۱۰ تا) =========================
 async def list_fortunes(update: Update):
