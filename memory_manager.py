@@ -44,12 +44,6 @@ def save_data(file, data):
 
 # ========================= 🧠 یادگیری هوشمند با وزن =========================
 def learn(phrase, *responses):
-    """
-    یادگیری هوشمند:
-    - ذخیره پاسخ‌ها با وزن
-    - تشخیص پاسخ جدید
-    - جلوگیری از تکرار
-    """
     data = load_data("memory.json")
 
     if "data" not in data:
@@ -61,13 +55,11 @@ def learn(phrase, *responses):
     if not responses:
         return "❗ هیچ پاسخی برای یادگیری ارسال نشد."
 
-    # ✅ اگر جمله جدید بود
     if phrase not in data["data"]:
         data["data"][phrase] = [{"text": r, "weight": 1} for r in responses]
         save_data("memory.json", data)
         return f"🧠 یاد گرفتم {len(responses)} پاسخ برای '{phrase}'!"
 
-    # 🧩 اگر جمله تکراری بود ولی پاسخ‌های جدید دارد
     existing = data["data"][phrase]
     existing_texts = [r["text"] for r in existing]
     added = 0
@@ -87,7 +79,6 @@ def learn(phrase, *responses):
 
 # ========================= 🌙 یادگیری خودکار در سایه =========================
 def shadow_learn(phrase, response):
-    """یادگیری غیرفعال — داده‌ها در shadow_memory ذخیره می‌شوند"""
     if not phrase or not response:
         return
 
@@ -100,7 +91,7 @@ def shadow_learn(phrase, response):
     elif response not in data[phrase]:
         data[phrase].append(response)
     else:
-        return  # تکراری
+        return
 
     shadow["data"] = data
     save_data("shadow_memory.json", shadow)
@@ -109,7 +100,6 @@ def shadow_learn(phrase, response):
 
 # ========================= 💬 پاسخ‌دهی وزنی =========================
 def get_reply(text):
-    """پیدا کردن پاسخ بر اساس وزن"""
     mem = load_data("memory.json")
     data = mem.get("data", {})
 
@@ -120,17 +110,13 @@ def get_reply(text):
     key = random.choice(matches)
     responses = data[key]
 
-    # اگر ساختار قدیمی بود (لیست ساده)
     if isinstance(responses[0], str):
         responses = [{"text": r, "weight": 1} for r in responses]
         data[key] = responses
         save_data("memory.json", mem)
 
-    # انتخاب بر اساس وزن
     weights = [r["weight"] for r in responses]
     chosen = random.choices(responses, weights=weights, k=1)[0]
-
-    # تقویت پاسخ
     chosen["weight"] += 1
     save_data("memory.json", mem)
 
@@ -139,7 +125,6 @@ def get_reply(text):
 
 # ========================= 🧼 تمیزسازی حافظه =========================
 def clean_memory():
-    """حذف پاسخ‌های تکراری، کوتاه و ناسالم"""
     data = load_data("memory.json")
     changed = 0
 
@@ -186,7 +171,6 @@ def set_mode(mode):
 
 # ========================= ✨ جمله‌سازی خلاق =========================
 def enhance_sentence(sentence):
-    """افزودن حس طبیعی به پاسخ"""
     if not sentence:
         return "🤔 نمی‌دونم چی بگم!"
     extras = ["🙂", "😂", "😎", "🤖", "😅", "😉", "✨", "😄"]
@@ -194,7 +178,6 @@ def enhance_sentence(sentence):
 
 
 def generate_sentence():
-    """ساخت جمله خلاق از حافظه"""
     mem = load_data("memory.json")
     data = mem.get("data", {})
     if not data:
@@ -223,17 +206,18 @@ def list_phrases(limit=50):
         return "😅 هنوز چیزی یاد نگرفتم!"
     show = phrases[:limit]
     return "🧾 جملات یادگرفته‌شده:\n\n" + "\n".join(show)
-    
-# ========================= 🧠 تقویت هوشمند حافظه (Reinforcement) =========================
-def reinforce_learning():
+
+
+# ========================= 🧠 تقویت هوشمند حافظه (پیشرفته) =========================
+def reinforce_learning(verbose=True):
     """
     تقویت پاسخ‌های مفید و حذف پاسخ‌های ضعیف یا منقضی‌شده
-    - پاسخ‌هایی که زیاد استفاده شدن، وزن بالاتری می‌گیرن.
-    - پاسخ‌های کم‌استفاده یا غیرطبیعی به تدریج حذف می‌شن.
+    - بازمی‌گرداند: dict شامل آمار تقویت و حذف پاسخ‌ها
     """
     mem = load_data("memory.json")
     data = mem.get("data", {})
     changed = False
+    strengthened, removed = 0, 0
 
     for phrase, responses in list(data.items()):
         new_responses = []
@@ -241,33 +225,87 @@ def reinforce_learning():
             text = r.get("text", "").strip()
             weight = r.get("weight", 1)
 
-            # حذف پاسخ‌های بسیار کوتاه، خراب یا تکراری
             if len(text) < 2:
+                removed += 1
                 continue
 
-            # 🧩 افزایش وزن پاسخ‌های طبیعی
-            if any(c in text for c in "؟!?!.🙂😂😅🤖😉😎"):
-                r["weight"] = min(weight + random.choice([1, 2]), 15)
+            # 🔹 افزایش وزن پاسخ‌های طبیعی
+            if any(c in text for c in "؟!?!.🙂😂😅🤖😉😎✨❤️💬"):
+                new_weight = min(weight + random.choice([1, 2]), 15)
+                if new_weight > weight:
+                    strengthened += 1
+                r["weight"] = new_weight
 
-            # 💤 کاهش وزن پاسخ‌های ضعیف یا بی‌احساس
+            # 🔸 کاهش وزن پاسخ‌های بی‌احساس
             elif weight > 1:
                 r["weight"] -= 1
 
-            # حذف پاسخ‌های خیلی ضعیف
             if r["weight"] <= 0:
+                removed += 1
                 continue
 
             new_responses.append(r)
 
-        # اگر تغییر داشت، جایگزین کن
         if len(new_responses) != len(responses):
-            data[phrase] = new_responses
             changed = True
+        data[phrase] = new_responses
 
-    # ذخیره‌ی تغییرات در صورت نیاز
     if changed:
         mem["data"] = data
         save_data("memory.json", mem)
-        print("🧩 حافظه هوشمند تقویت شد و پاسخ‌های ضعیف حذف شدند ✅")
+
+    if verbose:
+        if strengthened or removed:
+            print(f"🧠 حافظه تقویت شد → ↑{strengthened} پاسخ قوی‌تر، ↓{removed} پاسخ حذف شد.")
+        else:
+            print("💤 حافظه نیازی به تقویت نداشت (بهینه بود).")
+
+    return {"strengthened": strengthened, "removed": removed}
+
+
+# ========================= 🧩 ارزیابی هوش خودکار (AI IQ) =========================
+def evaluate_intelligence():
+    """
+    تحلیل وضعیت مغز ربات و محاسبه‌ی نمره هوش (AI IQ)
+    بر اساس:
+    - تعداد جملات و پاسخ‌ها
+    - میانگین وزن پاسخ‌ها
+    """
+    mem = load_data("memory.json")
+    data = mem.get("data", {})
+    if not data:
+        return {"iq": 0, "level": "🍼 تازه متولد شده!", "summary": "هیچ داده‌ای هنوز وجود ندارد."}
+
+    total_phrases = len(data)
+    total_responses = sum(len(v) for v in data.values())
+    total_weight, response_count = 0, 0
+
+    for responses in data.values():
+        for r in responses:
+            total_weight += r.get("weight", 1)
+            response_count += 1
+
+    avg_weight = total_weight / response_count if response_count else 1
+    iq_score = int((total_phrases * 0.7 + total_responses * 0.3) * (avg_weight / 3))
+    iq_score = min(iq_score, 9999)
+
+    if iq_score < 100:
+        level = "🐣 تازه‌کار"
+    elif iq_score < 300:
+        level = "🧠 در حال رشد"
+    elif iq_score < 700:
+        level = "⚡ هوش پیشرفته"
+    elif iq_score < 1500:
+        level = "🚀 خلاق و مستقل"
     else:
-        print("💤 هیچ به‌روزرسانی خاصی در حافظه انجام نشد (همه‌چیز بهینه بود).")
+        level = "👑 نابغه‌ی خنگول!"
+
+    summary = (
+        f"📊 جملات: {total_phrases}\n"
+        f"💬 پاسخ‌ها: {total_responses}\n"
+        f"⚖️ میانگین وزن پاسخ‌ها: {avg_weight:.2f}\n"
+        f"🧩 نمره‌ی هوش (AI IQ): {iq_score}\n"
+        f"🌟 سطح: {level}"
+    )
+
+    return {"iq": iq_score, "level": level, "summary": summary}
