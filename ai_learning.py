@@ -1,16 +1,18 @@
 import re
 import random
 from memory_manager import learn, load_data, save_data, shadow_learn
-def auto_learn_from_text(text: str):
-    """یادگیری خودکار از گفت‌وگوهای طبیعی کاربران"""
-    from smart_reply import detect_emotion  # ⬅️ انتقال import به داخل تابع
-    ...
+
 # ===============================================================
 # 🤖 یادگیری خودکار خنگول Cloud+ — نسخه‌ی هوشمند و احساسی
 # ===============================================================
-
 def auto_learn_from_text(text: str):
     """یادگیری خودکار از گفت‌وگوهای طبیعی کاربران با درک احساس و منطق ساده"""
+    # ⚙️ import داخلی برای جلوگیری از حلقه‌ی import
+    try:
+        from smart_reply import detect_emotion
+    except ImportError:
+        detect_emotion = lambda x: None  # اگر در دسترس نبود، احساس رو خنثی کن
+
     if not text or len(text) < 3:
         return
 
@@ -31,6 +33,7 @@ def auto_learn_from_text(text: str):
         r"خنگ(ی)?": ["آره ولی باحال 🤪", "آره ولی باهوشم 😎"],
     }
 
+    # 🧩 بررسی و یادگیری سریع بر اساس الگوها
     for pattern, responses in patterns.items():
         if re.search(pattern, text, re.IGNORECASE):
             learn(pattern, *responses)
@@ -110,12 +113,28 @@ def reinforce_learning():
     data = mem.get("data") or mem.get("phrases") or {}
     weights = mem.get("weights", {})
 
+    strengthened = 0
+    removed = 0
+
     for phrase, responses in data.items():
         if not isinstance(responses, list):
             continue
         count = len(responses)
-        weights[phrase] = weights.get(phrase, 1) + count / 5  # افزایش وزن بر اساس تکرار
+        old_weight = weights.get(phrase, 1)
+        new_weight = min(old_weight + count / 5, 20)  # افزایش وزن تا سقف ۲۰
+        if new_weight != old_weight:
+            strengthened += 1
+        weights[phrase] = new_weight
+
+    # حذف داده‌های بی‌استفاده (در صورت حافظه‌ی خیلی ضعیف)
+    for phrase in list(weights.keys()):
+        if weights[phrase] <= 0.5:
+            removed += 1
+            del weights[phrase]
 
     mem["weights"] = weights
     save_data("memory.json", mem)
-    print("💪 تقویت حافظه انجام شد (reinforced learning) ✅")
+    print(f"💪 تقویت حافظه انجام شد ✅ ({strengthened} تقویت، {removed} حذف)")
+
+    # خروجی برای auto_brain
+    return {"strengthened": strengthened, "removed": removed}
