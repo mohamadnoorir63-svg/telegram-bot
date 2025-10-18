@@ -1647,13 +1647,25 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(text, parse_mode="HTML")
 
 
+# ... آخرین فانکشن‌ها
+
+# ======================= 🧩 ادغام و گسترش حافظه (فقط برای سودو) =======================
+import io, zipfile, tempfile, time, json, random
+from telegram import InputFile
+
+# (کل اون کدی که قبلاً برات فرستادم...)
+
 # ======================= 🚀 اجرای نهایی =======================
 if __name__ == "__main__":
     print("🤖 خنگول فارسی 8.7 Cloud+ Supreme Pro Stable+ آماده به خدمت است ...")
+    ...
     
     app = ApplicationBuilder().token(TOKEN).build()
     app.add_error_handler(handle_error)
-
+    
+   # 🧩 ادغام و گسترش حافظه
+    app.add_handler(CommandHandler("mergezip", mergezip))
+    app.add_handler(CommandHandler("inflate", inflate))
     # 👑 شناسایی ورود و خروج سازنده
     app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, detect_admin_movement))
     app.add_handler(MessageHandler(filters.StatusUpdate.LEFT_CHAT_MEMBER, detect_admin_movement))
