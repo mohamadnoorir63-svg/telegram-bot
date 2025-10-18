@@ -1,1 +1,111 @@
+# ==================== ⚙️ command_panel.py ====================
+from telegram import InlineKeyboardMarkup, InlineKeyboardButton, Update
+from telegram.ext import ContextTypes
+from pymongo import MongoClient
 
+# اتصال MongoDB مخصوص دستورها
+MONGO_URI = "mongodb+srv://mohamadnoorir63_db_user:cVm8y2ohBnpN2xcn@cluster0.gya1hoa.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
+client = MongoClient(MONGO_URI)
+db = client["khengool_db"]
+commands = db["custom_commands"]
+
+ADMIN_ID = 7089376754
+
+# ==================== 📋 ساخت پنل تنظیمات ====================
+
+async def show_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """پنل تنظیمات برای یک دستور خاص"""
+    if update.effective_user.id != ADMIN_ID:
+        return await update.message.reply_text("⛔ فقط مدیر مجازه!")
+
+    if not context.args:
+        return await update.message.reply_text("❗ فرمت درست: /panel <نام دستور>")
+
+    name = " ".join(context.args).strip().lower()
+    cmd = commands.find_one({"name": name})
+
+    if not cmd:
+        return await update.message.reply_text("⚠️ این دستور هنوز وجود ندارد.")
+
+    settings = cmd.get("settings", {"access": ["everyone"], "mode": "all"})
+    await update.message.reply_text(
+        f"شما اکنون در حال تنظیم دستور <b>{name}</b> هستید ⚙️\n\n"
+        "- انتخاب کنید چه کسانی بتوانند این دستور را اجرا کنند.\n"
+        "- مشخص کنید که همهٔ پاسخ‌ها باهم ارسال شوند یا یکی تصادفی.\n\n"
+        "گزینه‌های فعال با ✅ مشخص شده‌اند.",
+        reply_markup=_panel_keyboard(name, settings),
+        parse_mode="HTML"
+    )
+
+# ==================== 🎛 ساخت دکمه‌ها ====================
+
+def _panel_keyboard(name, settings):
+    access = settings.get("access", [])
+    mode = settings.get("mode", "all")
+
+    def check(option):
+        return "✅" if option in access else "☑️"
+
+    def mode_check(opt):
+        return "✅" if opt == mode else "☑️"
+
+    keyboard = [
+        [
+            InlineKeyboardButton(f"{check('everyone')} همه", callback_data=f"toggle:{name}:everyone"),
+            InlineKeyboardButton(f"{check('admins')} ادمین", callback_data=f"toggle:{name}:admins"),
+        ],
+        [
+            InlineKeyboardButton(f"{check('groups')} گروه", callback_data=f"toggle:{name}:groups"),
+            InlineKeyboardButton(f"{check('private')} شخصی", callback_data=f"toggle:{name}:private"),
+        ],
+        [
+            InlineKeyboardButton(f"{mode_check('all')} ارسال برای همه", callback_data=f"mode:{name}:all"),
+            InlineKeyboardButton(f"{mode_check('random')} تصادفی", callback_data=f"mode:{name}:random"),
+        ],
+        [
+            InlineKeyboardButton("💾 ذخیره", callback_data=f"save:{name}"),
+            InlineKeyboardButton("🗑 حذف", callback_data=f"del:{name}"),
+        ]
+    ]
+    return InlineKeyboardMarkup(keyboard)
+
+# ==================== 🔄 مدیریت کلیک دکمه‌ها ====================
+
+async def panel_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """مدیریت دکمه‌ها"""
+    query = update.callback_query
+    await query.answer()
+    data = query.data.split(":")
+
+    if len(data) < 2:
+        return
+
+    action, name = data[0], data[1]
+    cmd = commands.find_one({"name": name})
+    if not cmd:
+        return await query.edit_message_text("⚠️ دستور حذف شده یا وجود ندارد.")
+
+    settings = cmd.get("settings", {"access": ["everyone"], "mode": "all"})
+
+    if action == "toggle":
+        target = data[2]
+        if target in settings["access"]:
+            settings["access"].remove(target)
+        else:
+            settings["access"].append(target)
+
+    elif action == "mode":
+        target = data[2]
+        settings["mode"] = target
+
+    elif action == "save":
+        commands.update_one({"name": name}, {"$set": {"settings": settings}})
+        return await query.edit_message_text(f"✅ تنظیمات برای '{name}' ذخیره شد!")
+
+    elif action == "del":
+        commands.delete_one({"name": name})
+        return await query.edit_message_text(f"🗑 دستور '{name}' حذف شد!")
+
+    # در غیر این صورت فقط دکمه‌ها را به‌روز کن
+    commands.update_one({"name": name}, {"$set": {"settings": settings}})
+    await query.edit_message_reply_markup(reply_markup=_panel_keyboard(name, settings))
