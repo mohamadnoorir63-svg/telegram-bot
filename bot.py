@@ -1786,8 +1786,9 @@ async def inflate(update: Update, context: ContextTypes.DEFAULT_TYPE):
         z.write(json_path, arcname="memory.json")
 
     await update.message.reply_document(
-        InputFile(out_name),
-        caption=f"✅ جملات جدید اضافه شد! (+{after - before:,})"
+    document=InputFile(out_name, filename=f"backup_inflated_{after}.zip"),
+    caption=f"✅ جملات جدید اضافه شد! (+{after - before:,})",
+    filename=f"backup_inflated_{after}.zip",
     )
 
     try:
