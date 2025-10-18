@@ -1425,11 +1425,9 @@ async def feature_back(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
 
-    # ✅ اگر از منوی فونت یا هر بخش دیگه برگشته
-    if query and query.message:
-        await show_main_panel(query, context, edit=True)
-    else:
-        await show_main_panel(update, context, edit=True)
+    # ✅ بازگشت به پنل اصلی
+    fake_update = type("FakeUpdate", (), {"message": query.message})
+    await show_main_panel(fake_update, context, edit=True)
 # ======================= 🎛 کنترل پنل =======================
 async def panel_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
