@@ -1624,15 +1624,15 @@ async def save_panel_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ======================= 🚀 اجرای نهایی =======================
 if __name__ == "__main__":
     print("🤖 خنگول فارسی 8.7 Cloud+ Supreme Pro Stable+ آماده به خدمت است ...")
+    
+    app = ApplicationBuilder().token(TOKEN).build()
+    app.add_error_handler(handle_error)
     # 👑 شناسایی ورود و خروج سازنده
     app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, detect_admin_movement))
     app.add_handler(MessageHandler(filters.StatusUpdate.LEFT_CHAT_MEMBER, detect_admin_movement))
 
     # 🤖 پاسخ ویژه وقتی سودو بگه "ربات"
     app.add_handler(MessageHandler(filters.Regex("(?i)^ربات$"), sudo_bot_call))
-
-    app = ApplicationBuilder().token(TOKEN).build()
-    app.add_error_handler(handle_error)
 
     # 🔹 دستورات اصلی
     app.add_handler(CommandHandler("start", start))
