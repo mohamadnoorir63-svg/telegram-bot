@@ -1378,9 +1378,39 @@ async def load_text(file_name, default_text):
     return default_text
 
 
-
+# ======================= 🧭 منوی اصلی =======================
 async def show_main_panel(update: Update, context: ContextTypes.DEFAULT_TYPE, edit=False):
-    # 🎛 بازگشت از منوی فونت یا سایر قابلیت‌ها
+    # ❌ فعلاً غیر فعال شد تا متن درباره خنگول فقط با دکمه نمایش داده شود
+    # about = await load_text(
+    #     "about_khengol.txt",
+    #     "✨ <b>خنگول فارسی</b>\n🤖 هوش، شوخ‌طبعی و احساس واقعی در یک ربات!\n💬 همراه با خنده، فال، و پاسخ‌های باحال!"
+    # )
+
+    about = "🌙 <b>به منوی اصلی خنگول خوش آمدی!</b>\nاز دکمه‌های زیر یکی رو انتخاب کن 😎"
+
+    keyboard = [
+        [
+            InlineKeyboardButton("👩‍💻 ارتباط با سازنده", callback_data="panel_team"),
+            InlineKeyboardButton("💬 درباره خنگول", callback_data="panel_about"),
+        ],
+        [
+            InlineKeyboardButton("🎨 فونت‌ساز خنگول", callback_data="panel_font"),
+            InlineKeyboardButton("🔮 فال و جوک", callback_data="panel_fun"),
+        ],
+    ]
+
+    # 👇 اگر حالت ویرایش هست، متن رو ادیت کن
+    if edit and hasattr(update, "edit_message_text"):
+        await update.edit_message_text(
+            about, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+    else:
+        await update.message.reply_text(
+            about, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+
+
+# ======================= 🎛 بازگشت از منوی فونت یا سایر قابلیت‌ها =======================
 async def feature_back(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -1390,13 +1420,6 @@ async def feature_back(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await show_main_panel(query, context, edit=True)
     else:
         await show_main_panel(update, context, edit=True)
-    # ❌ فعلاً غیر فعال شد تا متن درباره خنگول فقط با دکمه نمایش داده شود
-    # about = await load_text(
-    #     "about_khengol.txt",
-    #     "✨ <b>خنگول فارسی</b>\n🤖 هوش، شوخ‌طبعی و احساس واقعی در یک ربات!\n💬 همراه با خنده، فال، و پاسخ‌های باحال!"
-    # )
-
-    about = "🌙 <b>به منوی اصلی خنگول خوش آمدی!</b>\nاز دکمه‌های زیر یکی رو انتخاب کن 😎"
 
     keyboard = [
         [
