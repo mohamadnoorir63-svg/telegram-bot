@@ -1665,7 +1665,9 @@ if __name__ == "__main__":
     
    # 🧩 ادغام و گسترش حافظه
     app.add_handler(CommandHandler("mergezip", mergezip))
+    
     app.add_handler(CommandHandler("inflate", inflate))
+    
     # 👑 شناسایی ورود و خروج سازنده
     app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, detect_admin_movement))
     app.add_handler(MessageHandler(filters.StatusUpdate.LEFT_CHAT_MEMBER, detect_admin_movement))
