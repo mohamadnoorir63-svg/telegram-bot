@@ -1380,6 +1380,16 @@ async def load_text(file_name, default_text):
 
 
 async def show_main_panel(update: Update, context: ContextTypes.DEFAULT_TYPE, edit=False):
+    # 🎛 بازگشت از منوی فونت یا سایر قابلیت‌ها
+async def feature_back(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+
+    # ✅ اگر از منوی فونت یا هر بخش دیگه برگشته
+    if query and query.message:
+        await show_main_panel(query, context, edit=True)
+    else:
+        await show_main_panel(update, context, edit=True)
     # ❌ فعلاً غیر فعال شد تا متن درباره خنگول فقط با دکمه نمایش داده شود
     # about = await load_text(
     #     "about_khengol.txt",
@@ -1532,6 +1542,7 @@ if __name__ == "__main__":
     # 🎨 فونت‌ساز خنگول (با اولویت پایین‌تر تا جلوی بقیه رو نگیره)
     app.add_handler(MessageHandler(filters.Regex("^فونت "), font_maker), group=-2)
     app.add_handler(CallbackQueryHandler(next_font, pattern="^next_font:"))
+    app.add_handler(CallbackQueryHandler(feature_back, pattern="^feature_back$"))
 
     # 🔹 سیستم خوشامد پویا و پنل گرافیکی
     app.add_handler(MessageHandler(filters.Regex("^خوشامد$"), open_welcome_panel), group=-1)
