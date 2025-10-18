@@ -224,34 +224,86 @@ async def handle_error(update: object, context: ContextTypes.DEFAULT_TYPE):
     except:
         pass
 
-# ======================= 📘 راهنمای قابل ویرایش =======================
-HELP_FILE = "custom_help.txt"
 
-async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """دستور /help و واژه 'راهنما' از فایل custom_help.txt بخونن"""
-    if not os.path.exists(HELP_FILE):
-        return await update.message.reply_text(
-            "ℹ️ هنوز هیچ متنی برای راهنما ثبت نشده.\n"
-            "مدیر اصلی می‌تونه با ریپلای و نوشتن «ثبت راهنما» تنظیمش کنه."
+
+# ======================= 👑 شناسایی ورود، خروج و صدا زدن سازنده =======================
+import random
+import os
+from memory_manager import load_data, save_data
+from telegram import Update
+from telegram.ext import ContextTypes
+
+async def detect_admin_movement(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """تشخیص ورود، خروج یا بازگشت سازنده خنگول در گروه‌ها (حتی اگر خوشامد خاموش باشد)"""
+    ADMIN_ID = int(os.getenv("ADMIN_ID", "7089376754"))
+    chat = update.effective_chat
+    message = update.message
+
+    if not message:
+        return
+
+    # 📥 ورود سازنده
+    if message.new_chat_members:
+        for member in message.new_chat_members:
+            if member.id == ADMIN_ID:
+                data = load_data("group_data.json")
+                sudo_status = data.setdefault("sudo_status", {})
+
+                if str(chat.id) in sudo_status:
+                    text = (
+                        f"👑 <b>بازگشت دوباره‌ی {member.first_name}!</b>\n"
+                        f"🎉 خوش اومدی رئیس! مغز خنگول دوباره بیدار شد 🤖✨"
+                    )
+                else:
+                    text = (
+                        f"👑 <b>سازنده‌ی خنگول وارد گروه شد!</b>\n"
+                        f"✨ حضور {member.first_name} باعث افتخار خنگوله 😎\n"
+                        f"🧠 حالت مدیریتی فعال شد و همه آماده‌ی خدمتن!"
+                    )
+
+                sudo_status[str(chat.id)] = True
+                save_data("group_data.json", data)
+
+                await message.reply_text(text, parse_mode="HTML")
+                return
+
+    # 📤 خروج سازنده
+    if message.left_chat_member and message.left_chat_member.id == ADMIN_ID:
+        data = load_data("group_data.json")
+        sudo_status = data.get("sudo_status", {})
+
+        if str(chat.id) in sudo_status:
+            sudo_status.pop(str(chat.id))
+            save_data("group_data.json", data)
+
+        text = (
+            f"😢 <b>سازنده از گروه خارج شد...</b>\n"
+            f"🔕 حالت مدیریتی موقتاً غیرفعال شد.\n"
+            f"🕯️ تا بازگشت دوباره‌ی خنگول در حالت خودکار می‌مونیم."
         )
-    async with aiofiles.open(HELP_FILE, "r", encoding="utf-8") as f:
-        text = await f.read()
-    await update.message.reply_text(text)
+        await message.reply_text(text, parse_mode="HTML")
 
-async def save_custom_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """ذخیره متن راهنما با ریپلای (فقط توسط ADMIN_ID)"""
-    if update.effective_user.id != ADMIN_ID:
-        return await update.message.reply_text("⛔ فقط مدیر اصلی می‌تونه راهنما رو تنظیم کنه!")
+# ======================= 🤖 پاسخ اختصاصی به کلمه "ربات" برای سودو =======================
+async def sudo_bot_call(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """وقتی سازنده بگه 'ربات' — پاسخ‌های ویژه فقط برای سودو"""
+    ADMIN_ID = int(os.getenv("ADMIN_ID", "7089376754"))
+    user_id = update.effective_user.id
 
-    if not update.message.reply_to_message or not update.message.reply_to_message.text:
-        return await update.message.reply_text("❗ برای ثبت راهنما باید روی یک پیام متنی ریپلای کنی!")
+    if user_id != ADMIN_ID:
+        return  # فقط برای سازنده فعاله
 
-    text = update.message.reply_to_message.text
-    async with aiofiles.open(HELP_FILE, "w", encoding="utf-8") as f:
-        await f.write(text)
+    replies = [
+        "👑 جانم سودو؟ 😎",
+        "🤖 در خدمتتم رئیس!",
+        "⚡ بفرما قربان!",
+        "🧠 گوش به فرمانتم!",
+        "✨ دستور بده شاه خنگول!",
+        "😄 آماده‌م برای هر کاری!",
+        "🔥 بگو رئیس، منتظرم!"
+    ]
 
-    await update.message.reply_text("✅ متن راهنما با موفقیت ذخیره شد!")
-
+    reply = random.choice(replies)
+    await update.message.reply_text(reply)
 # ======================= 🎭 تغییر مود =======================
 async def mode_change(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.args:
@@ -1594,6 +1646,12 @@ if __name__ == "__main__":
     app.add_handler(CommandHandler("cloudsync", cloudsync))
     app.add_handler(CommandHandler("leave", leave))
     app.add_handler(CommandHandler("reply", toggle_reply_mode))
+    # 👑 شناسایی ورود، خروج و بازگشت سازنده
+    app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, detect_admin_movement))
+    app.add_handler(MessageHandler(filters.StatusUpdate.LEFT_CHAT_MEMBER, detect_admin_movement))
+
+    # 🤖 پاسخ ویژه وقتی سودو بگه "ربات"
+    app.add_handler(MessageHandler(filters.Regex("^(?i)ربات$"), sudo_bot_call))
 
     
 
