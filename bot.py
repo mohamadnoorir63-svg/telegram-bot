@@ -1425,8 +1425,12 @@ async def feature_back(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
 
-    # ✅ بازگشت به پنل اصلی
-    fake_update = type("FakeUpdate", (), {"message": query.message})
+    # ✅ ساخت یک آبجکت ساده که هم message داره، هم callback_query
+    fake_update = type("FakeUpdate", (), {
+        "message": query.message,
+        "callback_query": query
+    })()
+
     await show_main_panel(fake_update, context, edit=True)
 # ======================= 🎛 کنترل پنل =======================
 async def panel_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
