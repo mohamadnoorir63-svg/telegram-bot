@@ -1173,50 +1173,7 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(reply_text)
 
-# ======================= 🧾 راهنما و کمک =======================
 
-HELP_FILE = "custom_help.txt"
-
-async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """نمایش راهنمای فنی (فقط برای مدیر) یا راهنمای عمومی برای کاربران"""
-    user_id = update.effective_user.id
-
-    # ⚙️ فقط مدیر اصلی مجاز به دیدن /help فنی است
-    if update.message.text.startswith("/help"):
-        if user_id != ADMIN_ID:
-            return  # 🚫 کاربر عادی چیزی نمی‌بیند
-
-        text = (
-            "🧠 <b>راهنمای فنی خنگول</b>\n\n"
-            "📘 <b>دستورات مدیریتی:</b>\n"
-            "/backup — گرفتن بک‌آپ کامل\n"
-            "/restore — بازیابی بک‌آپ\n"
-            "/cloudsync — بک‌آپ ابری برای ادمین\n"
-            "/reset — پاکسازی حافظه ربات\n"
-            "/reload — بوت مجدد مغز\n"
-            "/broadcast پیام — ارسال همگانی\n"
-            "/stats — نمایش آمار کلی\n"
-            "/fullstats — آمار گروه‌ها\n"
-            "/reply — فعال یا غیرفعال کردن ریپلای مود\n"
-            "/mode شوخ/بی‌ادب/غمگین/نرمال — تغییر مود پاسخ‌ها\n"
-            "/welcome — کنترل خوشامد گروهی\n"
-            "/toggle — روشن/خاموش کردن ربات\n"
-            "/lock /unlock — قفل یا بازکردن یادگیری\n\n"
-            "💡 کاربران عادی از واژه 'راهنما' برای کمک استفاده کنن."
-        )
-        return await update.message.reply_text(text, parse_mode="HTML")
-
-    # 💬 برای کاربران عادی: نمایش فایل custom_help.txt
-    if not os.path.exists(HELP_FILE):
-        return await update.message.reply_text(
-            "ℹ️ هنوز هیچ متنی برای راهنما ثبت نشده.\n"
-            "مدیر اصلی می‌تونه با ریپلای و نوشتن «ثبت راهنما» تنظیمش کنه."
-        )
-
-    async with aiofiles.open(HELP_FILE, "r", encoding="utf-8") as f:
-        text = await f.read()
-
-    await update.message.reply_text(text)
 
 
 # ======================= 🧹 ریست و ریلود =======================
@@ -1621,12 +1578,81 @@ async def save_panel_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         await update.message.reply_text("❗ دستور اشتباه است — باید یکی از این‌ها باشد:\nثبت درباره / ثبت تیم / ثبت قابلیت")
 
+# ======================= 🧾 راهنمای قابل ویرایش =======================
+import aiofiles
+HELP_FILE = "custom_help.txt"
+
+async def save_custom_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """ثبت یا تغییر متن راهنما توسط مدیر اصلی"""
+    ADMIN_ID = int(os.getenv("ADMIN_ID", "7089376754"))
+    user_id = update.effective_user.id
+
+    if user_id != ADMIN_ID:
+        return  # فقط مدیر اصلی
+
+    if not update.message.reply_to_message:
+        return await update.message.reply_text("ℹ️ لطفاً متن جدید راهنما را ریپلای کن و بنویس: ثبت راهنما")
+
+    text = update.message.reply_to_message.text
+    async with aiofiles.open(HELP_FILE, "w", encoding="utf-8") as f:
+        await f.write(text)
+
+    await update.message.reply_text("✅ متن راهنما با موفقیت ثبت و ذخیره شد.")
+
+
+async def show_custom_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """نمایش راهنما برای کاربران (متن قابل ویرایش)"""
+    if not os.path.exists(HELP_FILE):
+        return await update.message.reply_text(
+            "ℹ️ هنوز هیچ متنی برای راهنما ثبت نشده.\n"
+            "مدیر اصلی می‌تونه با ریپلای و نوشتن «ثبت راهنما» تنظیمش کنه."
+        )
+
+    async with aiofiles.open(HELP_FILE, "r", encoding="utf-8") as f:
+        text = await f.read()
+
+    await update.message.reply_text(text)
+
+
+# ======================= 🧠 راهنمای فنی مخصوص مدیر (دستور /help) =======================
+async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """راهنمای مخصوص مدیر برای کنترل و نگهداری ربات"""
+    ADMIN_ID = int(os.getenv("ADMIN_ID", "7089376754"))
+    user_id = update.effective_user.id
+
+    # 🚫 برای کاربران عادی هیچ پاسخی ارسال نکن
+    if user_id != ADMIN_ID:
+        return
+
+    text = (
+        "🧠 <b>راهنمای فنی خنگول</b>\n\n"
+        "📘 <b>دستورات مدیریتی:</b>\n"
+        "/backup — گرفتن بک‌آپ کامل\n"
+        "/restore — بازیابی بک‌آپ\n"
+        "/cloudsync — بک‌آپ ابری برای ادمین\n"
+        "/reset — پاکسازی حافظه ربات\n"
+        "/reload — بوت مجدد مغز\n"
+        "/broadcast پیام — ارسال همگانی\n"
+        "/stats — نمایش آمار کلی\n"
+        "/fullstats — آمار گروه‌ها\n"
+        "/reply — فعال یا غیرفعال کردن ریپلای مود\n"
+        "/mode شوخ/بی‌ادب/غمگین/نرمال — تغییر مود پاسخ‌ها\n"
+        "/welcome — کنترل خوشامد گروهی\n"
+        "/toggle — روشن/خاموش کردن ربات\n"
+        "/lock /unlock — قفل یا بازکردن یادگیری\n\n"
+        "💡 کاربران عادی از واژه 'راهنما' برای کمک استفاده کنن."
+    )
+
+    await update.message.reply_text(text, parse_mode="HTML")
+
+
 # ======================= 🚀 اجرای نهایی =======================
 if __name__ == "__main__":
     print("🤖 خنگول فارسی 8.7 Cloud+ Supreme Pro Stable+ آماده به خدمت است ...")
     
     app = ApplicationBuilder().token(TOKEN).build()
     app.add_error_handler(handle_error)
+
     # 👑 شناسایی ورود و خروج سازنده
     app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, detect_admin_movement))
     app.add_handler(MessageHandler(filters.StatusUpdate.LEFT_CHAT_MEMBER, detect_admin_movement))
@@ -1653,15 +1679,12 @@ if __name__ == "__main__":
     app.add_handler(CommandHandler("leave", leave))
     app.add_handler(CommandHandler("reply", toggle_reply_mode))
 
-
-    
-
-    # 🎨 فونت‌ساز خنگول (با اولویت پایین‌تر تا جلوی بقیه رو نگیره)
+    # 🎨 فونت‌ساز خنگول (با اولویت پایین‌تر)
     app.add_handler(MessageHandler(filters.Regex("^فونت "), font_maker), group=-2)
     app.add_handler(CallbackQueryHandler(next_font, pattern="^next_font:"))
     app.add_handler(CallbackQueryHandler(feature_back, pattern="^feature_back$"))
     
-    # 🔹 سیستم خوشامد پویا و پنل گرافیکی
+    # 🔹 خوشامد پویا و تنظیماتش
     app.add_handler(MessageHandler(filters.Regex("^خوشامد$"), open_welcome_panel), group=-1)
     app.add_handler(CallbackQueryHandler(welcome_panel_buttons, pattern="^welcome_"), group=-1)
     app.add_handler(MessageHandler(filters.Regex("^ثبت خوشامد$"), set_welcome_text), group=-1)
@@ -1672,21 +1695,20 @@ if __name__ == "__main__":
 
     # 🔹 راهنمای قابل ویرایش
     app.add_handler(MessageHandler(filters.Regex("^ثبت راهنما$"), save_custom_help))
-    app.add_handler(MessageHandler(filters.Regex("^راهنما$"), help_command))
+    app.add_handler(MessageHandler(filters.Regex("^راهنما$"), show_custom_help))
 
-    # 🔹 پیام‌ها و اسناد
+    # 🔹 فایل‌ها و پنل‌ها
     app.add_handler(MessageHandler(filters.Document.ALL, handle_document))
-    # 🌟 پنل اصلی (نوری پلاس)
     app.add_handler(CallbackQueryHandler(panel_handler))
 
-    # 🎭 سخنگوی اصلی ربات (آخر از همه تا تداخلی پیش نیاد)
+    # 🎭 سخنگوی اصلی
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, reply), group=0)
 
-    # 🔹 هنگام استارت
+    # 🔹 وظایف استارتاپ
     async def on_startup(app):
         await notify_admin_on_startup(app)
         app.create_task(auto_backup(app.bot))
-        app.create_task(start_auto_brain_loop(app.bot))  # 🧠 فعال‌سازی مغز خودکار
+        app.create_task(start_auto_brain_loop(app.bot))
         print("🌙 [SYSTEM] Startup tasks scheduled ✅")
 
     app.post_init = on_startup
