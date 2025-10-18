@@ -1544,6 +1544,7 @@ if __name__ == "__main__":
     # 🎨 فونت‌ساز خنگول (با اولویت پایین‌تر تا جلوی بقیه رو نگیره)
     app.add_handler(MessageHandler(filters.Regex("^فونت "), font_maker), group=-2)
     app.add_handler(CallbackQueryHandler(next_font, pattern="^next_font:"))
+    app.add_handler(CallbackQueryHandler(feature_back, pattern="^feature_back$"))
     
     # 🔹 سیستم خوشامد پویا و پنل گرافیکی
     app.add_handler(MessageHandler(filters.Regex("^خوشامد$"), open_welcome_panel), group=-1)
