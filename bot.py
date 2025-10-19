@@ -778,50 +778,37 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ======================= 💬 پاسخ و هوش مصنوعی =======================
 async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """پاسخ‌دهی اصلی هوش مصنوعی و سیستم یادگیری (با فیلتر دقیق)"""
+    """پاسخ‌دهی اصلی هوش مصنوعی و سیستم یادگیری"""
 
-    try:
-        # ✅ بررسی پیام معتبر
-        if not update.message or not update.message.text:
+    # ✅ بررسی اینکه پیام معتبره
+    if not update.message or not update.message.text:
+        return
+
+    text = update.message.text.strip()
+    lower_text = text.lower()
+    uid = update.effective_user.id
+    chat_id = update.effective_chat.id
+
+    # 🚫 جلوگیری از پاسخ به بعضی پیام‌های خاص که هندلر اختصاصی دارند
+    # ⚠️ «جوک» و «فال» عمداً حذف شدن تا هنوز در پیوی کار کنن
+    ignore_texts = [
+        "راهنما", "ثبت راهنما",
+        "لیست جوک‌ها", "لیست فال‌ها",
+        "ثبت جوک", "ثبت فال",
+        "لیست", "جمله بساز",
+        "درصد هوش", "درصد هوش اجتماعی", "هوش کلی"
+    ]
+    if lower_text in ignore_texts:
+        return
+
+    # 🚫 جلوگیری از پاسخ در پیوی (فقط جوک و فال مجازند)
+    if update.effective_chat.type == "private":
+        if lower_text not in ["جوک", "فال"]:
             return
 
-        text = update.message.text.strip()
-        lower_text = text.lower()
-        uid = update.effective_user.id
-        chat_id = update.effective_chat.id
-
-        # 🚫 جلوگیری از پاسخ به دستوراتی که هندلر جدا دارن
-        ignore_exact = [
-            "راهنما", "ثبت راهنما",
-            "save", "del", "panel",
-            "backup", "cloudsync", "leave",
-            "lock", "unlock", "reply", "toggle"
-        ]
-        if lower_text in ignore_exact:
-            return
-
-        # 🚫 جلوگیری از پاسخ در پیوی به جز جوک و فال
-        if update.effective_chat.type == "private":
-            if lower_text in ["جوک", "فال"]:
-                return  # چون هندلر مخصوص دارن
-            else:
-                return  # بقیه در پیوی بی‌جواب
-
-        # 🧠 بررسی حالت ریپلی مود گروهی
-        if await handle_group_reply_mode(update, context):
-            return
-
-        # ✅ جلوگیری از پاسخ به پیام‌های خاص گروهی
-        if lower_text in ["جوک", "فال", "راهنما", "خوشامد", "ربات"]:
-            return  # چون هندلر خودشون جواب می‌دن
-
-        # ✅ اگر هیچکدوم از بالا نبود → پاسخ هوشمند بده
-        response = smart_response(text, uid)
-        if response:
-            await update.message.reply_text(response)
-
-    except Exception as e:
-        print(f"⚠️ [reply error]: {e}")
+    # 🧠 بررسی حالت ریپلی مود گروهی
+    if await handle_group_reply_mode(update, context):
+        return
 # ثبت کاربر و گروه
     await register_user(update.effective_user)
     register_group_activity(chat_id, uid)
