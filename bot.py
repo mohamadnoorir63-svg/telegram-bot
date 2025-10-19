@@ -773,25 +773,28 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data["await_restore"] = False
 
 # ======================= 💬 پاسخ و هوش مصنوعی =======================
+async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # 🚫 جلوگیری از پاسخ در پیوی (فقط جوک و فال مجازند)
+    if update.effective_chat.type == "private":
+        text = update.message.text.strip().lower()
+        allowed = ["جوک", "فال"]
 
-
-        # 🧠 بررسی ریپلی مود گروهی
-        if await handle_group_reply_mode(update, context):
-            print("🧩 [DEBUG] حالت پاسخ گروهی فعال بود، متوقف شد.")
+        # اگه پیام جزو مجازها نیست، نادیده بگیر
+        if text not in allowed:
             return
 
-        # 🧠 اجرای پاسخ هوشمند
-        print("✅ [DEBUG] اجرای smart_response...")
-        reply_text = smart_response(text, user_id)
+    """پاسخ‌دهی اصلی هوش مصنوعی و سیستم یادگیری"""
+    if not update.message or not update.message.text:
+        return
 
-        if reply_text:
-            await update.message.reply_text(reply_text)
-            print("✅ [DEBUG] پاسخ ارسال شد:", reply_text)
-        else:
-            print("⚠️ [DEBUG] پاسخی تولید نشد (احتمالاً ورودی خالی).")
+    text = update.message.text.strip()
+    uid = update.effective_user.id
+    chat_id = update.effective_chat.id
 
-    except Exception as e:
-        print(f"❌ [DEBUG ERROR in reply]: {e}")
+    # 🧠 بررسی حالت ریپلی مود گروهی
+    if await handle_group_reply_mode(update, context):
+        return
+
 
 # ثبت کاربر و گروه
     await register_user(update.effective_user)
