@@ -1,20 +1,27 @@
-# ======================== 🧠 command_manager.py ========================
-from pymongo import MongoClient
+# ======================== 🧠 command_manager.py (local version) ========================
+import os, json
 from datetime import datetime
 from telegram import InlineKeyboardMarkup, InlineKeyboardButton, Update
 from telegram.ext import ContextTypes
 from telegram.error import BadRequest
 
-# ⚙️ اتصال به MongoDB فقط برای مدیریت دستورات
-MONGO_URI = "mongodb+srv://mohamadnoorir63_db_user:cVm8y2ohBnpN2xcn@cluster0.gya1hoa.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
-client = MongoClient(MONGO_URI)
+DATA_FILE = "custom_commands.json"
+ADMIN_ID = 7089376754
 
-db = client["khengool_db"]             # دیتابیس مخصوص بخش دستورات
-commands = db["custom_commands"]       # کالکشن فقط برای دستورها
+# ======================== 📦 حافظه دستورات ========================
 
-ADMIN_ID = 7089376754  # آیدی عددی مدیر اصلی (تو)
+def load_commands():
+    if not os.path.exists(DATA_FILE):
+        with open(DATA_FILE, "w", encoding="utf-8") as f:
+            json.dump({}, f)
+    with open(DATA_FILE, "r", encoding="utf-8") as f:
+        return json.load(f)
 
-# ======================== 📋 پنل تنظیمات ========================
+def save_commands(data):
+    with open(DATA_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
+# ======================== 🎛 ساخت پنل ========================
 
 def build_panel_keyboard(name, settings=None):
     if settings is None:
@@ -52,9 +59,10 @@ def build_panel_keyboard(name, settings=None):
 # ======================== 📥 ذخیره دستور ========================
 
 async def save_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """ذخیره دستور جدید با /save <نام> (روی پیام ریپلای کن)"""
-    if update.effective_user.id != ADMIN_ID:
-        return await update.message.reply_text("⛔ فقط مدیر اصلی می‌تواند دستور بسازد.")
+    """ذخیره دستور جدید با /save <نام>"""
+    user = update.effective_user
+    if user.id != ADMIN_ID:
+        return await update.message.reply_text("⛔ فقط مدیر اصلی می‌تونه دستور بسازه.")
 
     if not context.args:
         return await update.message.reply_text("❗ فرمت درست: /save <نام دستور> (روی پیام ریپلای کن)")
@@ -65,7 +73,15 @@ async def save_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not reply:
         return await update.message.reply_text("📎 باید روی پیامی ریپلای کنی تا ذخیره شود.")
 
-    doc = {"name": name, "type": None, "data": None, "created": datetime.now(), "settings": {"access": ["everyone"], "mode": "all"}}
+    commands = load_commands()
+
+    doc = {
+        "name": name,
+        "type": None,
+        "data": None,
+        "created": datetime.now().isoformat(),
+        "settings": {"access": ["everyone"], "mode": "all"}
+    }
 
     if reply.text:
         doc["type"] = "text"
@@ -91,25 +107,27 @@ async def save_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         return await update.message.reply_text("⚠️ نوع این پیام پشتیبانی نمی‌شود.")
 
-    # ذخیره در MongoDB
-    commands.update_one({"name": name}, {"$set": doc}, upsert=True)
+    # ذخیره در فایل JSON
+    commands[name] = doc
+    save_commands(commands)
 
-    # نمایش فوری پنل تنظیمات
+    # نمایش پنل تنظیمات
     await update.message.reply_text(
-        f"✅ دستور <b>{name}</b> با موفقیت ذخیره شد!\nاکنون می‌تونی مشخص کنی برای چه کسانی فعال باشه 👇",
+        f"✅ دستور <b>{name}</b> ذخیره شد.\nاکنون تنظیماتش را انتخاب کن 👇",
         parse_mode="HTML",
         reply_markup=build_panel_keyboard(name)
     )
 
-# ======================== 📤 اجرای دستور ========================
+# ======================== 📤 اجرا ========================
 
 async def handle_custom_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """اجرای دستور ذخیره‌شده با نوشتن اسم آن"""
+    """اجرای دستور ذخیره‌شده"""
     text = update.message.text.strip().lower()
-    cmd = commands.find_one({"name": text})
-    if not cmd:
+    commands = load_commands()
+    if text not in commands:
         return
 
+    cmd = commands[text]
     try:
         if cmd["type"] == "text":
             await update.message.reply_text(cmd["data"])
@@ -126,29 +144,31 @@ async def handle_custom_command(update: Update, context: ContextTypes.DEFAULT_TY
         elif cmd["type"] == "sticker":
             await update.message.reply_sticker(cmd["data"])
     except Exception as e:
-        await update.message.reply_text(f"⚠️ خطا در ارسال دستور:\n{e}")
+        await update.message.reply_text(f"⚠️ خطا در اجرای دستور:\n{e}")
 
-# ======================== ❌ حذف دستور ========================
+# ======================== ❌ حذف ========================
 
 async def delete_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """حذف دستور با /del <نام>"""
-    if update.effective_user.id != ADMIN_ID:
+    user = update.effective_user
+    if user.id != ADMIN_ID:
         return await update.message.reply_text("⛔ فقط مدیر اصلی مجازه.")
-
     if not context.args:
         return await update.message.reply_text("❗ فرمت درست: /del <نام دستور>")
 
     name = " ".join(context.args).strip().lower()
-    result = commands.delete_one({"name": name})
-    if result.deleted_count:
+    commands = load_commands()
+    if name in commands:
+        del commands[name]
+        save_commands(commands)
         await update.message.reply_text(f"🗑 دستور '{name}' حذف شد.")
     else:
-        await update.message.reply_text(f"⚠️ دستوری با نام '{name}' یافت نشد.")
+        await update.message.reply_text("⚠️ دستوری با این نام یافت نشد.")
 
-# ======================== 🔄 دکمه‌های پنل ========================
+# ======================== 🔄 پنل ========================
 
 async def panel_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """مدیریت دکمه‌های پنل برای دستورات"""
+    """مدیریت دکمه‌های پنل"""
     query = update.callback_query
     await query.answer()
     data = query.data.split(":")
@@ -157,7 +177,8 @@ async def panel_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     action, name = data[0], data[1]
-    cmd = commands.find_one({"name": name})
+    commands = load_commands()
+    cmd = commands.get(name)
     if not cmd:
         return await query.edit_message_text("⚠️ دستور حذف شده یا وجود ندارد.")
 
@@ -174,17 +195,20 @@ async def panel_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         settings["mode"] = data[2]
 
     elif action == "save":
-        commands.update_one({"name": name}, {"$set": {"settings": settings}})
+        commands[name]["settings"] = settings
+        save_commands(commands)
         return await query.edit_message_text(f"✅ تنظیمات برای '{name}' ذخیره شد!")
 
     elif action == "del":
-        commands.delete_one({"name": name})
+        del commands[name]
+        save_commands(commands)
         return await query.edit_message_text(f"🗑 دستور '{name}' حذف شد!")
 
-    # به‌روزرسانی دکمه‌ها (بدون ارور)
+    # آپدیت پنل بدون خطا
     try:
         await query.edit_message_reply_markup(reply_markup=build_panel_keyboard(name, settings))
-        commands.update_one({"name": name}, {"$set": {"settings": settings}})
+        commands[name]["settings"] = settings
+        save_commands(commands)
     except BadRequest as e:
         if "message is not modified" not in str(e).lower():
             raise e
