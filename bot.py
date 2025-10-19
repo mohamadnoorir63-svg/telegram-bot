@@ -34,8 +34,9 @@ from auto_brain.command_manager import (
     handle_custom_command,
     list_commands,
     cleanup_group_commands
-from auto_brain.anime_maker import anime_photo
 )
+
+from auto_brain.anime_maker import anime_photo
 
 
 # 🧠 نکته مهم:
