@@ -4,7 +4,7 @@ from telegram.ext import ContextTypes
 
 # 🧠 API از DeepAI
 API_URL = "https://api.deepai.org/api/toonify"
-API_KEY = 64bdec50-8c1b-4c58-94fa-aa1a2402dd12
+API_KEY = "64bdec50-8c1b-4c58-94fa-aa1a2402dd12"
 
 HEADERS = {"api-key": API_KEY}
 
