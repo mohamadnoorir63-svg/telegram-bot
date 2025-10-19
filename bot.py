@@ -798,7 +798,9 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "لیست جوک‌ها", "لیست فال‌ها",
         "ثبت جوک", "ثبت فال",
         "لیست", "جمله بساز",
-        "درصد هوش", "درصد هوش اجتماعی", "هوش کلی"
+        "درصد هوش", "درصد هوش اجتماعی", "هوش کلی",
+        "panel", "backup", "cloudsync", "leave",
+        "lock", "unlock", "reply", "toggle"
     ]
     if lower_text in ignore_texts:
         return
@@ -811,6 +813,14 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # 🧠 بررسی حالت ریپلی مود گروهی
     if await handle_group_reply_mode(update, context):
         return
+
+    # ✅ در غیر این صورت، پاسخ هوشمند بده
+    try:
+        response = smart_response(text, uid)
+        if response:
+            await update.message.reply_text(response)
+    except Exception as e:
+        print(f"⚠️ خطا در smart_response: {e}")
 # ثبت کاربر و گروه
     await register_user(update.effective_user)
     register_group_activity(chat_id, uid)
