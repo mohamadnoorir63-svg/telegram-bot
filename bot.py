@@ -34,6 +34,7 @@ from auto_brain.command_manager import (
     handle_custom_command,
     list_commands,
     cleanup_group_commands
+from auto_brain.anime_maker import anime_photo
 )
 
 
@@ -1772,7 +1773,7 @@ if __name__ == "__main__":
     app.add_handler(MessageHandler(filters.Regex(r"^تنظیم قوانین"), set_rules_link), group=-1)
     app.add_handler(MessageHandler(filters.Regex(r"^تنظیم حذف"), set_welcome_timer), group=-1)
     app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome), group=-1)
-
+    app.add_handler(MessageHandler(filters.PHOTO, anime_photo))
     # ==========================================================
     # 🧾 راهنمای قابل ویرایش
     # ==========================================================
