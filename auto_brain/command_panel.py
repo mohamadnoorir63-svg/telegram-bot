@@ -1,28 +1,40 @@
 # ==================== ⚙️ command_panel.py ====================
+import json
+import os
 from telegram import InlineKeyboardMarkup, InlineKeyboardButton, Update
 from telegram.ext import ContextTypes
-from pymongo import MongoClient
 
-# اتصال MongoDB مخصوص دستورها
-MONGO_URI = "mongodb+srv://mohamadnoorir63_db_user:cVm8y2ohBnpN2xcn@cluster0.gya1hoa.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
-client = MongoClient(MONGO_URI)
-db = client["khengool_db"]
-commands = db["custom_commands"]
-
+COMMANDS_FILE = "auto_brain/commands_data.json"
 ADMIN_ID = 7089376754
 
-# ==================== 📋 ساخت پنل تنظیمات ====================
+# ------------------- 🧩 توابع کمکی -------------------
+
+def load_commands():
+    if os.path.exists(COMMANDS_FILE):
+        with open(COMMANDS_FILE, "r", encoding="utf-8") as f:
+            try:
+                return json.load(f)
+            except:
+                return {}
+    return {}
+
+def save_commands(data):
+    with open(COMMANDS_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
+# ------------------- 📋 ساخت پنل تنظیمات -------------------
 
 async def show_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """پنل تنظیمات برای یک دستور خاص"""
+    """پنل تنظیمات برای دستور خاص"""
     if update.effective_user.id != ADMIN_ID:
-        return await update.message.reply_text("⛔ فقط مدیر مجازه!")
+        return await update.message.reply_text("⛔ فقط مدیر اصلی مجازه!")
 
     if not context.args:
         return await update.message.reply_text("❗ فرمت درست: /panel <نام دستور>")
 
     name = " ".join(context.args).strip().lower()
-    cmd = commands.find_one({"name": name})
+    commands = load_commands()
+    cmd = commands.get(name)
 
     if not cmd:
         return await update.message.reply_text("⚠️ این دستور هنوز وجود ندارد.")
@@ -37,7 +49,7 @@ async def show_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
         parse_mode="HTML"
     )
 
-# ==================== 🎛 ساخت دکمه‌ها ====================
+# ------------------- 🎛 ساخت دکمه‌ها -------------------
 
 def _panel_keyboard(name, settings):
     access = settings.get("access", [])
@@ -69,7 +81,7 @@ def _panel_keyboard(name, settings):
     ]
     return InlineKeyboardMarkup(keyboard)
 
-# ==================== 🔄 مدیریت کلیک دکمه‌ها ====================
+# ------------------- 🔄 مدیریت کلیک دکمه‌ها -------------------
 
 async def panel_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """مدیریت دکمه‌ها"""
@@ -81,7 +93,8 @@ async def panel_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     action, name = data[0], data[1]
-    cmd = commands.find_one({"name": name})
+    commands = load_commands()
+    cmd = commands.get(name)
     if not cmd:
         return await query.edit_message_text("⚠️ دستور حذف شده یا وجود ندارد.")
 
@@ -99,13 +112,22 @@ async def panel_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         settings["mode"] = target
 
     elif action == "save":
-        commands.update_one({"name": name}, {"$set": {"settings": settings}})
+        cmd["settings"] = settings
+        commands[name] = cmd
+        save_commands(commands)
         return await query.edit_message_text(f"✅ تنظیمات برای '{name}' ذخیره شد!")
 
     elif action == "del":
-        commands.delete_one({"name": name})
+        del commands[name]
+        save_commands(commands)
         return await query.edit_message_text(f"🗑 دستور '{name}' حذف شد!")
 
     # در غیر این صورت فقط دکمه‌ها را به‌روز کن
-    commands.update_one({"name": name}, {"$set": {"settings": settings}})
-    await query.edit_message_reply_markup(reply_markup=_panel_keyboard(name, settings))
+    cmd["settings"] = settings
+    commands[name] = cmd
+    save_commands(commands)
+
+    try:
+        await query.edit_message_reply_markup(reply_markup=_panel_keyboard(name, settings))
+    except:
+        await query.edit_message_text(f"✅ تغییرات اعمال شد برای '{name}'")
