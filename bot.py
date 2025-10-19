@@ -30,11 +30,15 @@ from emotion_memory import remember_emotion, get_last_emotion, emotion_context_r
 from auto_brain.auto_brain import start_auto_brain_loop
 from selective_backup import selective_backup_menu, selective_backup_buttons
 from auto_brain import auto_backup
-# ===== دستورات شخصی و پنل تنظیمات =====
-from auto_brain.command_manager import save_command, handle_custom_command, delete_command
-from auto_brain.command_panel import show_panel, panel_callback
+# ===== ⚙️ دستورات شخصی و پنل مدیریت =====
+from auto_brain.command_manager import (
+    save_command,
+    handle_custom_command,
+    delete_command,
+    panel_callback
+)
+from auto_brain.admin_panel import show_admin_panel, admin_panel_callback  # اگر فایل admin_panel داری
 from telegram.ext import CommandHandler, MessageHandler, CallbackQueryHandler, filters
-
 # 🎯 تنظیمات پایه
 TOKEN = os.getenv("BOT_TOKEN")
 ADMIN_ID = int(os.getenv("ADMIN_ID", "7089376754"))
@@ -1666,15 +1670,15 @@ if __name__ == "__main__":
     # ⚙️ مدیریت خطاهای کلی
     app.add_error_handler(handle_error)
 
-    # ===== ⚙️ دستورات شخصی و پنل‌ها =====
+    # ===== 💾 دستورات شخصی =====
     app.add_handler(CommandHandler("save", save_command))
     app.add_handler(CommandHandler("del", delete_command))
+    app.add_handler(CallbackQueryHandler(panel_callback, pattern="^cmdpanel:"))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_custom_command))
 
-    # ===== ⚙️ پنل مدیریت اصلی (فقط برای ADMIN_ID) =====
+    # ===== 🧠 پنل مدیریت اصلی =====
     app.add_handler(CommandHandler("panel", show_admin_panel))
     app.add_handler(CallbackQueryHandler(admin_panel_callback, pattern="^admin:"))
-    app.add_handler(CallbackQueryHandler(panel_callback, pattern="^cmdpanel_"))
 
     # 👑 شناسایی ورود و خروج سازنده
     app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, detect_admin_movement))
