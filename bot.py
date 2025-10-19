@@ -777,6 +777,11 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """پاسخ‌دهی اصلی هوش مصنوعی و سیستم یادگیری"""
 
+    # 🚫 جلوگیری از پاسخ هوشمند در صورت اجرای دستور سفارشی
+    if context.user_data.get("custom_handled"):
+        context.user_data["custom_handled"] = False
+        return
+
     # 🧩 اطمینان از اینکه پیام معتبره
     if not update.message or not update.message.text:
         return
