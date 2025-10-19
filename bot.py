@@ -13,9 +13,7 @@ from telegram.ext import (
     CallbackQueryHandler
 )
 import aiofiles
-# 🎨 فونت‌ساز خنگول
-from font_maker import font_maker, receive_font_name, next_font, prev_font, ASK_NAME
-
+from font_maker import font_maker, next_font, prev_font
 # 📦 ماژول‌ها
 from memory_manager import (
     init_files, load_data, save_data, learn, shadow_learn, get_reply,
