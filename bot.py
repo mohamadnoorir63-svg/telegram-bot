@@ -32,12 +32,11 @@ from auto_brain.auto_brain import start_auto_brain_loop
 from selective_backup import selective_backup_menu, selective_backup_buttons
 from auto_brain import auto_backup
 
-# ===== ⚙️ دستورات شخصی =====
 from auto_brain.command_manager import (
     save_command,
     handle_custom_command,
-    delete_command,
-    panel_callback
+    delete_command
+)
 )
 
 # 🧠 نکته مهم:
@@ -1686,8 +1685,7 @@ if __name__ == "__main__":
     app.add_handler(CommandHandler("save", save_command))
     app.add_handler(CommandHandler("del", delete_command))
 
-    # 📲 هندلر مخصوص پنل ساسی (تمام دکمه‌ها)
-    app.add_handler(CallbackQueryHandler(panel_callback, pattern="^(toggle_|set_|save:|delete:|cmdpanel:)"))
+
 
     # ✉️ پیام‌های متنی غیر از کامند → هندلر دستورات ذخیره‌شده
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_custom_command), group=-4)
