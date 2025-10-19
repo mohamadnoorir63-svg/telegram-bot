@@ -115,6 +115,10 @@ async def handle_custom_command(update: Update, context: ContextTypes.DEFAULT_TY
             await update.message.reply_animation(d)
         elif t == "sticker":
             await update.message.reply_sticker(d)
+
+        # ✅ جلوگیری از اجرای تابع reply بعد از دستور ذخیره‌شده
+        context.user_data["custom_handled"] = True
+
     except Exception as e:
         await update.message.reply_text(f"⚠️ خطا در اجرای دستور:\n{e}")
 
