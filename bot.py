@@ -778,12 +778,11 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ======================= 💬 پاسخ و هوش مصنوعی =======================
 async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """پاسخ‌دهی اصلی هوش مصنوعی و سیستم یادگیری با لاگ دیباگ"""
+    """پاسخ‌دهی اصلی هوش مصنوعی و سیستم یادگیری (با فیلتر دقیق)"""
 
     try:
-        # بررسی پیام
+        # ✅ بررسی پیام معتبر
         if not update.message or not update.message.text:
-            print("⚠️ [DEBUG] پیام بدون متن یا نامعتبر دریافت شد.")
             return
 
         text = update.message.text.strip()
@@ -791,50 +790,38 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
         uid = update.effective_user.id
         chat_id = update.effective_chat.id
 
-        print(f"💬 [DEBUG] پیام از {uid} در چت {chat_id}: {text}")
-
-        # فیلتر دستورات خاص
-        ignore_texts = [
+        # 🚫 جلوگیری از پاسخ به دستوراتی که هندلر جدا دارن
+        ignore_exact = [
             "راهنما", "ثبت راهنما",
-            "جوک", "فال",
-            "خوشامد", "ثبت خوشامد",
-            "ربات",
-            "لیست جوک‌ها", "لیست فال‌ها",
-            "ثبت جوک", "ثبت فال",
-            "لیست", "جمله بساز",
-            "درصد هوش", "درصد هوش اجتماعی", "هوش کلی",
-            "panel", "backup", "cloudsync", "leave",
+            "save", "del", "panel",
+            "backup", "cloudsync", "leave",
             "lock", "unlock", "reply", "toggle"
         ]
-        if lower_text in ignore_texts:
-            print(f"🚫 [DEBUG] پیام '{lower_text}' در ignore_texts بود — رد شد.")
+        if lower_text in ignore_exact:
             return
 
-        # فیلتر پیوی
+        # 🚫 جلوگیری از پاسخ در پیوی به جز جوک و فال
         if update.effective_chat.type == "private":
-            if lower_text not in ["جوک", "فال"]:
-                print(f"🚫 [DEBUG] پیام در پیوی و خارج از لیست مجاز بود — رد شد.")
-                return
+            if lower_text in ["جوک", "فال"]:
+                return  # چون هندلر مخصوص دارن
+            else:
+                return  # بقیه در پیوی بی‌جواب
 
-        # بررسی ریپلی مود
+        # 🧠 بررسی حالت ریپلی مود گروهی
         if await handle_group_reply_mode(update, context):
-            print("🧩 [DEBUG] در حالت ریپلی مود بود — خروج.")
             return
 
-        # اجرای پاسخ هوشمند
-        print("🧠 [DEBUG] در حال اجرای smart_response ...")
-        response = smart_response(text, uid)
-        print(f"🧠 [DEBUG] خروجی smart_response: {response}")
+        # ✅ جلوگیری از پاسخ به پیام‌های خاص گروهی
+        if lower_text in ["جوک", "فال", "راهنما", "خوشامد", "ربات"]:
+            return  # چون هندلر خودشون جواب می‌دن
 
+        # ✅ اگر هیچکدوم از بالا نبود → پاسخ هوشمند بده
+        response = smart_response(text, uid)
         if response:
             await update.message.reply_text(response)
-            print(f"✅ [DEBUG] پاسخ ارسال شد: {response}")
-        else:
-            print("⚠️ [DEBUG] smart_response چیزی برنگردوند.")
 
     except Exception as e:
-        print(f"❌ [DEBUG ERROR in reply]: {e}")
-
+        print(f"⚠️ [reply error]: {e}")
 # ثبت کاربر و گروه
     await register_user(update.effective_user)
     register_group_activity(chat_id, uid)
