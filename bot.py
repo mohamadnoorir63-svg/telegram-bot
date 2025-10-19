@@ -1712,7 +1712,7 @@ if __name__ == "__main__":
     app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, detect_admin_movement))
     app.add_handler(MessageHandler(filters.StatusUpdate.LEFT_CHAT_MEMBER, detect_admin_movement))
     # 🧹 پاکسازی خودکار دستورات گروه هنگام حذف ربات
-    app.add_handler(MessageHandler(filters.StatusUpdate.MY_CHAT_MEMBER, handle_left_chat))
+    app.add_handler(MessageHandler(filters.StatusUpdate.LEFT_CHAT_MEMBER, handle_left_chat))
     # ==========================================================
     # 🤖 پاسخ به "ربات" توسط سودو
     # ==========================================================
