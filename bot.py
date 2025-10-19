@@ -1680,14 +1680,15 @@ if __name__ == "__main__":
     # ⚙️ مدیریت خطاهای کلی
     app.add_error_handler(handle_error)
 
-    # ==========================================================
     # 💾 دستورات شخصی (ذخیره، حذف، اجرای دستورها)
-    # ==========================================================
     app.add_handler(CommandHandler("save", save_command))
     app.add_handler(CommandHandler("del", delete_command))
-    app.add_handler(CallbackQueryHandler(panel_callback, pattern="^cmdpanel:"))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_custom_command), group=-3)
 
+    # 📲 هندلر مخصوص پنل ساسی (تمام دکمه‌ها)
+    app.add_handler(CallbackQueryHandler(panel_callback, pattern="^(toggle_|set_|save:|delete:|cmdpanel:)"))
+
+    # ✉️ پیام‌های متنی غیر از کامند → هندلر دستورات ذخیره‌شده
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_custom_command), group=-3)
  
 
 
