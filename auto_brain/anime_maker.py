@@ -9,9 +9,9 @@ HF_API_KEY = os.getenv("HF_API_KEY")
 
 # چند مدل جایگزین؛ اگر اولی جواب نداد سراغ بعدی می‌ره
 CANDIDATE_MODELS = [
-    "akhaliq/AnimeGANv2",                 # اصلی
-    "akhaliq/AnimeGANv2-Hayao",           # استایل هایائو
-    "akhaliq/AnimeGANv2-Paprika",         # استایل پاپریکا
+    "akhaliq/AnimeGANv2-Hayao",
+    "akhaliq/AnimeGANv2-Shinkai",
+    "akhaliq/AnimeGANv2-FacePortrait",
 ]
 
 HEADERS = {
