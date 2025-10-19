@@ -1762,7 +1762,7 @@ if __name__ == "__main__":
     # ==========================================================
     # 🎭 پاسخ هوشمند خنگول (در انتهای اولویت)
     # ==========================================================
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, reply), group=2)
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_custom_command), group=-4)
 
     # ==========================================================
     # 🔹 وظایف استارتاپ
