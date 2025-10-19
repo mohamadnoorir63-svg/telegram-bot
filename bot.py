@@ -774,50 +774,42 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ======================= 💬 پاسخ و هوش مصنوعی =======================
 async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
-   async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """پاسخ‌دهی هوشمند بدون تداخل با دستورات و امن در برابر خطاهای شبکه"""
-
+    """نسخه‌ی دیباگ برای پیدا کردن نقطه‌ی سکوت ربات"""
     try:
-        # 🚫 جلوگیری از پاسخ در پیوی (فقط جوک و فال مجازند)
-        if update.effective_chat.type == "private":
-            text = update.message.text.strip().lower()
-            allowed = ["جوک", "فال"]
-            if text not in allowed:
-                return
-
-        # 🧠 بررسی وجود متن پیام
         if not update.message or not update.message.text:
+            print("⚠️ [DEBUG] پیام بدون متن دریافت شد.")
             return
 
         text = update.message.text.strip().lower()
-        uid = update.effective_user.id
-        chat_id = update.effective_chat.id
+        print(f"💬 [DEBUG] پیام دریافت شد: {text}")
 
-        # ⚙️ جلوگیری از پاسخ روی دستورات خاص
+        # 🚫 جلوگیری از پاسخ در پیوی (فقط جوک و فال مجازند)
+        if update.effective_chat.type == "private":
+            allowed = ["جوک", "فال"]
+            if text not in allowed:
+                print("⚠️ [DEBUG] در پیوی، پیام غیرمجاز بود. رد شد.")
+                return
+
+        # 🚫 لیست کلمات خاص که نباید جواب بدن
         protected_words = [
             "راهنما", "ثبت راهنما", "خوشامد", "ثبت خوشامد", "ربات",
             "save", "del", "panel", "backup", "cloudsync", "leave"
         ]
         if any(text.startswith(word) for word in protected_words):
+            print(f"⚠️ [DEBUG] '{text}' در لیست محافظت‌شده است، پاسخی نمی‌دهم.")
             return
 
-        # 🧩 بررسی حالت ریپلی مود گروهی
+        # 🧠 بررسی ریپلی مود گروهی
         if await handle_group_reply_mode(update, context):
+            print("🧩 [DEBUG] در حالت پاسخ گروهی بود. خروج.")
             return
 
-        # 🎭 پاسخ هوشمند (با تحلیل احساس)
-        emotion = await detect_emotion(update, context)
-        await remember_emotion(uid, emotion)
-        last_emotion = await get_last_emotion(uid)
-        await emotion_context_reply(update, context, emotion, last_emotion)
+        print("✅ [DEBUG] در حال اجرای smart_response ...")
+        await smart_response(update, context)
+        print("✅ [DEBUG] smart_response انجام شد.")
 
     except Exception as e:
-        print(f"⚠️ [Reply Error]: {e}")
-        try:
-            # در صورت خطا، حداقل پاسخ ساده بده تا ربات زنده بمونه
-            await smart_response(update, context)
-        except Exception as inner_e:
-            print(f"❌ [Smart Response Error]: {inner_e}")
+        print(f"❌ [DEBUG ERROR in reply]: {e}")
         
 # ثبت کاربر و گروه
     await register_user(update.effective_user)
