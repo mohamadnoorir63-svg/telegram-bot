@@ -38,8 +38,6 @@ from auto_brain.command_manager import (
     handle_custom_command,
     delete_command,
     panel_callback
-async def panel_callback(update, context):
-    print(f"[DEBUG] panel_callback triggered: {update.callback_query.data}")
 )
 
 # 🧠 نکته مهم:
