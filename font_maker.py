@@ -13,7 +13,7 @@ async def font_maker(update, context: ContextTypes.DEFAULT_TYPE):
     # ✅ جلوگیری از فونت در گروه‌ها
     if chat_type in ["group", "supergroup"]:
         msg = await update.message.reply_text("✨ برای ساخت فونت، لطفاً به پیوی ربات مراجعه کنید 🙏")
-        await asyncio.sleep(5)
+        await asyncio.sleep(6)
         try:
             await msg.delete()
             await update.message.delete()
@@ -60,7 +60,7 @@ async def send_fonts(update, context, name):
     return ConversationHandler.END
 
 
-# ======================= 🎭 تولید فونت فارسی (ظریف و مرتب) =======================
+# ======================= 🎭 تولید فونت فارسی (اصلی و ظریف مثل قبل) =======================
 def generate_persian_fonts(name):
     styles = [
         f"• {name} •", f"✦ {name} ✦", f"⋆ {name} ⋆", f"✿ {name} ✿",
@@ -68,12 +68,13 @@ def generate_persian_fonts(name):
         f"⋆❀ {name} ❀⋆", f"ღ {name} ღ", f"❋ {name} ❋", f"✧ {name} ✧",
         f"⋆⸙ {name} ⸙⋆", f"⊰ {name} ⊱", f"❦ {name} ❦", f"⋆✦ {name} ✦⋆",
         f"⚜ {name} ⚜", f"⋆✶ {name} ✶⋆", f"˗ˏˋ {name} ˎˊ˗", f"⟡✧ {name} ✧⟡",
-        f"∘₊✧ {name} ✧₊∘", f"⋆｡°✩ {name} ✩°｡⋆"
+        f"∘₊✧ {name} ✧₊∘", f"⋆｡°✩ {name} ✩°｡⋆", f"𓆩♡𓆪 {name} 𓆩♡𓆪",
+        f"༺ {name} ༻", f"꧁༒☬ {name} ☬༒꧂"
     ]
     return make_pages(name, styles)
 
 
-# ======================= ✨ تولید فونت انگلیسی (سبک‌تر) =======================
+# ======================= ✨ تولید فونت انگلیسی (سبک‌تر و تمیز) =======================
 def generate_english_fonts(name):
     frames = [
         lambda t: f"• {t} •", lambda t: f"✦ {t} ✦", lambda t: f"⋆ {t} ⋆", lambda t: f"✿ {t} ✿",
@@ -86,7 +87,7 @@ def generate_english_fonts(name):
 
 
 # ======================= 📄 تقسیم فونت‌ها به صفحات =======================
-def make_pages(name, all_fonts, page_size=25):
+def make_pages(name, all_fonts, page_size=20):
     pages = []
     chunks = [all_fonts[i:i + page_size] for i in range(0, len(all_fonts), page_size)]
 
@@ -110,3 +111,29 @@ def make_pages(name, all_fonts, page_size=25):
             ])
         })
     return pages
+
+
+# ======================= 🔁 کنترل صفحات فونت =======================
+async def next_font(update, context):
+    query = update.callback_query
+    await query.answer()
+    index = int(query.data.split(":")[1])
+    fonts = context.user_data.get("font_pages", [])
+    if 0 <= index < len(fonts):
+        await query.edit_message_text(
+            fonts[index]["text"],
+            parse_mode="HTML",
+            reply_markup=fonts[index]["keyboard"]
+        )
+
+async def prev_font(update, context):
+    query = update.callback_query
+    await query.answer()
+    index = int(query.data.split(":")[1])
+    fonts = context.user_data.get("font_pages", [])
+    if 0 <= index < len(fonts):
+        await query.edit_message_text(
+            fonts[index]["text"],
+            parse_mode="HTML",
+            reply_markup=fonts[index]["keyboard"]
+                     )
