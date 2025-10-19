@@ -1656,7 +1656,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(text, parse_mode="HTML")
 
-# ======================= 🚀 اجرای نهایی =======================
+   # ======================= 🚀 اجرای نهایی =======================
 if __name__ == "__main__":
     print("🤖 خنگول فارسی 8.7 Cloud+ Supreme Pro Stable+ آماده به خدمت است ...")
 
@@ -1666,12 +1666,16 @@ if __name__ == "__main__":
     # ⚙️ مدیریت خطاهای کلی
     app.add_error_handler(handle_error)
 
-    # =================== ⚙️ بخش دستورهای سفارشی ===================
+    # ===== ⚙️ دستورات شخصی و پنل‌ها =====
     app.add_handler(CommandHandler("save", save_command))
     app.add_handler(CommandHandler("del", delete_command))
-    # ⚙️ پنل مدیریت اصلی
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_custom_command))
+
+    # ===== ⚙️ پنل مدیریت اصلی (فقط برای ADMIN_ID) =====
     app.add_handler(CommandHandler("panel", show_admin_panel))
     app.add_handler(CallbackQueryHandler(admin_panel_callback, pattern="^admin:"))
+    app.add_handler(CallbackQueryHandler(panel_callback, pattern="^cmdpanel_"))
+
     # 👑 شناسایی ورود و خروج سازنده
     app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, detect_admin_movement))
     app.add_handler(MessageHandler(filters.StatusUpdate.LEFT_CHAT_MEMBER, detect_admin_movement))
@@ -1679,7 +1683,7 @@ if __name__ == "__main__":
     # 🤖 پاسخ ویژه وقتی سودو بگه "ربات"
     app.add_handler(MessageHandler(filters.Regex("(?i)^ربات$"), sudo_bot_call))
 
-    # =================== 🔹 دستورات اصلی ===================
+    # 🔹 دستورات اصلی
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("help", help_command))
     app.add_handler(CommandHandler("toggle", toggle))
@@ -1700,12 +1704,12 @@ if __name__ == "__main__":
     app.add_handler(CommandHandler("leave", leave))
     app.add_handler(CommandHandler("reply", toggle_reply_mode))
 
-    # =================== 🎨 فونت‌ساز خنگول ===================
+    # 🎨 فونت‌ساز خنگول
     app.add_handler(MessageHandler(filters.Regex("^فونت "), font_maker), group=-2)
     app.add_handler(CallbackQueryHandler(next_font, pattern="^next_font:"))
     app.add_handler(CallbackQueryHandler(feature_back, pattern="^feature_back$"))
 
-    # =================== 💬 خوشامد پویا و تنظیمات ===================
+    # 🔹 خوشامد پویا
     app.add_handler(MessageHandler(filters.Regex("^خوشامد$"), open_welcome_panel), group=-1)
     app.add_handler(CallbackQueryHandler(welcome_panel_buttons, pattern="^welcome_"), group=-1)
     app.add_handler(MessageHandler(filters.Regex("^ثبت خوشامد$"), set_welcome_text), group=-1)
@@ -1714,19 +1718,18 @@ if __name__ == "__main__":
     app.add_handler(MessageHandler(filters.Regex(r"^تنظیم حذف"), set_welcome_timer))
     app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome), group=-1)
 
-    # =================== 📘 راهنمای قابل ویرایش ===================
+    # 🔹 راهنمای قابل ویرایش
     app.add_handler(MessageHandler(filters.Regex("^ثبت راهنما$"), save_custom_help))
     app.add_handler(MessageHandler(filters.Regex("^راهنما$"), show_custom_help))
 
-    # =================== 📎 فایل‌ها و پنل‌ها ===================
+    # 🔹 فایل‌ها و پنل‌ها
     app.add_handler(MessageHandler(filters.Document.ALL, handle_document))
     app.add_handler(CallbackQueryHandler(panel_handler))
 
-    # =================== 🎭 سخنگوی اصلی خنگول ===================
-    # گروه 0 یعنی آخرین سطح — این همیشه بعد از همه اجرا میشه
+    # 🎭 سخنگوی اصلی
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, reply), group=0)
 
-    # =================== 🌙 وظایف استارتاپ ===================
+    # 🔹 وظایف استارتاپ
     async def on_startup(app):
         await notify_admin_on_startup(app)
         app.create_task(auto_backup(app.bot))
@@ -1737,5 +1740,4 @@ if __name__ == "__main__":
     app.post_init = on_startup
 
     # 🚀 اجرای نهایی ربات
-    app.run_polling(allowed_updates=Update.ALL_TYPES)
-    
+    app.run_polling(allowed_updates=Update.ALL_TYPES) 
