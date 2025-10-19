@@ -1,9 +1,8 @@
 # ======================== ⚙️ command_manager.py ========================
 import os, json, random
 from datetime import datetime
-from telegram import InlineKeyboardMarkup, InlineKeyboardButton, Update
+from telegram import Update
 from telegram.ext import ContextTypes
-from telegram.error import BadRequest
 
 # 📁 مسیر فایل دستورات
 DATA_FILE = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "custom_commands.json"))
@@ -12,6 +11,7 @@ ADMIN_ID = 7089376754
 # ======================== 📦 حافظه دستورات ========================
 
 def load_commands():
+    """خواندن تمام دستورها از فایل JSON"""
     if not os.path.exists(DATA_FILE):
         with open(DATA_FILE, "w", encoding="utf-8") as f:
             json.dump({}, f)
@@ -19,6 +19,7 @@ def load_commands():
         return json.load(f)
 
 def save_commands(data):
+    """ذخیره دستورها در فایل JSON"""
     with open(DATA_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
@@ -27,8 +28,7 @@ def save_commands(data):
 async def save_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """ذخیره دستور جدید با /save <نام> (روی پیام ریپلای کن)"""
     user = update.effective_user
-    if user.id != ADMIN_ID:
-        return await update.message.reply_text("⛔ فقط مدیر اصلی می‌تونه دستور بسازه.")
+    chat = update.effective_chat
 
     if not context.args:
         return await update.message.reply_text("❗ استفاده: /save <نام دستور> (روی پیام ریپلای کن)")
@@ -38,14 +38,17 @@ async def save_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not reply:
         return await update.message.reply_text("📎 باید روی پیامی ریپلای کنی تا ذخیره شود.")
 
+    # بارگذاری داده‌های قبلی
     commands = load_commands()
     doc = commands.get(name, {
         "name": name,
         "responses": [],
         "created": datetime.now().isoformat(),
+        "group_id": chat.id if chat.type in ["group", "supergroup"] else None,
+        "owner_id": user.id
     })
 
-    # استخراج داده
+    # استخراج محتوا از پیام ریپلای شده
     entry = {}
     if reply.text:
         entry = {"type": "text", "data": reply.text}
@@ -64,7 +67,7 @@ async def save_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         return await update.message.reply_text("⚠️ نوع این پیام پشتیبانی نمی‌شود.")
 
-    # 🧠 اضافه‌کردن پاسخ جدید (حداکثر 100 تا)
+    # اضافه‌کردن پاسخ جدید (حداکثر 100 مورد)
     doc["responses"].append(entry)
     if len(doc["responses"]) > 100:
         doc["responses"].pop(0)
@@ -86,17 +89,15 @@ async def handle_custom_command(update: Update, context: ContextTypes.DEFAULT_TY
 
     text = update.message.text.strip().lower()
     commands = load_commands()
-
     if text not in commands:
         return
 
     cmd = commands[text]
     responses = cmd.get("responses", [])
-
     if not responses:
         return await update.message.reply_text("⚠️ هنوز پاسخی برای این دستور ثبت نشده.")
 
-    # 🎲 انتخاب تصادفی یکی از پاسخ‌ها
+    # 🎲 انتخاب تصادفی از بین پاسخ‌ها
     response = random.choice(responses)
     t, d = response["type"], response["data"]
 
@@ -116,7 +117,7 @@ async def handle_custom_command(update: Update, context: ContextTypes.DEFAULT_TY
         elif t == "sticker":
             await update.message.reply_sticker(d)
 
-        # ✅ جلوگیری از اجرای تابع reply بعد از دستور ذخیره‌شده
+        # جلوگیری از پاسخ اضافی ربات (reply اصلی)
         context.user_data["custom_handled"] = True
 
     except Exception as e:
@@ -134,9 +135,61 @@ async def delete_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     name = " ".join(context.args).strip().lower()
     commands = load_commands()
+
     if name in commands:
         del commands[name]
         save_commands(commands)
         await update.message.reply_text(f"🗑 دستور '{name}' حذف شد.")
     else:
         await update.message.reply_text("⚠️ چنین دستوری وجود ندارد.")
+
+# ======================== 📜 لیست تمام دستورها ========================
+
+async def list_commands(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """نمایش لیست تمام دستورهای ذخیره‌شده"""
+    user = update.effective_user
+    if user.id != ADMIN_ID:
+        return await update.message.reply_text("⛔ فقط مدیر اصلی می‌تونه لیست رو ببینه.")
+
+    commands = load_commands()
+    if not commands:
+        return await update.message.reply_text("📭 هنوز هیچ دستوری ذخیره نشده.")
+
+    text = "📜 <b>لیست دستورهای ذخیره‌شده:</b>\n\n"
+    for name, info in commands.items():
+        owner = "👑 سودو" if info.get("owner_id") == ADMIN_ID else f"👤 {info.get('owner_id')}"
+        group = info.get("group_id")
+        count = len(info.get("responses", []))
+        text += f"🔹 <b>{name}</b> ({count}) — {owner}"
+        if group:
+            text += f" | 🏠 گروه: {group}"
+        text += "\n"
+
+    if len(text) > 4000:
+        text = text[:3990] + "..."
+
+    await update.message.reply_text(text, parse_mode="HTML")
+
+# ======================== 🧹 پاکسازی دستورات گروه ========================
+
+def cleanup_group_commands(chat_id):
+    """حذف دستورهای ساخته‌شده در گروه مشخص"""
+    try:
+        commands = load_commands()
+        new_data = {}
+        removed = 0
+
+        for name, info in commands.items():
+            group = info.get("group_id")
+            owner = info.get("owner_id")
+
+            # فقط دستورهای همان گروه حذف شوند، دستورات ADMIN_ID باقی بمانند
+            if group == chat_id and owner != ADMIN_ID:
+                removed += 1
+                continue
+            new_data[name] = info
+
+        save_commands(new_data)
+        print(f"🧹 {removed} دستور مربوط به گروه {chat_id} حذف شد.")
+    except Exception as e:
+        print(f"⚠️ خطا در پاکسازی دستورات گروه {chat_id}: {e}")
