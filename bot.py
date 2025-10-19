@@ -774,25 +774,44 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ======================= 💬 پاسخ و هوش مصنوعی =======================
 async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """پاسخ‌دهی هوشمند بدون تداخل با دستورات و محدود به گروه"""
+    
     # 🚫 جلوگیری از پاسخ در پیوی (فقط جوک و فال مجازند)
     if update.effective_chat.type == "private":
         text = update.message.text.strip().lower()
         allowed = ["جوک", "فال"]
-
-        # اگه پیام جزو مجازها نیست، نادیده بگیر
         if text not in allowed:
             return
-    """پاسخ‌دهی اصلی هوش مصنوعی و سیستم یادگیری"""
+
+    # 🧠 بررسی وجود متن پیام
     if not update.message or not update.message.text:
         return
 
-    text = update.message.text.strip()
+    text = update.message.text.strip().lower()
     uid = update.effective_user.id
     chat_id = update.effective_chat.id
 
-    # 🧠 بررسی حالت ریپلی مود گروهی
+    # ⚙️ جلوگیری از پاسخ روی دستورات خاص
+    protected_words = [
+        "راهنما", "ثبت راهنما", "خوشامد", "ثبت خوشامد", "ربات",
+        "save", "del", "panel", "backup", "cloudsync", "leave"
+    ]
+    if any(text.startswith(word) for word in protected_words):
+        return
+
+    # 🧩 بررسی حالت ریپلی مود گروهی (مثلاً پاسخ اختصاصی در حالت یادگیری)
     if await handle_group_reply_mode(update, context):
         return
+
+    # 🎭 پاسخ هوشمند بر اساس احساس و حافظه
+    try:
+        emotion = await detect_emotion(update, context)
+        await remember_emotion(uid, emotion)
+        last_emotion = await get_last_emotion(uid)
+        await emotion_context_reply(update, context, emotion, last_emotion)
+    except Exception as e:
+        print(f"[Reply Error] {e}")
+        await smart_response(update, context)
         
 # ثبت کاربر و گروه
     await register_user(update.effective_user)
