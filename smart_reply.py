@@ -1,82 +1,113 @@
 # ===================== 🤖 smart_reply.py =====================
-from telegram import Update
-from telegram.ext import ContextTypes
 import random
 import re
-from datetime import datetime
+from telegram import Update
+from telegram.ext import ContextTypes
 
-# می‌تونی بعداً این دو تابعو وصل کنی به memory یا emotion_memory
-from emotion_memory import remember_emotion, get_last_emotion
+from memory_manager import get_reply, enhance_sentence, shadow_learn
+from emotion_memory import remember_emotion, get_last_emotion, emotion_context_reply
 
 
-# ===================== 🧠 تابع اصلی پاسخ هوشمند =====================
+# ===============================================================
+# 😄 تشخیص احساس — Emotion Engine
+# ===============================================================
+def detect_emotion(text: str) -> str:
+    if not text:
+        return "neutral"
+
+    text = text.lower()
+
+    emotions = {
+        "happy": ["😂", "🤣", "😅", "خوشحالم", "عالیه", "دمت گرم", "خوبه", "مرسی", "❤️"],
+        "sad": ["😔", "😢", "غمگینم", "بدم میاد", "دلم گرفته", "افسرده"],
+        "angry": ["😡", "لعنتی", "حرصم", "عصبانی", "بدبخت", "خفه شو"],
+        "love": ["دوستت دارم", "❤️", "😘", "عاشقتم", "عشق", "قلبم"],
+        "question": ["?", "چرا", "چیه", "چی شد", "کجایی", "کجا", "چطوری"],
+    }
+
+    for emo, words in emotions.items():
+        for w in words:
+            if w in text:
+                return emo
+
+    return "neutral"
+
+
+# ===============================================================
+# 💬 پاسخ هوشمند احساسی (نسخه‌ی Async برای تلگرام)
+# ===============================================================
 async def smart_response(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """پاسخ هوشمند خنگول — با کنترل خطا و حافظه احساسی"""
+    """پاسخ پویا و احساسی در چت (هماهنگ با Telegram API)"""
 
     try:
-        # ===== بررسی پیام =====
         if not update.message or not update.message.text:
             return
 
-        text = update.message.text.strip().lower()
-        chat_id = update.effective_chat.id
+        text = update.message.text.strip()
         user_id = update.effective_user.id
+        chat_id = update.effective_chat.id
 
-        print(f"🧠 [smart_response] دریافت شد از {user_id} در {chat_id}: {text}")
+        # تشخیص احساس فعلی
+        emotion = detect_emotion(text)
+        last_emotion = get_last_emotion(user_id)
+        context_reply = emotion_context_reply(emotion, last_emotion)
 
-        # ===== پاسخ‌های خاص =====
-        if any(word in text for word in ["سلام", "درود", "hi", "hello"]):
-            await update.message.reply_text(random.choice([
-                "سلام رفیق 🌞",
-                "درود بر تو ✋",
-                "سلام! حالت چطوره؟ 😄",
-                "سلام به روی ماهت 🌹"
-            ]))
-            await remember_emotion(user_id, "happy")
-            return
+        # اگه پاسخ زمینه‌ای هست، همونو بفرست
+        if context_reply:
+            await remember_emotion(user_id, emotion)
+            return await update.message.reply_text(enhance_sentence(context_reply))
 
-        elif any(word in text for word in ["خداحافظ", "بای", "bye"]):
-            await update.message.reply_text(random.choice([
-                "خدانگهدار 🌙",
-                "فعلاً 👋",
-                "مواظب خودت باش 💫"
-            ]))
-            await remember_emotion(user_id, "neutral")
-            return
+        # به‌روزرسانی احساس کاربر
+        await remember_emotion(user_id, emotion)
 
-        # ===== پاسخ به حالت احساسی =====
-        if "😢" in text or "غمگین" in text:
-            await update.message.reply_text("ناراحت نباش، من اینجام 🤗")
-            await remember_emotion(user_id, "sad")
-            return
+        # بررسی حافظه برای پاسخ مشابه
+        mem_reply = get_reply(text)
+        if mem_reply:
+            shadow_learn(text, mem_reply)
+            return await update.message.reply_text(enhance_sentence(mem_reply))
 
-        if "😂" in text or "خنده" in text:
-            await update.message.reply_text("خوشحالم که خندیدی 😄")
-            await remember_emotion(user_id, "happy")
-            return
+        # پاسخ احساسی عمومی
+        responses = {
+            "happy": [
+                "😂 خوشحالم حالت خوبه!",
+                "😄 بخند که دنیا بخنده!",
+                "😁 چه حس خوبی!",
+            ],
+            "sad": [
+                "😢 نگران نباش، درست میشه.",
+                "💔 بعد شب تاریک، صبح روشن میاد.",
+                "😔 دلم برات یه چای داغ می‌خواد.",
+            ],
+            "angry": [
+                "😤 آروم باش رفیق...",
+                "😡 ارزش عصبی شدن نداره!",
+                "🧘 یه نفس عمیق بکش و ولش کن.",
+            ],
+            "love": [
+                "❤️ منم از تو خوشم میاد 😳",
+                "😘 خجالت نکش 😅",
+                "🌹 عشق توی هوا پخشه!",
+            ],
+            "question": [
+                "🤔 سوال خوبیه، بزار فکر کنم...",
+                "😅 سوال سختیه ولی جالبه!",
+                "🧠 سوال باعث رشد ذهن میشه!",
+            ],
+            "neutral": [
+                "🙂 جالبه...",
+                "😶 باشه...",
+                "👌 حله!",
+                "🤖 من گوش می‌دم...",
+                "😏 ادامه بده..."
+            ],
+        }
 
-        # ===== پاسخ عمومی =====
-        if re.search(r"چطوری|حالت چطوره|چه خبر", text):
-            mood = await get_last_emotion(user_id)
-            if mood == "happy":
-                await update.message.reply_text("خوبه، تو هم که خوشحالی 😄")
-            elif mood == "sad":
-                await update.message.reply_text("یکم گرفته‌ام، ولی تو که بیای بهتر می‌شه 💫")
-            else:
-                await update.message.reply_text("بد نیستم، مرسی که پرسیدی 🫶")
-            return
+        base = random.choice(responses.get(emotion, responses["neutral"]))
+        reply = enhance_sentence(base)
+        shadow_learn(text, reply)
 
-        # ===== پاسخ هوش مصنوعی ساده =====
-        responses = [
-            "جالبه 😄",
-            "می‌تونی بیشتر بگی؟ 🤔",
-            "آهااا فهمیدم 👀",
-            "خب بعدش چی شد؟ 😅",
-            "عه جدی؟ 😳"
-        ]
-        await update.message.reply_text(random.choice(responses))
-        await remember_emotion(user_id, "neutral")
+        await update.message.reply_text(reply)
 
     except Exception as e:
         print(f"❌ [smart_response ERROR]: {e}")
-        await update.message.reply_text("⚠️ خطای موقتی در پاسخ‌دهی. لطفاً دوباره تلاش کن.")
+        await update.message.reply_text("⚠️ خطای موقتی در پاسخ‌دهی.")
