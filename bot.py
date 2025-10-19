@@ -16,6 +16,7 @@ import aiofiles
 
 # 🎨 فونت‌ساز خنگول
 from font_maker import font_maker, next_font
+
 # 📦 ماژول‌ها
 from memory_manager import (
     init_files, load_data, save_data, learn, shadow_learn, get_reply,
@@ -30,15 +31,18 @@ from emotion_memory import remember_emotion, get_last_emotion, emotion_context_r
 from auto_brain.auto_brain import start_auto_brain_loop
 from selective_backup import selective_backup_menu, selective_backup_buttons
 from auto_brain import auto_backup
-# ===== ⚙️ دستورات شخصی و پنل مدیریت =====
+
+# ===== ⚙️ دستورات شخصی =====
 from auto_brain.command_manager import (
     save_command,
     handle_custom_command,
     delete_command,
     panel_callback
 )
-from auto_brain.admin_panel import show_admin_panel, admin_panel_callback  # اگر فایل admin_panel داری
-from telegram.ext import CommandHandler, MessageHandler, CallbackQueryHandler, filters
+
+# 🧠 نکته مهم:
+# ❌ از اینجا دیگه admin_panel رو import نکن!
+# ✅ اون رو بعد از ساخت app در بخش اصلی فایل (پایین) اضافه خواهیم کرد.
 # 🎯 تنظیمات پایه
 TOKEN = os.getenv("BOT_TOKEN")
 ADMIN_ID = int(os.getenv("ADMIN_ID", "7089376754"))
