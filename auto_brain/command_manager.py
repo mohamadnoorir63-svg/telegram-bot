@@ -1,24 +1,38 @@
 # ======================== 🧠 command_manager.py ========================
-from pymongo import MongoClient
+import json
+import os
 from datetime import datetime
-from telegram import InlineKeyboardMarkup, InlineKeyboardButton, Update
+from telegram import Update
 from telegram.ext import ContextTypes
 
-# ⚙️ اتصال به MongoDB فقط برای مدیریت دستورات
-MONGO_URI = "mongodb+srv://mohamadnoorir63_db_user:cVm8y2ohBnpN2xcn@cluster0.gya1hoa.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
-client = MongoClient(MONGO_URI)
+COMMANDS_FILE = "auto_brain/commands_data.json"
+ADMIN_ID = 7089376754  # آیدی عددی مدیر اصلی
 
-db = client["khengool_db"]             # دیتابیس مخصوص بخش دستورات
-commands = db["custom_commands"]       # کالکشن فقط برای دستورها
+# ------------------ 📂 توابع ذخیره و بارگذاری ------------------
 
-ADMIN_ID = 7089376754  # آیدی عددی مدیر اصلی (تو)
+def load_commands():
+    """خواندن دستورات از فایل JSON"""
+    if os.path.exists(COMMANDS_FILE):
+        with open(COMMANDS_FILE, "r", encoding="utf-8") as f:
+            try:
+                return json.load(f)
+            except:
+                return {}
+    return {}
 
-# ======================== 📥 ذخیره دستور ========================
+def save_commands(data):
+    """ذخیره دستورات در فایل JSON"""
+    with open(COMMANDS_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
+commands = load_commands()
+
+# ------------------ 💾 ذخیره دستور ------------------
 
 async def save_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """ذخیره دستور جدید با /save <نام> (روی پیام ریپلای کن)"""
-    if update.effective_user.id != ADMIN_ID:
-        return await update.message.reply_text("⛔ فقط مدیر اصلی می‌تواند دستور بسازد.")
+    """ذخیره دستور جدید — /save <نام> (روی پیام ریپلای کن)"""
+    user_id = update.effective_user.id
+    chat_id = str(update.effective_chat.id)
 
     if not context.args:
         return await update.message.reply_text("❗ فرمت درست: /save <نام دستور> (روی پیام ریپلای کن)")
@@ -29,7 +43,17 @@ async def save_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not reply:
         return await update.message.reply_text("📎 باید روی پیامی ریپلای کنی تا ذخیره شود.")
 
-    doc = {"name": name, "type": None, "data": None, "created": datetime.now()}
+    # تشخیص نوع محتوا
+    doc = {
+        "name": name,
+        "type": None,
+        "data": None,
+        "creator": user_id,
+        "chat_id": chat_id,
+        "is_global": (user_id == ADMIN_ID),
+        "created": datetime.now().isoformat(),
+    }
+
     if reply.text:
         doc["type"] = "text"
         doc["data"] = reply.text
@@ -54,47 +78,78 @@ async def save_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         return await update.message.reply_text("⚠️ نوع این پیام پشتیبانی نمی‌شود.")
 
-    commands.update_one({"name": name}, {"$set": doc}, upsert=True)
-    await update.message.reply_text(f"✅ دستور '{name}' با موفقیت ذخیره شد!")
+    # ذخیره در لیست
+    commands[name] = doc
+    save_commands(commands)
 
-# ======================== 📤 اجرا و حذف ========================
+    scope = "📢 عمومی" if doc["is_global"] else "👥 فقط برای این گروه"
+    await update.message.reply_text(f"✅ دستور '{name}' ذخیره شد! ({scope})")
+
+# ------------------ ⚙️ اجرای دستور ------------------
 
 async def handle_custom_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """فراخوانی دستور ذخیره‌شده با نوشتن اسم آن"""
+    """فراخوانی دستور ذخیره‌شده با نوشتن نام آن"""
     text = update.message.text.strip().lower()
-    cmd = commands.find_one({"name": text})
+    chat_id = str(update.effective_chat.id)
+
+    cmd = commands.get(text)
     if not cmd:
         return
 
+    # بررسی سطح دسترسی
+    if not cmd["is_global"] and cmd["chat_id"] != chat_id:
+        return  # دستور برای این گروه نیست
+
     try:
-        if cmd["type"] == "text":
+        t = cmd["type"]
+        if t == "text":
             await update.message.reply_text(cmd["data"])
-        elif cmd["type"] == "photo":
+        elif t == "photo":
             await update.message.reply_photo(cmd["data"])
-        elif cmd["type"] == "video":
+        elif t == "video":
             await update.message.reply_video(cmd["data"])
-        elif cmd["type"] == "document":
+        elif t == "document":
             await update.message.reply_document(cmd["data"])
-        elif cmd["type"] == "voice":
+        elif t == "voice":
             await update.message.reply_voice(cmd["data"])
-        elif cmd["type"] == "animation":
+        elif t == "animation":
             await update.message.reply_animation(cmd["data"])
-        elif cmd["type"] == "sticker":
+        elif t == "sticker":
             await update.message.reply_sticker(cmd["data"])
     except Exception as e:
-        await update.message.reply_text(f"⚠️ خطا در ارسال دستور:\n{e}")
+        await update.message.reply_text(f"⚠️ خطا در اجرای دستور:\n{e}")
+
+# ------------------ 🗑 حذف دستور ------------------
 
 async def delete_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """حذف دستور با /del <نام>"""
-    if update.effective_user.id != ADMIN_ID:
-        return await update.message.reply_text("⛔ فقط مدیر اصلی مجازه.")
+    user_id = update.effective_user.id
 
     if not context.args:
         return await update.message.reply_text("❗ فرمت درست: /del <نام دستور>")
 
     name = " ".join(context.args).strip().lower()
-    result = commands.delete_one({"name": name})
-    if result.deleted_count:
-        await update.message.reply_text(f"🗑 دستور '{name}' حذف شد.")
-    else:
-        await update.message.reply_text(f"⚠️ دستوری با نام '{name}' یافت نشد.")
+    cmd = commands.get(name)
+
+    if not cmd:
+        return await update.message.reply_text(f"⚠️ دستوری با نام '{name}' یافت نشد.")
+
+    # فقط سازنده یا ادمین اصلی می‌تواند حذف کند
+    if user_id != ADMIN_ID and user_id != cmd["creator"]:
+        return await update.message.reply_text("⛔ فقط سازنده یا مدیر اصلی می‌تواند حذف کند.")
+
+    del commands[name]
+    save_commands(commands)
+    await update.message.reply_text(f"🗑 دستور '{name}' حذف شد.")
+
+# ------------------ 🚪 پاکسازی هنگام خروج ربات از گروه ------------------
+
+async def clear_group_commands(chat_id: int):
+    """وقتی ربات از گروه خارج شد، دستورات مخصوص اون گروه حذف می‌شن"""
+    global commands
+    chat_id = str(chat_id)
+    before = len(commands)
+    commands = {k: v for k, v in commands.items() if v.get("is_global") or v.get("chat_id") != chat_id}
+    if len(commands) != before:
+        save_commands(commands)
+        print(f"🧹 پاکسازی دستورات گروه {chat_id} انجام شد.")
