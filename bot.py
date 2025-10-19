@@ -1790,5 +1790,15 @@ if __name__ == "__main__":
     # ثبت وظیفه‌ی استارتاپ
     app.post_init = on_startup
 
-    # 🚀 اجرای نهایی ربات
-    app.run_polling(allowed_updates=Update.ALL_TYPES)
+    # 🚀 اجرای نهایی ربات (نسخه‌ی ضد‌سکته)
+import asyncio
+import time
+
+while True:
+    try:
+        print("🔄 در حال اجرای ربات...")
+        app.run_polling(allowed_updates=Update.ALL_TYPES)
+    except Exception as e:
+        print(f"⚠️ خطا در ربات:\n{e}")
+        print("♻️ تلاش مجدد برای راه‌اندازی در 10 ثانیه...")
+        time.sleep(10)
