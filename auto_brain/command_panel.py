@@ -1,5 +1,5 @@
-# ======================== 🧠 command_manager.py (local version) ========================
-import os, json
+# ======================== 🧠 command_manager.py (fixed full version) ========================
+import os, json, random
 from datetime import datetime
 from telegram import InlineKeyboardMarkup, InlineKeyboardButton, Update
 from telegram.ext import ContextTypes
@@ -25,33 +25,34 @@ def save_commands(data):
 
 def build_panel_keyboard(name, settings=None):
     if settings is None:
-        settings = {"access": ["everyone"], "mode": "all"}
+        settings = {"access": ["everyone"], "targets": ["group", "private"], "mode": "all"}
 
-    access = settings.get("access", [])
+    access = settings.get("access", ["everyone"])
+    targets = settings.get("targets", ["group", "private"])
     mode = settings.get("mode", "all")
 
-    def check(option):
-        return "✅" if option in access else "☑️"
+    def chk(lst, opt):
+        return "✅" if opt in lst else "☑️"
 
-    def mode_check(opt):
+    def mode_chk(opt):
         return "✅" if opt == mode else "☑️"
 
     keyboard = [
         [
-            InlineKeyboardButton(f"{check('everyone')} همه", callback_data=f"toggle:{name}:everyone"),
-            InlineKeyboardButton(f"{check('admins')} ادمین", callback_data=f"toggle:{name}:admins"),
+            InlineKeyboardButton(f"{chk(access,'everyone')} همه", callback_data=f"toggle_access:{name}:everyone"),
+            InlineKeyboardButton(f"{chk(access,'admins')} ادمین", callback_data=f"toggle_access:{name}:admins"),
         ],
         [
-            InlineKeyboardButton(f"{check('groups')} گروه", callback_data=f"toggle:{name}:groups"),
-            InlineKeyboardButton(f"{check('private')} شخصی", callback_data=f"toggle:{name}:private"),
+            InlineKeyboardButton(f"{chk(targets,'group')} گروه", callback_data=f"toggle_target:{name}:group"),
+            InlineKeyboardButton(f"{chk(targets,'private')} شخصی", callback_data=f"toggle_target:{name}:private"),
         ],
         [
-            InlineKeyboardButton(f"{mode_check('all')} ارسال ثابت", callback_data=f"mode:{name}:all"),
-            InlineKeyboardButton(f"{mode_check('random')} تصادفی", callback_data=f"mode:{name}:random"),
+            InlineKeyboardButton(f"{mode_chk('all')} ارسال ثابت", callback_data=f"set_mode:{name}:all"),
+            InlineKeyboardButton(f"{mode_chk('random')} تصادفی", callback_data=f"set_mode:{name}:random"),
         ],
         [
             InlineKeyboardButton("💾 ذخیره", callback_data=f"save:{name}"),
-            InlineKeyboardButton("🗑 حذف", callback_data=f"del:{name}"),
+            InlineKeyboardButton("🗑 حذف", callback_data=f"delete:{name}"),
         ]
     ]
     return InlineKeyboardMarkup(keyboard)
@@ -80,7 +81,7 @@ async def save_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "type": None,
         "data": None,
         "created": datetime.now().isoformat(),
-        "settings": {"access": ["everyone"], "mode": "all"}
+        "settings": {"access": ["everyone"], "targets": ["group", "private"], "mode": "all"}
     }
 
     if reply.text:
@@ -107,11 +108,10 @@ async def save_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         return await update.message.reply_text("⚠️ نوع این پیام پشتیبانی نمی‌شود.")
 
-    # ذخیره در فایل JSON
+    # ذخیره یا بروزرسانی
     commands[name] = doc
     save_commands(commands)
 
-    # نمایش پنل تنظیمات
     await update.message.reply_text(
         f"✅ دستور <b>{name}</b> ذخیره شد.\nاکنون تنظیماتش را انتخاب کن 👇",
         parse_mode="HTML",
@@ -122,34 +122,64 @@ async def save_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def handle_custom_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """اجرای دستور ذخیره‌شده"""
+    if not update.message or not update.message.text:
+        return
+
     text = update.message.text.strip().lower()
+    chat_type = update.effective_chat.type
+    user_id = update.effective_user.id
+
     commands = load_commands()
     if text not in commands:
         return
 
     cmd = commands[text]
+    settings = cmd.get("settings", {"access": ["everyone"], "targets": ["group", "private"], "mode": "all"})
+
+    # دسترسی بر اساس نوع چت
+    if chat_type == "private" and "private" not in settings.get("targets", []):
+        return
+    if chat_type in ["group", "supergroup"] and "group" not in settings.get("targets", []):
+        return
+
+    # بررسی سطح دسترسی
+    if "admins" in settings.get("access", []) and user_id != ADMIN_ID:
+        return  # فقط ادمین اجازه دارد
+
     try:
-        if cmd["type"] == "text":
-            await update.message.reply_text(cmd["data"])
-        elif cmd["type"] == "photo":
-            await update.message.reply_photo(cmd["data"])
-        elif cmd["type"] == "video":
-            await update.message.reply_video(cmd["data"])
-        elif cmd["type"] == "document":
-            await update.message.reply_document(cmd["data"])
-        elif cmd["type"] == "voice":
-            await update.message.reply_voice(cmd["data"])
-        elif cmd["type"] == "animation":
-            await update.message.reply_animation(cmd["data"])
-        elif cmd["type"] == "sticker":
-            await update.message.reply_sticker(cmd["data"])
+        # حالت ارسال: ثابت یا تصادفی
+        if settings.get("mode") == "random":
+            await send_command_random(update, cmd)
+        else:
+            await send_command_fixed(update, cmd)
     except Exception as e:
         await update.message.reply_text(f"⚠️ خطا در اجرای دستور:\n{e}")
+
+async def send_command_fixed(update, cmd):
+    """ارسال ثابت"""
+    t, d = cmd["type"], cmd["data"]
+    if t == "text":
+        await update.message.reply_text(d)
+    elif t == "photo":
+        await update.message.reply_photo(d)
+    elif t == "video":
+        await update.message.reply_video(d)
+    elif t == "document":
+        await update.message.reply_document(d)
+    elif t == "voice":
+        await update.message.reply_voice(d)
+    elif t == "animation":
+        await update.message.reply_animation(d)
+    elif t == "sticker":
+        await update.message.reply_sticker(d)
+
+async def send_command_random(update, cmd):
+    """ارسال تصادفی (در آینده اگر چند پاسخ اضافه شد)"""
+    await send_command_fixed(update, cmd)
 
 # ======================== ❌ حذف ========================
 
 async def delete_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """حذف دستور با /del <نام>"""
     user = update.effective_user
     if user.id != ADMIN_ID:
         return await update.message.reply_text("⛔ فقط مدیر اصلی مجازه.")
@@ -168,11 +198,9 @@ async def delete_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ======================== 🔄 پنل ========================
 
 async def panel_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """مدیریت دکمه‌های پنل"""
     query = update.callback_query
     await query.answer()
     data = query.data.split(":")
-
     if len(data) < 2:
         return
 
@@ -182,16 +210,23 @@ async def panel_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not cmd:
         return await query.edit_message_text("⚠️ دستور حذف شده یا وجود ندارد.")
 
-    settings = cmd.get("settings", {"access": ["everyone"], "mode": "all"})
+    settings = cmd.get("settings", {"access": ["everyone"], "targets": ["group", "private"], "mode": "all"})
 
-    if action == "toggle":
+    if action == "toggle_access":
         target = data[2]
         if target in settings["access"]:
             settings["access"].remove(target)
         else:
             settings["access"].append(target)
 
-    elif action == "mode":
+    elif action == "toggle_target":
+        target = data[2]
+        if target in settings["targets"]:
+            settings["targets"].remove(target)
+        else:
+            settings["targets"].append(target)
+
+    elif action == "set_mode":
         settings["mode"] = data[2]
 
     elif action == "save":
@@ -199,16 +234,16 @@ async def panel_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         save_commands(commands)
         return await query.edit_message_text(f"✅ تنظیمات برای '{name}' ذخیره شد!")
 
-    elif action == "del":
+    elif action == "delete":
         del commands[name]
         save_commands(commands)
         return await query.edit_message_text(f"🗑 دستور '{name}' حذف شد!")
 
     # آپدیت پنل بدون خطا
     try:
-        await query.edit_message_reply_markup(reply_markup=build_panel_keyboard(name, settings))
         commands[name]["settings"] = settings
         save_commands(commands)
+        await query.edit_message_reply_markup(reply_markup=build_panel_keyboard(name, settings))
     except BadRequest as e:
         if "message is not modified" not in str(e).lower():
             raise e
