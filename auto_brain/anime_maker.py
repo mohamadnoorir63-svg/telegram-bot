@@ -4,27 +4,28 @@ import requests
 from telegram import Update
 from telegram.ext import ContextTypes
 
-API_URL = "https://image-to-anime.vercel.app/api"
+API_URL = "https://api.boringapis.com/image/anime"  # 🎨 API پایدار کارتونی‌ساز
 
 async def anime_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """دریافت عکس و ارسال نسخه کارتونی‌شده (انیمه)"""
+    """دریافت عکس و تبدیل به سبک انیمه"""
     if not update.message or not update.message.photo:
         return await update.message.reply_text("📸 لطفاً یه عکس بفرست تا کارتونی‌ش کنم!")
 
     msg = await update.message.reply_text("🎨 در حال کارتونی کردن عکس... صبر کن 💫")
 
     try:
-        # گرفتن عکس از تلگرام
+        # 📥 دریافت فایل از تلگرام
         photo = update.message.photo[-1]
         photo_file = await photo.get_file()
         img_bytes = await photo_file.download_as_bytearray()
 
-        # فرستادن به API جدید
+        # 🚀 ارسال به API
         files = {"image": ("photo.jpg", io.BytesIO(img_bytes), "image/jpeg")}
         response = requests.post(API_URL, files=files, timeout=90)
 
+        # 🧩 بررسی پاسخ
         if response.status_code == 200:
-            # خروجی کارتونی به صورت باینری (تصویر)
+            # خروجی به صورت تصویر برمی‌گرده
             out_bytes = response.content
             await update.message.reply_photo(out_bytes, caption="✨ اینم نسخه کارتونی عکست 😍")
         else:
