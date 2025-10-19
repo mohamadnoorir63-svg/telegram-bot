@@ -38,6 +38,8 @@ from auto_brain.command_manager import (
     handle_custom_command,
     delete_command,
     panel_callback
+async def panel_callback(update, context):
+    print(f"[DEBUG] panel_callback triggered: {update.callback_query.data}")
 )
 
 # 🧠 نکته مهم:
@@ -1680,6 +1682,8 @@ if __name__ == "__main__":
     # ⚙️ مدیریت خطاهای کلی
     app.add_error_handler(handle_error)
 
+    app.add_error_handler(handle_error)
+
     # 💾 دستورات شخصی (ذخیره، حذف، اجرای دستورها)
     app.add_handler(CommandHandler("save", save_command))
     app.add_handler(CommandHandler("del", delete_command))
@@ -1689,7 +1693,6 @@ if __name__ == "__main__":
 
     # ✉️ پیام‌های متنی غیر از کامند → هندلر دستورات ذخیره‌شده
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_custom_command), group=-3)
- 
 
 
     # ==========================================================
