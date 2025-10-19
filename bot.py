@@ -31,12 +31,10 @@ from emotion_memory import remember_emotion, get_last_emotion, emotion_context_r
 from auto_brain.auto_brain import start_auto_brain_loop
 from selective_backup import selective_backup_menu, selective_backup_buttons
 from auto_brain import auto_backup
-
 from auto_brain.command_manager import (
     save_command,
     handle_custom_command,
     delete_command
-)
 )
 
 # 🧠 نکته مهم:
