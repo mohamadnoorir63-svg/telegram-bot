@@ -1687,7 +1687,7 @@ if __name__ == "__main__":
     # ==========================================================
     # 🧠 پنل مدیریت اصلی
     # ==========================================================
-    app.add_handler(CommandHandler("panel", show_admin_panel))
+    app.add_handler(CommandHandler("panel", show_main_panel))
     app.add_handler(CallbackQueryHandler(admin_panel_callback, pattern="^admin:"))
 
     # ==========================================================
