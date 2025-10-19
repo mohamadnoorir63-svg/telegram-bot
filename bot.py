@@ -1741,12 +1741,29 @@ if __name__ == "__main__":
     app.add_handler(CommandHandler("reply", toggle_reply_mode))
 
     # ==========================================================
-    # 🎨 فونت‌ساز خنگول
+  
     # ==========================================================
-    app.add_handler(MessageHandler(filters.Regex("^فونت "), font_maker), group=-2)
-    app.add_handler(CallbackQueryHandler(next_font, pattern="^next_font:"))
-    app.add_handler(CallbackQueryHandler(feature_back, pattern="^feature_back$"))
+    # 🎨 فونت‌ساز خنگول (با حالت گفت‌وگویی و ضد اسپم گروه)
+    # ==========================================================
+    from telegram.ext import ConversationHandler
 
+    from font_maker import font_maker, receive_font_name, next_font, prev_font, ASK_NAME
+
+    # 💎 گفت‌وگوی فونت‌ساز
+    font_handler = ConversationHandler(
+        entry_points=[MessageHandler(filters.TEXT & filters.Regex(r"^فونت"), font_maker)],
+        states={
+            ASK_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, receive_font_name)],
+        },
+        fallbacks=[],
+    )
+
+    app.add_handler(font_handler)
+
+    # 🔁 کنترل صفحات فونت
+    app.add_handler(CallbackQueryHandler(next_font, pattern="^next_font"))
+    app.add_handler(CallbackQueryHandler(prev_font, pattern="^prev_font"))
+    app.add_handler(CallbackQueryHandler(feature_back, pattern="^feature_back$"))
     # ==========================================================
     # 🎉 خوشامد پویا و تنظیمات گروه
     # ==========================================================
