@@ -773,10 +773,6 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data["await_restore"] = False
 
 # ======================= 💬 پاسخ و هوش مصنوعی =======================
-from telegram import Update
-from telegram.ext import ContextTypes
-from smart_reply import smart_response  # اگه فایلش همین اسم رو داره
-
 async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """مدیریت اصلی پاسخ‌ها با فیلتر هوشمند و هماهنگ با smart_response(text, user_id)"""
     try:
@@ -786,9 +782,10 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         text = update.message.text.strip()
         user_id = update.effective_user.id
+        chat_id = update.effective_chat.id   # ✅ این خط رو اضافه کن
         chat_type = update.effective_chat.type
 
-        print(f"💬 [DEBUG] پیام از کاربر {user_id} دریافت شد: {text}")
+        print(f"💬 [DEBUG] پیام از کاربر {user_id} در چت {chat_id}: {text}")
 
         # 🚫 جلوگیری از پاسخ در پیوی (فقط جوک و فال مجازند)
         if chat_type == "private":
@@ -823,6 +820,7 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     except Exception as e:
         print(f"❌ [DEBUG ERROR in reply]: {e}")
+
 # ثبت کاربر و گروه
     await register_user(update.effective_user)
     register_group_activity(chat_id, uid)
