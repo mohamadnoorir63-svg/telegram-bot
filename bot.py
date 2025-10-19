@@ -1774,7 +1774,7 @@ if __name__ == "__main__":
     app.add_handler(MessageHandler(filters.Regex(r"^تنظیم قوانین"), set_rules_link), group=-1)
     app.add_handler(MessageHandler(filters.Regex(r"^تنظیم حذف"), set_welcome_timer), group=-1)
     app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome), group=-1)
-    app.add_handler(MessageHandler(filters.PHOTO, anime_photo))
+    app.add_handler(MessageHandler(filters.PHOTO, anime_photo), group=-3)
     # ==========================================================
     # 🧾 راهنمای قابل ویرایش
     # ==========================================================
