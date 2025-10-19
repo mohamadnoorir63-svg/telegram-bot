@@ -790,9 +790,9 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
 
     # 🚫 جلوگیری از پاسخ به بعضی پیام‌های خاص که هندلر اختصاصی دارند
+    # ⚠️ «جوک» و «فال» عمداً حذف شدن تا هنوز در پیوی کار کنن
     ignore_texts = [
         "راهنما", "ثبت راهنما",
-        "جوک", "فال",
         "لیست جوک‌ها", "لیست فال‌ها",
         "ثبت جوک", "ثبت فال",
         "لیست", "جمله بساز",
@@ -809,8 +809,6 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # 🧠 بررسی حالت ریپلی مود گروهی
     if await handle_group_reply_mode(update, context):
         return
-
-
 # ثبت کاربر و گروه
     await register_user(update.effective_user)
     register_group_activity(chat_id, uid)
