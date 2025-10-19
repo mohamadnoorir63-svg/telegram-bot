@@ -1,14 +1,14 @@
-# ======================= 🧠 admin_panel.py (اصلاح‌شده بدون import حلقه‌ای) =======================
+# ======================= 🧠 admin_panel.py (نسخه نهایی بدون import از bot.py) =======================
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import ContextTypes
 from datetime import datetime
 import asyncio
 import os
-
 from memory_manager import get_stats
-from selective_backup import selective_backup_menu, selective_backup_buttons
 from auto_brain.auto_backup import cloudsync_internal
-from bot import ADMIN_ID  # فقط این مجازه چون مقدار ساده‌ست (نه تابع async)
+
+# 💡 مقدار ADMIN_ID مستقیم از محیط گرفته می‌شود
+ADMIN_ID = int(os.getenv("ADMIN_ID", "7089376754"))
 
 # ======================= 🧩 پنل اصلی =======================
 async def show_admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -62,9 +62,9 @@ async def admin_panel_callback(update: Update, context: ContextTypes.DEFAULT_TYP
         )
         return await query.edit_message_text(msg, parse_mode="HTML")
 
-    # 💾 بک‌آپ کامل
+    # 💾 بک‌آپ
     elif data == "backup":
-        from bot import backup
+        from bot import backup  # فقط تابع async در زمان کلیک import می‌شود
         await query.edit_message_text("💾 در حال تهیه بک‌آپ...")
         await backup(update, context)
         return await query.edit_message_text("✅ بک‌آپ ساخته و ارسال شد!")
@@ -79,20 +79,19 @@ async def admin_panel_callback(update: Update, context: ContextTypes.DEFAULT_TYP
     elif data == "broadcast":
         from bot import broadcast
         context.user_data["await_broadcast"] = True
-        await query.edit_message_text("📢 پیام همگانی رو بفرست (برای همه کاربران و گروه‌ها):")
-        return
+        return await query.edit_message_text("📢 پیام همگانی رو بفرست:")
 
     # 🔒 قفل یادگیری
     elif data == "lock":
         from bot import lock_learning
         await lock_learning(update, context)
-        return await query.edit_message_text("🔒 یادگیری ربات قفل شد.")
+        return await query.edit_message_text("🔒 یادگیری قفل شد!")
 
     # 🔓 باز کردن یادگیری
     elif data == "unlock":
         from bot import unlock_learning
         await unlock_learning(update, context)
-        return await query.edit_message_text("🔓 یادگیری آزاد شد.")
+        return await query.edit_message_text("🔓 یادگیری آزاد شد!")
 
     # ♻️ ریست حافظه
     elif data == "reset":
@@ -110,6 +109,7 @@ async def admin_panel_callback(update: Update, context: ContextTypes.DEFAULT_TYP
 
 # ======================= 📨 ارسال همگانی =======================
 async def handle_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """دریافت پیام همگانی از مدیر"""
     if not context.user_data.get("await_broadcast"):
         return
     if update.effective_user.id != ADMIN_ID:
