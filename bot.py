@@ -773,44 +773,56 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data["await_restore"] = False
 
 # ======================= 💬 پاسخ و هوش مصنوعی =======================
+from telegram import Update
+from telegram.ext import ContextTypes
+from smart_reply import smart_response  # اگه فایلش همین اسم رو داره
+
 async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """نسخه‌ی دیباگ برای پیدا کردن نقطه‌ی سکوت ربات"""
+    """مدیریت اصلی پاسخ‌ها با فیلتر هوشمند و هماهنگ با smart_response(text, user_id)"""
     try:
         if not update.message or not update.message.text:
             print("⚠️ [DEBUG] پیام بدون متن دریافت شد.")
             return
 
-        text = update.message.text.strip().lower()
-        print(f"💬 [DEBUG] پیام دریافت شد: {text}")
+        text = update.message.text.strip()
+        user_id = update.effective_user.id
+        chat_type = update.effective_chat.type
+
+        print(f"💬 [DEBUG] پیام از کاربر {user_id} دریافت شد: {text}")
 
         # 🚫 جلوگیری از پاسخ در پیوی (فقط جوک و فال مجازند)
-        if update.effective_chat.type == "private":
+        if chat_type == "private":
             allowed = ["جوک", "فال"]
-            if text not in allowed:
-                print("⚠️ [DEBUG] در پیوی، پیام غیرمجاز بود. رد شد.")
+            if text.lower() not in allowed:
+                print("⚠️ [DEBUG] پیام در پیوی غیرمجاز بود، نادیده گرفته شد.")
                 return
 
-        # 🚫 لیست کلمات خاص که نباید جواب بدن
+        # 🚫 جلوگیری از تداخل با دستورهای خاص
         protected_words = [
             "راهنما", "ثبت راهنما", "خوشامد", "ثبت خوشامد", "ربات",
             "save", "del", "panel", "backup", "cloudsync", "leave"
         ]
-        if any(text.startswith(word) for word in protected_words):
-            print(f"⚠️ [DEBUG] '{text}' در لیست محافظت‌شده است، پاسخی نمی‌دهم.")
+        if any(text.lower().startswith(word) for word in protected_words):
+            print(f"⚠️ [DEBUG] '{text}' در لیست محافظت‌شده است — پاسخی داده نشد.")
             return
 
         # 🧠 بررسی ریپلی مود گروهی
         if await handle_group_reply_mode(update, context):
-            print("🧩 [DEBUG] در حالت پاسخ گروهی بود. خروج.")
+            print("🧩 [DEBUG] حالت پاسخ گروهی فعال بود، متوقف شد.")
             return
 
-        print("✅ [DEBUG] در حال اجرای smart_response ...")
-        await smart_response(update, context)
-        print("✅ [DEBUG] smart_response انجام شد.")
+        # 🧠 اجرای پاسخ هوشمند
+        print("✅ [DEBUG] اجرای smart_response...")
+        reply_text = smart_response(text, user_id)
+
+        if reply_text:
+            await update.message.reply_text(reply_text)
+            print("✅ [DEBUG] پاسخ ارسال شد:", reply_text)
+        else:
+            print("⚠️ [DEBUG] پاسخی تولید نشد (احتمالاً ورودی خالی).")
 
     except Exception as e:
         print(f"❌ [DEBUG ERROR in reply]: {e}")
-        
 # ثبت کاربر و گروه
     await register_user(update.effective_user)
     register_group_activity(chat_id, uid)
