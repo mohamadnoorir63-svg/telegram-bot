@@ -4,9 +4,10 @@ import requests
 from telegram import Update
 from telegram.ext import ContextTypes
 
-API_URL = "https://tenapi.cn/v2/cartoon"  # 🎨 API رایگان کارتونی‌ساز
+API_URL = "https://image-to-anime.vercel.app/api"
 
 async def anime_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """دریافت عکس و ارسال نسخه کارتونی‌شده (انیمه)"""
     if not update.message or not update.message.photo:
         return await update.message.reply_text("📸 لطفاً یه عکس بفرست تا کارتونی‌ش کنم!")
 
@@ -18,23 +19,19 @@ async def anime_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
         photo_file = await photo.get_file()
         img_bytes = await photo_file.download_as_bytearray()
 
-        # فرستادن عکس به API
-        files = {"file": ("image.jpg", io.BytesIO(img_bytes), "image/jpeg")}
-        response = requests.post(API_URL, files=files, timeout=60)
+        # فرستادن به API جدید
+        files = {"image": ("photo.jpg", io.BytesIO(img_bytes), "image/jpeg")}
+        response = requests.post(API_URL, files=files, timeout=90)
 
         if response.status_code == 200:
-            data = response.json()
-            if data.get("code") == 200 and data.get("url"):
-                await update.message.reply_photo(
-                    data["url"], caption="✨ اینم نسخه کارتونی عکست 😍"
-                )
-            else:
-                await update.message.reply_text("⚠️ خطا در پردازش عکس، لطفاً دوباره تلاش کن 🙏")
+            # خروجی کارتونی به صورت باینری (تصویر)
+            out_bytes = response.content
+            await update.message.reply_photo(out_bytes, caption="✨ اینم نسخه کارتونی عکست 😍")
         else:
-            await update.message.reply_text(f"⚠️ خطای سرور: {response.status_code}")
+            await update.message.reply_text(f"⚠️ خطا در پردازش عکس. کد وضعیت: {response.status_code}")
 
     except Exception as e:
-        await update.message.reply_text(f"❌ خطا در پردازش تصویر:\n{e}")
+        await update.message.reply_text(f"❌ خطا در ارتباط با سرور:\n{e}")
 
     finally:
         try:
