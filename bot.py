@@ -773,35 +773,7 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data["await_restore"] = False
 
 # ======================= 💬 پاسخ و هوش مصنوعی =======================
-async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """مدیریت اصلی پاسخ‌ها با فیلتر هوشمند و هماهنگ با smart_response(text, user_id)"""
-    try:
-        if not update.message or not update.message.text:
-            print("⚠️ [DEBUG] پیام بدون متن دریافت شد.")
-            return
 
-        text = update.message.text.strip()
-        user_id = update.effective_user.id
-        chat_id = update.effective_chat.id   # ✅ این خط رو اضافه کن
-        chat_type = update.effective_chat.type
-
-        print(f"💬 [DEBUG] پیام از کاربر {user_id} در چت {chat_id}: {text}")
-
-        # 🚫 جلوگیری از پاسخ در پیوی (فقط جوک و فال مجازند)
-        if chat_type == "private":
-            allowed = ["جوک", "فال"]
-            if text.lower() not in allowed:
-                print("⚠️ [DEBUG] پیام در پیوی غیرمجاز بود، نادیده گرفته شد.")
-                return
-
-        # 🚫 جلوگیری از تداخل با دستورهای خاص
-        protected_words = [
-            "راهنما", "ثبت راهنما", "خوشامد", "ثبت خوشامد", "ربات",
-            "save", "del", "panel", "backup", "cloudsync", "leave"
-        ]
-        if any(text.lower().startswith(word) for word in protected_words):
-            print(f"⚠️ [DEBUG] '{text}' در لیست محافظت‌شده است — پاسخی داده نشد.")
-            return
 
         # 🧠 بررسی ریپلی مود گروهی
         if await handle_group_reply_mode(update, context):
