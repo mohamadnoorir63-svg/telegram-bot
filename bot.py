@@ -1669,10 +1669,9 @@ if __name__ == "__main__":
     # =================== ⚙️ بخش دستورهای سفارشی ===================
     app.add_handler(CommandHandler("save", save_command))
     app.add_handler(CommandHandler("del", delete_command))
-    app.add_handler(CommandHandler("panel", show_panel))
-    app.add_handler(CallbackQueryHandler(panel_callback))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_custom_command), group=-3)
-
+    # ⚙️ پنل مدیریت اصلی
+    app.add_handler(CommandHandler("panel", show_admin_panel))
+    app.add_handler(CallbackQueryHandler(admin_panel_callback, pattern="^admin:"))
     # 👑 شناسایی ورود و خروج سازنده
     app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, detect_admin_movement))
     app.add_handler(MessageHandler(filters.StatusUpdate.LEFT_CHAT_MEMBER, detect_admin_movement))
