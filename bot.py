@@ -33,9 +33,12 @@ from selective_backup import selective_backup_menu, selective_backup_buttons
 from auto_brain import auto_backup
 from auto_brain.command_manager import (
     save_command,
+    delete_command,
     handle_custom_command,
-    delete_command
+    list_commands,
+    cleanup_group_commands
 )
+
 
 # 🧠 نکته مهم:
 # ❌ از اینجا دیگه admin_panel رو import نکن!
@@ -1447,6 +1450,16 @@ async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
     await progress_msg.edit_text(result, parse_mode="HTML")
+    # 🧹 وقتی ربات از گروه حذف می‌شود، دستورهای مربوط به آن گروه پاک می‌شوند
+async def handle_left_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    try:
+        my_chat_member = update.my_chat_member
+        if my_chat_member.new_chat_member.status == "left":
+            chat_id = update.effective_chat.id
+            cleanup_group_commands(chat_id)
+            print(f"🧹 دستورات گروه {chat_id} حذف شدند (ربات خارج شد).")
+    except Exception as e:
+        print(f"⚠️ خطا در پاکسازی خودکار گروه: {e}")
 # ======================= 🚪 خروج از گروه =======================
 async def leave(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id == ADMIN_ID:
@@ -1687,7 +1700,7 @@ if __name__ == "__main__":
     # ==========================================================
     app.add_handler(CommandHandler("save", save_command))
     app.add_handler(CommandHandler("del", delete_command))
-
+    app.add_handler(CommandHandler("listcmds", list_commands))
 
 
     # ✉️ پیام‌های متنی غیر از کامند → هندلر دستورات ذخیره‌شده
@@ -1698,7 +1711,8 @@ if __name__ == "__main__":
     # ==========================================================
     app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, detect_admin_movement))
     app.add_handler(MessageHandler(filters.StatusUpdate.LEFT_CHAT_MEMBER, detect_admin_movement))
-
+    # 🧹 پاکسازی خودکار دستورات گروه هنگام حذف ربات
+    app.add_handler(MessageHandler(filters.StatusUpdate.MY_CHAT_MEMBER, handle_left_chat))
     # ==========================================================
     # 🤖 پاسخ به "ربات" توسط سودو
     # ==========================================================
