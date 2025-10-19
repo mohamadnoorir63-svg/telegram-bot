@@ -778,22 +778,28 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ======================= 💬 پاسخ و هوش مصنوعی =======================
 async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # 🚫 جلوگیری از پاسخ در پیوی (فقط جوک و فال مجازند)
-    if update.effective_chat.type == "private":
-        text = update.message.text.strip().lower()
-        allowed = ["جوک", "فال"]
-
-        # اگه پیام جزو مجازها نیست، نادیده بگیر
-        if text not in allowed:
-            return
-
     """پاسخ‌دهی اصلی هوش مصنوعی و سیستم یادگیری"""
+
+    # 🧩 اطمینان از اینکه پیام معتبره
     if not update.message or not update.message.text:
         return
 
     text = update.message.text.strip()
+    lower_text = text.lower()
     uid = update.effective_user.id
     chat_id = update.effective_chat.id
+
+    # 🚫 جلوگیری از پاسخ در پیوی (فقط جوک و فال مجازند)
+    if update.effective_chat.type == "private" and lower_text not in ["جوک", "فال"]:
+        return
+
+    # ✅ جلوگیری از پاسخ به دستورات خاص (مثل راهنما، خوشامد، ربات و غیره)
+    protected_words = [
+        "راهنما", "ثبت راهنما", "خوشامد", "ثبت خوشامد",
+        "ربات", "save", "del", "panel", "backup", "cloudsync", "leave"
+    ]
+    if any(lower_text.startswith(word) for word in protected_words):
+        return
 
     # 🧠 بررسی حالت ریپلی مود گروهی
     if await handle_group_reply_mode(update, context):
