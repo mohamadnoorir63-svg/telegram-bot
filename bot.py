@@ -1660,7 +1660,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(text, parse_mode="HTML")
 
-   # ======================= 🚀 اجرای نهایی =======================
+# ======================= 🚀 اجرای نهایی =======================
 if __name__ == "__main__":
     print("🤖 خنگول فارسی 8.7 Cloud+ Supreme Pro Stable+ آماده به خدمت است ...")
 
@@ -1674,13 +1674,12 @@ if __name__ == "__main__":
     app.add_handler(CommandHandler("save", save_command))
     app.add_handler(CommandHandler("del", delete_command))
     app.add_handler(CallbackQueryHandler(panel_callback, pattern="^cmdpanel:"))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_custom_command))
 
     # ===== 🧠 پنل مدیریت اصلی =====
     app.add_handler(CommandHandler("panel", show_admin_panel))
     app.add_handler(CallbackQueryHandler(admin_panel_callback, pattern="^admin:"))
 
-    # 👑 شناسایی ورود و خروج سازنده
+    # 👑 ورود و خروج ادمین
     app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, detect_admin_movement))
     app.add_handler(MessageHandler(filters.StatusUpdate.LEFT_CHAT_MEMBER, detect_admin_movement))
 
@@ -1709,28 +1708,35 @@ if __name__ == "__main__":
     app.add_handler(CommandHandler("reply", toggle_reply_mode))
 
     # 🎨 فونت‌ساز خنگول
-    app.add_handler(MessageHandler(filters.Regex("^فونت "), font_maker), group=-2)
+    app.add_handler(MessageHandler(filters.Regex("^فونت "), font_maker), group=-3)
     app.add_handler(CallbackQueryHandler(next_font, pattern="^next_font:"))
     app.add_handler(CallbackQueryHandler(feature_back, pattern="^feature_back$"))
 
     # 🔹 خوشامد پویا
-    app.add_handler(MessageHandler(filters.Regex("^خوشامد$"), open_welcome_panel), group=-1)
-    app.add_handler(CallbackQueryHandler(welcome_panel_buttons, pattern="^welcome_"), group=-1)
-    app.add_handler(MessageHandler(filters.Regex("^ثبت خوشامد$"), set_welcome_text), group=-1)
-    app.add_handler(MessageHandler(filters.Regex("^ثبت عکس خوشامد$"), set_welcome_media), group=-1)
-    app.add_handler(MessageHandler(filters.Regex(r"^تنظیم قوانین"), set_rules_link))
-    app.add_handler(MessageHandler(filters.Regex(r"^تنظیم حذف"), set_welcome_timer))
-    app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome), group=-1)
+    app.add_handler(MessageHandler(filters.Regex("^خوشامد$"), open_welcome_panel), group=-2)
+    app.add_handler(CallbackQueryHandler(welcome_panel_buttons, pattern="^welcome_"), group=-2)
+    app.add_handler(MessageHandler(filters.Regex("^ثبت خوشامد$"), set_welcome_text), group=-2)
+    app.add_handler(MessageHandler(filters.Regex("^ثبت عکس خوشامد$"), set_welcome_media), group=-2)
+    app.add_handler(MessageHandler(filters.Regex(r"^تنظیم قوانین"), set_rules_link), group=-2)
+    app.add_handler(MessageHandler(filters.Regex(r"^تنظیم حذف"), set_welcome_timer), group=-2)
+    app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome), group=-2)
 
     # 🔹 راهنمای قابل ویرایش
-    app.add_handler(MessageHandler(filters.Regex("^ثبت راهنما$"), save_custom_help))
-    app.add_handler(MessageHandler(filters.Regex("^راهنما$"), show_custom_help))
+    app.add_handler(MessageHandler(filters.Regex("^ثبت راهنما$"), save_custom_help), group=-1)
+    app.add_handler(MessageHandler(filters.Regex("^راهنما$"), show_custom_help), group=-1)
 
     # 🔹 فایل‌ها و پنل‌ها
-    app.add_handler(MessageHandler(filters.Document.ALL, handle_document))
+    app.add_handler(MessageHandler(filters.Document.ALL, handle_document), group=-1)
     app.add_handler(CallbackQueryHandler(panel_handler))
 
-    # 🎭 سخنگوی اصلی
+    # ===== 💬 بخش‌های متنی (با ترتیب مشخص) =====
+    # 📢 ارسال همگانی
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_broadcast), group=-3)
+
+    # 🧩 دستورهای سفارشی
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_custom_command), group=-2)
+
+    # 🤖 پاسخ اصلی ربات (هوش مصنوعی و مکالمه)
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, reply), group=0)
 
     # 🔹 وظایف استارتاپ
@@ -1744,4 +1750,4 @@ if __name__ == "__main__":
     app.post_init = on_startup
 
     # 🚀 اجرای نهایی ربات
-    app.run_polling(allowed_updates=Update.ALL_TYPES) 
+    app.run_polling(allowed_updates=Update.ALL_TYPES)
