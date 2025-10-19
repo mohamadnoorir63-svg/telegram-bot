@@ -1672,7 +1672,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(text, parse_mode="HTML")
 
-# ======================= 🚀 اجرای نهایی =======================
+    # ======================= 🚀 اجرای نهایی =======================
 if __name__ == "__main__":
     print("🤖 خنگول فارسی 8.7 Cloud+ Supreme Pro Stable+ آماده به خدمت است ...")
 
@@ -1682,9 +1682,9 @@ if __name__ == "__main__":
     # ⚙️ مدیریت خطاهای کلی
     app.add_error_handler(handle_error)
 
-    app.add_error_handler(handle_error)
-
+    # ==========================================================
     # 💾 دستورات شخصی (ذخیره، حذف، اجرای دستورها)
+    # ==========================================================
     app.add_handler(CommandHandler("save", save_command))
     app.add_handler(CommandHandler("del", delete_command))
 
@@ -1692,8 +1692,7 @@ if __name__ == "__main__":
     app.add_handler(CallbackQueryHandler(panel_callback, pattern="^(toggle_|set_|save:|delete:|cmdpanel:)"))
 
     # ✉️ پیام‌های متنی غیر از کامند → هندلر دستورات ذخیره‌شده
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_custom_command), group=-3)
-
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_custom_command), group=-4)
 
     # ==========================================================
     # 👑 مدیریت وضعیت ادمین (ورود و خروج)
@@ -1762,7 +1761,7 @@ if __name__ == "__main__":
     # ==========================================================
     # 🎭 پاسخ هوشمند خنگول (در انتهای اولویت)
     # ==========================================================
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_custom_command), group=-4)
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, reply), group=2)
 
     # ==========================================================
     # 🔹 وظایف استارتاپ
@@ -1773,18 +1772,14 @@ if __name__ == "__main__":
         app.create_task(start_auto_brain_loop(app.bot))
         print("🌙 [SYSTEM] Startup tasks scheduled ✅")
 
-    # ثبت وظیفه‌ی استارتاپ
     app.post_init = on_startup
 
-    # 🚀 اجرای نهایی ربات (نسخه‌ی ضد‌سکته)
-import asyncio
-import time
-
-while True:
+    # ==========================================================
+    # 🚀 اجرای نهایی ربات (بدون خطای Event loop)
+    # ==========================================================
     try:
         print("🔄 در حال اجرای ربات...")
         app.run_polling(allowed_updates=Update.ALL_TYPES)
     except Exception as e:
-        print(f"⚠️ خطا در ربات:\n{e}")
-        print("♻️ تلاش مجدد برای راه‌اندازی در 10 ثانیه...")
-        time.sleep(10)
+        print(f"⚠️ خطا در اجرای ربات:\n{e}")
+        print("♻️ ربات به‌صورت خودکار توسط هاست ری‌استارت خواهد شد ✅")
