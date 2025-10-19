@@ -1,36 +1,38 @@
-import requests
+import os
+import aiohttp
 from telegram import Update
 from telegram.ext import ContextTypes
 
-# 🧠 API از DeepAI
-API_URL = "https://api.deepai.org/api/toonify"
-API_KEY = "64bdec50-8c1b-4c58-94fa-aa1a2402dd12"
-
-HEADERS = {"api-key": API_KEY}
+API_URL = "https://api-inference.huggingface.co/models/akhaliq/AnimeGANv2"
+API_KEY = os.getenv("HF_API_KEY")
 
 async def anime_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not update.message.photo:
+    if not update.message or not update.message.photo:
         return await update.message.reply_text("📸 لطفاً یه عکس بفرست تا کارتونی‌ش کنم!")
 
-    msg = await update.message.reply_text("🎨 در حال کارتونی کردن عکس... صبر کن 💫")
+    msg = await update.message.reply_text("🎨 در حال کارتونی کردن عکس...")
 
     try:
         photo = update.message.photo[-1]
-        photo_file = await photo.get_file()
-        image_bytes = await photo_file.download_as_bytearray()
+        tg_file = await photo.get_file()
+        img_bytes = await tg_file.download_as_bytearray()
 
-        response = requests.post(API_URL, headers=HEADERS, files={"image": image_bytes})
+        headers = {"Authorization": f"Bearer {API_KEY}"}
 
-        if response.status_code == 200:
-            result_url = response.json().get("output_url")
-            if result_url:
-                await update.message.reply_photo(result_url, caption="✨ کارتونی شد 😍")
-            else:
-                await update.message.reply_text("⚠️ خطا در دریافت خروجی از سرور.")
-        else:
-            await update.message.reply_text(f"⚠️ خطا در پردازش عکس (کد: {response.status_code})")
+        async with aiohttp.ClientSession() as session:
+            async with session.post(API_URL, headers=headers, data=img_bytes) as resp:
+                if resp.status == 200:
+                    data = await resp.read()
+                    with open("anime_out.jpg", "wb") as f:
+                        f.write(data)
+                    await update.message.reply_photo("anime_out.jpg", caption="✨ نسخه کارتونی آماده شد 😍")
+                else:
+                    await update.message.reply_text(f"⚠️ خطا در پردازش عکس (کد {resp.status})")
 
     except Exception as e:
-        await update.message.reply_text(f"❌ خطا در ارتباط با سرور:\n{e}")
+        await update.message.reply_text(f"❌ خطا: {e}")
 
-    await msg.delete()
+    try:
+        await msg.delete()
+    except:
+        pass
