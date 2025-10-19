@@ -778,49 +778,63 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ======================= 💬 پاسخ و هوش مصنوعی =======================
 async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """پاسخ‌دهی اصلی هوش مصنوعی و سیستم یادگیری"""
+    """پاسخ‌دهی اصلی هوش مصنوعی و سیستم یادگیری با لاگ دیباگ"""
 
-    # ✅ بررسی اینکه پیام معتبره
-    if not update.message or not update.message.text:
-        return
-
-    text = update.message.text.strip()
-    lower_text = text.lower()
-    uid = update.effective_user.id
-    chat_id = update.effective_chat.id
-
-    # 🚫 جلوگیری از پاسخ به بعضی پیام‌های خاص که هندلر اختصاصی دارند
-    ignore_texts = [
-        "راهنما", "ثبت راهنما",
-        "جوک", "فال",
-        "خوشامد", "ثبت خوشامد",
-        "ربات",
-        "لیست جوک‌ها", "لیست فال‌ها",
-        "ثبت جوک", "ثبت فال",
-        "لیست", "جمله بساز",
-        "درصد هوش", "درصد هوش اجتماعی", "هوش کلی",
-        "panel", "backup", "cloudsync", "leave",
-        "lock", "unlock", "reply", "toggle"
-    ]
-    if lower_text in ignore_texts:
-        return
-
-    # 🚫 جلوگیری از پاسخ در پیوی (فقط جوک و فال مجازند)
-    if update.effective_chat.type == "private":
-        if lower_text not in ["جوک", "فال"]:
+    try:
+        # بررسی پیام
+        if not update.message or not update.message.text:
+            print("⚠️ [DEBUG] پیام بدون متن یا نامعتبر دریافت شد.")
             return
 
-    # 🧠 بررسی حالت ریپلی مود گروهی
-    if await handle_group_reply_mode(update, context):
-        return
+        text = update.message.text.strip()
+        lower_text = text.lower()
+        uid = update.effective_user.id
+        chat_id = update.effective_chat.id
 
-    # ✅ در غیر این صورت، پاسخ هوشمند بده
-    try:
+        print(f"💬 [DEBUG] پیام از {uid} در چت {chat_id}: {text}")
+
+        # فیلتر دستورات خاص
+        ignore_texts = [
+            "راهنما", "ثبت راهنما",
+            "جوک", "فال",
+            "خوشامد", "ثبت خوشامد",
+            "ربات",
+            "لیست جوک‌ها", "لیست فال‌ها",
+            "ثبت جوک", "ثبت فال",
+            "لیست", "جمله بساز",
+            "درصد هوش", "درصد هوش اجتماعی", "هوش کلی",
+            "panel", "backup", "cloudsync", "leave",
+            "lock", "unlock", "reply", "toggle"
+        ]
+        if lower_text in ignore_texts:
+            print(f"🚫 [DEBUG] پیام '{lower_text}' در ignore_texts بود — رد شد.")
+            return
+
+        # فیلتر پیوی
+        if update.effective_chat.type == "private":
+            if lower_text not in ["جوک", "فال"]:
+                print(f"🚫 [DEBUG] پیام در پیوی و خارج از لیست مجاز بود — رد شد.")
+                return
+
+        # بررسی ریپلی مود
+        if await handle_group_reply_mode(update, context):
+            print("🧩 [DEBUG] در حالت ریپلی مود بود — خروج.")
+            return
+
+        # اجرای پاسخ هوشمند
+        print("🧠 [DEBUG] در حال اجرای smart_response ...")
         response = smart_response(text, uid)
+        print(f"🧠 [DEBUG] خروجی smart_response: {response}")
+
         if response:
             await update.message.reply_text(response)
+            print(f"✅ [DEBUG] پاسخ ارسال شد: {response}")
+        else:
+            print("⚠️ [DEBUG] smart_response چیزی برنگردوند.")
+
     except Exception as e:
-        print(f"⚠️ خطا در smart_response: {e}")
+        print(f"❌ [DEBUG ERROR in reply]: {e}")
+
 # ثبت کاربر و گروه
     await register_user(update.effective_user)
     register_group_activity(chat_id, uid)
