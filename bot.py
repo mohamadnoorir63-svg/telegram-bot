@@ -1684,11 +1684,12 @@ if __name__ == "__main__":
     app.add_handler(CallbackQueryHandler(panel_callback, pattern="^cmdpanel:"))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_custom_command), group=-3)
 
+    # ===== 🧠 پنل مدیریت =====
+    from auto_brain.admin_panel import show_admin_panel
+    app.add_handler(CommandHandler("panel", show_admin_panel))
+    app.add_handler(CallbackQueryHandler(panel_callback, pattern="^admin:"))
     # ==========================================================
-    # 🧠 پنل مدیریت اصلی
-    # ==========================================================
-    app.add_handler(CommandHandler("panel", show_main_panel))
-    app.add_handler(CallbackQueryHandler(admin_panel_callback, pattern="^admin:"))
+
 
     # ==========================================================
     # 👑 مدیریت وضعیت ادمین (ورود و خروج)
