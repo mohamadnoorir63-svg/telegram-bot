@@ -1667,15 +1667,15 @@ if __name__ == "__main__":
     app.add_error_handler(handle_error)
      
 
-    application.add_handler(CommandHandler("save", save_command))
-    application.add_handler(CommandHandler("del", delete_command))
+    app.add_handler(CommandHandler("save", save_command))
+    app.add_handler(CommandHandler("del", delete_command))
 
-    # ⚙️ پنل تنظیمات
-    application.add_handler(CommandHandler("panel", show_panel))
-    application.add_handler(CallbackQueryHandler(panel_callback))
+        # ⚙️ پنل تنظیمات
+    app.add_handler(CommandHandler("panel", show_panel))
+    app.add_handler(CallbackQueryHandler(panel_callback))
 
-    # 🧩 واکنش به دستورهای ذخیره‌شده (هر پیامی که به عنوان دستور شناخته شود)
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_custom_command))
+       # 🧩 واکنش به دستورهای ذخیره‌شده (هر پیامی که به عنوان دستور شناخته شود)
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_custom_command))
     
     # 👑 شناسایی ورود و خروج سازنده
     app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, detect_admin_movement))
