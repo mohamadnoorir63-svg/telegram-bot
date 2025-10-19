@@ -1656,7 +1656,6 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(text, parse_mode="HTML")
 
-
 # ======================= 🚀 اجرای نهایی =======================
 if __name__ == "__main__":
     print("🤖 خنگول فارسی 8.7 Cloud+ Supreme Pro Stable+ آماده به خدمت است ...")
@@ -1743,3 +1742,4 @@ if __name__ == "__main__":
 
     # 🚀 اجرای نهایی ربات
     app.run_polling(allowed_updates=Update.ALL_TYPES)
+    
