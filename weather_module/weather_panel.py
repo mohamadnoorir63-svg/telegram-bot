@@ -33,39 +33,26 @@ async def get_forecast(city: str):
             return await response.json()
 
 # ======================= 🌆 هندلر اصلی =======================
+# ======================= 🌆 هندلر اصلی (نسخه محدود به پنل) =======================
 async def show_weather(update: Update, context: ContextTypes.DEFAULT_TYPE):
     message = update.message or update.callback_query.message
 
-    # از پنل دکمه
+    # فقط از طریق دکمه پنل فعال شود
     if update.callback_query:
         await update.callback_query.answer()
-        if not context.user_data.get("weather_prompt_sent"):
-            await message.reply_text("🏙 لطفاً نام شهر را بنویس تا وضعیت آب‌وهوا را بگویم 🌤")
-            context.user_data["awaiting_city"] = True
-            context.user_data["weather_prompt_sent"] = True
+        await message.reply_text("🏙 لطفاً نام شهر را بنویس تا وضعیت آب‌وهوا را بگویم 🌤")
+        context.user_data["awaiting_city"] = True
         return
 
-    # منتظر شهر
+    # اگر از دکمه وارد شده و هنوز منتظر شهر هستیم
     if context.user_data.get("awaiting_city"):
         city = update.message.text.strip()
         context.user_data["awaiting_city"] = False
-        context.user_data["weather_prompt_sent"] = False
         await process_weather(update, city)
         return
 
-    # تشخیص دستور
-    text = (update.message.text or "").strip()
-    match = re.match(r"^(?:آب[\u200c\s]*و[\u200c\s]*هوا(?:ی)?)\s+(.+)$", text)
-    if match:
-        city = match.group(1).strip()
-        await process_weather(update, city)
-        return
-
-    # حالت هوشمند (فقط نام شهر)
-    if re.match(r"^[A-Za-zآ-ی\s]{2,20}$", text):
-        await process_weather(update, text)
-        return
-
+    # 🚫 اگر کاربر خودش چیزی بنویسه، هیچ کاری نکن
+    return
 
 # ======================= 🧩 پردازش نهایی =======================
 async def process_weather(update: Update, city: str):
