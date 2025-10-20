@@ -1643,7 +1643,7 @@ DATA_FILE = "help_data.json"
 ADMIN_ID = int(os.getenv("ADMIN_ID", "7089376754"))
 
 # ======================= 📦 توابع کمکی =======================
-def load_data():
+def load_help_data():
     if not os.path.exists(DATA_FILE):
         return {"help": "", "guide": ""}
     try:
@@ -1653,7 +1653,7 @@ def load_data():
         return {"help": "", "guide": ""}
 
 
-def save_data(data):
+def save_help_data(data):
     with open(DATA_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
