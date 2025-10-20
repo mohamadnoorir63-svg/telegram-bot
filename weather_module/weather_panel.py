@@ -2,7 +2,7 @@ import os
 import aiohttp
 import re
 import io
-from PIL import Image, ImageDraw
+from PIL import Image
 from datetime import datetime
 from telegram import Update
 from telegram.ext import ContextTypes
@@ -142,13 +142,13 @@ async def process_weather(update: Update, city_text: str):
 
     await update.message.reply_text(text, parse_mode="HTML")
 
-    # 📍 ارسال موقعیت
+    # 📍 ارسال مختصات
     try:
         await update.message.reply_location(latitude=lat, longitude=lon)
     except Exception:
         pass
 
-    # 🛰 نقشه ترکیبی با علامت شهر
+    # 🛰 ساخت نقشه ترکیبی
     tile_zoom = 5
     x_tile = int((lon + 180) / 360 * (2 ** tile_zoom))
     y_tile = int((1 - ((lat + 90) / 180)) * (2 ** tile_zoom))
@@ -162,21 +162,13 @@ async def process_weather(update: Update, city_text: str):
                 temp_img = Image.open(io.BytesIO(await t_res.read())).convert("RGBA")
                 clouds_img = Image.open(io.BytesIO(await c_res.read())).convert("RGBA")
 
-                # ترکیب شفافیت ابرها روی نقشه دما
+                # ترکیب شفافیت ابرها روی دما
                 combined = Image.blend(temp_img, clouds_img, alpha=0.45)
 
-                # 🟥 رسم دایره قرمز در مرکز نقشه (نشانه شهر)
-                draw = ImageDraw.Draw(combined)
-                w, h = combined.size
-                cx, cy = w // 2, h // 2
-                r = 6
-                draw.ellipse((cx - r, cy - r, cx + r, cy + r), fill=(255, 0, 0, 255))
-
-                # ارسال به کاربر
                 buf = io.BytesIO()
                 combined.save(buf, format="PNG")
                 buf.seek(0)
-                await update.message.reply_photo(buf, caption="🌍 نقشه ترکیبی دما و ابرها + موقعیت شهر 📍")
+                await update.message.reply_photo(buf, caption="🌍 نقشه ترکیبی دما و ابرها")
             else:
                 await update.message.reply_text("⚠️ دریافت نقشه ماهواره‌ای با خطا مواجه شد.")
 
