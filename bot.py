@@ -1481,49 +1481,44 @@ async def load_text(file_name, default_text):
     return default_text
 
 
-# ======================= 🧭 منوی اصلی =======================
-async def show_main_panel(update: Update, context: ContextTypes.DEFAULT_TYPE, edit=False):
-    # ❌ فعلاً غیر فعال شد تا متن درباره خنگول فقط با دکمه نمایش داده شود
-    # about = await load_text(
-    #     "about_khengol.txt",
-    #     "✨ <b>خنگول فارسی</b>\n🤖 هوش، شوخ‌طبعی و احساس واقعی در یک ربات!\n💬 همراه با خنده، فال، و پاسخ‌های باحال!"
-    # )
 
+
+    # ======================= 🎛 پنل اصلی خنگول =======================
+from telegram import InlineKeyboardMarkup, InlineKeyboardButton, Update
+from telegram.ext import ContextTypes
+
+async def show_main_panel(update: Update, context: ContextTypes.DEFAULT_TYPE, edit=False):
     about = "🌙 <b>به منوی اصلی خنگول خوش آمدی!</b>\nاز دکمه‌های زیر یکی رو انتخاب کن 😎"
 
     keyboard = [
-    [
-        InlineKeyboardButton("💬 ارتباط با سازنده", url="https://t.me/NOORI_NOOR"),
-        InlineKeyboardButton("💭 گروه پشتیبانی", url="https://t.me/Poshtibahni")
-    ],
-    [
-        InlineKeyboardButton("➕ افزودن به گروه", url="https://t.me/Khenqol_bot?startgroup=true"),
-        InlineKeyboardButton("🧩 قابلیت‌های ربات", callback_data="panel_features")
-    ],
-    [
-        InlineKeyboardButton("🤖 درباره خنگول", callback_data="panel_about"),
-        InlineKeyboardButton("👨‍💻 درباره تیم ما", callback_data="panel_team")
-    ],
-    [
-        InlineKeyboardButton("🔮 فال امروز", callback_data="panel_fortune"),
-        InlineKeyboardButton("😂 جوک خنده‌دار", callback_data="panel_joke")
-    ],
-    [
-        InlineKeyboardButton("🎨 فونت‌ساز حرفه‌ای", callback_data="panel_font"),
-        InlineKeyboardButton("💳 آیدی خنگولی من", callback_data="panel_stats")
-    ],
-    [
-        InlineKeyboardButton("🧠 گفتگوی ChatGPT", callback_data="panel_ai")
-    ],
-    [
-        InlineKeyboardButton("🌤 آب و هوا", callback_data="panel_weather")
+        [
+            InlineKeyboardButton("💬 ارتباط با سازنده", url="https://t.me/NOORI_NOOR"),
+            InlineKeyboardButton("💭 گروه پشتیبانی", url="https://t.me/Poshtibahni")
+        ],
+        [
+            InlineKeyboardButton("➕ افزودن به گروه", url="https://t.me/Khenqol_bot?startgroup=true"),
+            InlineKeyboardButton("🧩 قابلیت‌های ربات", callback_data="panel_features")
+        ],
+        [
+            InlineKeyboardButton("🤖 درباره خنگول", callback_data="panel_about"),
+            InlineKeyboardButton("👨‍💻 درباره تیم ما", callback_data="panel_team")
+        ],
+        [
+            InlineKeyboardButton("🔮 فال امروز", callback_data="panel_fortune"),
+            InlineKeyboardButton("😂 جوک خنده‌دار", callback_data="panel_joke")
+        ],
+        [
+            InlineKeyboardButton("🎨 فونت‌ساز حرفه‌ای", callback_data="panel_font"),
+            InlineKeyboardButton("💳 آیدی خنگولی من", callback_data="panel_stats")
+        ],
+        [
+            InlineKeyboardButton("🧠 گفتگوی ChatGPT", callback_data="panel_chatgpt")
+        ],
+        [
+            InlineKeyboardButton("🌤 آب و هوا", callback_data="panel_weather")
+        ]
     ]
-    ]
-    
 
-    
-
-    # 🔹 ساخت markup برای نمایش دکمه‌ها
     markup = InlineKeyboardMarkup(keyboard)
 
     if edit:
