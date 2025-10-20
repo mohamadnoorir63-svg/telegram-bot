@@ -76,8 +76,13 @@ async def start_ai_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ======================= 💬 چت با ChatGPT =======================
 async def chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_type = update.message.chat.type  # 🆕 نوع چت (private / group)
     user_id = update.effective_user.id
     text = update.message.text.strip()
+
+    # 🚫 اگر در گروه یا سوپرگروه است، پاسخ نده
+    if chat_type != "private":
+        return
 
     if not context.user_data.get("ai_chat_active"):
         return
