@@ -36,14 +36,21 @@ async def show_weather(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.callback_query:
         query = update.callback_query
         await query.answer()
+
+        # ✅ ضدتکرار — اگر قبلاً پیام پرسش شهر فرستاده شده، دیگه نفرسته
+        if context.user_data.get("weather_prompt_sent"):
+            return
+
         await query.message.reply_text("🏙 لطفاً نام شهر را بنویس تا وضعیت آب‌وهوا را بگویم 🌤")
         context.user_data["awaiting_city"] = True
+        context.user_data["weather_prompt_sent"] = True  # علامت‌گذاری که فرستاده شده
         return
 
     # حالت ۲️⃣: وقتی در انتظار نام شهر هستیم
     if context.user_data.get("awaiting_city"):
         city = update.message.text.strip()
         context.user_data["awaiting_city"] = False  # بعد از دریافت شهر، حالت انتظار غیرفعال شود
+        context.user_data["weather_prompt_sent"] = False  # ریست برای دفعه‌ی بعد
         await process_weather_request(update, city)
         return
 
