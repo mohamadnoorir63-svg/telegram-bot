@@ -5,13 +5,13 @@ from datetime import datetime
 from telegram import Update
 from telegram.ext import ContextTypes
 
-# 🗝 کلید API از تنظیمات محیطی Heroku
-WEATHER_API_KEY = os.getenv("WEATHER_API_KEY")
+# 🗝 خواندن کلید API از محیط Heroku
+WEATHER_API_KEY = os.environ.get("WEATHER_API_KEY", "").strip()
 BASE_URL = "https://api.openweathermap.org/data/2.5/weather"
 
 # ======================= 🌤 دریافت اطلاعات از API =======================
 async def get_weather(city: str):
-    """دریافت اطلاعات آب‌وهوا از OpenWeather"""
+    """دریافت داده از OpenWeather"""
     if not WEATHER_API_KEY:
         return {"_error": "NO_API_KEY"}
 
@@ -31,44 +31,42 @@ async def get_weather(city: str):
             data["_status"] = resp.status
             return data
 
-# ======================= 🌆 نمایش آب‌وهوا =======================
+# ======================= 🌆 هندلر اصلی =======================
 async def show_weather(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
     📍 دو حالت:
-    1. از چت: «آب و هوا تهران» یا «آب‌وهوا هرات»
-    2. از پنل: دکمه را می‌زنی → ازت شهر می‌پرسد → فقط اسم شهر را بفرست
+    1. از چت: "آب و هوا تهران"
+    2. از پنل: کلیک روی دکمه → درخواست شهر
     """
     message = update.message or (update.callback_query.message if update.callback_query else None)
     if not message:
         return
 
     # جلوگیری از ارسال دوباره پیام درخواست شهر
-    if context.user_data.get("weather_waiting_prompt_sent", False):
+    if context.user_data.get("weather_waiting_prompt_sent"):
         return
 
-    # 🌦 حالت پنل
+    # اگر از پنل دکمه‌ای اومده
     if update.callback_query:
         await update.callback_query.answer()
         context.user_data["awaiting_city_weather"] = True
-
-        # فقط یک بار پیام درخواست بفرست
-        if not context.user_data.get("weather_prompt_active", False):
+        if not context.user_data.get("weather_prompt_active"):
             context.user_data["weather_prompt_active"] = True
             await message.reply_text("🏙 لطفاً نام شهر را بنویس تا وضعیت آب‌وهوا را بگویم 🌤")
             context.user_data["weather_waiting_prompt_sent"] = True
         return
 
-    # 🌤 حالت چت مستقیم
+    # اگر از چت مستقیم بود
     txt = (message.text or "").strip()
 
-    # اگر جمله شامل "آب و هوا" بود
+    # تشخیص الگوی "آب و هوا تهران"
     match = re.match(r"^(?:آب[\u200c\s]*و[\u200c\s]*هوا(?:ی)?|آب‌وهوا(?:ی)?|weather)\s+(.+)$", txt, flags=re.IGNORECASE)
     if match:
         city = match.group(1).strip()
         context.user_data["weather_prompt_active"] = False
         return await _process_weather(message, city)
 
-    # اگر کاربر بعد از پنل شهر را فرستاده
+    # اگر قبلاً از پنل شهر خواسته شده بود
     if context.user_data.get("awaiting_city_weather"):
         context.user_data["awaiting_city_weather"] = False
         context.user_data["weather_prompt_active"] = False
@@ -79,19 +77,18 @@ async def show_weather(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return await message.reply_text("⚠️ نام شهر خالیه. دوباره بفرست.")
         return await _process_weather(message, city)
 
-    # در غیر اینصورت، پیام را نادیده بگیر
     return
 
-# ======================= 🧠 پردازش پاسخ =======================
+# ======================= 🧠 پردازش و پاسخ =======================
 async def _process_weather(message, city: str):
     data = await get_weather(city)
 
     # 🛑 اگر کلید API تنظیم نشده
     if isinstance(data, dict) and data.get("_error") == "NO_API_KEY":
-        return await message.reply_text("⚠️ کلید API در تنظیمات محیطی تنظیم نشده!")
+        return await message.reply_text("⚠️ کلید API پیدا نشد! در تنظیمات Heroku باید WEATHER_API_KEY تعریف شده باشه.")
 
-    # 🛑 اگر API یا شهر خطا داد
-    if (not isinstance(data, dict)) or data.get("cod") != 200:
+    # 🛑 اگر خطای API یا شهر اشتباه
+    if not isinstance(data, dict) or data.get("cod") != 200:
         api_msg = data.get("message") if isinstance(data, dict) else None
         hint = "مثلاً: Herat یا Tehran یا Kabul"
         return await message.reply_text(f"⚠️ شهر پیدا نشد یا API خطا داد. {('پیام: ' + api_msg) if api_msg else hint}")
@@ -101,18 +98,16 @@ async def _process_weather(message, city: str):
     country = data["sys"].get("country", "")
     temp = round(data["main"]["temp"])
     humidity = data["main"]["humidity"]
-    wind_ms = data["wind"]["speed"]
-    wind_kmh = round(float(wind_ms) * 3.6)
+    wind_ms = float(data["wind"]["speed"])
+    wind_kmh = round(wind_ms * 3.6)
     desc = data["weather"][0]["description"]
     icon = data["weather"][0]["icon"]
     dt = datetime.fromtimestamp(data["dt"])
     local_time = dt.strftime("%H:%M")
 
-    # ایموجی و پرچم
     emoji = _get_weather_emoji(icon)
     flag = _flag_emoji(country)
 
-    # ساخت متن نهایی
     text = (
         f"{emoji} <b>آب‌وهوا</b>\n\n"
         f"🏙 شهر: <b>{name}</b> {flag}\n"
