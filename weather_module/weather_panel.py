@@ -2,17 +2,20 @@ import os
 import aiohttp
 import re
 import io
-import imageio.v2 as imageio
 from PIL import Image, ImageDraw
 from datetime import datetime
 from telegram import Update
 from telegram.ext import ContextTypes
 
-# 🔑 کلید API
+# 🗝 کلید API
 WEATHER_API_KEY = os.getenv("WEATHER_API_KEY")
-BASE_URL = "https://api.openweathermap.org/data/2.5/weather"
+
+# 🌍 API URLs
+CURRENT_URL = "https://api.openweathermap.org/data/2.5/weather"
 FORECAST_URL = "https://api.openweathermap.org/data/2.5/forecast"
 GEO_URL = "https://api.openweathermap.org/geo/1.0/direct"
+
+# 🛰 لایه‌های ماهواره‌ای
 TILE_BASE = "https://tile.openweathermap.org/map"
 LAYER_TEMP = "temp_new"
 LAYER_CLOUDS = "clouds_new"
@@ -20,31 +23,44 @@ LAYER_CLOUDS = "clouds_new"
 
 # ======================= 📍 مختصات دقیق شهر =======================
 async def get_city_coordinates(city_text: str):
-    """استخراج مختصات دقیق شهر"""
+    """استخراج مختصات دقیق شهر (با تشخیص کشور)"""
     if not WEATHER_API_KEY:
         return None
-    params = {"q": city_text, "limit": 1, "appid": WEATHER_API_KEY}
+
+    parts = city_text.split()
+    if len(parts) >= 2:
+        city = " ".join(parts[:-1])
+        country = parts[-1]
+    else:
+        city = city_text
+        country = None
+
+    params = {"q": f"{city},{country}" if country else city, "limit": 1, "appid": WEATHER_API_KEY}
     async with aiohttp.ClientSession() as session:
-        async with session.get(GEO_URL, params=params) as r:
-            if r.status != 200:
+        async with session.get(GEO_URL, params=params) as response:
+            if response.status != 200:
                 return None
-            data = await r.json()
+            data = await response.json()
             return data[0] if data else None
 
 
-# ======================= 🌤 داده‌های آب‌وهوا =======================
-async def get_weather(lat, lon):
+# ======================= 🌤 داده‌های هواشناسی =======================
+async def get_weather(lat: float, lon: float):
     params = {"lat": lat, "lon": lon, "appid": WEATHER_API_KEY, "units": "metric", "lang": "fa"}
-    async with aiohttp.ClientSession() as s:
-        async with s.get(BASE_URL, params=params) as r:
-            return await r.json() if r.status == 200 else None
+    async with aiohttp.ClientSession() as session:
+        async with session.get(CURRENT_URL, params=params) as response:
+            if response.status != 200:
+                return None
+            return await response.json()
 
 
-async def get_forecast(lat, lon):
+async def get_forecast(lat: float, lon: float):
     params = {"lat": lat, "lon": lon, "appid": WEATHER_API_KEY, "units": "metric", "lang": "fa"}
-    async with aiohttp.ClientSession() as s:
-        async with s.get(FORECAST_URL, params=params) as r:
-            return await r.json() if r.status == 200 else None
+    async with aiohttp.ClientSession() as session:
+        async with session.get(FORECAST_URL, params=params) as response:
+            if response.status != 200:
+                return None
+            return await response.json()
 
 
 # ======================= 🌆 هندلر اصلی =======================
@@ -93,62 +109,74 @@ async def process_weather(update: Update, city_text: str):
     if not current or current.get("cod") != 200:
         return await update.message.reply_text("⚠️ خطا در دریافت داده‌های آب‌وهوا.")
 
+    # 📊 اطلاعات فعلی
     temp = round(current["main"]["temp"])
+    humidity = current["main"]["humidity"]
+    wind = round(current["wind"]["speed"] * 3.6, 1)
     desc = current["weather"][0]["description"]
     icon = current["weather"][0]["icon"]
-    dt = datetime.fromtimestamp(current["dt"]).strftime("%H:%M")
+    dt = datetime.fromtimestamp(current["dt"])
+    local_time = dt.strftime("%H:%M")
 
-    # پیش‌بینی سه‌روزه
+    # 📅 پیش‌بینی
     forecast_text = ""
     if forecast and forecast.get("list"):
         labels = ["امروز", "فردا", "پس‌فردا"]
         for i, item in enumerate(forecast["list"][::8][:3]):
-            t = round(item["main"]["temp"])
-            d = item["weather"][0]["description"]
-            ic = item["weather"][0]["icon"]
-            forecast_text += f"📅 {labels[i]}: {d} {get_weather_emoji(ic)} — {t}°C\n"
+            day_temp = round(item["main"]["temp"])
+            day_desc = item["weather"][0]["description"]
+            day_icon = item["weather"][0]["icon"]
+            forecast_text += f"📅 {labels[i]}: {day_desc} {get_weather_emoji(day_icon)} — {day_temp}°C\n"
 
+    emoji = get_weather_emoji(icon)
     text = (
-        f"{get_weather_emoji(icon)} <b>آب‌وهوا</b>\n\n"
+        f"{emoji} <b>آب‌وهوا</b>\n\n"
         f"🏙 شهر: {city_name} {flag_emoji(country_code)}\n"
         f"{forecast_text}\n"
         f"🌤 وضعیت فعلی: {desc}\n"
         f"🌡 دما: {temp}°C\n"
-        f"🕒 بروزرسانی: {dt}"
+        f"💧 رطوبت: {humidity}%\n"
+        f"💨 باد: {wind} km/h\n"
+        f"🕒 بروزرسانی: {local_time}"
     )
+
     await update.message.reply_text(text, parse_mode="HTML")
 
-    # 🛰 نقشه با پالس متحرک
+    # 📍 ارسال موقعیت
+    try:
+        await update.message.reply_location(latitude=lat, longitude=lon)
+    except Exception:
+        pass
+
+    # 🛰 نقشه ترکیبی با علامت شهر
     tile_zoom = 5
     x_tile = int((lon + 180) / 360 * (2 ** tile_zoom))
     y_tile = int((1 - ((lat + 90) / 180)) * (2 ** tile_zoom))
 
-    temp_url = f"{TILE_BASE}/temp_new/{tile_zoom}/{x_tile}/{y_tile}.png?appid={WEATHER_API_KEY}"
-    cloud_url = f"{TILE_BASE}/clouds_new/{tile_zoom}/{x_tile}/{y_tile}.png?appid={WEATHER_API_KEY}"
+    temp_url = f"{TILE_BASE}/{LAYER_TEMP}/{tile_zoom}/{x_tile}/{y_tile}.png?appid={WEATHER_API_KEY}"
+    cloud_url = f"{TILE_BASE}/{LAYER_CLOUDS}/{tile_zoom}/{x_tile}/{y_tile}.png?appid={WEATHER_API_KEY}"
 
-    async with aiohttp.ClientSession() as s:
-        async with s.get(temp_url) as t_res, s.get(cloud_url) as c_res:
+    async with aiohttp.ClientSession() as session:
+        async with session.get(temp_url) as t_res, session.get(cloud_url) as c_res:
             if t_res.status == 200 and c_res.status == 200:
                 temp_img = Image.open(io.BytesIO(await t_res.read())).convert("RGBA")
                 clouds_img = Image.open(io.BytesIO(await c_res.read())).convert("RGBA")
+
+                # ترکیب شفافیت ابرها روی نقشه دما
                 combined = Image.blend(temp_img, clouds_img, alpha=0.45)
 
-                # 🎞 ساخت فریم‌های پالس
-                frames = []
-                for r in range(3, 20, 2):
-                    frame = combined.copy()
-                    draw = ImageDraw.Draw(frame)
-                    cx, cy = frame.width // 2, frame.height // 2
-                    draw.ellipse((cx - r, cy - r, cx + r, cy + r), outline=(255, 0, 0, 255), width=3)
-                    frames.append(frame)
+                # 🟥 رسم دایره قرمز در مرکز نقشه (نشانه شهر)
+                draw = ImageDraw.Draw(combined)
+                w, h = combined.size
+                cx, cy = w // 2, h // 2
+                r = 6
+                draw.ellipse((cx - r, cy - r, cx + r, cy + r), fill=(255, 0, 0, 255))
 
-                # حلقه رفت و برگشتی پالس
-                frames += frames[::-1]
-
+                # ارسال به کاربر
                 buf = io.BytesIO()
-                imageio.mimsave(buf, frames, format="GIF", duration=0.1)
+                combined.save(buf, format="PNG")
                 buf.seek(0)
-                await update.message.reply_animation(buf, caption="🌍 نقشه ترکیبی با موقعیت متحرک 📍")
+                await update.message.reply_photo(buf, caption="🌍 نقشه ترکیبی دما و ابرها + موقعیت شهر 📍")
             else:
                 await update.message.reply_text("⚠️ دریافت نقشه ماهواره‌ای با خطا مواجه شد.")
 
