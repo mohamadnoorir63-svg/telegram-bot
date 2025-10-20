@@ -1644,6 +1644,7 @@ ADMIN_ID = int(os.getenv("ADMIN_ID", "7089376754"))
 
 # ======================= 📦 توابع کمکی =======================
 def load_help_data():
+    """خواندن فایل help_data.json"""
     if not os.path.exists(DATA_FILE):
         return {"help": "", "guide": ""}
     try:
@@ -1654,9 +1655,9 @@ def load_help_data():
 
 
 def save_help_data(data):
+    """ذخیره‌سازی help_data.json"""
     with open(DATA_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
-
 
 # ======================= 💾 ثبت help =======================
 async def save_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -1669,12 +1670,11 @@ async def save_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return await update.message.reply_text("ℹ️ لطفاً روی متن جدید help ریپلای کن و بنویس: ثبت help")
 
     text = update.message.reply_to_message.text
-    data = load_data()
+    data = load_help_data()
     data["help"] = text
-    save_data(data)
+    save_help_data(data)
 
     await update.message.reply_text("✅ متن help با موفقیت ثبت شد.")
-
 
 # ======================= 💾 ثبت راهنما =======================
 async def save_custom_guide(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -1687,32 +1687,29 @@ async def save_custom_guide(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return await update.message.reply_text("ℹ️ لطفاً روی متن جدید راهنما ریپلای کن و بنویس: ثبت راهنما")
 
     text = update.message.reply_to_message.text
-    data = load_data()
+    data = load_help_data()
     data["guide"] = text
-    save_data(data)
+    save_help_data(data)
 
     await update.message.reply_text("✅ متن راهنمای عمومی با موفقیت ثبت شد.")
-
 
 # ======================= 📖 نمایش help =======================
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """نمایش متن /help"""
-    data = load_data()
+    data = load_help_data()
     text = data.get("help", "")
     if not text:
         return await update.message.reply_text("ℹ️ هنوز متنی برای help ثبت نشده.")
     await update.message.reply_text(text)
 
-
 # ======================= 📖 نمایش راهنما =======================
 async def show_custom_guide(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """نمایش متن 'راهنما'"""
-    data = load_data()
+    data = load_help_data()
     text = data.get("guide", "")
     if not text:
         return await update.message.reply_text("ℹ️ هنوز متنی برای راهنما ثبت نشده.")
     await update.message.reply_text(text)
-    
     # ======================= 🚀 اجرای نهایی =======================
 if __name__ == "__main__":
     print("🤖 خنگول فارسی 8.7 Cloud+ Supreme Pro Stable+ آماده به خدمت است ...")
