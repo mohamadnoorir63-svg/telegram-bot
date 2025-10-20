@@ -1562,19 +1562,19 @@ async def panel_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         text += "\n\n🔙 برای بازگشت، روی دکمه زیر بزن:"
         back_btn = [[InlineKeyboardButton("🔙 بازگشت", callback_data="back_main")]]
         await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(back_btn), parse_mode="HTML")
+    elif query.data == "panel_stats":
+    user = query.from_user
+    now = datetime.now().strftime("%Y/%m/%d - %H:%M:%S")
 
+    elif query.data == "panel_weather":
+        await show_weather(update, context)
     elif query.data == "panel_fortune":
         await query.message.reply_text("🔮 برای دیدن فال بنویس:\n<b>فال</b>", parse_mode="HTML")
     elif query.data == "panel_joke":
         await query.message.reply_text("😂 برای دیدن جوک بنویس:\n<b>جوک</b>", parse_mode="HTML")
     elif query.data == "panel_font":
         await query.message.reply_text("🎨 برای ساخت فونت بنویس:\n<b>فونت اسم‌ت</b>", parse_mode="HTML")
-    elif query.data == "panel_stats":
-        user = query.from_user
-        now = datetime.now().strftime("%Y/%m/%d - %H:%M:%S")
-    elif query.data == "panel_weather":
-       await show_weather(update, context)
-
+    
         text = (
             f"📊 <b>اطلاعات کاربر:</b>\n\n"
             f"👤 نام: <b>{user.first_name}</b>\n"
