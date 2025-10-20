@@ -28,6 +28,7 @@ async def get_weather(city: str):
             return await response.json()
 
 
+
 # ======================= 🌆 نمایش آب‌وهوا (عمومی و از پنل) =======================
 async def show_weather(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """نمایش وضعیت آب‌وهوا هم از چت و هم از پنل"""
@@ -50,23 +51,24 @@ async def show_weather(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # حالت ۲️⃣: وقتی در انتظار نام شهر هستیم
     if context.user_data.get("awaiting_city"):
         city = update.message.text.strip()
-        context.user_data["awaiting_city"] = False  # بعد از دریافت شهر، حالت انتظار غیرفعال شود
-        context.user_data["weather_prompt_sent"] = False  # ریست برای دفعه‌ی بعد
+        context.user_data["awaiting_city"] = False
+        context.user_data["weather_prompt_sent"] = False
         await process_weather_request(update, city)
         return
 
-    # حالت ۳️⃣: وقتی کاربر مستقیماً نوشت "آب و هوا [شهر]" یا "آب‌وهوای [شهر]"
+    # حالت ۳️⃣: فقط وقتی پیام با "آب و هوا" یا "آب‌وهوای" شروع بشه
     if update.message and update.message.text:
         text = update.message.text.strip()
 
-        # 📌 تشخیص هوشمند همه‌ی حالت‌های "آب و هوا" و "آب‌وهوای"
-        match = re.match(r"^آب[\u200c\s]*و[\u200c\s]*هوا(?:ی)?\s+(.+)$", text)
+        # 📌 فقط دستورهایی که با "آب و هوا" شروع می‌شن (نه وسط جمله)
+        match = re.match(r"^(?:آب[\u200c\s]*و[\u200c\s]*هوا(?:ی)?)\s+(.+)$", text)
         if match:
             city = match.group(1).strip()
             await process_weather_request(update, city)
             return
 
-
+    # 🚫 اگر پیام هیچ‌کدوم از حالت‌های بالا نبود → هیچی نگو
+    return
 # ======================= 🧩 پردازش داده و ارسال نتیجه =======================
 async def process_weather_request(update: Update, city: str):
     """دریافت اطلاعات از API و ساخت پیام خروجی"""
