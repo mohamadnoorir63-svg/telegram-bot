@@ -3,13 +3,13 @@ import json
 import datetime
 from telegram import InlineKeyboardMarkup, InlineKeyboardButton, Update
 from telegram.ext import ContextTypes
-from openai import OpenAI
+import openai
 
-# 🔑 API از محیط سرور خوانده می‌شود
+# 🔑 تنظیم کلید API از محیط سرور
 API_KEY = os.getenv("OPENAI_API_KEY")
-client = OpenAI(api_key=API_KEY)
+openai.api_key = API_KEY
 
-# 📁 مسیر فایل ذخیره کاربران
+# 📁 مسیر فایل کاربران
 USERS_FILE = "ai_chat/ai_users.json"
 
 # 👑 مدیر کل برای نامحدود بودن
@@ -44,9 +44,9 @@ async def show_ai_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     text = (
         "🤖 <b>گفتگوی هوش مصنوعی ChatGPT</b>\n\n"
-        "💬 در این بخش می‌تونی با هوش مصنوعی حرفه‌ای گفتگو کنی.\n"
-        "🧩 هر کاربر روزانه ۵ پیام رایگان داره.\n\n"
-        "برای شروع روی دکمه زیر بزن 👇"
+        "💬 این بخش برای گفتگو با هوش مصنوعی پیشرفته است.\n"
+        "🧩 هر کاربر روزانه تا ۵ پیام رایگان دارد.\n\n"
+        "برای شروع گفتگو روی دکمه زیر بزن 👇"
     )
 
     keyboard = [[InlineKeyboardButton("🚀 شروع گفتگو", callback_data="start_ai_chat")]]
@@ -68,7 +68,7 @@ async def start_ai_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
     await query.message.reply_text(
         "🧠 گفتگوی ChatGPT فعال شد!\n"
-        "✍️ حالا هرچی می‌خوای بنویس تا هوش مصنوعی جواب بده.\n"
+        "✍️ هرچی می‌خوای بنویس تا هوش مصنوعی جواب بده.\n"
         "📊 پیام‌های باقی‌مانده‌ی امروز: ۵\n\n"
         "برای قطع گفتگو بنویس: <b>خاموش</b>",
         parse_mode="HTML"
@@ -79,7 +79,6 @@ async def chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     text = update.message.text.strip()
 
-    # فقط وقتی گفتگوی ChatGPT فعاله
     if not context.user_data.get("ai_chat_active"):
         return
 
@@ -93,11 +92,11 @@ async def chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     try:
-        response = client.chat.completions.create(
-            model="gpt-4o-mini",
+        response = openai.ChatCompletion.create(
+            model="gpt-3.5-turbo",
             messages=[{"role": "user", "content": text}]
         )
-        reply_text = response.choices[0].message.content.strip()
+        reply_text = response.choices[0].message["content"].strip()
     except Exception as e:
         reply_text = f"⚠️ خطا در ارتباط با ChatGPT:\n{e}"
 
