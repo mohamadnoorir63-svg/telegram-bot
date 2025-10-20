@@ -38,6 +38,7 @@ from auto_brain.command_manager import (
 
 
 from ai_chat.chatgpt_panel import show_ai_panel, chat, start_ai_chat, stop_ai_chat
+from help_system import help_command
 
 # 🧠 نکته مهم:
 # ❌ از اینجا دیگه admin_panel رو import نکن!
