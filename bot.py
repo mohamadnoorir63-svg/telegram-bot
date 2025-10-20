@@ -38,7 +38,7 @@ from auto_brain.command_manager import (
 
 
 from ai_chat.chatgpt_panel import show_ai_panel, chat, start_ai_chat, stop_ai_chat
-from help_system import help_command
+
 
 # 🧠 نکته مهم:
 # ❌ از اینجا دیگه admin_panel رو import نکن!
@@ -1621,44 +1621,88 @@ async def save_panel_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"✅ متن «{cmd}» ذخیره شد!")
     else:
         await update.message.reply_text("❗ دستور اشتباه است — باید یکی از این‌ها باشد:\nثبت درباره / ثبت تیم / ثبت قابلیت")
-# ======================= 🧾 راهنمای قابل ویرایش (جداسازی از /help) =======================
-import aiofiles, os
+# ======================= 🧾 سیستم ثبت دستی راهنما و help =======================
+# بدون نیاز به ویرایش فایل‌ها یا پوشه‌ها
+# ==============================================================
+import os, json
+from telegram import Update
+from telegram.ext import ContextTypes
 
-HELP_FILE = "custom_help.txt"           # 📘 مخصوص /help مدیر اصلی
-USER_GUIDE_FILE = "editable_guide.txt"  # 💬 مخصوص ثبت راهنمای عمومی
+# 📦 مسیر ساده برای ذخیره موقت
+DATA_FILE = "help_data.json"
+
+# 🔐 مدیر اصلی
+ADMIN_ID = int(os.getenv("ADMIN_ID", "7089376754"))
+
+# ======================= 📦 توابع کمکی =======================
+def load_data():
+    if not os.path.exists(DATA_FILE):
+        return {"help": "", "guide": ""}
+    try:
+        with open(DATA_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except:
+        return {"help": "", "guide": ""}
 
 
-# ======================= 💾 ثبت راهنمای عمومی =======================
-async def save_custom_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """ثبت یا تغییر متن راهنمای عمومی توسط مدیر اصلی"""
-    ADMIN_ID = int(os.getenv("ADMIN_ID", "7089376754"))
+def save_data(data):
+    with open(DATA_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
+
+# ======================= 💾 ثبت help =======================
+async def save_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """ثبت یا تغییر متن /help توسط مدیر اصلی (ریپلای با 'ثبت help')"""
     user_id = update.effective_user.id
+    if user_id != ADMIN_ID:
+        return await update.message.reply_text("⛔ فقط مدیر اصلی می‌تونه متن help رو تغییر بده!")
 
+    if not update.message.reply_to_message or not update.message.reply_to_message.text:
+        return await update.message.reply_text("ℹ️ لطفاً روی متن جدید help ریپلای کن و بنویس: ثبت help")
+
+    text = update.message.reply_to_message.text
+    data = load_data()
+    data["help"] = text
+    save_data(data)
+
+    await update.message.reply_text("✅ متن help با موفقیت ثبت شد.")
+
+
+# ======================= 💾 ثبت راهنما =======================
+async def save_custom_guide(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """ثبت یا تغییر متن 'راهنما' توسط مدیر اصلی (ریپلای با 'ثبت راهنما')"""
+    user_id = update.effective_user.id
     if user_id != ADMIN_ID:
         return await update.message.reply_text("⛔ فقط مدیر اصلی می‌تونه راهنما رو تغییر بده!")
 
     if not update.message.reply_to_message or not update.message.reply_to_message.text:
-        return await update.message.reply_text("ℹ️ لطفاً روی پیام جدید راهنما ریپلای کن و بنویس: ثبت راهنما")
+        return await update.message.reply_text("ℹ️ لطفاً روی متن جدید راهنما ریپلای کن و بنویس: ثبت راهنما")
 
     text = update.message.reply_to_message.text
-    async with aiofiles.open(USER_GUIDE_FILE, "w", encoding="utf-8") as f:
-        await f.write(text)
+    data = load_data()
+    data["guide"] = text
+    save_data(data)
 
-    await update.message.reply_text("✅ متن راهنمای عمومی ذخیره شد (editable_guide.txt).")
+    await update.message.reply_text("✅ متن راهنمای عمومی با موفقیت ثبت شد.")
 
 
-# ======================= 📖 نمایش راهنمای عمومی =======================
-async def show_custom_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """نمایش راهنمای عمومی برای کاربران"""
-    if not os.path.exists(USER_GUIDE_FILE):
-        return await update.message.reply_text(
-            "ℹ️ هنوز هیچ متنی برای راهنما ثبت نشده.\n"
-            "مدیر اصلی می‌تونه با ریپلای و نوشتن «ثبت راهنما» تنظیمش کنه."
-        )
+# ======================= 📖 نمایش help =======================
+async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """نمایش متن /help"""
+    data = load_data()
+    text = data.get("help", "")
+    if not text:
+        return await update.message.reply_text("ℹ️ هنوز متنی برای help ثبت نشده.")
+    await update.message.reply_text(text)
 
-    async with aiofiles.open(USER_GUIDE_FILE, "r", encoding="utf-8") as f:
-        text = await f.read()
 
+# ======================= 📖 نمایش راهنما =======================
+async def show_custom_guide(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """نمایش متن 'راهنما'"""
+    data = load_data()
+    text = data.get("guide", "")
+    if not text:
+        return await update.message.reply_text("ℹ️ هنوز متنی برای راهنما ثبت نشده.")
     await update.message.reply_text(text)
 
     # ======================= 🚀 اجرای نهایی =======================
@@ -1760,9 +1804,10 @@ if __name__ == "__main__":
     # ==========================================================
     # 🧾 راهنمای قابل ویرایش
     # ==========================================================
-    app.add_handler(MessageHandler(filters.Regex("^ثبت راهنما$"), save_custom_help), group=0)
-    app.add_handler(MessageHandler(filters.Regex("^راهنما$"), show_custom_help), group=0)
-
+    app.add_handler(CommandHandler("help", help_command))                           
+    app.add_handler(MessageHandler(filters.Regex("^ثبت help$"), save_help))         
+    app.add_handler(MessageHandler(filters.Regex("^راهنما$"), show_custom_guide))   
+    app.add_handler(MessageHandler(filters.Regex("^ثبت راهنما$"), save_custom_guide))
     # ==========================================================
     # 📂 فایل‌ها و پنل‌ها
     # ==========================================================
