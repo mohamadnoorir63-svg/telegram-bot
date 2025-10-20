@@ -1572,7 +1572,7 @@ async def panel_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif query.data == "panel_stats":
         user = query.from_user
         now = datetime.now().strftime("%Y/%m/%d - %H:%M:%S")
-        elif query.data == "panel_weather":
+    elif query.data == "panel_weather":
     await show_weather(update, context)
 
         text = (
