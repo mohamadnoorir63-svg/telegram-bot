@@ -11,6 +11,8 @@ from telegram.ext import (
     ContextTypes,
     filters,
     CallbackQueryHandler
+# 🧠 حافظه کوتاه‌مدت گفتگو برای Context AI
+context_memory = ContextMemory()
 )
 import aiofiles
 from font_maker import font_maker, next_font, prev_font
