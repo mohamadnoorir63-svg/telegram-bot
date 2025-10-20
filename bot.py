@@ -1516,8 +1516,11 @@ async def show_main_panel(update: Update, context: ContextTypes.DEFAULT_TYPE, ed
     # 👇 دکمه جدید ChatGPT 👇
     [
         InlineKeyboardButton("🧠 گفتگوی ChatGPT", callback_data="panel_chatgpt")
-    ]
-    ]
+        [
+    InlineKeyboardButton("🌤 آب و هوا", callback_data="panel_weather")
+]
+    
+    
 
     
 
