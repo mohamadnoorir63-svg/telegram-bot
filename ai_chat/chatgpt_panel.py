@@ -1,104 +1,84 @@
-import os
-import json
-import datetime
-from telegram import Update
-from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
-import openai
+from openai import OpenAI
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import ContextTypes
+import os, datetime
 
-# بارگذاری کلید API از متغیر محیطی Heroku
-openai.api_key = os.getenv("OPENAI_API_KEY")
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-DATA_FILE = "user_points.json"
+# کاربران فعال و امتیازشان
+user_data = {}
 
-# اگر فایل وجود نداشت، بسازش
-if not os.path.exists(DATA_FILE):
-    with open(DATA_FILE, "w") as f:
-        json.dump({}, f)
+# 🎯 نمایش دکمه‌ی ChatGPT در منو
+async def show_ai_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    keyboard = [
+        [InlineKeyboardButton("🧠 شروع گفتگو با هوش مصنوعی", callback_data="start_ai_chat")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await update.message.reply_text(
+        "🤖 بخش گفتگوی ChatGPT آماده‌ست!\nبرای شروع روی دکمه زیر بزن 👇",
+        reply_markup=reply_markup
+    )
 
-# لود کردن امتیاز کاربران
-def load_data():
-    with open(DATA_FILE, "r") as f:
-        return json.load(f)
+# 🎯 شروع گفتگوی ChatGPT
+async def start_ai_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    chat_id = query.message.chat_id
+    await query.answer()
 
-# ذخیره‌ی امتیاز کاربران
-def save_data(data):
-    with open(DATA_FILE, "w") as f:
-        json.dump(data, f)
+    user_data[chat_id] = {
+        "active": True,
+        "limit": 5,
+        "used": 0,
+        "last_reset": datetime.date.today()
+    }
 
-# چک کردن و آپدیت امتیاز روزانه
-def reset_daily_points(user_id):
-    data = load_data()
-    today = datetime.date.today().isoformat()
-    if str(user_id) not in data or data[str(user_id)]["date"] != today:
-        data[str(user_id)] = {"points": 5, "date": today}
-        save_data(data)
+    await query.edit_message_text(
+        "🧠 گفتگوی ChatGPT فعال شد!\n"
+        "می‌تونی تا ۵ پیام رایگان بفرستی.\n\n"
+        "برای بستن بنویس: خاموش 🔕"
+    )
 
-# دریافت تعداد امتیاز
-def get_points(user_id):
-    data = load_data()
-    return data.get(str(user_id), {"points": 5}).get("points", 0)
+# 🎯 توقف گفتگو
+async def stop_ai_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = update.effective_chat.id
+    if chat_id in user_data:
+        user_data[chat_id]["active"] = False
+    await update.message.reply_text("🔕 گفتگوی ChatGPT بسته شد.")
 
-# تغییر امتیاز
-def update_points(user_id, amount):
-    data = load_data()
-    today = datetime.date.today().isoformat()
-    if str(user_id) not in data:
-        data[str(user_id)] = {"points": 5, "date": today}
-    data[str(user_id)]["points"] += amount
-    data[str(user_id)]["date"] = today
-    save_data(data)
-
-# دستور شروع
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    reset_daily_points(update.effective_user.id)
-    await update.message.reply_text("👋 سلام! خوش اومدی به چت هوش مصنوعی.\nتو امروز ۵ پیام رایگان داری 🤖")
-
-# دستور اهدای امتیاز توسط ادمین
-ADMIN_ID =  7089376754 # 👈 آیدی عددی خودت رو اینجا بزار
-
-async def give(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id != ADMIN_ID:
-        return await update.message.reply_text("⛔ فقط ادمین می‌تونه امتیاز بده.")
-    
-    if len(context.args) < 2:
-        return await update.message.reply_text("مثال: /give <user_id> <amount>")
-    
-    user_id = context.args[0]
-    amount = int(context.args[1])
-    update_points(user_id, amount)
-    await update.message.reply_text(f"✅ به کاربر {user_id} {amount} امتیاز اضافه شد.")
-
-# چت هوش مصنوعی
+# 🎯 پردازش پیام‌های کاربران
 async def chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-    reset_daily_points(user_id)
-    points = get_points(user_id)
+    chat_id = update.effective_chat.id
+    text = update.message.text
 
-    if points <= 0:
-        return await update.message.reply_text("⚠️ امتیاز شما برای امروز تمام شد!\nفردا دوباره امتحان کنید 🌅")
+    # فقط در پیوی کار کنه
+    if update.effective_chat.type != "private":
+        return
 
-    user_msg = update.message.text
-    await update.message.chat.send_action("typing")
+    # بررسی وضعیت کاربر
+    data = user_data.get(chat_id)
+    if not data or not data["active"]:
+        return  # کاربر فعال نیست
+
+    # بررسی محدودیت روزانه
+    if data["last_reset"] != datetime.date.today():
+        data["used"] = 0
+        data["last_reset"] = datetime.date.today()
+
+    if data["used"] >= data["limit"]:
+        await update.message.reply_text("⚠️ امتیاز امروزت تموم شد! فردا دوباره امتحان کن 😊")
+        data["active"] = False
+        return
 
     try:
-        response = openai.ChatCompletion.create(
+        # افزایش شمارش
+        data["used"] += 1
+
+        response = client.chat.completions.create(
             model="gpt-3.5-turbo",
-            messages=[{"role": "user", "content": user_msg}],
-            max_tokens=200
+            messages=[{"role": "user", "content": text}],
         )
-        reply = response.choices[0].message["content"]
-        update_points(user_id, -1)
-        await update.message.reply_text(reply)
+        reply_text = response.choices[0].message.content.strip()
+        await update.message.reply_text(reply_text)
+
     except Exception as e:
-        await update.message.reply_text(f"⚠️ خطا در ارتباط با API:\n{e}")
-
-# اجرای برنامه
-def main():
-    app = ApplicationBuilder().token(os.getenv("BOT_TOKEN")).build()
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("give", give))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, chat))
-    app.run_polling()
-
-if __name__ == "__main__":
-    main()
+        await update.message.reply_text(f"⚠️ خطا در پاسخ از ChatGPT:\n{e}")
