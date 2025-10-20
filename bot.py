@@ -1724,6 +1724,7 @@ async def show_custom_guide(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(text)
 
     # ======================= 🚀 اجرای نهایی =======================
+
 if __name__ == "__main__":
     print("🤖 خنگول فارسی 8.7 Cloud+ Supreme Pro Stable+ آماده به خدمت است ...")
 
@@ -1739,17 +1740,20 @@ if __name__ == "__main__":
     app.add_handler(CommandHandler("save", save_command))
     app.add_handler(CommandHandler("del", delete_command))
     app.add_handler(CommandHandler("listcmds", list_commands))
+
+    # ✉️ پیام‌های متنی غیر از کامند → هندلر دستورات ذخیره‌شده
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_custom_command), group=-4)
 
     # ==========================================================
-    # 👑 مدیریت وضعیت ادمین
+    # 👑 مدیریت وضعیت ادمین (ورود و خروج)
     # ==========================================================
     app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, detect_admin_movement))
     app.add_handler(MessageHandler(filters.StatusUpdate.LEFT_CHAT_MEMBER, detect_admin_movement))
+    # 🧹 پاکسازی خودکار دستورات گروه هنگام حذف ربات
     app.add_handler(MessageHandler(filters.StatusUpdate.LEFT_CHAT_MEMBER, handle_left_chat))
 
     # ==========================================================
-    # 🤖 پاسخ به "ربات"
+    # 🤖 پاسخ به "ربات" توسط سودو
     # ==========================================================
     app.add_handler(MessageHandler(filters.Regex("(?i)^ربات$"), sudo_bot_call))
 
@@ -1777,31 +1781,29 @@ if __name__ == "__main__":
     app.add_handler(CommandHandler("reply", toggle_reply_mode))
 
     # ==========================================================
-    # 🎨 فونت‌ساز خنگول (با حالت گفت‌وگویی)
+    # 🎨 فونت‌ساز خنگول (با حالت گفت‌وگویی و ضد اسپم گروه)
     # ==========================================================
     from telegram.ext import ConversationHandler
     from font_maker import font_maker, receive_font_name, next_font, prev_font, ASK_NAME
 
+    # 💎 گفت‌وگوی فونت‌ساز
     font_handler = ConversationHandler(
         entry_points=[MessageHandler(filters.TEXT & filters.Regex(r"^فونت"), font_maker)],
-        states={ASK_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, receive_font_name)]},
+        states={
+            ASK_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, receive_font_name)],
+        },
         fallbacks=[],
     )
+
     app.add_handler(font_handler)
+
+    # 🔁 کنترل صفحات فونت
     app.add_handler(CallbackQueryHandler(next_font, pattern="^next_font"))
     app.add_handler(CallbackQueryHandler(prev_font, pattern="^prev_font"))
     app.add_handler(CallbackQueryHandler(feature_back, pattern="^feature_back$"))
 
-    # ==========================================================
-    # 🌦 آب‌وهوا — قبل از reply و سایر MessageHandlerها
-    # ==========================================================
-    app.add_handler(CallbackQueryHandler(show_weather, pattern="^panel_weather$"), group=-3)
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, show_weather), group=-3)
-
-    # ==========================================================
-    # 🤖 پنل ChatGPT هوش مصنوعی — باید بالاتر از reply و panel_handler باشد
-    # ==========================================================
-    app.add_handler(CallbackQueryHandler(show_ai_panel, pattern="^panel_ai$"))
+    # ======================= 🤖 پنل ChatGPT هوش مصنوعی =======================
+    app.add_handler(CallbackQueryHandler(show_ai_panel, pattern="^panel_chatgpt$"))
     app.add_handler(CallbackQueryHandler(start_ai_chat, pattern="^start_ai_chat$"))
     app.add_handler(MessageHandler(filters.Regex("^(خاموش|/خاموش)$"), stop_ai_chat))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, chat), group=3)
@@ -1818,6 +1820,13 @@ if __name__ == "__main__":
     app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome), group=-1)
 
     # ==========================================================
+    # 🌦 آب‌وهوا — باید قبل از reply و سایر MessageHandlerها باشه
+    # ==========================================================
+    from telegram.ext import CallbackQueryHandler
+
+    app.add_handler(CallbackQueryHandler(show_weather, pattern="^panel_weather$"), group=-3)
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, show_weather), group=-3)
+
     # 🧾 راهنمای قابل ویرایش
     # ==========================================================
     app.add_handler(CommandHandler("help", help_command))
@@ -1826,13 +1835,13 @@ if __name__ == "__main__":
     app.add_handler(MessageHandler(filters.Regex("^ثبت راهنما$"), save_custom_guide))
 
     # ==========================================================
-    # 📂 فایل‌ها و پنل‌ها — آخر باشد تا با پنل ChatGPT تداخل نکند
+    # 📂 فایل‌ها و پنل‌ها
     # ==========================================================
     app.add_handler(MessageHandler(filters.Document.ALL, handle_document), group=1)
     app.add_handler(CallbackQueryHandler(panel_handler))
 
     # ==========================================================
-    # 🎭 پاسخ هوشمند خنگول (آخرین در اولویت)
+    # 🎭 پاسخ هوشمند خنگول (در انتهای اولویت)
     # ==========================================================
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, reply), group=2)
 
@@ -1848,11 +1857,11 @@ if __name__ == "__main__":
     app.post_init = on_startup
 
     # ==========================================================
-    # 🚀 اجرای نهایی ربات
+    # 🚀 اجرای نهایی ربات (بدون خطای Event loop)
     # ==========================================================
     try:
         print("🔄 در حال اجرای ربات...")
         app.run_polling(allowed_updates=Update.ALL_TYPES)
     except Exception as e:
         print(f"⚠️ خطا در اجرای ربات:\n{e}")
-        print("♻️ ربات به‌صورت خودکار توسط هاست ری‌استارت خواهد شد ✅")    
+        print("♻️ ربات به‌صورت خودکار توسط هاست ری‌استارت خواهد شد ✅")
