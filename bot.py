@@ -1787,10 +1787,12 @@ if __name__ == "__main__":
     from font_maker import font_maker, receive_font_name, next_font, prev_font, ASK_NAME
 
     font_handler = ConversationHandler(
-        entry_points=[MessageHandler(filters.TEXT & filters.Regex(r"^فونت"), font_maker)],
-        states={ASK_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, receive_font_name)]},
-        fallbacks=[],
-    )
+    entry_points=[MessageHandler(filters.TEXT & filters.Regex(r"^فونت"), font_maker)],
+    states={
+        ASK_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, receive_font_name)],
+    },
+    fallbacks=[],
+)
     app.add_handler(font_handler)
     app.add_handler(CallbackQueryHandler(next_font, pattern="^next_font"))
     app.add_handler(CallbackQueryHandler(prev_font, pattern="^prev_font"))
