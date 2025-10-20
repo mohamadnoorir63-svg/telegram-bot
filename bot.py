@@ -1636,7 +1636,7 @@ import os, json
 from telegram import Update
 from telegram.ext import ContextTypes
 
-# 📦 مسیر ساده برای ذخیره موقت
+# 📦 مسیر ذخیره داده‌ها
 DATA_FILE = "help_data.json"
 
 # 🔐 مدیر اصلی
@@ -1661,10 +1661,10 @@ def save_help_data(data):
 
 # ======================= 💾 ثبت help =======================
 async def save_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """ثبت یا تغییر متن /help توسط مدیر اصلی (ریپلای با 'ثبت help')"""
+    """ثبت یا تغییر متن /help فقط برای مدیر اصلی"""
     user_id = update.effective_user.id
     if user_id != ADMIN_ID:
-        return await update.message.reply_text("⛔ فقط مدیر اصلی می‌تونه متن help رو تغییر بده!")
+        return await update.message.reply_text("😜 فقط مغز اصلی (سودو) می‌تونه help رو تغییر بده!")
 
     if not update.message.reply_to_message or not update.message.reply_to_message.text:
         return await update.message.reply_text("ℹ️ لطفاً روی متن جدید help ریپلای کن و بنویس: ثبت help")
@@ -1674,14 +1674,14 @@ async def save_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data["help"] = text
     save_help_data(data)
 
-    await update.message.reply_text("✅ متن help با موفقیت ثبت شد.")
+    await update.message.reply_text("✅ متن help با موفقیت ذخیره شد، رئیس!")
 
 # ======================= 💾 ثبت راهنما =======================
 async def save_custom_guide(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """ثبت یا تغییر متن 'راهنما' توسط مدیر اصلی (ریپلای با 'ثبت راهنما')"""
+    """ثبت یا تغییر متن 'راهنما' فقط برای مدیر اصلی"""
     user_id = update.effective_user.id
     if user_id != ADMIN_ID:
-        return await update.message.reply_text("⛔ فقط مدیر اصلی می‌تونه راهنما رو تغییر بده!")
+        return await update.message.reply_text("😎 فقط رئیس خنگول اجازه ویرایش راهنما رو داره!")
 
     if not update.message.reply_to_message or not update.message.reply_to_message.text:
         return await update.message.reply_text("ℹ️ لطفاً روی متن جدید راهنما ریپلای کن و بنویس: ثبت راهنما")
@@ -1691,25 +1691,38 @@ async def save_custom_guide(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data["guide"] = text
     save_help_data(data)
 
-    await update.message.reply_text("✅ متن راهنمای عمومی با موفقیت ثبت شد.")
+    await update.message.reply_text("✅ متن راهنمای عمومی با موفقیت ذخیره شد 😄")
 
-# ======================= 📖 نمایش help =======================
+# ======================= 📖 نمایش help (فقط برای مدیر اصلی) =======================
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """نمایش متن /help"""
+    """نمایش متن /help — فقط برای مدیر اصلی"""
+    user_id = update.effective_user.id
+    if user_id != ADMIN_ID:
+        funny_replies = [
+            "🤖 اوووه نه نه نه! این بخش مخصوص مغز خنگوله 😜",
+            "😎 تو مجاز به دیدن منوی سودو نیستی!",
+            "🧠 فقط رئیس می‌تونه به /help اصلی دسترسی داشته باشه!",
+            "🚫 ورود ممنوع! فقط خنگول اعظم اجازه داره!",
+            "😂 فکر کردی می‌تونی کدهای مخفی منو ببینی؟"
+        ]
+        import random
+        return await update.message.reply_text(random.choice(funny_replies))
+
     data = load_help_data()
     text = data.get("help", "")
     if not text:
         return await update.message.reply_text("ℹ️ هنوز متنی برای help ثبت نشده.")
     await update.message.reply_text(text)
 
-# ======================= 📖 نمایش راهنما =======================
+# ======================= 📖 نمایش راهنما (برای همه کاربران) =======================
 async def show_custom_guide(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """نمایش متن 'راهنما'"""
+    """نمایش متن 'راهنما' برای همه کاربران"""
     data = load_help_data()
     text = data.get("guide", "")
     if not text:
         return await update.message.reply_text("ℹ️ هنوز متنی برای راهنما ثبت نشده.")
     await update.message.reply_text(text)
+
     # ======================= 🚀 اجرای نهایی =======================
 if __name__ == "__main__":
     print("🤖 خنگول فارسی 8.7 Cloud+ Supreme Pro Stable+ آماده به خدمت است ...")
