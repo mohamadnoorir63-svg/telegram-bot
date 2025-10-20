@@ -1,5 +1,6 @@
 import os
 import aiohttp
+import re
 from datetime import datetime
 from telegram import Update
 from telegram.ext import ContextTypes
@@ -54,16 +55,14 @@ async def show_weather(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await process_weather_request(update, city)
         return
 
-    # حالت ۳️⃣: وقتی کاربر مستقیماً نوشت "آب و هوا [شهر]"
+    # حالت ۳️⃣: وقتی کاربر مستقیماً نوشت "آب و هوا [شهر]" یا "آب‌وهوای [شهر]"
     if update.message and update.message.text:
         text = update.message.text.strip()
-        if text.startswith("آب و هوا"):
-            parts = text.split(maxsplit=2)
-            if len(parts) < 3:
-                return await update.message.reply_text(
-                    "🌆 لطفاً بنویس:\nآب و هوا [نام شهر]\nمثلاً: آب و هوا تهران"
-                )
-            city = parts[-1]
+
+        # 📌 تشخیص هوشمند همه‌ی حالت‌های "آب و هوا" و "آب‌وهوای"
+        match = re.match(r"^آب[\u200c\s]*و[\u200c\s]*هوا(?:ی)?\s+(.+)$", text)
+        if match:
+            city = match.group(1).strip()
             await process_weather_request(update, city)
             return
 
