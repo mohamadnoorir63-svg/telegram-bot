@@ -1803,7 +1803,9 @@ if __name__ == "__main__":
     app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome), group=-1)
     
     # ==========================================================
-    app.add_handler(MessageHandler(filters.Regex("^آب و هوا"), get_weather))
+    # 🌤 آب‌وهوا
+    from weather_module.weather_panel import show_weather
+    app.add_handler(MessageHandler(filters.Regex("^آب و هوا"), show_weather))
     # 🧾 راهنمای قابل ویرایش
     # ==========================================================
     app.add_handler(CommandHandler("help", help_command))                           
