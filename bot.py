@@ -1799,11 +1799,12 @@ if __name__ == "__main__":
     app.add_handler(CallbackQueryHandler(feature_back, pattern="^feature_back$"))
 
     # ======================= 🤖 پنل ChatGPT هوش مصنوعی =======================
+    from ai_chat.chatgpt_panel import show_ai_panel, chat, start_ai_chat, stop_ai_chat
+
     app.add_handler(CallbackQueryHandler(show_ai_panel, pattern="^panel_chatgpt$"))
     app.add_handler(CallbackQueryHandler(start_ai_chat, pattern="^start_ai_chat$"))
     app.add_handler(MessageHandler(filters.Regex("^(خاموش|/خاموش)$"), stop_ai_chat))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, chat), group=3)
-
     # ==========================================================
     # 🎉 خوشامد پویا و تنظیمات گروه
     # ==========================================================
