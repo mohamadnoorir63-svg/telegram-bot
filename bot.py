@@ -789,6 +789,18 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # 🧩 اطمینان از اینکه پیام معتبره
     if not update.message or not update.message.text:
         return
+        # 🧠 فعال‌سازی حافظهٔ کوتاه‌مدت گفتگو
+    uid = update.effective_user.id
+    text = update.message.text.strip()
+
+    # 🧠 ثبت پیام در حافظه کوتاه‌مدت
+    context_memory.add_message(uid, text)
+
+    # 🧠 گرفتن کل تاریخچه اخیر کاربر
+    recent_context = context_memory.get_context(uid)
+
+    # 🧩 ترکیب سه پیام آخر برای درک بهتر ادامه گفتگو
+    full_context = " ".join(recent_context[-3:]) if recent_context else text
 
     text = update.message.text.strip()
     lower_text = text.lower()
@@ -1199,7 +1211,7 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif learned_reply:
         reply_text = enhance_sentence(learned_reply)
     else:
-        reply_text = smart_response(text, uid) or enhance_sentence(text)
+        reply_text = smart_response(full_context, uid) or enhance_sentence(full_context)
 
     await update.message.reply_text(reply_text)
 
