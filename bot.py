@@ -36,7 +36,7 @@ from auto_brain.command_manager import (
     cleanup_group_commands
 )
 
-from auto_brain.anime_maker import anime_photo
+
 from ai_chat.chatgpt_panel import show_ai_panel, chat, start_ai_chat, stop_ai_chat
 
 # 🧠 نکته مهم:
@@ -1784,7 +1784,7 @@ if __name__ == "__main__":
     app.add_handler(MessageHandler(filters.Regex(r"^تنظیم قوانین"), set_rules_link), group=-1)
     app.add_handler(MessageHandler(filters.Regex(r"^تنظیم حذف"), set_welcome_timer), group=-1)
     app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome), group=-1)
-    app.add_handler(MessageHandler(filters.PHOTO, anime_photo), group=-3)
+    
     # ==========================================================
     # 🧾 راهنمای قابل ویرایش
     # ==========================================================
