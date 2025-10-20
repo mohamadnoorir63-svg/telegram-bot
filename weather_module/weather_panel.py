@@ -29,26 +29,25 @@ async def get_weather(city: str):
 
 
 
-# ======================= 🌆 نمایش آب‌وهوا (عمومی و از پنل) =======================
+
+# ======================= 🌆 نمایش آب‌وهوا (هوشمند) =======================
 async def show_weather(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """نمایش وضعیت آب‌وهوا هم از چت و هم از پنل"""
+    """نمایش وضعیت آب‌وهوا (خودکار و از پنل)"""
     message = update.message or update.callback_query.message
 
-    # حالت ۱️⃣: وقتی از پنل (دکمه) زده میشه
+    # حالت ۱️⃣: از پنل دکمه‌ای
     if update.callback_query:
         query = update.callback_query
         await query.answer()
 
-        # ✅ ضدتکرار — اگر قبلاً پیام پرسش شهر فرستاده شده، دیگه نفرسته
-        if context.user_data.get("weather_prompt_sent"):
-            return
-
-        await query.message.reply_text("🏙 لطفاً نام شهر را بنویس تا وضعیت آب‌وهوا را بگویم 🌤")
-        context.user_data["awaiting_city"] = True
-        context.user_data["weather_prompt_sent"] = True  # علامت‌گذاری که فرستاده شده
+        # ✅ ضدتکرار — فقط یکبار پیام بفرستد
+        if not context.user_data.get("weather_prompt_sent"):
+            await query.message.reply_text("🏙 لطفاً نام شهر را بنویس تا وضعیت آب‌وهوا را بگویم 🌤")
+            context.user_data["awaiting_city"] = True
+            context.user_data["weather_prompt_sent"] = True
         return
 
-    # حالت ۲️⃣: وقتی در انتظار نام شهر هستیم
+    # حالت ۲️⃣: اگر در انتظار نام شهر هستیم
     if context.user_data.get("awaiting_city"):
         city = update.message.text.strip()
         context.user_data["awaiting_city"] = False
@@ -56,18 +55,24 @@ async def show_weather(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await process_weather_request(update, city)
         return
 
-    # حالت ۳️⃣: فقط وقتی پیام با "آب و هوا" یا "آب‌وهوای" شروع بشه
+    # حالت ۳️⃣: اگر پیام با «آب و هوا ...» شروع شده باشد
     if update.message and update.message.text:
         text = update.message.text.strip()
 
-        # 📌 فقط دستورهایی که با "آب و هوا" شروع می‌شن (نه وسط جمله)
         match = re.match(r"^(?:آب[\u200c\s]*و[\u200c\s]*هوا(?:ی)?)\s+(.+)$", text)
         if match:
             city = match.group(1).strip()
             await process_weather_request(update, city)
             return
 
-    # 🚫 اگر پیام هیچ‌کدوم از حالت‌های بالا نبود → هیچی نگو
+        # 🌍 حالت ۴️⃣: تشخیص هوشمند شهر بدون دستور
+        # اگر متن فقط شامل حروف فارسی/انگلیسی و فاصله باشد، و طولش معقول باشد (۲ تا ۲۰)
+        if re.match(r"^[A-Za-zآ-ی\s]{2,20}$", text):
+            city = text.strip()
+            await process_weather_request(update, city)
+            return
+
+    # 🚫 اگر هیچ‌کدام نبود — پاسخ نده
     return
 # ======================= 🧩 پردازش داده و ارسال نتیجه =======================
 async def process_weather_request(update: Update, city: str):
