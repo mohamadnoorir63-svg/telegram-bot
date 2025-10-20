@@ -37,8 +37,7 @@ from auto_brain.command_manager import (
 )
 
 from auto_brain.anime_maker import anime_photo
-from ai_chat.chatgpt_panel import chat, start, give
-
+from ai_chat.chatgpt_panel import show_ai_panel, chat, start_ai_chat, stop_ai_chat
 
 # 🧠 نکته مهم:
 # ❌ از اینجا دیگه admin_panel رو import نکن!
@@ -1490,30 +1489,35 @@ async def show_main_panel(update: Update, context: ContextTypes.DEFAULT_TYPE, ed
 
     about = "🌙 <b>به منوی اصلی خنگول خوش آمدی!</b>\nاز دکمه‌های زیر یکی رو انتخاب کن 😎"
 
-    
-
     keyboard = [
-        [
-            InlineKeyboardButton("💬 ارتباط با سازنده", url="https://t.me/NOORI_NOOR"),
-            InlineKeyboardButton("💭 گروه پشتیبانی", url="https://t.me/Poshtibahni")
-        ],
-        [
-            InlineKeyboardButton("➕ افزودن به گروه", url="https://t.me/Khenqol_bot?startgroup=true"),
-            InlineKeyboardButton("🧩 قابلیت‌های ربات", callback_data="panel_features")
-        ],
-        [
-            InlineKeyboardButton("🤖 درباره خنگول", callback_data="panel_about"),
-            InlineKeyboardButton("👨‍💻 درباره تیم ما", callback_data="panel_team")
-        ],
-        [
-            InlineKeyboardButton("🔮 فال امروز", callback_data="panel_fortune"),
-            InlineKeyboardButton("😂 جوک خنده‌دار", callback_data="panel_joke")
-        ],
-        [
-            InlineKeyboardButton("🎨 فونت‌ساز حرفه‌ای", callback_data="panel_font"),
-            InlineKeyboardButton("💳 آیدی خنگولی من", callback_data="panel_stats")
-        ]
+    [
+        InlineKeyboardButton("💬 ارتباط با سازنده", url="https://t.me/NOORI_NOOR"),
+        InlineKeyboardButton("💭 گروه پشتیبانی", url="https://t.me/Poshtibahni")
+    ],
+    [
+        InlineKeyboardButton("➕ افزودن به گروه", url="https://t.me/Khenqol_bot?startgroup=true"),
+        InlineKeyboardButton("🧩 قابلیت‌های ربات", callback_data="panel_features")
+    ],
+    [
+        InlineKeyboardButton("🤖 درباره خنگول", callback_data="panel_about"),
+        InlineKeyboardButton("👨‍💻 درباره تیم ما", callback_data="panel_team")
+    ],
+    [
+        InlineKeyboardButton("🔮 فال امروز", callback_data="panel_fortune"),
+        InlineKeyboardButton("😂 جوک خنده‌دار", callback_data="panel_joke")
+    ],
+    [
+        InlineKeyboardButton("🎨 فونت‌ساز حرفه‌ای", callback_data="panel_font"),
+        InlineKeyboardButton("💳 آیدی خنگولی من", callback_data="panel_stats")
+    ],
+
+    # 👇 دکمه جدید ChatGPT 👇
+    [
+        InlineKeyboardButton("🧠 گفتگوی ChatGPT", callback_data="panel_chatgpt")
     ]
+    ]
+
+    
 
     # 🔹 ساخت markup برای نمایش دکمه‌ها
     markup = InlineKeyboardMarkup(keyboard)
@@ -1765,11 +1769,11 @@ if __name__ == "__main__":
     app.add_handler(CallbackQueryHandler(next_font, pattern="^next_font"))
     app.add_handler(CallbackQueryHandler(prev_font, pattern="^prev_font"))
     app.add_handler(CallbackQueryHandler(feature_back, pattern="^feature_back$"))
-    # 🧠 هوش مصنوعی ChatGPT
-    app.add_handler(CommandHandler("hoosh", start))
-    app.add_handler(CommandHandler("give", give))
-    app.add_handler(MessageHandler(filters.Regex("^(هوش|/هوش)"), start))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, chat))
+    # ======================= 🤖 پنل ChatGPT هوش مصنوعی =======================
+    app.add_handler(CallbackQueryHandler(show_ai_panel, pattern="^panel_chatgpt$"))
+    app.add_handler(CallbackQueryHandler(start_ai_chat, pattern="^start_ai_chat$"))
+    app.add_handler(MessageHandler(filters.Regex("^(خاموش|/خاموش)$"), stop_ai_chat))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, chat), group=3)
     # ==========================================================
     # 🎉 خوشامد پویا و تنظیمات گروه
     # ==========================================================
