@@ -1765,8 +1765,10 @@ if __name__ == "__main__":
     app.add_handler(CallbackQueryHandler(next_font, pattern="^next_font"))
     app.add_handler(CallbackQueryHandler(prev_font, pattern="^prev_font"))
     app.add_handler(CallbackQueryHandler(feature_back, pattern="^feature_back$"))
-    app.add_handler(CommandHandler("هوش", start))
+    # 🧠 هوش مصنوعی ChatGPT
+    app.add_handler(CommandHandler("hoosh", start))
     app.add_handler(CommandHandler("give", give))
+    app.add_handler(MessageHandler(filters.Regex("^(هوش|/هوش)"), start))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, chat))
     # ==========================================================
     # 🎉 خوشامد پویا و تنظیمات گروه
