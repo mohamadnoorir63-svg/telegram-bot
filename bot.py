@@ -1620,74 +1620,45 @@ async def save_panel_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"✅ متن «{cmd}» ذخیره شد!")
     else:
         await update.message.reply_text("❗ دستور اشتباه است — باید یکی از این‌ها باشد:\nثبت درباره / ثبت تیم / ثبت قابلیت")
+# ======================= 🧾 راهنمای قابل ویرایش (جداسازی از /help) =======================
+import aiofiles, os
 
-# ======================= 🧾 راهنمای قابل ویرایش =======================
-import aiofiles
-HELP_FILE = "custom_help.txt"
+HELP_FILE = "custom_help.txt"           # 📘 مخصوص /help مدیر اصلی
+USER_GUIDE_FILE = "editable_guide.txt"  # 💬 مخصوص ثبت راهنمای عمومی
 
+
+# ======================= 💾 ثبت راهنمای عمومی =======================
 async def save_custom_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """ثبت یا تغییر متن راهنما توسط مدیر اصلی"""
+    """ثبت یا تغییر متن راهنمای عمومی توسط مدیر اصلی"""
     ADMIN_ID = int(os.getenv("ADMIN_ID", "7089376754"))
     user_id = update.effective_user.id
 
     if user_id != ADMIN_ID:
-        return  # فقط مدیر اصلی
+        return await update.message.reply_text("⛔ فقط مدیر اصلی می‌تونه راهنما رو تغییر بده!")
 
-    if not update.message.reply_to_message:
-        return await update.message.reply_text("ℹ️ لطفاً متن جدید راهنما را ریپلای کن و بنویس: ثبت راهنما")
+    if not update.message.reply_to_message or not update.message.reply_to_message.text:
+        return await update.message.reply_text("ℹ️ لطفاً روی پیام جدید راهنما ریپلای کن و بنویس: ثبت راهنما")
 
     text = update.message.reply_to_message.text
-    async with aiofiles.open(HELP_FILE, "w", encoding="utf-8") as f:
+    async with aiofiles.open(USER_GUIDE_FILE, "w", encoding="utf-8") as f:
         await f.write(text)
 
-    await update.message.reply_text("✅ متن راهنما با موفقیت ثبت و ذخیره شد.")
+    await update.message.reply_text("✅ متن راهنمای عمومی ذخیره شد (editable_guide.txt).")
 
 
+# ======================= 📖 نمایش راهنمای عمومی =======================
 async def show_custom_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """نمایش راهنما برای کاربران (متن قابل ویرایش)"""
-    if not os.path.exists(HELP_FILE):
+    """نمایش راهنمای عمومی برای کاربران"""
+    if not os.path.exists(USER_GUIDE_FILE):
         return await update.message.reply_text(
             "ℹ️ هنوز هیچ متنی برای راهنما ثبت نشده.\n"
             "مدیر اصلی می‌تونه با ریپلای و نوشتن «ثبت راهنما» تنظیمش کنه."
         )
 
-    async with aiofiles.open(HELP_FILE, "r", encoding="utf-8") as f:
+    async with aiofiles.open(USER_GUIDE_FILE, "r", encoding="utf-8") as f:
         text = await f.read()
 
     await update.message.reply_text(text)
-
-    
-    
-# ======================= 🧠 راهنمای فنی مخصوص مدیر (دستور /help) =======================
-async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """راهنمای مخصوص مدیر برای کنترل و نگهداری ربات"""
-    ADMIN_ID = int(os.getenv("ADMIN_ID", "7089376754"))
-    user_id = update.effective_user.id
-
-    # 🚫 برای کاربران عادی هیچ پاسخی ارسال نکن
-    if user_id != ADMIN_ID:
-        return
-
-    text = (
-        "🧠 <b>راهنمای فنی خنگول</b>\n\n"
-        "📘 <b>دستورات مدیریتی:</b>\n"
-        "/backup — گرفتن بک‌آپ کامل\n"
-        "/restore — بازیابی بک‌آپ\n"
-        "/cloudsync — بک‌آپ ابری برای ادمین\n"
-        "/reset — پاکسازی حافظه ربات\n"
-        "/reload — بوت مجدد مغز\n"
-        "/broadcast پیام — ارسال همگانی\n"
-        "/stats — نمایش آمار کلی\n"
-        "/fullstats — آمار گروه‌ها\n"
-        "/reply — فعال یا غیرفعال کردن ریپلای مود\n"
-        "/mode شوخ/بی‌ادب/غمگین/نرمال — تغییر مود پاسخ‌ها\n"
-        "/welcome — کنترل خوشامد گروهی\n"
-        "/toggle — روشن/خاموش کردن ربات\n"
-        "/lock /unlock — قفل یا بازکردن یادگیری\n\n"
-        "💡 کاربران عادی از واژه 'راهنما' برای کمک استفاده کنن."
-    )
-
-    await update.message.reply_text(text, parse_mode="HTML")
 
     # ======================= 🚀 اجرای نهایی =======================
 if __name__ == "__main__":
