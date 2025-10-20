@@ -39,7 +39,7 @@ from auto_brain.command_manager import (
 
 from ai_chat.chatgpt_panel import show_ai_panel, chat, start_ai_chat, stop_ai_chat
 from weather_module.weather_panel import show_weather
-
+from context_memory import ContextMemory
 
 # 🧠 نکته مهم:
 # ❌ از اینجا دیگه admin_panel رو import نکن!
