@@ -4,16 +4,14 @@ from datetime import datetime
 from telegram import Update
 from telegram.ext import ContextTypes
 
-# 📦 کلید API از تنظیمات محیطی (Heroku یا Local)
+# 🌍 کلید API
 WEATHER_API_KEY = os.getenv("WEATHER_API_KEY")
-
-# 🌍 URL پایه‌ی API
 BASE_URL = "https://api.openweathermap.org/data/2.5/weather"
 
 
-# ======================= 🌤 دریافت اطلاعات از API =======================
+# ======================= ☁️ تابع دریافت اطلاعات از API =======================
 async def get_weather(city: str):
-    """دریافت اطلاعات آب‌وهوا از OpenWeather"""
+    """دریافت اطلاعات آب‌وهوا از OpenWeather API"""
     params = {
         "q": city,
         "appid": WEATHER_API_KEY,
@@ -27,61 +25,74 @@ async def get_weather(city: str):
             return await response.json()
 
 
-# ======================= 🌆 نمایش آب‌وهوا (عمومی و از پنل) =======================
+# ======================= 🌆 نمایش وضعیت آب‌وهوا =======================
 async def show_weather(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """نمایش وضعیت آب‌وهوا هم از چت و هم از پنل"""
+    """نمایش وضعیت آب‌وهوا برای چت و پنل"""
     city = None
-    message = update.message or update.callback_query.message
+    message = None
 
-    # اگر از چت مستقیم نوشتن "آب و هوا تهران"
+    # 🗨️ اگر از چت مستقیم بود
     if update.message:
-        text = update.message.text.strip()
-        parts = text.split(maxsplit=3)
+        message = update.message
+        text = message.text.strip()
+        parts = text.split(maxsplit=2)
         if len(parts) >= 3:
             city = parts[-1]
         else:
-            return await update.message.reply_text("🌆 لطفاً بنویس:\nآب و هوا [نام شهر]\nمثلاً: آب و هوا تهران")
+            return await message.reply_text("🌤 لطفاً بنویس:\nآب و هوا [نام شهر]\nمثلاً: آب و هوا تهران")
 
-    # اگر از پنل دکمه‌ای بود
+    # 🔘 اگر از پنل فشرده شد
     elif update.callback_query:
         query = update.callback_query
         await query.answer()
-        await query.message.reply_text("🏙 لطفاً نام شهر را بنویس تا وضعیت آب‌وهوا را بگویم 🌤")
+        await query.message.reply_text("🏙 لطفاً نام شهری که می‌خوای بدونی رو بنویس 🌦")
+        context.user_data["awaiting_city"] = True
         return
 
-    # اگر نام شهر مشخص شد
-    if city:
-        data = await get_weather(city)
-        if not data or data.get("cod") != 200:
-            return await message.reply_text("⚠️ شهر مورد نظر پیدا نشد یا API خطا داد.")
+    # 📩 اگر کاربر بعد از پنل شهر را ارسال کرد
+    elif context.user_data.get("awaiting_city"):
+        message = update.message
+        city = message.text.strip()
+        context.user_data["awaiting_city"] = False
 
-        name = data["name"]
-        country = data["sys"].get("country", "")
-        temp = round(data["main"]["temp"])
-        humidity = data["main"]["humidity"]
-        wind = data["wind"]["speed"]
-        desc = data["weather"][0]["description"]
-        icon = data["weather"][0]["icon"]
+    # 🚫 اگر هنوز شهری مشخص نشده
+    if not city:
+        return
 
-        dt = datetime.fromtimestamp(data["dt"])
-        local_time = dt.strftime("%H:%M")
+    data = await get_weather(city)
+    if not data or data.get("cod") != 200:
+        return await message.reply_text("⚠️ شهر مورد نظر پیدا نشد یا API خطا داد.")
 
-        emoji = get_weather_emoji(icon)
+    # 🧩 استخراج داده‌ها
+    name = data["name"]
+    country = data["sys"].get("country", "")
+    temp = round(data["main"]["temp"])
+    humidity = data["main"]["humidity"]
+    wind = data["wind"]["speed"]
+    desc = data["weather"][0]["description"]
+    icon = data["weather"][0]["icon"]
 
-        text = (
-            f"{emoji} <b>وضعیت آب‌وهوا</b>\n\n"
-            f"🏙 شهر: {name} {flag_emoji(country)}\n"
-            f"🌤 وضعیت: {desc}\n"
-            f"🌡 دما: {temp}°C\n"
-            f"💧 رطوبت: {humidity}%\n"
-            f"💨 باد: {wind} km/h\n"
-            f"🕒 آخرین بروزرسانی: {local_time}"
-        )
+    # 🕒 زمان محلی
+    dt = datetime.utcfromtimestamp(data["dt"])
+    local_time = dt.strftime("%H:%M")
 
-        await message.reply_text(text, parse_mode="HTML")
+    emoji = get_weather_emoji(icon)
+    flag = flag_emoji(country)
+
+    text = (
+        f"{emoji} <b>وضعیت آب‌وهوا</b>\n\n"
+        f"🏙 شهر: {name} {flag}\n"
+        f"🌤 وضعیت: {desc}\n"
+        f"🌡 دما: {temp}°C\n"
+        f"💧 رطوبت: {humidity}%\n"
+        f"💨 باد: {wind} km/h\n"
+        f"🕒 آخرین بروزرسانی: {local_time}"
+    )
+
+    await message.reply_text(text, parse_mode="HTML")
 
 
-# ======================= 🎨 تابع‌های کمکی =======================
+# ======================= 🎨 کمک‌کننده‌ها =======================
 def get_weather_emoji(icon):
     mapping = {
         "01d": "☀️", "01n": "🌙",
