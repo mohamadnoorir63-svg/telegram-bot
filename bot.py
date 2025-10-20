@@ -1801,10 +1801,12 @@ if __name__ == "__main__":
     # ======================= 🤖 پنل ChatGPT هوش مصنوعی =======================
     from ai_chat.chatgpt_panel import show_ai_panel, chat, start_ai_chat, stop_ai_chat
 
+    # ⚡️ ترتیب مهم است: ChatGPT باید قبل از panel_handler بیاید
     app.add_handler(CallbackQueryHandler(show_ai_panel, pattern="^panel_chatgpt$"))
     app.add_handler(CallbackQueryHandler(start_ai_chat, pattern="^start_ai_chat$"))
     app.add_handler(MessageHandler(filters.Regex("^(خاموش|/خاموش)$"), stop_ai_chat))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, chat), group=3)
+
     # ==========================================================
     # 🎉 خوشامد پویا و تنظیمات گروه
     # ==========================================================
@@ -1819,11 +1821,10 @@ if __name__ == "__main__":
     # ==========================================================
     # 🌦 آب‌وهوا — باید قبل از reply و سایر MessageHandlerها باشه
     # ==========================================================
-    from telegram.ext import CallbackQueryHandler
-
     app.add_handler(CallbackQueryHandler(show_weather, pattern="^panel_weather$"), group=-3)
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, show_weather), group=-3)
 
+    # ==========================================================
     # 🧾 راهنمای قابل ویرایش
     # ==========================================================
     app.add_handler(CommandHandler("help", help_command))
@@ -1835,13 +1836,14 @@ if __name__ == "__main__":
     # 📂 فایل‌ها و پنل‌ها
     # ==========================================================
     app.add_handler(MessageHandler(filters.Document.ALL, handle_document), group=1)
+
+    # ⚠️ این باید آخرین CallbackQueryHandler باشد
     app.add_handler(CallbackQueryHandler(panel_handler))
 
     # ==========================================================
     # 🎭 پاسخ هوشمند خنگول (در انتهای اولویت)
     # ==========================================================
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, reply), group=2)
-
     # ==========================================================
     # 🔹 وظایف استارتاپ
     # ==========================================================
