@@ -1820,9 +1820,11 @@ if __name__ == "__main__":
     app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome), group=-1)
     
     # ==========================================================
-    # 🌤 آب‌وهوا
-    from weather_module.weather_panel import show_weather
-    app.add_handler(MessageHandler(filters.Regex("^آب و هوا"), show_weather))
+    # 🌦 آب‌وهوا — باید قبل از reply و سایر MessageHandlerها باشه
+    from telegram.ext import CallbackQueryHandler
+
+    app.add_handler(CallbackQueryHandler(show_weather, pattern="^panel_weather$"), group=-3)
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, show_weather), group=-3)
     # 🧾 راهنمای قابل ویرایش
     # ==========================================================
     app.add_handler(CommandHandler("help", help_command))                           
