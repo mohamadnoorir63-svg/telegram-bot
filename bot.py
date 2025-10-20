@@ -11,8 +11,7 @@ from telegram.ext import (
     ContextTypes,
     filters,
     CallbackQueryHandler
-# 🧠 حافظه کوتاه‌مدت گفتگو برای Context AI
-context_memory = ContextMemory()
+
 )
 import aiofiles
 from font_maker import font_maker, next_font, prev_font
@@ -38,7 +37,7 @@ from auto_brain.command_manager import (
     cleanup_group_commands
 )
 
-
+context_memory = ContextMemory()
 from ai_chat.chatgpt_panel import show_ai_panel, chat, start_ai_chat, stop_ai_chat
 from weather_module.weather_panel import show_weather
 from context_memory import ContextMemory
