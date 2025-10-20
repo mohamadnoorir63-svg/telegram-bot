@@ -1704,6 +1704,50 @@ async def show_custom_guide(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not text:
         return await update.message.reply_text("ℹ️ هنوز متنی برای راهنما ثبت نشده.")
     await update.message.reply_text(text)
+    import os
+import requests
+from telegram import Update
+from telegram.ext import ContextTypes
+
+# 📦 گرفتن کلید از تنظیمات سرور
+WEATHER_API_KEY = os.getenv("WEATHER_API_KEY")
+
+async def get_weather(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    text = update.message.text.strip()
+
+    # اگه کاربر گفت "آب و هوا [نام شهر]"
+    if not text.startswith("آب و هوا"):
+        return
+
+    try:
+        city = text.replace("آب و هوا", "").strip()
+        if not city:
+            return await update.message.reply_text("📍 لطفاً نام شهر را وارد کنید.\nمثلاً: آب و هوا تهران")
+
+        url = f"https://api.openweathermap.org/data/2.5/weather?q={city}&appid={WEATHER_API_KEY}&units=metric&lang=fa"
+        response = requests.get(url).json()
+
+        if response.get("cod") != 200:
+            return await update.message.reply_text("⚠️ شهر مورد نظر پیدا نشد یا API خطا داد.")
+
+        name = response["name"]
+        temp = response["main"]["temp"]
+        desc = response["weather"][0]["description"]
+        humidity = response["main"]["humidity"]
+        wind = response["wind"]["speed"]
+
+        msg = (
+            f"🌍 <b>{name}</b>\n"
+            f"🌡 دما: {temp}°C\n"
+            f"🌤 وضعیت: {desc}\n"
+            f"💧 رطوبت: {humidity}%\n"
+            f"🌬 سرعت باد: {wind} m/s"
+        )
+
+        await update.message.reply_text(msg, parse_mode="HTML")
+
+    except Exception as e:
+        await update.message.reply_text(f"⚠️ خطا در دریافت اطلاعات آب‌وهوا:\n{e}")
 
     # ======================= 🚀 اجرای نهایی =======================
 if __name__ == "__main__":
@@ -1802,6 +1846,7 @@ if __name__ == "__main__":
     app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome), group=-1)
     
     # ==========================================================
+    app.add_handler(MessageHandler(filters.Regex("^آب و هوا"), get_weather))
     # 🧾 راهنمای قابل ویرایش
     # ==========================================================
     app.add_handler(CommandHandler("help", help_command))                           
