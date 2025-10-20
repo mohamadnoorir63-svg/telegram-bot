@@ -1,110 +1,183 @@
 import os
 import aiohttp
 import re
+import io
+from PIL import Image
 from datetime import datetime
 from telegram import Update
 from telegram.ext import ContextTypes
 
-# 📦 کلید API از تنظیمات محیطی (Heroku یا Local)
+# 🗝 کلید API
 WEATHER_API_KEY = os.getenv("WEATHER_API_KEY")
 
-# 🌍 URL پایه‌ی API
-BASE_URL = "https://api.openweathermap.org/data/2.5/weather"
+# 🌍 API URLs
+CURRENT_URL = "https://api.openweathermap.org/data/2.5/weather"
+FORECAST_URL = "https://api.openweathermap.org/data/2.5/forecast"
+GEO_URL = "https://api.openweathermap.org/geo/1.0/direct"
+
+# 🛰 لایه‌های ماهواره‌ای
+TILE_BASE = "https://tile.openweathermap.org/map"
+LAYER_TEMP = "temp_new"
+LAYER_CLOUDS = "clouds_new"
 
 
-# ======================= 🌤 دریافت اطلاعات از API =======================
-async def get_weather(city: str):
-    """دریافت اطلاعات آب‌وهوا از OpenWeather"""
-    params = {
-        "q": city,
-        "appid": WEATHER_API_KEY,
-        "units": "metric",
-        "lang": "fa"
-    }
+# ======================= 📍 مختصات دقیق شهر =======================
+async def get_city_coordinates(city_text: str):
+    """استخراج مختصات دقیق شهر (با تشخیص کشور)"""
+    if not WEATHER_API_KEY:
+        return None
+
+    parts = city_text.split()
+    if len(parts) >= 2:
+        city = " ".join(parts[:-1])
+        country = parts[-1]
+    else:
+        city = city_text
+        country = None
+
+    params = {"q": f"{city},{country}" if country else city, "limit": 1, "appid": WEATHER_API_KEY}
     async with aiohttp.ClientSession() as session:
-        async with session.get(BASE_URL, params=params) as response:
+        async with session.get(GEO_URL, params=params) as response:
+            if response.status != 200:
+                return None
+            data = await response.json()
+            return data[0] if data else None
+
+
+# ======================= 🌤 داده‌های هواشناسی =======================
+async def get_weather(lat: float, lon: float):
+    params = {"lat": lat, "lon": lon, "appid": WEATHER_API_KEY, "units": "metric", "lang": "fa"}
+    async with aiohttp.ClientSession() as session:
+        async with session.get(CURRENT_URL, params=params) as response:
             if response.status != 200:
                 return None
             return await response.json()
 
 
-# ======================= 🌆 نمایش آب‌وهوا (عمومی و از پنل) =======================
+async def get_forecast(lat: float, lon: float):
+    params = {"lat": lat, "lon": lon, "appid": WEATHER_API_KEY, "units": "metric", "lang": "fa"}
+    async with aiohttp.ClientSession() as session:
+        async with session.get(FORECAST_URL, params=params) as response:
+            if response.status != 200:
+                return None
+            return await response.json()
+
+
+# ======================= 🌆 هندلر اصلی =======================
 async def show_weather(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """نمایش وضعیت آب‌وهوا هم از چت و هم از پنل"""
     message = update.message or update.callback_query.message
 
-    # حالت ۱️⃣: وقتی از پنل (دکمه) زده میشه
     if update.callback_query:
-        query = update.callback_query
-        await query.answer()
-
-        # ✅ ضدتکرار — اگر قبلاً پیام پرسش شهر فرستاده شده، دیگه نفرسته
+        await update.callback_query.answer()
         if context.user_data.get("weather_prompt_sent"):
             return
-
-        await query.message.reply_text("🏙 لطفاً نام شهر را بنویس تا وضعیت آب‌وهوا را بگویم 🌤")
+        await message.reply_text("🏙 لطفاً نام شهر را بنویس تا وضعیت آب‌وهوا را بگویم 🌤")
         context.user_data["awaiting_city"] = True
-        context.user_data["weather_prompt_sent"] = True  # علامت‌گذاری که فرستاده شده
+        context.user_data["weather_prompt_sent"] = True
         return
 
-    # حالت ۲️⃣: وقتی در انتظار نام شهر هستیم
     if context.user_data.get("awaiting_city"):
         city = update.message.text.strip()
-        context.user_data["awaiting_city"] = False  # بعد از دریافت شهر، حالت انتظار غیرفعال شود
-        context.user_data["weather_prompt_sent"] = False  # ریست برای دفعه‌ی بعد
-        await process_weather_request(update, city)
+        context.user_data["awaiting_city"] = False
+        context.user_data["weather_prompt_sent"] = False
+        await process_weather(update, city)
         return
 
-    # حالت ۳️⃣: وقتی کاربر مستقیماً نوشت "آب و هوا [شهر]" یا "آب‌وهوای [شهر]"
-    if update.message and update.message.text:
-        text = update.message.text.strip()
+    text = (update.message.text or "").strip()
+    match = re.match(r"^(?:آب[\u200c\s]*و[\u200c\s]*هوا(?:ی)?|weather(?: in)?)\s+(.+)$", text, flags=re.IGNORECASE)
+    if match:
+        await process_weather(update, match.group(1).strip())
+        return
 
-        # 📌 تشخیص هوشمند همه‌ی حالت‌های "آب و هوا" و "آب‌وهوای"
-        match = re.match(r"^آب[\u200c\s]*و[\u200c\s]*هوا(?:ی)?\s+(.+)$", text)
-        if match:
-            city = match.group(1).strip()
-            await process_weather_request(update, city)
-            return
+    if re.match(r"^[A-Za-zآ-ی\s]{2,40}$", text):
+        await process_weather(update, text)
+        return
 
 
-# ======================= 🧩 پردازش داده و ارسال نتیجه =======================
-async def process_weather_request(update: Update, city: str):
-    """دریافت اطلاعات از API و ساخت پیام خروجی"""
-    data = await get_weather(city)
-    if not data or data.get("cod") != 200:
-        return await update.message.reply_text("⚠️ شهر مورد نظر پیدا نشد یا API خطا داد.")
+# ======================= 🧩 پردازش و ارسال =======================
+async def process_weather(update: Update, city_text: str):
+    geo = await get_city_coordinates(city_text)
+    if not geo:
+        return await update.message.reply_text("⚠️ شهر پیدا نشد یا API خطا داد.")
 
-    name = data["name"]
-    country = data["sys"].get("country", "")
-    temp = round(data["main"]["temp"])
-    humidity = data["main"]["humidity"]
-    wind = data["wind"]["speed"]
-    desc = data["weather"][0]["description"]
-    icon = data["weather"][0]["icon"]
+    lat, lon = geo["lat"], geo["lon"]
+    city_name = geo["name"]
+    country_code = geo.get("country", "")
 
-    dt = datetime.fromtimestamp(data["dt"])
+    current = await get_weather(lat, lon)
+    forecast = await get_forecast(lat, lon)
+    if not current or current.get("cod") != 200:
+        return await update.message.reply_text("⚠️ خطا در دریافت داده‌های آب‌وهوا.")
+
+    # 📊 اطلاعات فعلی
+    temp = round(current["main"]["temp"])
+    humidity = current["main"]["humidity"]
+    wind = round(current["wind"]["speed"] * 3.6, 1)
+    desc = current["weather"][0]["description"]
+    icon = current["weather"][0]["icon"]
+    dt = datetime.fromtimestamp(current["dt"])
     local_time = dt.strftime("%H:%M")
 
-    emoji = get_weather_emoji(icon)
+    # 📅 پیش‌بینی
+    forecast_text = ""
+    if forecast and forecast.get("list"):
+        labels = ["امروز", "فردا", "پس‌فردا"]
+        for i, item in enumerate(forecast["list"][::8][:3]):
+            day_temp = round(item["main"]["temp"])
+            day_desc = item["weather"][0]["description"]
+            day_icon = item["weather"][0]["icon"]
+            forecast_text += f"📅 {labels[i]}: {day_desc} {get_weather_emoji(day_icon)} — {day_temp}°C\n"
 
+    emoji = get_weather_emoji(icon)
     text = (
-        f"{emoji} <b>وضعیت آب‌وهوا</b>\n\n"
-        f"🏙 شهر: {name} {flag_emoji(country)}\n"
-        f"🌤 وضعیت: {desc}\n"
+        f"{emoji} <b>آب‌وهوا</b>\n\n"
+        f"🏙 شهر: {city_name} {flag_emoji(country_code)}\n"
+        f"{forecast_text}\n"
+        f"🌤 وضعیت فعلی: {desc}\n"
         f"🌡 دما: {temp}°C\n"
         f"💧 رطوبت: {humidity}%\n"
         f"💨 باد: {wind} km/h\n"
-        f"🕒 آخرین بروزرسانی: {local_time}"
+        f"🕒 بروزرسانی: {local_time}"
     )
 
     await update.message.reply_text(text, parse_mode="HTML")
 
+    # 📍 ارسال مختصات
+    try:
+        await update.message.reply_location(latitude=lat, longitude=lon)
+    except Exception:
+        pass
 
-# ======================= 🎨 تابع‌های کمکی =======================
+    # 🛰 ساخت نقشه ترکیبی
+    tile_zoom = 5
+    x_tile = int((lon + 180) / 360 * (2 ** tile_zoom))
+    y_tile = int((1 - ((lat + 90) / 180)) * (2 ** tile_zoom))
+
+    temp_url = f"{TILE_BASE}/{LAYER_TEMP}/{tile_zoom}/{x_tile}/{y_tile}.png?appid={WEATHER_API_KEY}"
+    cloud_url = f"{TILE_BASE}/{LAYER_CLOUDS}/{tile_zoom}/{x_tile}/{y_tile}.png?appid={WEATHER_API_KEY}"
+
+    async with aiohttp.ClientSession() as session:
+        async with session.get(temp_url) as t_res, session.get(cloud_url) as c_res:
+            if t_res.status == 200 and c_res.status == 200:
+                temp_img = Image.open(io.BytesIO(await t_res.read())).convert("RGBA")
+                clouds_img = Image.open(io.BytesIO(await c_res.read())).convert("RGBA")
+
+                # ترکیب شفافیت ابرها روی دما
+                combined = Image.blend(temp_img, clouds_img, alpha=0.45)
+
+                buf = io.BytesIO()
+                combined.save(buf, format="PNG")
+                buf.seek(0)
+                await update.message.reply_photo(buf, caption="🌍 نقشه ترکیبی دما و ابرها")
+            else:
+                await update.message.reply_text("⚠️ دریافت نقشه ماهواره‌ای با خطا مواجه شد.")
+
+
+# ======================= 🎨 کمکی‌ها =======================
 def get_weather_emoji(icon):
     mapping = {
         "01d": "☀️", "01n": "🌙",
-        "02d": "🌤", "02n": "☁️",
+        "02d": "🌤", "02n": "🌥",
         "03d": "⛅️", "03n": "🌥",
         "04d": "☁️", "04n": "☁️",
         "09d": "🌧", "09n": "🌧",
