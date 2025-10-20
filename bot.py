@@ -1722,7 +1722,8 @@ async def show_custom_guide(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not text:
         return await update.message.reply_text("ℹ️ هنوز متنی برای راهنما ثبت نشده.")
     await update.message.reply_text(text)
-# ======================= 🚀 اجرای نهایی =======================
+
+    # ======================= 🚀 اجرای نهایی =======================
 if __name__ == "__main__":
     print("🤖 خنگول فارسی 8.7 Cloud+ Supreme Pro Stable+ آماده به خدمت است ...")
 
@@ -1776,7 +1777,7 @@ if __name__ == "__main__":
     app.add_handler(CommandHandler("reply", toggle_reply_mode))
 
     # ==========================================================
-    # 🎨 فونت‌ساز خنگول
+    # 🎨 فونت‌ساز خنگول (با حالت گفت‌وگویی)
     # ==========================================================
     from telegram.ext import ConversationHandler
     from font_maker import font_maker, receive_font_name, next_font, prev_font, ASK_NAME
@@ -1792,18 +1793,18 @@ if __name__ == "__main__":
     app.add_handler(CallbackQueryHandler(feature_back, pattern="^feature_back$"))
 
     # ==========================================================
-    # 🤖 پنل ChatGPT هوش مصنوعی — بالاتر از reply
+    # 🌦 آب‌وهوا — قبل از reply و سایر MessageHandlerها
+    # ==========================================================
+    app.add_handler(CallbackQueryHandler(show_weather, pattern="^panel_weather$"), group=-3)
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, show_weather), group=-3)
+
+    # ==========================================================
+    # 🤖 پنل ChatGPT هوش مصنوعی — باید بالاتر از reply و panel_handler باشد
     # ==========================================================
     app.add_handler(CallbackQueryHandler(show_ai_panel, pattern="^panel_ai$"))
     app.add_handler(CallbackQueryHandler(start_ai_chat, pattern="^start_ai_chat$"))
     app.add_handler(MessageHandler(filters.Regex("^(خاموش|/خاموش)$"), stop_ai_chat))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, chat), group=3)
-
-    # ==========================================================
-    # 🌦 آب‌وهوا — بالاتر از reply و سایر MessageHandlerها
-    # ==========================================================
-    app.add_handler(CallbackQueryHandler(show_weather, pattern="^panel_weather$"), group=-3)
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, show_weather), group=-3)
 
     # ==========================================================
     # 🎉 خوشامد پویا و تنظیمات گروه
@@ -1825,13 +1826,13 @@ if __name__ == "__main__":
     app.add_handler(MessageHandler(filters.Regex("^ثبت راهنما$"), save_custom_guide))
 
     # ==========================================================
-    # 📂 فایل‌ها و پنل‌ها — باید آخر باشد
+    # 📂 فایل‌ها و پنل‌ها — آخر باشد تا با پنل ChatGPT تداخل نکند
     # ==========================================================
     app.add_handler(MessageHandler(filters.Document.ALL, handle_document), group=1)
     app.add_handler(CallbackQueryHandler(panel_handler))
 
     # ==========================================================
-    # 🎭 پاسخ هوشمند خنگول — آخرین گروه پاسخ
+    # 🎭 پاسخ هوشمند خنگول (آخرین در اولویت)
     # ==========================================================
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, reply), group=2)
 
@@ -1854,5 +1855,4 @@ if __name__ == "__main__":
         app.run_polling(allowed_updates=Update.ALL_TYPES)
     except Exception as e:
         print(f"⚠️ خطا در اجرای ربات:\n{e}")
-        print("♻️ ربات به‌صورت خودکار توسط هاست ری‌استارت خواهد شد ✅")
- 
+        print("♻️ ربات به‌صورت خودکار توسط هاست ری‌استارت خواهد شد ✅")    
