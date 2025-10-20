@@ -1802,12 +1802,15 @@ if __name__ == "__main__":
     app.add_handler(CallbackQueryHandler(prev_font, pattern="^prev_font"))
     app.add_handler(CallbackQueryHandler(feature_back, pattern="^feature_back$"))
 
-    # ======================= 🤖 پنل ChatGPT هوش مصنوعی =======================
-    app.add_handler(CallbackQueryHandler(show_ai_panel, pattern="^panel_chatgpt$"))
-    app.add_handler(CallbackQueryHandler(start_ai_chat, pattern="^start_ai_chat$"))
-    app.add_handler(MessageHandler(filters.Regex("^(خاموش|/خاموش)$"), stop_ai_chat))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, chat), group=3)
 
+    
+    # ======================= 🤖 پنل ChatGPT هوش مصنوعی =======================
+    # 🔹 باید قبل از reply و weather باشه تا پیام‌ها بهش برسن
+
+    app.add_handler(CallbackQueryHandler(show_ai_panel, pattern="^panel_chatgpt$"), group=-3)
+    app.add_handler(CallbackQueryHandler(start_ai_chat, pattern="^start_ai_chat$"), group=-3)
+    app.add_handler(MessageHandler(filters.Regex("^(خاموش|/خاموش)$"), stop_ai_chat), group=-3)
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, chat), group=-2)
     # ==========================================================
     # 🎉 خوشامد پویا و تنظیمات گروه
     # ==========================================================
