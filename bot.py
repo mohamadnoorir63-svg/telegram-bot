@@ -790,6 +790,7 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # 🧩 اطمینان از اینکه پیام معتبره
     if not update.message or not update.message.text:
         return
+        reply_text = process_group_message(uid, chat_id, text)
         # 🧠 فعال‌سازی حافظهٔ کوتاه‌مدت گفتگو
     uid = update.effective_user.id
     text = update.message.text.strip()
