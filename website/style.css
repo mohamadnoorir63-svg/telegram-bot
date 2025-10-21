@@ -1,1 +1,86 @@
 
+body {
+    font-family: "Vazirmatn", sans-serif;
+    background: radial-gradient(circle at top, #1e1e1e, #000);
+    color: #f5f5f5;
+    margin: 0;
+    padding: 0;
+    text-align: center;
+    direction: rtl;
+}
+
+header {
+    background: #111;
+    padding: 2em 1em;
+    box-shadow: 0 0 20px #00ffc8;
+}
+
+h1 {
+    font-size: 2.2em;
+    color: #00ffc8;
+    margin-bottom: 0.3em;
+}
+
+p {
+    font-size: 1.1em;
+    color: #ddd;
+}
+
+section {
+    margin: 2em auto;
+    max-width: 700px;
+    background: rgba(255,255,255,0.05);
+    padding: 1.5em;
+    border-radius: 20px;
+    box-shadow: 0 0 20px rgba(0,255,200,0.1);
+}
+
+ul {
+    text-align: right;
+    line-height: 1.9em;
+}
+
+a {
+    color: #00ffc8;
+    text-decoration: none;
+}
+
+a:hover {
+    color: #fff;
+}
+
+.btn {
+    display: inline-block;
+    background: #00ffc8;
+    color: #111;
+    padding: 10px 20px;
+    margin: 10px;
+    border-radius: 12px;
+    font-weight: bold;
+    transition: all 0.3s;
+}
+
+.btn:hover {
+    background: #fff;
+    color: #000;
+    transform: scale(1.05);
+}
+
+.btn.secondary {
+    background: transparent;
+    border: 2px solid #00ffc8;
+    color: #00ffc8;
+}
+
+.btn.secondary:hover {
+    background: #00ffc8;
+    color: #000;
+}
+
+footer {
+    background: #111;
+    padding: 1em;
+    font-size: 0.9em;
+    margin-top: 2em;
+    color: #888;
+}
