@@ -1,10 +1,25 @@
-from flask import Flask, send_from_directory
+from flask import Flask, render_template_string
 
-app = Flask(__name__, static_folder=".", static_url_path="")
+app = Flask(__name__)
 
-@app.route('/')
+@app.route("/")
 def home():
-    return send_from_directory('.', 'index.html')
+    return render_template_string("""
+    <html>
+      <head>
+        <title>ربات خنگول 🤖</title>
+        <meta charset="utf-8"/>
+      </head>
+      <body style="text-align:center; font-family:sans-serif;">
+        <h1>👋 سلام! این سایت رسمی ربات خنگول است</h1>
+        <p>ساخته شده توسط <b>@NOORI_NOOR</b></p>
+        <p>برای چت با ربات به 
+        <a href="https://t.me/Khenqol_bot">@Khenqol_bot</a> بروید.</p>
+      </body>
+    </html>
+    """)
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000)
+    import os
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)
