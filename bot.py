@@ -786,8 +786,7 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if context.user_data.get("custom_handled"):
         context.user_data["custom_handled"] = False
         return
-    if re.search(r"(هوای|آب[\s‌]*و[\s‌]*هوا)", text):
-        return
+    
 
     # 🧩 اطمینان از اینکه پیام معتبره
     if not update.message or not update.message.text:
@@ -813,6 +812,8 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # 🚫 جلوگیری از پاسخ در پیوی (فقط جوک و فال مجازند)
     if update.effective_chat.type == "private" and lower_text not in ["جوک", "فال"]:
+        return
+    if re.search(r"(هوای|آب[\s‌]*و[\s‌]*هوا)", text):
         return
 
     # ✅ جلوگیری از پاسخ به دستورات خاص (مثل راهنما، خوشامد، ربات و غیره)
