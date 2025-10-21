@@ -786,8 +786,8 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if context.user_data.get("custom_handled"):
         context.user_data["custom_handled"] = False
         return
-        if re.search(r"(هوای|آب[\s‌]*و[\s‌]*هوا)", text):
-    return
+    if re.search(r"(هوای|آب[\s‌]*و[\s‌]*هوا)", text):
+        return
 
     # 🧩 اطمینان از اینکه پیام معتبره
     if not update.message or not update.message.text:
