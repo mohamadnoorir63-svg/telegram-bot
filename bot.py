@@ -36,10 +36,10 @@ from auto_brain.command_manager import (
     cleanup_group_commands
 )
 from context_memory import ContextMemory  # ✅ باید قبل از استفاده ازش باشه
-
+from brain_bridge_group import process_group_message
 # 🧠 حافظه کوتاه‌مدت گفتگو برای Context AI
 context_memory = ContextMemory()
-
+from brain_bridge import process_user_message
 from ai_chat.chatgpt_panel import show_ai_panel, chat, start_ai_chat, stop_ai_chat
 from weather_module.weather_panel import show_weather
 # 🧠 نکته مهم:
