@@ -40,8 +40,10 @@ async def show_weather(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # فقط از طریق دکمه پنل فعال شود
     if update.callback_query:
         await update.callback_query.answer()
-        await message.reply_text("🏙 لطفاً نام شهر را بنویس تا وضعیت آب‌وهوا را بگویم 🌤")
-        context.user_data["awaiting_city"] = True
+        # ✅ جلوگیری از ارسال دوباره‌ی پیام در صورت فعال بودن فلگ
+        if not context.user_data.get("awaiting_city", False):
+            await message.reply_text("🏙 لطفاً نام شهر را بنویس تا وضعیت آب‌وهوا را بگویم 🌤")
+            context.user_data["awaiting_city"] = True
         return
 
     # اگر از دکمه وارد شده و هنوز منتظر شهر هستیم
@@ -50,6 +52,16 @@ async def show_weather(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data["awaiting_city"] = False
         await process_weather(update, city)
         return
+
+    # ✅ تشخیص خودکار پیام‌هایی مثل «هوای تهران» یا «آب و هوای مشهد»
+    text = update.message.text.strip()
+    pattern = r"(?i)(?:هوا|آب[\s‌]*و[\s‌]*هوا)\s*(?:ی)?\s*([\wآ-ی\s]+)?"
+    match = re.search(pattern, text)
+    if match:
+        city = match.group(1)
+        if city and len(city.strip()) > 1:
+            await process_weather(update, city.strip())
+            return
 
     # 🚫 اگر کاربر خودش چیزی بنویسه، هیچ کاری نکن
     return
