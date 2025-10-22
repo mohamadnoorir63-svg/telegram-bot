@@ -1,77 +1,63 @@
 import requests
+from bs4 import BeautifulSoup
 import datetime
 import asyncio
 import os
 from telegram import Update
 from telegram.ext import ContextTypes
 
-# 🌐 آدرس API آزاد و رایگان (بدون نیاز به ثبت‌نام)
-BASE_URL = "https://gnews.io/api/v4/top-headlines"
-# ✅ برای رایگان بودن، کلید عمومی زیر استفاده می‌شود:
-DEFAULT_API_KEY = "1f7e7c2f5b2f1b5c40d3b6740b5e1b15"
+# 🌐 تابع گرفتن اخبار فارسی از گوگل‌نیوز
+def fetch_persian_news(query="اخبار ایران"):
+    try:
+        # آدرس جستجوی گوگل‌نیوز برای فارسی
+        url = f"https://news.google.com/rss/search?q={query}+when:1d&hl=fa&gl=IR&ceid=IR:fa"
+        response = requests.get(url)
+        response.encoding = "utf-8"
+        soup = BeautifulSoup(response.text, "xml")
 
-# 📢 دستور دستی برای دریافت خبر
+        items = soup.find_all("item")
+        news_list = []
+        for item in items[:5]:
+            title = item.title.text
+            link = item.link.text
+            pub_date = item.pubDate.text
+            news_list.append((title, link, pub_date))
+
+        return news_list
+    except Exception as e:
+        print("❌ خطا در دریافت اخبار:", e)
+        return []
+
+
+# 📢 دستور دستی در ربات: /اخبار یا اخبار سیاسی و...
 async def get_news(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.message.text.replace("اخبار", "").strip() or "ایران"
+    news = fetch_persian_news(query)
 
-    params = {
-        "q": query,
-        "lang": "fa",  # فارسی
-        "country": "ir",  # ایران
-        "max": 5,
-        "token": DEFAULT_API_KEY
-    }
+    if not news:
+        await update.message.reply_text("⚠️ خبری یافت نشد، لطفاً دوباره تلاش کنید یا موضوع دیگری بنویسید.")
+        return
 
-    try:
-        response = requests.get(BASE_URL, params=params)
-        data = response.json()
+    msg = f"🗞 <b>آخرین خبرهای {query}</b>:\n\n"
+    for title, link, pub in news:
+        msg += f"🔹 <b>{title}</b>\n🔗 {link}\n🕘 {pub}\n\n"
 
-        if "articles" not in data or len(data["articles"]) == 0:
-            await update.message.reply_text("⚠️ خبری یافت نشد. لطفاً موضوع دیگری امتحان کنید.")
-            return
+    now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+    msg += f"🕓 زمان به‌روزرسانی: {now}"
 
-        message = f"🗞 آخرین خبرهای مربوط به <b>{query}</b>:\n\n"
-        for article in data["articles"][:5]:
-            title = article.get("title", "بدون عنوان")
-            source = article.get("source", {}).get("name", "منبع ناشناس")
-            url = article.get("url", "")
-            published = article.get("publishedAt", "").split("T")[0]
-            message += f"🔹 <b>{title}</b>\n📰 {source}\n📅 {published}\n🔗 {url}\n\n"
-
-        now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
-        message += f"🕘 زمان به‌روزرسانی: {now}"
-
-        await update.message.reply_html(message)
-
-    except Exception as e:
-        await update.message.reply_text(f"⚠️ خطا در دریافت خبر:\n{e}")
+    await update.message.reply_html(msg)
 
 
-# ⏰ ارسال خودکار هر روز ساعت ۹ صبح
+# ⏰ ارسال خودکار خبر داغ ساعت ۹ صبح
 async def start_daily_news_scheduler(bot):
     while True:
         now = datetime.datetime.now()
         if now.hour == 9 and now.minute == 0:
             chat_id = os.getenv("NEWS_CHAT_ID")
             if chat_id:
-                try:
-                    params = {
-                        "q": "ایران",
-                        "lang": "fa",
-                        "country": "ir",
-                        "max": 3,
-                        "token": DEFAULT_API_KEY
-                    }
-                    response = requests.get(BASE_URL, params=params)
-                    data = response.json()
-
-                    if "articles" in data and len(data["articles"]) > 0:
-                        first = data["articles"][0]
-                        title = first.get("title", "خبر بدون عنوان")
-                        url = first.get("url", "")
-                        msg = f"🌅 خبر داغ صبح:\n<b>{title}</b>\n🔗 {url}"
-                        await bot.send_message(chat_id, msg, parse_mode="HTML")
-                except Exception as e:
-                    print("❌ خطا در ارسال خودکار اخبار:", e)
-
-        await asyncio.sleep(60)  # بررسی هر دقیقه
+                news = fetch_persian_news("خبر داغ")
+                if news:
+                    first = news[0]
+                    msg = f"🌅 <b>خبر داغ امروز:</b>\n\n{first[0]}\n🔗 {first[1]}"
+                    await bot.send_message(chat_id, msg, parse_mode="HTML")
+        await asyncio.sleep(60)
