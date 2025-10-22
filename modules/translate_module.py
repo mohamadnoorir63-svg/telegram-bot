@@ -1,144 +1,92 @@
 # modules/translate_module.py
-import asyncio
 import os
-from typing import Optional, Tuple, List
 import aiohttp
 from telegram import Update
 from telegram.ext import ContextTypes
+from typing import List, Optional
 
-# می‌تونی URL اختصاصی بذاری (اختیاری). اگه خالی باشه از لیست عمومی استفاده می‌کنیم.
-LIBRE_URL_ENV = os.getenv("LIBRETRANSLATE_URL", "").strip()
+# ===============================
+# 🌐 سرورهای فعال LibreTranslate
+# ===============================
 PUBLIC_ENDPOINTS: List[str] = [
-    # ترتیب تست؛ اول سریع‌تر/پایدارتر
-    "https://translate.astian.org",
-    "https://libretranslate.com",
+    "https://translate.argosopentech.com",
+    "https://lt.vern.cc",
+    "https://translate.api.skitzen.com",
+    "https://translate.josstorer.com",
 ]
 
 LANG_NAMES = {
     "fa": "فارسی",
     "en": "انگلیسی",
-    "ar": "عربی",
-    "tr": "ترکی",
-    "ru": "روسی",
     "de": "آلمانی",
     "fr": "فرانسوی",
     "es": "اسپانیایی",
+    "ar": "عربی",
+    "tr": "ترکی",
+    "ru": "روسی",
     "hi": "هندی",
     "ur": "اردو",
     "ps": "پشتو",
 }
 
-def _lang_name(code: str) -> str:
-    return LANG_NAMES.get(code, code)
-
-async def _detect(session: aiohttp.ClientSession, base: str, text: str) -> Optional[str]:
+# ===============================
+# 🔍 تشخیص زبان متن
+# ===============================
+async def _detect_language(session: aiohttp.ClientSession, base: str, text: str) -> Optional[str]:
     url = f"{base.rstrip('/')}/detect"
     try:
-        async with session.post(url, data={"q": text}, timeout=15) as r:
-            if r.status == 200:
-                data = await r.json()
-                # پاسخ معمولاً لیستی از کاندیدهاست: [{"language":"fa","confidence":...}, ...]
-                if isinstance(data, list) and data:
+        async with session.post(url, data={"q": text}, timeout=10) as resp:
+            if resp.status == 200:
+                data = await resp.json()
+                if isinstance(data, list) and len(data) > 0:
                     return data[0].get("language")
     except Exception:
         pass
     return None
 
-async def _translate(session: aiohttp.ClientSession, base: str, text: str, src: str, tgt: str, api_key: Optional[str]) -> Optional[str]:
+# ===============================
+# 🌐 ترجمه متن
+# ===============================
+async def _translate(session: aiohttp.ClientSession, base: str, text: str, src: str, tgt: str) -> Optional[str]:
     url = f"{base.rstrip('/')}/translate"
-    payload = {"q": text, "source": src, "target": tgt, "format": "text"}
-    if api_key:
-        payload["api_key"] = api_key
     try:
-        async with session.post(url, data=payload, timeout=20) as r:
-            if r.status == 200:
-                data = await r.json()
-                # {"translatedText": "..."}
+        async with session.post(url, data={"q": text, "source": src, "target": tgt, "format": "text"}, timeout=15) as resp:
+            if resp.status == 200:
+                data = await resp.json()
                 return data.get("translatedText")
     except Exception:
         pass
     return None
 
-def _choose_endpoints() -> List[str]:
-    if LIBRE_URL_ENV:
-        return [LIBRE_URL_ENV] + PUBLIC_ENDPOINTS
-    return PUBLIC_ENDPOINTS
-
-def _parse_target_arg(text: str) -> Optional[str]:
-    """
-    پترن‌های قابل قبول:
-      - 'ترجمه en'  یا  'ترجمه به en'
-      - '/translate fa'
-      - 'ترجمه انگلیسی' (چند مورد پرکاربرد نگاشت می‌کنیم)
-    """
-    t = text.strip().lower().replace("به ", " ").split()
-    # مثال: ["ترجمه","en"]
-    if len(t) >= 2:
-        maybe = t[1]
-        map_words = {
-            "فارسی": "fa", "انگلیسی": "en", "عربی": "ar", "ترکی": "tr",
-            "روسی": "ru", "آلمانی": "de", "فرانسوی": "fr", "اسپانیایی": "es",
-            "هندی":"hi","اردو":"ur","پشتو":"ps"
-        }
-        return map_words.get(maybe, maybe)  # اگر کد بود همان، اگر کلمه بود نگاشت
-    return None
-
+# ===============================
+# 🧠 تابع اصلی ترجمه
+# ===============================
 async def translate_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """
-    استفاده:
-      ▸ روی یک پیام ریپلای کن و بنویس:
-        «ترجمه»  → خودکار: اگر متن فارسی بود → انگلیسی؛ در غیر اینصورت → فارسی
-        «ترجمه en» یا «ترجمه به en»
-        «/translate fa»
-        «ترجمه انگلیسی / ترجمه فارسی / ...»
-    """
     msg = update.effective_message
+
+    # بررسی اینکه پیام ریپلای دارد یا نه
     if not msg.reply_to_message or not (msg.reply_to_message.text or msg.reply_to_message.caption):
-        return await msg.reply_text("برای ترجمه، روی یک پیام متنی ریپلای کن و بنویس: «ترجمه» یا «ترجمه en»")
+        return await msg.reply_text("برای ترجمه، روی یک پیام متنی ریپلای کن و بنویس: «ترجمه» ✅")
 
-    original = (msg.reply_to_message.text or msg.reply_to_message.caption).strip()
-    if not original:
-        return await msg.reply_text("این پیام متنی ندارد.")
+    text = (msg.reply_to_message.text or msg.reply_to_message.caption).strip()
 
-    # هدف موردنظر کاربر (اختیاری)
-    user_text = msg.text or msg.caption or ""
-    user_text = user_text.strip()
-
-    explicit_target = _parse_target_arg(user_text)  # مثلا "en"
-    api_key = os.getenv("LIBRETRANSLATE_API_KEY", "").strip() or None
-
-    endpoints = _choose_endpoints()
-    errors = []
-
+    endpoints = PUBLIC_ENDPOINTS
     async with aiohttp.ClientSession() as session:
         for base in endpoints:
             try:
                 # تشخیص زبان
-                src = await _detect(session, base, original) or "auto"
+                src_lang = await _detect_language(session, base, text) or "auto"
 
-                # اگر کاربر مقصد را مشخص نکرد:
-                if not explicit_target:
-                    # منطق ساده: اگر منبع فارسی/عربی/اردو/پشتو بود → انگلیسی؛ در غیر این صورت → فارسی
-                    rtl_like = {"fa", "ar", "ur", "ps"}
-                    target = "en" if src in rtl_like else "fa"
-                else:
-                    target = explicit_target
+                # مقصد خودکار: اگر فارسی بود → انگلیسی، در غیر اینصورت → فارسی
+                target_lang = "en" if src_lang in ["fa", "ar", "ur", "ps"] else "fa"
 
-                # اگر src و target یکسان شدند، مقصد را برعکس می‌کنیم تا خروجی داشته باشیم
-                if src == target:
-                    target = "fa" if target != "fa" else "en"
-
-                translated = await _translate(session, base, original, src, target, api_key)
+                translated = await _translate(session, base, text, src_lang, target_lang)
                 if translated:
-                    await msg.reply_text(
-                        f"🈯️ ترجمه ({_lang_name(src)} → {_lang_name(target)}):\n\n{translated}"
-                    )
-                    return
-                else:
-                    errors.append(f"{base}: no result")
-            except Exception as e:
-                errors.append(f"{base}: {e}")
+                    src_name = LANG_NAMES.get(src_lang, src_lang)
+                    tgt_name = LANG_NAMES.get(target_lang, target_lang)
+                    return await msg.reply_text(f"🈯️ ترجمه از {src_name} → {tgt_name}:\n\n{translated}")
 
-    await msg.reply_text(
-        "⚠️ ترجمه انجام نشد. ممکنه سرویس رایگان لحظه‌ای محدود شده باشه. کمی بعد دوباره امتحان کن."
-    )
+            except Exception:
+                continue
+
+    await msg.reply_text("⚠️ ترجمه انجام نشد. احتمالاً تمام سرورهای رایگان لحظه‌ای محدود شده‌اند. بعداً دوباره امتحان کن.")
