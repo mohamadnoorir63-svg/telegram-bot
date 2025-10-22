@@ -44,6 +44,7 @@ context_memory = ContextMemory()
 from ai_chat.chatgpt_panel import show_ai_panel, chat, start_ai_chat, stop_ai_chat
 from weather_module.weather_panel import show_weather
 from modules.azan_module import get_azan_time
+from modules.news_module import get_news
 # 🧠 نکته مهم:
 # ❌ از اینجا دیگه admin_panel رو import نکن!
 # ✅ اون رو بعد از ساخت app در بخش اصلی فایل (پایین) اضافه خواهیم کرد.
@@ -1838,6 +1839,8 @@ if __name__ == "__main__":
     app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome), group=-1)
     # ======================= 🕌 اذان =======================
     app.add_handler(MessageHandler(filters.Regex(r"^اذان"), get_azan_time))
+    # ======================= 📰 اخبار =======================
+    app.add_handler(MessageHandler(filters.Regex(r"^اخبار"), get_news))
     # ==========================================================
     # 🌦 آب‌وهوا — باید قبل از reply و سایر MessageHandlerها باشه
     # ==========================================================
