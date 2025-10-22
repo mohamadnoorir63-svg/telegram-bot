@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://my-telegram-bot123-af01e0571064.herokuapp.com/static/sitemap.xml
