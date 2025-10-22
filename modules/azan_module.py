@@ -9,7 +9,6 @@ from telegram.ext import ContextTypes
 AZAN_API = "https://api.aladhan.com/v1/timingsByCity"
 G_TO_H_API = "https://api.aladhan.com/v1/gToH"
 
-# لیست شهرهای قابل پشتیبانی
 CITIES = {
     "هرات": {"city": "Herat", "country": "Afghanistan"},
     "کابل": {"city": "Kabul", "country": "Afghanistan"},
@@ -37,9 +36,7 @@ async def get_azan_time(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def send_azan_info(update, city, country, city_fa):
     try:
-        # 🕌 اذان سنی (Method 2)
         sunni = requests.get(f"{AZAN_API}?city={city}&country={country}&method=2").json()
-        # 🕋 اذان شیعه (Method 12)
         shia = requests.get(f"{AZAN_API}?city={city}&country={country}&method=12").json()
 
         sunni_data = sunni["data"]["timings"]
@@ -67,16 +64,14 @@ async def send_azan_info(update, city, country, city_fa):
             f"🌙 نیمه شب: {shia_data['Midnight']}\n"
         )
 
-        # بررسی وضعیت رمضان
         hijri_month = sunni["data"]["date"]["hijri"]["month"]["en"]
         if hijri_month == "Ramadan":
             msg += "\n🌙 <b>ماه مبارک رمضان است!</b>\n"
             maghrib_time = datetime.strptime(sunni_data["Maghrib"], "%H:%M")
-            now = datetime.utcnow() + timedelta(hours=4.5)  # برای تنظیم ساعت افغانستان
+            now = datetime.utcnow() + timedelta(hours=4.5)
 
-            # محاسبه زمان باقی‌مانده
             delta = (maghrib_time - now.replace(second=0, microsecond=0)).total_seconds()
-            if 0 < delta <= 600:  # ۱۰ دقیقه مانده
+            if 0 < delta <= 600:
                 minutes = int(delta // 60)
                 msg += f"\n⏰ <b>{minutes} دقیقه تا اذان مغرب باقی مانده...</b> 🌇"
             elif delta > 600:
@@ -89,15 +84,33 @@ async def send_azan_info(update, city, country, city_fa):
     except Exception as e:
         await update.message.reply_text(f"⚠️ خطا در دریافت اوقات شرعی: {e}")
 
+
 # ===================== 🌙 بررسی وضعیت رمضان و مناسبت‌ها =====================
 async def get_ramadan_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         today = datetime.utcnow().strftime("%Y-%m-%d")
-        response = requests.get(f"{G_TO_H_API}/{today}").json()
+        response = requests.get(f"{G_TO_H_API}/{today}")
 
-        # بررسی امن داده‌ها
-        hijri_data = response.get("data", {}).get("hijri", {})
-        gregorian_data = response.get("data", {}).get("gregorian", {})
+        # تبدیل امن به JSON
+        try:
+            data = response.json()
+        except Exception:
+            import json
+            data = json.loads(response.text)
+
+        if isinstance(data, str):
+            import json
+            data = json.loads(data)
+
+        hijri_data = data.get("data", {}).get("hijri", {})
+        gregorian_data = data.get("data", {}).get("gregorian", {})
+
+        if isinstance(hijri_data, str):
+            import json
+            hijri_data = json.loads(hijri_data)
+        if isinstance(gregorian_data, str):
+            import json
+            gregorian_data = json.loads(gregorian_data)
 
         hijri_date = hijri_data.get("date", "نامشخص")
         hijri_day = int(hijri_data.get("day", "0"))
@@ -115,7 +128,7 @@ async def get_ramadan_status(update: Update, context: ContextTypes.DEFAULT_TYPE)
             f"🕌 <b>تاریخ هجری:</b> {hijri_date} ({month_name_fa})\n\n"
         )
 
-        # لیست مناسبت‌ها
+        # ✅ مناسبت‌ها
         special_days = []
 
         if month_name_en == "Ramadan":
