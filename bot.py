@@ -1854,7 +1854,9 @@ if __name__ == "__main__":
     app.add_handler(MessageHandler(filters.Regex("^ثبت help$"), save_help))
     app.add_handler(MessageHandler(filters.Regex("^راهنما$"), show_custom_guide))
     app.add_handler(MessageHandler(filters.Regex("^ثبت راهنما$"), save_custom_guide))
-
+    # 🕘 اجرای خودکار ارسال خبرهای روز
+    from modules.news_module import start_daily_news_scheduler
+    app.create_task(start_daily_news_scheduler
     # ==========================================================
     # 📂 فایل‌ها و پنل‌ها
     # ==========================================================
@@ -1870,9 +1872,7 @@ if __name__ == "__main__":
     # ==========================================================
     # 🔹 وظایف استارتاپ
     # ==========================================================
-    # 🕘 اجرای خودکار ارسال خبرهای روز
-    from modules.news_module import start_daily_news_scheduler
-    app.create_task(start_daily_news_scheduler
+
     async def on_startup(app):
         await notify_admin_on_startup(app)
         app.create_task(auto_backup(app.bot))
