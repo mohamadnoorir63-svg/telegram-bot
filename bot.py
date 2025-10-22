@@ -43,7 +43,7 @@ context_memory = ContextMemory()
 
 from ai_chat.chatgpt_panel import show_ai_panel, chat, start_ai_chat, stop_ai_chat
 from weather_module.weather_panel import show_weather
-from modules.azan_module import get_azan_time
+from modules.azan_module import get_azan_time, get_ramadan_status
 from modules.news_module import get_news, start_daily_news_scheduler
 # 🧠 نکته مهم:
 # ❌ از اینجا دیگه admin_panel رو import نکن!
@@ -1839,6 +1839,7 @@ if __name__ == "__main__":
     app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome), group=-1)
     # ======================= 🕌 اذان =======================
     app.add_handler(MessageHandler(filters.Regex(r"^اذان"), get_azan_time))
+    app.add_handler(MessageHandler(filters.Regex(r"^رمضان"), get_ramadan_status))
     # ======================= 📰 اخبار =======================
     app.add_handler(MessageHandler(filters.Regex(r"^اخبار"), get_news))
     # ==========================================================
