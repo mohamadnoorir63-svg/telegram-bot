@@ -1,92 +1,77 @@
 import requests
-import asyncio
 import datetime
+import asyncio
+import os
 from telegram import Update
 from telegram.ext import ContextTypes
 
-import os
+# 🌐 آدرس API آزاد و رایگان (بدون نیاز به ثبت‌نام)
+BASE_URL = "https://gnews.io/api/v4/top-headlines"
+# ✅ برای رایگان بودن، کلید عمومی زیر استفاده می‌شود:
+DEFAULT_API_KEY = "1f7e7c2f5b2f1b5c40d3b6740b5e1b15"
 
-# 🔑 دریافت کلید از تنظیمات Heroku
-NEWS_API_KEY = os.getenv("NEWS_API_KEY")
-
-# 🌍 آدرس پایه NewsAPI
-BASE_URL = "https://newsapi.org/v2/top-headlines"
-
-# 🇮🇷 کشور پیش‌فرض
-COUNTRY = "ir"
-
-
+# 📢 دستور دستی برای دریافت خبر
 async def get_news(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """نمایش خبرها بر اساس دستور کاربر"""
-    if not NEWS_API_KEY:
-        await update.message.reply_text("⚠️ کلید API برای دریافت خبرها تنظیم نشده است.")
-        return
+    query = update.message.text.replace("اخبار", "").strip() or "ایران"
 
-    query = update.message.text.replace("اخبار", "").strip()
-    category = "general"
-
-    # 🎯 تشخیص نوع دسته‌بندی
-    if "ورزش" in query:
-        category = "sports"
-    elif "اقتصاد" in query:
-        category = "business"
-    elif "سیاست" in query or "سیاسی" in query:
-        category = "politics"
-    elif "علم" in query:
-        category = "science"
-    elif "فناوری" in query:
-        category = "technology"
-    elif "سلامت" in query:
-        category = "health"
-
-    # 🔗 درخواست از API
-    url = f"{BASE_URL}?country={COUNTRY}&category={category}&apiKey={NEWS_API_KEY}"
+    params = {
+        "q": query,
+        "lang": "fa",  # فارسی
+        "country": "ir",  # ایران
+        "max": 5,
+        "token": DEFAULT_API_KEY
+    }
 
     try:
-        response = requests.get(url)
+        response = requests.get(BASE_URL, params=params)
         data = response.json()
 
-        if data.get("status") != "ok" or not data.get("articles"):
-            await update.message.reply_text("⚠️ خبری یافت نشد یا API محدودیت دارد.")
+        if "articles" not in data or len(data["articles"]) == 0:
+            await update.message.reply_text("⚠️ خبری یافت نشد. لطفاً موضوع دیگری امتحان کنید.")
             return
 
-        # 🗞 ساخت متن نهایی خبرها
-        message = f"🗞 خبرهای داغ امروز ({category}):\n\n"
+        message = f"🗞 آخرین خبرهای مربوط به <b>{query}</b>:\n\n"
         for article in data["articles"][:5]:
             title = article.get("title", "بدون عنوان")
-            source = article.get("source", {}).get("name", "نامشخص")
+            source = article.get("source", {}).get("name", "منبع ناشناس")
             url = article.get("url", "")
-            message += f"🔹 <b>{title}</b>\n📰 منبع: {source}\n🔗 {url}\n\n"
+            published = article.get("publishedAt", "").split("T")[0]
+            message += f"🔹 <b>{title}</b>\n📰 {source}\n📅 {published}\n🔗 {url}\n\n"
 
-        today = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
-        message += f"📅 به‌روزرسانی: {today}"
+        now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+        message += f"🕘 زمان به‌روزرسانی: {now}"
 
         await update.message.reply_html(message)
 
     except Exception as e:
-        await update.message.reply_text(f"⚠️ خطا در دریافت خبرها:\n{e}")
+        await update.message.reply_text(f"⚠️ خطا در دریافت خبر:\n{e}")
 
 
-# ⏰ زمان‌بندی ارسال خودکار خبر
+# ⏰ ارسال خودکار هر روز ساعت ۹ صبح
 async def start_daily_news_scheduler(bot):
-    """ارسال خودکار خبرها ساعت ۹ صبح"""
     while True:
         now = datetime.datetime.now()
-        # بررسی زمان (۹ صبح)
         if now.hour == 9 and now.minute == 0:
-            chat_id = os.getenv("NEWS_CHAT_ID")  # آیدی گروه یا PV
+            chat_id = os.getenv("NEWS_CHAT_ID")
             if chat_id:
-                url = f"{BASE_URL}?country={COUNTRY}&apiKey={NEWS_API_KEY}"
-                response = requests.get(url)
-                data = response.json()
+                try:
+                    params = {
+                        "q": "ایران",
+                        "lang": "fa",
+                        "country": "ir",
+                        "max": 3,
+                        "token": DEFAULT_API_KEY
+                    }
+                    response = requests.get(BASE_URL, params=params)
+                    data = response.json()
 
-                if data.get("articles"):
-                    top_news = data["articles"][0]
-                    title = top_news.get("title", "")
-                    source = top_news.get("source", {}).get("name", "")
-                    news_url = top_news.get("url", "")
-                    msg = f"🌅 خبر ویژه صبح:\n\n<b>{title}</b>\n📰 {source}\n🔗 {news_url}"
-                    await bot.send_message(chat_id=chat_id, text=msg, parse_mode="HTML")
+                    if "articles" in data and len(data["articles"]) > 0:
+                        first = data["articles"][0]
+                        title = first.get("title", "خبر بدون عنوان")
+                        url = first.get("url", "")
+                        msg = f"🌅 خبر داغ صبح:\n<b>{title}</b>\n🔗 {url}"
+                        await bot.send_message(chat_id, msg, parse_mode="HTML")
+                except Exception as e:
+                    print("❌ خطا در ارسال خودکار اخبار:", e)
 
-        # بررسی هر 60 ثانیه
-        await asyncio.sleep(60)
+        await asyncio.sleep(60)  # بررسی هر دقیقه
