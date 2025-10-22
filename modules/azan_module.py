@@ -9,11 +9,12 @@ from telegram.ext import ContextTypes
 AZAN_API = "https://api.aladhan.com/v1/timingsByCity"
 G_TO_H_API = "https://api.aladhan.com/v1/gToH"
 
-# شهرها و کشورها
+# لیست شهرهای قابل پشتیبانی
 CITIES = {
     "هرات": {"city": "Herat", "country": "Afghanistan"},
     "کابل": {"city": "Kabul", "country": "Afghanistan"},
     "قندهار": {"city": "Kandahar", "country": "Afghanistan"},
+    "مزار": {"city": "Mazar-e-Sharif", "country": "Afghanistan"},
     "تهران": {"city": "Tehran", "country": "Iran"},
     "مشهد": {"city": "Mashhad", "country": "Iran"},
     "اصفهان": {"city": "Isfahan", "country": "Iran"},
@@ -92,15 +93,20 @@ async def send_azan_info(update, city, country, city_fa):
 async def get_ramadan_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         today = datetime.utcnow().strftime("%Y-%m-%d")
-        response = requests.get(f"{G_TO_H_API}/{today}")
-        hijri = response.json()["data"]["hijri"]
-        hijri_date = hijri["date"]
-        hijri_day = int(hijri["day"])
-        month_name_en = hijri["month"]["en"]
-        month_name_fa = hijri["month"]["ar"]
-        year = hijri["year"]
+        response = requests.get(f"{G_TO_H_API}/{today}").json()
 
-        gregorian_date = response.json()["data"]["gregorian"]["date"]
+        # بررسی امن داده‌ها
+        hijri_data = response.get("data", {}).get("hijri", {})
+        gregorian_data = response.get("data", {}).get("gregorian", {})
+
+        hijri_date = hijri_data.get("date", "نامشخص")
+        hijri_day = int(hijri_data.get("day", "0"))
+        hijri_month = hijri_data.get("month", {})
+        month_name_en = hijri_month.get("en", "Unknown")
+        month_name_fa = hijri_month.get("ar", "نامشخص")
+        year = hijri_data.get("year", "----")
+
+        gregorian_date = gregorian_data.get("date", "نامشخص")
         jalali_date = jdatetime.date.today().strftime("%Y/%m/%d")
 
         msg = (
@@ -109,6 +115,7 @@ async def get_ramadan_status(update: Update, context: ContextTypes.DEFAULT_TYPE)
             f"🕌 <b>تاریخ هجری:</b> {hijri_date} ({month_name_fa})\n\n"
         )
 
+        # لیست مناسبت‌ها
         special_days = []
 
         if month_name_en == "Ramadan":
@@ -131,6 +138,7 @@ async def get_ramadan_status(update: Update, context: ContextTypes.DEFAULT_TYPE)
             special_days.append("😢 روز عاشورا")
 
         msg += "\n".join(special_days) if special_days else "📿 امروز مناسبت مذهبی خاصی ندارد."
+
         await update.message.reply_text(msg, parse_mode="HTML")
 
     except Exception as e:
