@@ -20,6 +20,7 @@ dnspython==2.6.1     # ✅ برای MongoDB لازم است
 # ==== AI & NLP ====
 openai==0.28
 numpy==1.26.4
+lxml
 
 # ==== Progress & Misc ====
 tqdm==4.66.5
