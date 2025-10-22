@@ -15,21 +15,23 @@ imageio==2.36.0
 
 # ==== Database ====
 pymongo==4.10.1
-dnspython==2.6.1     # ✅ برای MongoDB لازم است
+dnspython==2.6.1    # ✅ برای MongoDB لازم است
 
 # ==== AI & NLP ====
 openai==0.28
 numpy==1.26.4
-lxml
-beautifulsoup4
 
-newspaper3k
+# ==== Web Scraping & Parsing ====
+lxml==5.3.0
+beautifulsoup4==4.12.3
+newspaper3k==0.2.8
+lxml_html_clean==0.1.0
+
+# ==== Persian & Date ====
+jdatetime==4.1.1
+khayyam==3.0.17
 
 # ==== Progress & Misc ====
 tqdm==4.66.5
 Flask==3.0.3
 gunicorn==23.0.0
-khayyam
-newspaper3k
-lxml_html_clean
-
