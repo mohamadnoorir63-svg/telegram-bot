@@ -21,10 +21,13 @@ dnspython==2.6.1     # ✅ برای MongoDB لازم است
 openai==0.28
 numpy==1.26.4
 lxml
+beautifulsoup4
+
+newspaper3k
 
 # ==== Progress & Misc ====
 tqdm==4.66.5
 Flask==3.0.3
 gunicorn==23.0.0
 khayyam
-beautifulsoup4
+
