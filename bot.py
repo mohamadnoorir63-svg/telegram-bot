@@ -1839,7 +1839,7 @@ if __name__ == "__main__":
     app.add_handler(MessageHandler(filters.Regex(r"^تنظیم حذف"), set_welcome_timer), group=-1)
     app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome), group=-1)
     # ======================= 🕌 اذان =======================
-    app.add_handler(MessageHandler(filters.Regex(r"^(ترجمه|translate)"), translate_text))
+    
     app.add_handler(MessageHandler(filters.Regex(r"^اذان"), get_azan_time))
     app.add_handler(MessageHandler(filters.Regex(r"^رمضان"), get_ramadan_status))
     # ======================= 📰 اخبار =======================
