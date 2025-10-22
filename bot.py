@@ -44,7 +44,9 @@ context_memory = ContextMemory()
 from ai_chat.chatgpt_panel import show_ai_panel, chat, start_ai_chat, stop_ai_chat
 from weather_module.weather_panel import show_weather
 from modules.azan_module import get_azan_time
-from modules.news_module import get_news
+# 🕘 اجرای خودکار ارسال خبرهای روز
+from modules.news_module import start_daily_news_scheduler
+app.create_task(start_daily_news_scheduler(app.bot))
 # 🧠 نکته مهم:
 # ❌ از اینجا دیگه admin_panel رو import نکن!
 # ✅ اون رو بعد از ساخت app در بخش اصلی فایل (پایین) اضافه خواهیم کرد.
