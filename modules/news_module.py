@@ -1,21 +1,25 @@
-import os, requests, asyncio
+import os
+import requests
+import asyncio
 from datetime import datetime, timedelta, timezone
 from telegram import Update
 from telegram.ext import ContextTypes
 
-API_KEY = os.getenv("NEWS_API_KEY", "demo")  # 🔑 اینو با کلید واقعی عوض کن
+API_KEY = os.getenv("NEWS_API_KEY", "demo")  # 🔑 کلید API واقعی رو بعداً جایگزین کن
 
 async def get_news(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """دریافت خبرهای داغ روز"""
+    """📢 دریافت خبرهای داغ روز"""
     url = f"https://newsapi.org/v2/top-headlines?country=us&apiKey={API_KEY}"
     resp = requests.get(url).json()
 
     if resp.get("status") != "ok":
-        return await update.message.reply_text("⚠️ خطا در دریافت خبرها یا API Key اشتباه است.")
+        await update.message.reply_text("⚠️ خطا در دریافت خبرها یا API Key اشتباه است.")
+        return
 
     articles = resp.get("articles", [])[:5]
     if not articles:
-        return await update.message.reply_text("😕 هیچ خبری یافت نشد.")
+        await update.message.reply_text("😕 هیچ خبری یافت نشد.")
+        return
 
     msg = "🗞 <b>خبرهای داغ امروز:</b>\n\n"
     for art in articles:
@@ -26,7 +30,7 @@ async def get_news(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(msg, parse_mode="HTML")
 
 
-# ======================= ⏰ ارسال خودکار هر روز ۹ صبح =======================
+# ======================= ⏰ ارسال خودکار خبر ساعت ۹ صبح =======================
 async def start_daily_news_scheduler(bot):
     while True:
         now = datetime.now(timezone.utc)
