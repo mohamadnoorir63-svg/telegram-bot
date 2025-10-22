@@ -87,34 +87,52 @@ async def send_azan_info(update, city, country, city_fa):
 
 # ===================== 🌙 بررسی وضعیت رمضان و مناسبت‌ها =====================
 async def get_ramadan_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    import json
     try:
         today = datetime.utcnow().strftime("%Y-%m-%d")
         response = requests.get(f"{G_TO_H_API}/{today}")
 
-        # تبدیل امن به JSON
+        # ✅ تلاش برای تبدیل پاسخ به JSON امن
         try:
             data = response.json()
         except Exception:
-            import json
-            data = json.loads(response.text)
+            try:
+                data = json.loads(response.text)
+            except Exception:
+                data = {}
 
+        # ✅ اطمینان از اینکه data دیکشنری است نه رشته
         if isinstance(data, str):
-            import json
-            data = json.loads(data)
+            try:
+                data = json.loads(data)
+            except Exception:
+                data = {}
 
-        hijri_data = data.get("data", {}).get("hijri", {})
-        gregorian_data = data.get("data", {}).get("gregorian", {})
+        # استخراج امن داده‌ها
+        hijri_data = {}
+        gregorian_data = {}
 
+        if "data" in data:
+            d = data["data"]
+            if isinstance(d, dict):
+                hijri_data = d.get("hijri", {})
+                gregorian_data = d.get("gregorian", {})
+
+        # اگر باز هم رشته بودن → تبدیل
         if isinstance(hijri_data, str):
-            import json
-            hijri_data = json.loads(hijri_data)
+            try:
+                hijri_data = json.loads(hijri_data)
+            except Exception:
+                hijri_data = {}
         if isinstance(gregorian_data, str):
-            import json
-            gregorian_data = json.loads(gregorian_data)
+            try:
+                gregorian_data = json.loads(gregorian_data)
+            except Exception:
+                gregorian_data = {}
 
         hijri_date = hijri_data.get("date", "نامشخص")
         hijri_day = int(hijri_data.get("day", "0"))
-        hijri_month = hijri_data.get("month", {})
+        hijri_month = hijri_data.get("month", {}) or {}
         month_name_en = hijri_month.get("en", "Unknown")
         month_name_fa = hijri_month.get("ar", "نامشخص")
         year = hijri_data.get("year", "----")
@@ -125,10 +143,10 @@ async def get_ramadan_status(update: Update, context: ContextTypes.DEFAULT_TYPE)
         msg = (
             f"📅 <b>تاریخ میلادی:</b> {gregorian_date}\n"
             f"🗓 <b>تاریخ شمسی:</b> {jalali_date}\n"
-            f"🕌 <b>تاریخ هجری:</b> {hijri_date} ({month_name_fa})\n\n"
+            f"🕌 <b>تاریخ هجری قمری:</b> {hijri_date} ({month_name_fa})\n\n"
         )
 
-        # ✅ مناسبت‌ها
+        # ✅ بررسی مناسبت‌ها
         special_days = []
 
         if month_name_en == "Ramadan":
@@ -156,3 +174,4 @@ async def get_ramadan_status(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
     except Exception as e:
         await update.message.reply_text(f"⚠️ خطا در بررسی ماه رمضان: {e}")
+        
