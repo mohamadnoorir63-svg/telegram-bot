@@ -4,6 +4,7 @@ import datetime
 from telegram import InlineKeyboardMarkup, InlineKeyboardButton, Update
 from telegram.ext import ContextTypes
 import openai
+import httpx  # ✅ برای مدیریت خطاهای ارتباطی
 
 # 🔑 کلید ChatGPT از محیط (در Heroku یا .env)
 API_KEY = os.getenv("OPENAI_API_KEY")
@@ -68,6 +69,9 @@ async def start_ai_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
     save_users(users)
 
     context.user_data["ai_chat_active"] = True
+    context.user_data["ai_history"] = [  # 🧠 شروع تاریخچه گفتگو
+        {"role": "system", "content": "You are a helpful AI assistant named Khengool."}
+    ]
 
     await query.answer()
     await query.message.reply_text(
@@ -80,7 +84,7 @@ async def start_ai_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ======================= 💬 چت با ChatGPT =======================
 async def chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """پردازش پیام‌های کاربر هنگام فعال بودن ChatGPT"""
+    """پردازش پیام‌های کاربر هنگام فعال بودن ChatGPT با حافظه مکالمه"""
     chat_type = update.message.chat.type
     user_id = update.effective_user.id
     text = update.message.text.strip()
@@ -101,17 +105,40 @@ async def chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("⚠️ امتیاز امروزت تموم شد، فردا دوباره امتحان کن 😅")
         return
 
-    # درخواست به API ChatGPT
+    # 🧠 ایجاد تاریخچه برای کاربر جدید
+    if "ai_history" not in context.user_data:
+        context.user_data["ai_history"] = [
+            {"role": "system", "content": "You are a helpful AI assistant named Khengool."}
+        ]
+
+    # افزودن پیام کاربر به تاریخچه
+    context.user_data["ai_history"].append({"role": "user", "content": text})
+
+    # 🧩 درخواست به API ChatGPT با مدیریت خطا
     try:
         response = openai.ChatCompletion.create(
             model="gpt-3.5-turbo",
-            messages=[{"role": "user", "content": text}]
+            messages=context.user_data["ai_history"],
+            timeout=30,  # جلوگیری از ReadError
         )
         reply_text = response.choices[0].message["content"].strip()
+
+        # افزودن پاسخ مدل به تاریخچه
+        context.user_data["ai_history"].append({"role": "assistant", "content": reply_text})
+
+    except httpx.ReadError:
+        reply_text = "⚠️ خطا در خواندن پاسخ از سرور ChatGPT!\nلطفاً چند لحظه بعد دوباره امتحان کن 🤖"
+
+    except openai.error.APIConnectionError:
+        reply_text = "🌐 اتصال به سرور ChatGPT برقرار نشد.\nممکنه اینترنت یا سرور موقتاً مشکل داشته باشه."
+
+    except openai.error.Timeout:
+        reply_text = "⏳ درخواست به ChatGPT بیش از حد طول کشید. لطفاً دوباره امتحان کن."
+
     except Exception as e:
         reply_text = f"⚠️ خطا در ارتباط با ChatGPT:\n{e}"
 
-    # افزایش شمارش
+    # افزایش شمارش پیام‌ها
     if user_id != ADMIN_ID:
         user["count"] += 1
         users[str(user_id)] = user
@@ -131,4 +158,5 @@ async def stop_ai_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return await update.message.reply_text("🤖 گفتگوی ChatGPT از قبل خاموش بود.")
 
     context.user_data["ai_chat_active"] = False
+    context.user_data.pop("ai_history", None)  # 🧹 پاک کردن تاریخچه مکالمه
     await update.message.reply_text("🛑 گفتگوی ChatGPT متوقف شد. برای شروع دوباره، از پنل ChatGPT استفاده کن.")
