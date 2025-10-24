@@ -1895,30 +1895,28 @@ async def on_startup(app):
 app.post_init = on_startup
 
 # ======================= ⚙️ اجرای همزمان Bot + Userbot =======================
-import asyncio
-import threading
+import threading, asyncio
 
 async def run_both():
     print("🚀 در حال راه‌اندازی خنگول + یوزربات ...")
 
-    def start_userbot_thread():
+    # 🔹 اجرای userbot در Thread جدا
+    def run_userbot_thread():
         try:
-            start_userbot()  # این تابع خودش event loop جدید می‌سازه
+            start_userbot()
         except Exception as e:
             print(f"⚠️ خطا در userbot: {e}")
 
-    # اجرا در ترد جدا برای جلوگیری از conflict با loop اصلی
-    threading.Thread(target=start_userbot_thread, daemon=True).start()
+    threading.Thread(target=run_userbot_thread, daemon=True).start()
 
+    # 🔹 اجرای ربات اصلی
     print("🤖 Bot Token connected and polling started ✅")
     await app.run_polling(close_loop=False)
 
 
 if __name__ == "__main__":
-    print("🤖 خنگول فارسی 8.7 Cloud+ Supreme Pro Stable+ آماده به خدمت است ...")
+    print("🤖 خنگول فارسی آماده به خدمت است ...")
     try:
         asyncio.run(run_both())
-    except KeyboardInterrupt:
-        print("🛑 توقف دستی.")
     except Exception as e:
         print(f"❌ خطای غیرمنتظره: {e}")
