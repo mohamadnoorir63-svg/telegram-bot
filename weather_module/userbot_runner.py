@@ -22,12 +22,13 @@ os.makedirs(DOWNLOAD_PATH, exist_ok=True)
 def download_precise(query: str):
     """
     جستجو و دانلود آهنگ از YouTube → YouTube Music → SoundCloud
+    اگر دانلود انجام نشد، لینک مستقیم برمی‌گرداند.
     """
     os.makedirs(DOWNLOAD_PATH, exist_ok=True)
 
     base_opts = {
         "format": "bestaudio/best",
-        "quiet": True,
+        "quiet": False,  # نمایش لاگ برای بررسی
         "noplaylist": True,
         "outtmpl": f"{DOWNLOAD_PATH}/%(title)s.%(ext)s",
         "retries": 3,
@@ -48,7 +49,7 @@ def download_precise(query: str):
     if os.path.exists(cookiefile):
         base_opts["cookiefile"] = cookiefile
 
-    # 📌 اگر لینک مستقیم بود
+    # 📌 اگر ورودی لینک مستقیم بود
     if re.match(r"^https?://", query.strip(), re.I):
         try:
             with yt_dlp.YoutubeDL(base_opts) as ydl:
@@ -56,17 +57,22 @@ def download_precise(query: str):
                 if "entries" in info:
                     info = info["entries"][0]
                 title = info.get("title", "audio")
+                url = info.get("webpage_url", query)
                 mp3_path = os.path.splitext(ydl.prepare_filename(info))[0] + ".mp3"
-                if os.path.exists(mp3_path):
-                    print(f"[✅ Direct URL] {title}")
-                    return mp3_path, title, "Direct URL"
-        except Exception as e:
-            print(f"[❌ Direct ERROR] {e}")
 
-    # منابع جستجو
+                if os.path.exists(mp3_path):
+                    print(f"[✅ Direct Download] {title}")
+                    return mp3_path, title, "Direct URL"
+                else:
+                    print(f"[⚠️ Direct URL] فایل mp3 ساخته نشد. لینک را برمی‌گردانم.")
+                    return None, url, "Direct URL"
+        except Exception as e:
+            print(f"[❌ Direct ERROR] {type(e).__name__}: {e}")
+
+    # 🔍 منابع جستجو
     sources = [
-        ("YouTube", f"ytsearch10:{query} audio"),
-        ("YouTube Music", f"ytmusicsearch10:{query}"),
+        ("YouTube", f"ytsearch5:{query}"),
+        ("YouTube Music", f"ytmusicsearch5:{query}"),
         ("SoundCloud", f"scsearch5:{query}"),
     ]
 
@@ -83,17 +89,20 @@ def download_precise(query: str):
                     continue
 
                 title = info.get("title", "audio")
+                url = info.get("webpage_url")
                 mp3_path = os.path.splitext(ydl.prepare_filename(info))[0] + ".mp3"
+
                 if os.path.exists(mp3_path):
                     print(f"[✅ Downloaded] {title} ← {source_name}")
                     return mp3_path, title, source_name
                 else:
-                    print(f"⚠️ {source_name}: فایل mp3 ساخته نشد")
+                    print(f"[⚠️ {source_name}] فایل mp3 ساخته نشد. لینک برمی‌گردد.")
+                    return None, url, source_name
 
         except Exception as e:
-            print(f"[❌ {source_name} ERROR] {e}")
+            print(f"[❌ {source_name} ERROR] {type(e).__name__}: {e}")
 
-    print("🚫 هیچ منبعی جواب نداد")
+    print("🚫 هیچ منبعی جواب نداد - احتمالاً ffmpeg یا SSL مشکل دارد.")
     return None, None, None
 
 
@@ -117,13 +126,18 @@ async def handle_message(client, message):
 
     m = await message.reply_text(f"🎧 در حال جستجو برای آهنگ: {query} ...")
 
-    # دانلود در thread جدا (برای جلوگیری از فریز شدن event loop)
+    # دانلود در thread جدا برای جلوگیری از فریز شدن event loop
     loop = asyncio.get_running_loop()
     file_path, title, source = await loop.run_in_executor(None, download_precise, query)
 
-    if not file_path or not os.path.exists(file_path):
+    # 🔹 اگر فایل وجود نداشت ولی لینک داشت
+    if not file_path:
+        if title and isinstance(title, str) and title.startswith("http"):
+            await m.edit(f"🎧 آهنگ پیدا شد اما قابل دانلود نیست:\n{title}")
+            return
         return await m.edit("❌ هیچ نتیجه‌ای پیدا نشد یا دانلود ناموفق بود 😔")
 
+    # 🔹 ارسال فایل
     await message.reply_audio(
         audio=file_path,
         caption=f"🎶 {title}\n🌐 منبع: {source}",
@@ -133,20 +147,19 @@ async def handle_message(client, message):
     # حذف فایل پس از ارسال
     try:
         os.remove(file_path)
-    except:
-        pass
+    except Exception as e:
+        print(f"⚠️ خطا در حذف فایل: {e}")
 
 
 # ================== 🚀 اجرای Userbot ==================
 async def run_userbot():
-    """اجرای کامل یوزربات (با Pyrogram جدید، بدون idle)"""
+    """اجرای کامل یوزربات (بدون استفاده از idle)"""
     try:
         print("🚀 Starting userbot...")
         await userbot.start()
         me = await userbot.get_me()
         print(f"✅ Userbot وارد شد: {me.first_name} ({me.id})")
 
-        # نگه داشتن ربات بدون idle()
         stop_event = asyncio.Event()
         await stop_event.wait()
 
@@ -157,7 +170,6 @@ async def run_userbot():
 def start_userbot():
     """اجرای Userbot در Thread جداگانه برای هماهنگی با خنگول"""
     def _worker():
-        # ✅ ساخت لوپ جدید مخصوص ترد
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         loop.run_until_complete(run_userbot())
