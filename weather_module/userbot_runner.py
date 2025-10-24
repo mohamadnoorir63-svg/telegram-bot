@@ -6,21 +6,21 @@ API_HASH = os.getenv("API_HASH", "")
 SESSION = os.getenv("SESSION_STRING", "")
 
 userbot = Client("userbot", api_id=API_ID, api_hash=API_HASH, session_string=SESSION)
+@userbot.on_message(filters.text & (filters.private | filters.group | filters.me))
+async def handle_message(client, message):
+    text = message.text.strip()
+    print(f"📩 Userbot received: {text}")
 
-@userbot.on_message(filters.text)
-async def handle_user_message(client, message):
-    text = message.text.lower()
-    print(f"📩 Userbot received: {text} | from {message.from_user.id}")
+    if text.lower() == "ping":
+        return await message.reply_text("✅ Userbot Online!")
 
-    if text == "ping":
-        await message.reply_text("✅ Userbot Online!")
+    if text.startswith("آهنگ "):
+        query = text.replace("آهنگ", "").strip()
+        if not query:
+            return await message.reply_text("❗ لطفاً بعد از 'آهنگ' نام آهنگ را بنویس.")
 
-    elif "آهنگ" in text:
-        await message.reply_text("🎶 در حال جستجو برای آهنگ شما ...")
-
-    elif text == "id":
-        await message.reply_text(f"🆔 Your ID: `{message.from_user.id}`")
-
+        m = await message.reply_text("🎧 در حال جستجو و دانلود آهنگ...")
+        ...
 async def start_userbot():
     print("🚀 Starting userbot...")
     await userbot.start()
