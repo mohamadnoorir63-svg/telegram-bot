@@ -14,21 +14,21 @@ userbot = Client(
     session_string=SESSION
 )
 
-# مسیر ذخیره آهنگ‌ها
+# ================== 📁 مسیر ذخیره آهنگ‌ها ==================
 DOWNLOAD_PATH = "downloads"
 os.makedirs(DOWNLOAD_PATH, exist_ok=True)
 
 
-# ================== 🎵 دانلود از SoundCloud ==================
+# ================== 🎵 تابع دانلود آهنگ چندمنبعی ==================
 def download_precise(query: str):
     """
-    جستجو و دانلود آهنگ فقط از SoundCloud
+    جستجو و دانلود آهنگ از YouTube → YouTube Music → SoundCloud
     """
     os.makedirs(DOWNLOAD_PATH, exist_ok=True)
 
-    ydl_opts = {
+    base_opts = {
         "format": "bestaudio/best",
-        "quiet": False,
+        "quiet": False,  # برای نمایش لاگ دقیق
         "noplaylist": True,
         "outtmpl": f"{DOWNLOAD_PATH}/%(title)s.%(ext)s",
         "retries": 3,
@@ -36,7 +36,11 @@ def download_precise(query: str):
         "ignoreerrors": True,
         "geo_bypass": True,
         "nocheckcertificate": True,
+        "concurrent_fragment_downloads": 3,
         "socket_timeout": 10,
+        "extractor_args": {
+            "youtube": {"player_client": ["android"]}
+        },
         "postprocessors": [{
             "key": "FFmpegExtractAudio",
             "preferredcodec": "mp3",
@@ -44,31 +48,60 @@ def download_precise(query: str):
         }],
     }
 
-    try:
-        print(f"🎧 جستجو در SoundCloud → {query}")
-        with yt_dlp.YoutubeDL({**ydl_opts, "download": True}) as ydl:
-            info = ydl.extract_info(f"scsearch1:{query}", download=True)
+    cookiefile = "cookies.txt"
+    if os.path.exists(cookiefile):
+        base_opts["cookiefile"] = cookiefile
 
-            if "entries" in info and info["entries"]:
-                info = info["entries"][0]
+    # 📌 اگر لینک مستقیم بود
+    if re.match(r"^https?://", query.strip(), re.I):
+        try:
+            with yt_dlp.YoutubeDL(base_opts) as ydl:
+                info = ydl.extract_info(query, download=True)
+                if "entries" in info:
+                    info = info["entries"][0]
+                title = info.get("title", "audio")
+                mp3_path = os.path.splitext(ydl.prepare_filename(info))[0] + ".mp3"
+                if os.path.exists(mp3_path):
+                    print(f"[✅ Direct URL] {title}")
+                    return mp3_path, title, "Direct URL"
+        except Exception as e:
+            print(f"[❌ Direct URL ERROR] {e}")
 
-            if not info:
-                print("⚠️ SoundCloud نتیجه‌ای برنگرداند.")
-                return None, None, None
+    # 🔍 منابع جستجو به ترتیب اولویت
+    sources = [
+        ("SoundCloud", f"scsearch1:{query}"),
+        ("YouTube", f"ytsearch5:{query} audio"),
+        ("YouTube Music", f"ytmusicsearch5:{query}"),
+    ]
 
-            title = info.get("title", "audio")
-            mp3_path = os.path.splitext(ydl.prepare_filename(info))[0] + ".mp3"
+    for source_name, expr in sources:
+        print(f"🔎 جستجو در {source_name} → {expr}")
+        try:
+            with yt_dlp.YoutubeDL({**base_opts, "download": True}) as ydl:
+                info = ydl.extract_info(expr, download=True)
 
-            if os.path.exists(mp3_path):
-                print(f"[✅ Downloaded] {title} ← SoundCloud")
-                return mp3_path, title, "SoundCloud"
-            else:
-                print("⚠️ فایل mp3 ساخته نشد.")
-                return None, None, None
+                # اگر پلی‌لیست یا چند نتیجه بود
+                if "entries" in info and info["entries"]:
+                    info = info["entries"][0]
 
-    except Exception as e:
-        print(f"[❌ SoundCloud ERROR] {type(e).__name__}: {e}")
-        return None, None, None
+                if not info:
+                    print(f"⚠️ {source_name}: نتیجه‌ای نداشت")
+                    continue
+
+                title = info.get("title", "audio")
+                mp3_path = os.path.splitext(ydl.prepare_filename(info))[0] + ".mp3"
+
+                if os.path.exists(mp3_path):
+                    print(f"[✅ Downloaded] {title} ← {source_name}")
+                    return mp3_path, title, source_name
+                else:
+                    print(f"⚠️ {source_name}: فایل mp3 ساخته نشد")
+
+        except Exception as e:
+            print(f"[❌ {source_name} ERROR] {e}")
+
+    print("🚫 هیچ منبعی جواب نداد")
+    return None, None, None
 
 
 # ================== 💬 هندل پیام‌ها ==================
@@ -89,8 +122,9 @@ async def handle_message(client, message):
     if not query:
         return await message.reply_text("❗ لطفاً بعد از 'آهنگ' نام آهنگ را بنویس.")
 
-    m = await message.reply_text(f"🎧 در حال جستجو در SoundCloud برای: {query} ...")
+    m = await message.reply_text(f"🎧 در حال جستجو برای آهنگ: {query} ...")
 
+    # دانلود در thread جدا (برای جلوگیری از فریز شدن event loop)
     loop = asyncio.get_running_loop()
     file_path, title, source = await loop.run_in_executor(None, download_precise, query)
 
@@ -103,6 +137,7 @@ async def handle_message(client, message):
     )
     await m.delete()
 
+    # حذف فایل پس از ارسال
     try:
         os.remove(file_path)
     except:
@@ -111,13 +146,14 @@ async def handle_message(client, message):
 
 # ================== 🚀 اجرای Userbot ==================
 async def run_userbot():
-    """اجرای کامل یوزربات (بدون idle)"""
+    """اجرای کامل یوزربات"""
     try:
         print("🚀 Starting userbot...")
         await userbot.start()
         me = await userbot.get_me()
         print(f"✅ Userbot وارد شد: {me.first_name} ({me.id})")
 
+        # نگه داشتن ربات بدون idle()
         stop_event = asyncio.Event()
         await stop_event.wait()
 
