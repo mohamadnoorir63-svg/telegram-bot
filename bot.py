@@ -45,7 +45,7 @@ from ai_chat.chatgpt_panel import show_ai_panel, chat, start_ai_chat, stop_ai_ch
 from weather_module.weather_panel import show_weather
 from modules.azan_module import get_azan_time, get_ramadan_status
 from modules.news_module import get_news, start_daily_news_scheduler
-
+from modules.userbot_runner import start_userbot
 # 🧠 نکته مهم:
 # ❌ از اینجا دیگه admin_panel رو import نکن!
 # ✅ اون رو بعد از ساخت app در بخش اصلی فایل (پایین) اضافه خواهیم کرد.
