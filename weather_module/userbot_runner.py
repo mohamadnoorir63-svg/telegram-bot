@@ -7,11 +7,9 @@ SESSION = os.getenv("SESSION_STRING", "")
 
 userbot = Client("userbot", api_id=API_ID, api_hash=API_HASH, session_string=SESSION)
 
-@userbot.on_message(filters.text & ~filters.edited)
+@userbot.on_message(filters.text)
 async def handle_user_message(client, message):
     text = message.text.lower()
-
-    # لاگ ساده برای نمایش پیام‌های دریافتی
     print(f"📩 Userbot received: {text} | from {message.from_user.id}")
 
     if text == "ping":
@@ -24,7 +22,6 @@ async def handle_user_message(client, message):
         await message.reply_text(f"🆔 Your ID: `{message.from_user.id}`")
 
 async def start_userbot():
-    """اجرای یوزربات و چاپ مشخصات ورود"""
     print("🚀 Starting userbot...")
     await userbot.start()
     me = await userbot.get_me()
