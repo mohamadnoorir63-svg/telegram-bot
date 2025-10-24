@@ -1,5 +1,6 @@
 from pyrogram import Client, filters
 import os, threading, asyncio, yt_dlp
+from weather_module.music_search import search_music  # جستجوی آهنگ از یوتیوب
 
 # ================== ⚙️ تنظیمات محیطی ==================
 API_ID = int(os.getenv("API_ID", "0"))
@@ -20,8 +21,8 @@ os.makedirs(DOWNLOAD_PATH, exist_ok=True)
 
 
 # ================== 🎧 تابع دانلود آهنگ ==================
-def download_song(query: str):
-    """دانلود آهنگ از YouTube"""
+def download_song(url_or_query: str):
+    """دانلود آهنگ از YouTube (بر اساس لینک یا جستجو)"""
     ydl_opts = {
         "format": "bestaudio/best",
         "quiet": True,
@@ -36,13 +37,11 @@ def download_song(query: str):
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(f"ytsearch1:{query}", download=True)
+            info = ydl.extract_info(url_or_query, download=True)
             if "entries" in info:
                 info = info["entries"][0]
-
             title = info.get("title", "music")
             filename = os.path.splitext(ydl.prepare_filename(info))[0] + ".mp3"
-            print(f"✅ دانلود شد: {title}")
             return filename, title
     except Exception as e:
         print(f"⚠️ خطا در دانلود آهنگ: {e}")
@@ -65,22 +64,32 @@ async def handle_message(client, message):
         if not query:
             return await message.reply_text("❗ لطفاً بعد از 'آهنگ' نام آهنگ را بنویس.")
 
-        m = await message.reply_text(f"🎧 در حال جستجو و دانلود آهنگ: {query} ...")
+        m = await message.reply_text(f"🎧 در حال جستجو برای آهنگ: {query} ...")
 
-        # اجرای دانلود در thread جدا تا ربات هنگ نکنه
+        # مرحله ۱: جستجوی آهنگ با استفاده از music_search
+        results = await search_music(query)
+        if not results:
+            return await m.edit("❌ هیچ آهنگی با این نام پیدا نشد 😔")
+
+        best = results[0]
+        title = best["title"]
+        url = best["url"]
+        await m.edit(f"🎶 آهنگ پیدا شد:\n<b>{title}</b>\n⬇️ در حال دانلود...", parse_mode="HTML")
+
+        # مرحله ۲: دانلود آهنگ با yt_dlp
         loop = asyncio.get_running_loop()
-        file_path, title = await loop.run_in_executor(None, download_song, query)
+        file_path, title = await loop.run_in_executor(None, download_song, url)
 
         if not file_path or not os.path.exists(file_path):
             return await m.edit("❌ خطا در دانلود آهنگ 😔")
 
         await message.reply_audio(
             audio=file_path,
-            caption=f"🎶 {title}",
+            caption=f"🎵 {title}",
         )
         await m.delete()
 
-        # حذف فایل پس از ارسال
+        # حذف فایل موقت پس از ارسال
         try:
             os.remove(file_path)
         except:
@@ -89,9 +98,7 @@ async def handle_message(client, message):
 
 # ================== ⚡ اتصال بین Userbot و Bot Token ==================
 async def send_song_request_from_bot(query, chat_id):
-    """
-    این تابع از سمت Bot Token فراخوانی می‌شود و دستور آهنگ را به یوزربات می‌فرستد.
-    """
+    """ارسال درخواست آهنگ از Bot Token به Userbot"""
     try:
         if not userbot.is_connected:
             print("⚠️ Userbot هنوز بالا نیامده!")
