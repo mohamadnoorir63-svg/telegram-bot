@@ -21,11 +21,14 @@ os.makedirs(DOWNLOAD_PATH, exist_ok=True)
 
 # ================== 🎵 دانلود از چند منبع با انتخاب بهینه ==================
 def download_precise(query: str):
+    """
+    دانلود آهنگ با منبع‌های مختلف و گزارش خطا برای دیباگ
+    """
     import re
     os.makedirs(DOWNLOAD_PATH, exist_ok=True)
 
     base_opts = {
-        "quiet": True,
+        "quiet": False,  # برای دیدن لاگ کامل
         "noplaylist": True,
         "outtmpl": f"{DOWNLOAD_PATH}/%(title)s.%(ext)s",
         "retries": 3,
@@ -46,7 +49,6 @@ def download_precise(query: str):
     if os.path.exists(cookiefile):
         base_opts["cookiefile"] = cookiefile
 
-    # بررسی اینکه ورودی لینک است یا نه
     is_url = re.match(r"^https?://", query.strip(), re.I) is not None
     if is_url:
         try:
@@ -58,33 +60,43 @@ def download_precise(query: str):
                 mp3_path = os.path.splitext(ydl.prepare_filename(info))[0] + ".mp3"
                 if os.path.exists(mp3_path):
                     print(f"[✅ Direct URL] {title}")
-                    return mp3_path, title, "Direct"
+                    return mp3_path, title, "Direct URL"
         except Exception as e:
-            print(f"[Direct URL ERROR] {e}")
+            print(f"[❌ Direct URL ERROR] {e}")
 
+    # منابع جستجو (بدون عدد برای پایداری)
     sources = [
-        ("YouTube", f"ytsearch5:{query} audio"),
-        ("YouTube Music", f"ytmusicsearch5:{query}"),
-        ("SoundCloud", f"scsearch5:{query}"),
+        ("YouTube", f"ytsearch:{query} audio"),
+        ("YouTube Music", f"ytmusicsearch:{query}"),
+        ("SoundCloud", f"scsearch:{query}"),
     ]
 
     for source_name, expr in sources:
+        print(f"🔎 جستجو در {source_name} → {expr}")
         try:
             with yt_dlp.YoutubeDL({**base_opts, "download": True}) as ydl:
                 info = ydl.extract_info(expr, download=True)
                 if "entries" in info and info["entries"]:
                     info = info["entries"][0]
+
+                if not info:
+                    print(f"⚠️ {source_name}: هیچ نتیجه‌ای نداشت")
+                    continue
+
                 title = info.get("title", "audio")
                 mp3_path = os.path.splitext(ydl.prepare_filename(info))[0] + ".mp3"
+
                 if os.path.exists(mp3_path):
-                    print(f"[✅ Found] {title} from {source_name}")
+                    print(f"[✅ Downloaded] {title} ← {source_name}")
                     return mp3_path, title, source_name
+                else:
+                    print(f"⚠️ {source_name}: فایل mp3 ساخته نشد")
+
         except Exception as e:
-            print(f"[{source_name} ERROR] {e}")
-            continue
+            print(f"[❌ {source_name} ERROR] {e}")
 
+    print("🚫 هیچ منبعی جواب نداد")
     return None, None, None
-
 
 # ================== 💬 هندل پیام‌ها ==================
 @userbot.on_message(filters.text & (filters.private | filters.group | filters.me))
