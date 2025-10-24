@@ -1881,38 +1881,29 @@ if __name__ == "__main__":
         print("🌙 [SYSTEM] Startup tasks scheduled ✅")
 
     app.post_init = on_startup
-
-# ======================= 🚀 اجرای همزمان Bot Token و Userbot =======================
-import asyncio
-
-async def on_startup(app):
-    """وظایف استارتاپی ربات"""
-    await notify_admin_on_startup(app)
-    app.create_task(auto_backup(app.bot))
-    app.create_task(start_auto_brain_loop(app.bot))
-    print("🌙 [SYSTEM] Startup tasks scheduled ✅")
-
-# اتصال وظایف استارتاپی
-app.post_init = on_startup
-
 # ======================= ⚙️ اجرای همزمان Bot + Userbot =======================
 async def main():
     print("🚀 در حال راه‌اندازی خنگول + یوزربات ...")
 
     try:
-        # اجرای ربات اصلی در یک تسک جدا
-        bot_task = asyncio.create_task(
-            app.run_polling(allowed_updates=Update.ALL_TYPES)
-        )
+        # مقداردهی اولیه ربات
+        await app.initialize()
 
-        # اجرای یوزربات در تسک جداگانه
+        # ساخت تسک‌ها برای اجرای همزمان
+        bot_task = asyncio.create_task(app.start())
         userbot_task = asyncio.create_task(start_userbot())
 
-        # اجرای همزمان هر دو
+        # انتظار برای تسک‌ها
         await asyncio.gather(bot_task, userbot_task)
 
     except Exception as e:
         print(f"⚠️ خطا در اجرای مشترک Bot + Userbot: {e}")
+
+    finally:
+        # در صورت توقف، ربات را تمیز متوقف کن
+        await app.stop()
+        await app.shutdown()
+        print("🛑 خنگول و یوزربات با موفقیت متوقف شدند.")
 
 # ======================= 🔰 اجرای نهایی =======================
 if __name__ == "__main__":
