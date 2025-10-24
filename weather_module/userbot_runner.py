@@ -18,61 +18,100 @@ userbot = Client(
 DOWNLOAD_PATH = "downloads"
 os.makedirs(DOWNLOAD_PATH, exist_ok=True)
 
-# ================== 🎵 دانلود از چند منبع (YouTube / YT Music / SoundCloud) ==================
+# ================== 🎵 دانلود از چند منبع با انتخاب بهینه ==================
 def download_precise(query: str):
-    """دانلود آهنگ با جستجو در چند منبع"""
+    """
+    - اگر ورودی لینک باشد: همان لینک را دانلود می‌کند.
+    - اگر جستجو باشد: از YouTube / YT Music / SoundCloud جستجو می‌کند،
+      بهترین نتیجه (< 12min) را گرفته و با URL دقیق دانلود می‌کند.
+    """
+    import re
     os.makedirs(DOWNLOAD_PATH, exist_ok=True)
-    common_opts = {
-        "format": "bestaudio/best",
+
+    base_opts = {
         "quiet": True,
         "noplaylist": True,
         "outtmpl": f"{DOWNLOAD_PATH}/%(title)s.%(ext)s",
+        "retries": 3,
+        "fragment_retries": 3,
+        "ignoreerrors": True,
+        "geo_bypass": True,
+        "nocheckcertificate": True,
+        "extractor_args": {"youtube": {"player_client": ["android"]}},
+        "concurrent_fragment_downloads": 3,
         "postprocessors": [{
             "key": "FFmpegExtractAudio",
             "preferredcodec": "mp3",
             "preferredquality": "192",
         }],
-        "ignoreerrors": True,
-        "retries": 3,
-        "fragment_retries": 3,
-        "geo_bypass": True,
-        "nocheckcertificate": True,
-        "concurrent_fragment_downloads": 3,
-        "extractor_args": {"youtube": {"player_client": ["android"]}},
     }
 
     cookiefile = "cookies.txt"
     if os.path.exists(cookiefile):
-        common_opts["cookiefile"] = cookiefile
+        base_opts["cookiefile"] = cookiefile
 
+    # اگر query لینک است، مستقیم دانلود کن
+    is_url = re.match(r"^https?://", query.strip(), re.I) is not None
+    if is_url:
+        try:
+            with yt_dlp.YoutubeDL({**base_opts, "format": "bestaudio/best"}) as ydl:
+                info = ydl.extract_info(query, download=True)
+                if "entries" in info:
+                    info = info["entries"][0]
+                with yt_dlp.YoutubeDL({**base_opts, "download": False}) as y2:
+                    prepared = y2.prepare_filename(info)
+                mp3_path = os.path.splitext(prepared)[0] + ".mp3"
+                title = info.get("title", "audio")
+                if os.path.exists(mp3_path):
+                    print(f"[✅ Direct URL] {title}")
+                    return mp3_path, title, "Direct"
+        except Exception as e:
+            print(f"[Direct URL ERROR] {e}")
+
+    # منابع جستجو
     sources = [
-        ("YouTube", f"ytsearch1:{query}"),
-        ("YouTube Music", f"ytmusicsearch1:{query}"),
-        ("SoundCloud", f"scsearch1:{query}"),
+        ("YouTube",       f"ytsearch5:{query} audio"),
+        ("YouTube Music", f"ytmusicsearch10:{query}"),
+        ("SoundCloud",    f"scsearch5:{query}"),
     ]
+
+    def pick_entry(info):
+        # از نتایج، اولین آیتم معتبر با مدت < 12 دقیقه را انتخاب کن
+        entries = []
+        if "entries" in info and info["entries"]:
+            entries = [e for e in info["entries"] if e]
+        else:
+            entries = [info] if info else []
+        for e in entries:
+            dur = e.get("duration", 0) or 0
+            if dur == 0 or dur <= 12 * 60:
+                return e
+        return entries[0] if entries else None
 
     for source_name, expr in sources:
         try:
-            with yt_dlp.YoutubeDL(common_opts) as ydl:
-                info = ydl.extract_info(expr, download=True)
+            # مرحله ۱: فقط استخراج اطلاعات (بدون دانلود) تا URL دقیق بگیریم
+            with yt_dlp.YoutubeDL({**base_opts, "download": False, "format": "bestaudio/best"}) as ydl_info:
+                info = ydl_info.extract_info(expr, download=False)
                 if not info:
                     continue
-
-                entry = None
-                if "entries" in info and info["entries"]:
-                    for e in info["entries"]:
-                        if e:
-                            entry = e
-                            break
-                else:
-                    entry = info
-
+                entry = pick_entry(info)
                 if not entry:
                     continue
 
+                url = entry.get("webpage_url") or entry.get("url")
                 title = entry.get("title", "audio")
-                with yt_dlp.YoutubeDL({**common_opts, "download": False}) as y2:
-                    prepared = y2.prepare_filename(entry)
+                if not url:
+                    continue
+
+            # مرحله ۲: دانلود با URL دقیق
+            with yt_dlp.YoutubeDL({**base_opts, "format": "bestaudio/best"}) as ydl_dl:
+                info2 = ydl_dl.extract_info(url, download=True)
+
+                if "entries" in info2:
+                    info2 = info2["entries"][0]
+                with yt_dlp.YoutubeDL({**base_opts, "download": False}) as y2:
+                    prepared = y2.prepare_filename(info2)
                 mp3_path = os.path.splitext(prepared)[0] + ".mp3"
 
                 if os.path.exists(mp3_path):
@@ -81,6 +120,21 @@ def download_precise(query: str):
 
         except Exception as e:
             print(f"[{source_name} ERROR] {e}")
+            # Fallback: یک دانلود ساده‌تر مستقیماً از عبارت سرچ (گاهی کار می‌کند)
+            try:
+                with yt_dlp.YoutubeDL({**base_opts, "format": "bestaudio/best"}) as ydl_fallback:
+                    info_f = ydl_fallback.extract_info(expr, download=True)
+                    if "entries" in info_f:
+                        info_f = info_f["entries"][0]
+                    with yt_dlp.YoutubeDL({**base_opts, "download": False}) as y2:
+                        prepared = y2.prepare_filename(info_f)
+                    mp3_path = os.path.splitext(prepared)[0] + ".mp3"
+                    title = info_f.get("title", "audio")
+                    if os.path.exists(mp3_path):
+                        print(f"[✅ Fallback] {title} from {source_name}")
+                        return mp3_path, title, source_name
+            except Exception as ee:
+                print(f"[{source_name} Fallback ERROR] {ee}")
             continue
 
     return None, None, None
@@ -92,11 +146,9 @@ async def handle_message(client, message):
     text = message.text.strip()
     print(f"📩 [Userbot] پیام: {text}")
 
-    # 🔹 تست اتصال
     if text.lower() == "ping":
         return await message.reply_text("✅ Userbot فعال است!")
 
-    # 🔹 درخواست آهنگ
     if text.startswith("آهنگ "):
         query = text.replace("آهنگ", "").strip()
         if not query:
@@ -108,7 +160,7 @@ async def handle_message(client, message):
         file_path, title, source = await loop.run_in_executor(None, download_precise, query)
 
         if not file_path or not os.path.exists(file_path):
-            return await m.edit("❌ هیچ آهنگی با این نام پیدا نشد 😔")
+            return await m.edit("❌ نتیجه‌ای پیدا نشد یا دانلود ناموفق بود. اسم دقیق‌تری بفرست یا یک لینک مستقیم بده 🙏")
 
         await message.reply_audio(
             audio=file_path,
@@ -120,36 +172,6 @@ async def handle_message(client, message):
             os.remove(file_path)
         except:
             pass
-
-
-# ================== ⚡ اتصال بین Userbot و Bot Token ==================
-async def send_song_request_from_bot(query, chat_id):
-    """ارسال درخواست آهنگ از Bot Token به Userbot"""
-    try:
-        if not userbot.is_connected:
-            print("⚠️ Userbot هنوز بالا نیامده!")
-            return False
-
-        await userbot.send_message(chat_id, f"آهنگ {query}")
-        print(f"📤 درخواست آهنگ برای Userbot ارسال شد: {query}")
-        return True
-    except Exception as e:
-        print(f"⚠️ خطا در ارسال پیام از Bot به Userbot: {e}")
-        return False
-
-
-# ================== 🚀 اجرای یوزربات ==================
-async def run_userbot():
-    try:
-        print("🚀 Starting userbot...")
-        await userbot.start()
-        me = await userbot.get_me()
-        print(f"✅ Userbot وارد شد: {me.first_name} ({me.id})")
-        await userbot.idle()
-    except Exception as e:
-        print(f"⚠️ خطا در اجرای userbot: {e}")
-
-
 def start_userbot():
     """اجرای Userbot در Thread جداگانه برای جلوگیری از تداخل asyncio"""
     def _worker():
