@@ -1882,12 +1882,20 @@ if __name__ == "__main__":
 
     app.post_init = on_startup
 
-# ==========================================================
-# 🚀 اجرای همزمان Bot Token و Userbot
-# ==========================================================
 # ======================= 🚀 اجرای همزمان Bot Token و Userbot =======================
 import asyncio
 
+async def on_startup(app):
+    """وظایف استارتاپی ربات"""
+    await notify_admin_on_startup(app)
+    app.create_task(auto_backup(app.bot))
+    app.create_task(start_auto_brain_loop(app.bot))
+    print("🌙 [SYSTEM] Startup tasks scheduled ✅")
+
+# اتصال وظایف استارتاپی
+app.post_init = on_startup
+
+# ======================= ⚙️ اجرای همزمان Bot + Userbot =======================
 async def main():
     print("🚀 در حال راه‌اندازی خنگول + یوزربات ...")
 
@@ -1897,17 +1905,19 @@ async def main():
             app.run_polling(allowed_updates=Update.ALL_TYPES)
         )
 
-        # اجرای یوزربات در تسک دیگر
+        # اجرای یوزربات در تسک جداگانه
         userbot_task = asyncio.create_task(start_userbot())
 
-        # اجرای همزمان هر دو تسک
+        # اجرای همزمان هر دو
         await asyncio.gather(bot_task, userbot_task)
 
     except Exception as e:
         print(f"⚠️ خطا در اجرای مشترک Bot + Userbot: {e}")
 
+# ======================= 🔰 اجرای نهایی =======================
 if __name__ == "__main__":
     print("🤖 خنگول فارسی 8.7 Cloud+ Supreme Pro Stable+ آماده به خدمت است ...")
+
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
