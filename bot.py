@@ -1914,39 +1914,21 @@ def start_userbot():
 
     # 🔹 وظایف استارتاپ
     # ==========================================================
-
-
 # ================== 🚀 اجرای همزمان Bot Token و Userbot ==================
 import threading
 import asyncio
-
-
-def start_userbot_thread():
-    """اجرای یوزربات در Thread جدا با event loop مخصوص خودش"""
-    from weather_module.userbot_runner import start_userbot
-
-    def run_userbot():
-        try:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            loop.run_until_complete(start_userbot())
-        except Exception as e:
-            print(f"⚠️ خطا در اجرای Userbot: {e}")
-
-    thread = threading.Thread(target=run_userbot, daemon=True)
-    thread.start()
-    print("🚀 Userbot thread started...")
-
+from weather_module.userbot_runner import start_userbot  # ✅ یوزربوت اصلی
 
 def run_both():
     """اجرای همزمان Bot Token و Userbot"""
-    print("🚀 در حال راه‌اندازی خنگول + یوزربات ...")
+    print("🚀 در حال راه‌اندازی خنگول + یوزربوت ...")
 
     try:
-        # اجرای Userbot در ترد جدا
-        start_userbot_thread()
+        # 🎧 اجرای Userbot در ترد جداگانه
+        threading.Thread(target=start_userbot, daemon=True).start()
+        print("🌀 Userbot thread started...")
 
-        # اجرای Bot Token (بدون await)
+        # 🤖 اجرای Bot Token
         print("🤖 Bot Token connected and polling started ✅")
         app.run_polling()
 
@@ -1957,10 +1939,4 @@ def run_both():
 # ================== 🔰 اجرای نهایی ==================
 if __name__ == "__main__":
     print("🤖 خنگول فارسی 8.7 Cloud+ Supreme Pro Stable+ آماده به خدمت است ...")
-
-    try:
-        run_both()
-    except KeyboardInterrupt:
-        print("🛑 توقف توسط کاربر (Ctrl+C).")
-    except Exception as e:
-        print(f"❌ خطای غیرمنتظره: {e}")
+    run_both()
