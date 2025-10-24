@@ -1,8 +1,0 @@
-User-agent: *
-Allow: /
-
-Sitemap: https://my-telegram-bot123-af01e0571064.herokuapp.com/static/sitemap.xml
-
-# خنگول AI - Persian Chatbot
-# هوش مصنوعی فارسی برای گفتگو، فال و سرگرمی
-# ربات سخنگوی فارسی برای وب و تلگرام
