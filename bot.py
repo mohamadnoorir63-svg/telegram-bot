@@ -1872,9 +1872,9 @@ if __name__ == "__main__":
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, reply), group=2)
     # ==========================================================
     # 🎵 سیستم درخواست آهنگ از طریق Userbot
-from weather_module.userbot_runner import send_song_request_from_bot
+    from weather_module.userbot_runner import send_song_request_from_bot
 
-async def request_song(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    async def request_song(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """ارسال درخواست آهنگ از Bot به Userbot"""
     text = update.message.text.strip()
     if not text.startswith("آهنگ "):
@@ -1893,8 +1893,8 @@ async def request_song(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         await update.message.reply_text("❌ یوزربات در حال حاضر در دسترس نیست.")
 
-# ثبت هندلر آهنگ در خنگول
-app.add_handler(MessageHandler(filters.Regex("^آهنگ "), request_song))
+    # ثبت هندلر آهنگ در خنگول
+    app.add_handler(MessageHandler(filters.Regex("^آهنگ "), request_song))
     # 🔹 وظایف استارتاپ
     # ==========================================================
 
