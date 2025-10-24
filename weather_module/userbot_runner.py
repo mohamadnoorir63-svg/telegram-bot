@@ -11,8 +11,7 @@ userbot = Client("userbot", api_id=API_ID, api_hash=API_HASH, session_string=SES
 async def handle_user_message(client, message):
     text = message.text.lower()
 
-    # مثال: جواب ساده یا دریافت لینک آهنگ
-    if "آهنگ" in text or "music" in text:
+    if "آهنگ" in text:
         await message.reply_text("🎶 در حال جستجو برای آهنگ شما ...")
 
     elif text == "ping":
