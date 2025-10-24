@@ -1881,37 +1881,52 @@ if __name__ == "__main__":
         print("🌙 [SYSTEM] Startup tasks scheduled ✅")
 
     app.post_init = on_startup
+# ======================= 🚀 اجرای همزمان Bot Token و Userbot =======================
+import asyncio
+
+async def on_startup(app):
+    """وظایف استارتاپی ربات"""
+    await notify_admin_on_startup(app)
+    app.create_task(auto_backup(app.bot))
+    app.create_task(start_auto_brain_loop(app.bot))
+    print("🌙 [SYSTEM] Startup tasks scheduled ✅")
+
+# اتصال وظایف استارتاپی
+app.post_init = on_startup
+
 # ======================= ⚙️ اجرای همزمان Bot + Userbot =======================
-async def main():
+async def run_both():
     print("🚀 در حال راه‌اندازی خنگول + یوزربات ...")
 
     try:
-        # مقداردهی اولیه ربات
+        # 🧩 مرحله ۱: راه‌اندازی ربات تلگرام (python-telegram-bot)
         await app.initialize()
+        await app.start()
+        await app.updater.start_polling()
+        print("🤖 Bot Token connected and polling started ✅")
 
-        # ساخت تسک‌ها برای اجرای همزمان
-        bot_task = asyncio.create_task(app.start())
-        userbot_task = asyncio.create_task(start_userbot())
+        # 🧩 مرحله ۲: اجرای یوزربات (Pyrogram/Telethon)
+        await start_userbot()  # این خودش داخل حلقه asyncio اجرا می‌شود
+        print("✅ Userbot connected successfully.")
 
-        # انتظار برای تسک‌ها
-        await asyncio.gather(bot_task, userbot_task)
+        # 🧩 مرحله ۳: تا وقتی یکی متوقف نشده، در حالت گوش دادن بمان
+        await app.updater.idle()
 
     except Exception as e:
         print(f"⚠️ خطا در اجرای مشترک Bot + Userbot: {e}")
 
     finally:
-        # در صورت توقف، ربات را تمیز متوقف کن
         await app.stop()
         await app.shutdown()
-        print("🛑 خنگول و یوزربات با موفقیت متوقف شدند.")
+        print("🛑 ربات متوقف شد.")
 
 # ======================= 🔰 اجرای نهایی =======================
 if __name__ == "__main__":
     print("🤖 خنگول فارسی 8.7 Cloud+ Supreme Pro Stable+ آماده به خدمت است ...")
 
     try:
-        asyncio.run(main())
+        asyncio.run(run_both())
     except KeyboardInterrupt:
-        print("🛑 ربات متوقف شد توسط کاربر.")
+        print("🛑 توقف توسط کاربر (Ctrl+C).")
     except Exception as e:
         print(f"❌ خطای غیرمنتظره: {e}")
