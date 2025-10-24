@@ -1871,28 +1871,43 @@ if __name__ == "__main__":
     # ==========================================================
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, reply), group=2)
     # ==========================================================
-    # 🎵 سیستم درخواست آهنگ از طریق Userbot
-    from weather_module.userbot_runner import send_song_request_from_bot
+    # ================== ⚡ اتصال بین Userbot و Bot Token ==================
+    async def send_song_request_from_bot(query, chat_id):
+        """ارسال درخواست آهنگ از Bot Token به Userbot"""
+        try:
+            if not userbot.is_connected:
+                print("⚠️ Userbot هنوز بالا نیامده!")
+                return False
 
-    async def request_song(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """ارسال درخواست آهنگ از Bot به Userbot"""
-    text = update.message.text.strip()
-    if not text.startswith("آهنگ "):
-        return
+             await userbot.send_message(chat_id, f"آهنگ {query}")
+             print(f"📤 درخواست آهنگ برای Userbot ارسال شد: {query}")
+            return True
+            except Exception as e:
+            print(f"⚠️ خطا در ارسال پیام از Bot به Userbot: {e}")
+            return False
 
-    query = text.replace("آهنگ", "").strip()
-    if not query:
-        return await update.message.reply_text("❗ لطفاً بعد از 'آهنگ' نام آهنگ را بنویس.")
 
-    chat_id = update.effective_chat.id
-    await update.message.reply_text(f"🎧 در حال ارسال درخواست آهنگ به یوزربات...")
+# ================== 🚀 اجرای یوزربات ==================
+async def run_userbot():
+    """اجرای اصلی userbot"""
+    try:
+        print("🚀 Starting userbot...")
+        await userbot.start()
+        me = await userbot.get_me()
+        print(f"✅ Userbot وارد شد: {me.first_name} ({me.id})")
+        await userbot.idle()
+    except Exception as e:
+        print(f"⚠️ خطا در اجرای userbot: {e}")
 
-    ok = await send_song_request_from_bot(query, chat_id)
-    if ok:
-        await update.message.reply_text("📩 درخواست شما به یوزربات ارسال شد. لطفاً چند لحظه صبر کنید ⏳")
-    else:
-        await update.message.reply_text("❌ یوزربات در حال حاضر در دسترس نیست.")
 
+def start_userbot():
+    """اجرای Userbot در Thread جداگانه برای جلوگیری از تداخل asyncio"""
+    def _worker():
+        asyncio.run(run_userbot())
+
+    t = threading.Thread(target=_worker, daemon=True)
+    t.start()
+    print("🌀 Userbot thread started...")
     # ثبت هندلر آهنگ در خنگول
     app.add_handler(MessageHandler(filters.Regex("^آهنگ "), request_song))
     # 🔹 وظایف استارتاپ
