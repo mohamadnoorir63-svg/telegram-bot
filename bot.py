@@ -1894,29 +1894,52 @@ async def on_startup(app):
 # اتصال وظایف استارتاپی
 app.post_init = on_startup
 
-# ======================= ⚙️ اجرای همزمان Bot + Userbot =======================
-import threading, asyncio
+# ======================= 🚀 اجرای همزمان Bot Token و Userbot =======================
+import asyncio
 
+async def on_startup(app):
+    """وظایف استارتاپی ربات"""
+    await notify_admin_on_startup(app)
+    app.create_task(auto_backup(app.bot))
+    app.create_task(start_auto_brain_loop(app.bot))
+    print("🌙 [SYSTEM] Startup tasks scheduled ✅")
+
+# اتصال وظایف استارتاپی
+app.post_init = on_startup
+
+# ======================= ⚙️ اجرای همزمان Bot + Userbot =======================
 async def run_both():
     print("🚀 در حال راه‌اندازی خنگول + یوزربات ...")
 
-    # 🔹 اجرای userbot در Thread جدا
-    def run_userbot_thread():
-        try:
-            start_userbot()
-        except Exception as e:
-            print(f"⚠️ خطا در userbot: {e}")
+    try:
+        # 🧩 مرحله ۱: راه‌اندازی ربات تلگرام (python-telegram-bot)
+        await app.initialize()
+        await app.start()
+        await app.updater.start_polling()
+        print("🤖 Bot Token connected and polling started ✅")
 
-    threading.Thread(target=run_userbot_thread, daemon=True).start()
+        # 🧩 مرحله ۲: اجرای یوزربات (Pyrogram/Telethon)
+        await start_userbot()  # این خودش داخل حلقه asyncio اجرا می‌شود
+        print("✅ Userbot connected successfully.")
 
-    # 🔹 اجرای ربات اصلی
-    print("🤖 Bot Token connected and polling started ✅")
-    await app.run_polling(close_loop=False)
+        # 🧩 مرحله ۳: تا وقتی یکی متوقف نشده، در حالت گوش دادن بمان
+        await app.updater.idle()
 
+    except Exception as e:
+        print(f"⚠️ خطا در اجرای مشترک Bot + Userbot: {e}")
 
-if __name__ == "__main__":
-    print("🤖 خنگول فارسی آماده به خدمت است ...")
+    finally:
+        await app.stop()
+        await app.shutdown()
+        print("🛑 ربات متوقف شد.")
+
+# ======================= 🔰 اجرای نهایی =======================
+if name == "main":
+    print("🤖 خنگول فارسی 8.7 Cloud+ Supreme Pro Stable+ آماده به خدمت است ...")
+
     try:
         asyncio.run(run_both())
+    except KeyboardInterrupt:
+        print("🛑 توقف توسط کاربر (Ctrl+C).")
     except Exception as e:
         print(f"❌ خطای غیرمنتظره: {e}")
