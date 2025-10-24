@@ -1888,8 +1888,7 @@ if __name__ == "__main__":
     # ==========================================================
 # 🚀 اجرای همزمان Bot Token و Userbot
 # ==========================================================
-import asyncio
-from modules.userbot_runner import start_userbot
+
 
 async def run_both():
     """اجرای همزمان bot token و userbot"""
