@@ -1,5 +1,5 @@
 from pyrogram import Client, filters
-import os, threading, asyncio, yt_dlp
+import os, threading, asyncio, yt_dlp, re
 
 # ================== ⚙️ تنظیمات محیطی ==================
 API_ID = int(os.getenv("API_ID", "0"))
@@ -19,16 +19,16 @@ DOWNLOAD_PATH = "downloads"
 os.makedirs(DOWNLOAD_PATH, exist_ok=True)
 
 
-# ================== 🎵 دانلود از چند منبع با انتخاب بهینه ==================
+# ================== 🎵 تابع دانلود چندمنبعی ==================
 def download_precise(query: str):
     """
-    دانلود آهنگ با منبع‌های مختلف و گزارش خطا برای دیباگ
+    جستجو و دانلود آهنگ از YouTube → YouTube Music → SoundCloud
     """
-    import re
     os.makedirs(DOWNLOAD_PATH, exist_ok=True)
 
     base_opts = {
-        "quiet": False,  # برای دیدن لاگ کامل
+        "format": "bestaudio/best",
+        "quiet": True,
         "noplaylist": True,
         "outtmpl": f"{DOWNLOAD_PATH}/%(title)s.%(ext)s",
         "retries": 3,
@@ -36,8 +36,8 @@ def download_precise(query: str):
         "ignoreerrors": True,
         "geo_bypass": True,
         "nocheckcertificate": True,
-        "extractor_args": {"youtube": {"player_client": ["android"]}},
         "concurrent_fragment_downloads": 3,
+        "socket_timeout": 10,
         "postprocessors": [{
             "key": "FFmpegExtractAudio",
             "preferredcodec": "mp3",
@@ -49,8 +49,8 @@ def download_precise(query: str):
     if os.path.exists(cookiefile):
         base_opts["cookiefile"] = cookiefile
 
-    is_url = re.match(r"^https?://", query.strip(), re.I) is not None
-    if is_url:
+    # 📌 اگر لینک مستقیم بود
+    if re.match(r"^https?://", query.strip(), re.I):
         try:
             with yt_dlp.YoutubeDL(base_opts) as ydl:
                 info = ydl.extract_info(query, download=True)
@@ -62,13 +62,13 @@ def download_precise(query: str):
                     print(f"[✅ Direct URL] {title}")
                     return mp3_path, title, "Direct URL"
         except Exception as e:
-            print(f"[❌ Direct URL ERROR] {e}")
+            print(f"[❌ Direct ERROR] {e}")
 
-    # منابع جستجو (بدون عدد برای پایداری)
+    # منابع جستجو
     sources = [
-        ("YouTube", f"ytsearch:{query} audio"),
-        ("YouTube Music", f"ytmusicsearch:{query}"),
-        ("SoundCloud", f"scsearch:{query}"),
+        ("YouTube", f"ytsearch10:{query} audio"),
+        ("YouTube Music", f"ytmusicsearch10:{query}"),
+        ("SoundCloud", f"scsearch5:{query}"),
     ]
 
     for source_name, expr in sources:
@@ -80,12 +80,11 @@ def download_precise(query: str):
                     info = info["entries"][0]
 
                 if not info:
-                    print(f"⚠️ {source_name}: هیچ نتیجه‌ای نداشت")
+                    print(f"⚠️ {source_name}: نتیجه‌ای نداشت")
                     continue
 
                 title = info.get("title", "audio")
                 mp3_path = os.path.splitext(ydl.prepare_filename(info))[0] + ".mp3"
-
                 if os.path.exists(mp3_path):
                     print(f"[✅ Downloaded] {title} ← {source_name}")
                     return mp3_path, title, source_name
@@ -98,15 +97,18 @@ def download_precise(query: str):
     print("🚫 هیچ منبعی جواب نداد")
     return None, None, None
 
+
 # ================== 💬 هندل پیام‌ها ==================
 @userbot.on_message(filters.text & (filters.private | filters.group | filters.me))
 async def handle_message(client, message):
     text = message.text.strip()
     print(f"📩 [Userbot] پیام دریافت شد: {text}")
 
+    # تست اتصال
     if text.lower() == "ping":
         return await message.reply_text("✅ Userbot فعال است!")
 
+    # درخواست آهنگ
     if text.startswith("آهنگ "):
         query = text.replace("آهنگ", "").strip()
         if not query:
@@ -131,7 +133,7 @@ async def handle_message(client, message):
             pass
 
 
-# ================== 🚀 اجرای userbot ==================
+# ================== 🚀 اجرای Userbot ==================
 async def run_userbot():
     """اجرای کامل یوزربات"""
     try:
