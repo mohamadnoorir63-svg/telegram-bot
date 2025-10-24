@@ -7,7 +7,6 @@ SESSION = os.getenv("SESSION_STRING", "")
 
 userbot = Client("userbot", api_id=API_ID, api_hash=API_HASH, session_string=SESSION)
 
-
 @userbot.on_message(filters.text)
 async def handle_message(client, message):
     text = message.text.strip()
@@ -17,23 +16,19 @@ async def handle_message(client, message):
         await message.reply_text("✅ Userbot Online!")
 
 
-async def start_userbot():
-    """اجرای userbot در همون event loop بدون ایجاد loop جدید"""
+def start_userbot():
+    """اجرا در ترد جدا بدون تداخل با event loop اصلی"""
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    loop.run_until_complete(run_userbot())
+
+
+async def run_userbot():
     try:
         print("🚀 Starting userbot...")
-
-        # اجرای userbot در پس‌زمینه تا تداخل با event loop اصلی نداشته باشه
-        loop = asyncio.get_running_loop()
-        loop.create_task(_run_userbot())
-
+        await userbot.start()
+        me = await userbot.get_me()
+        print(f"✅ Userbot logged in as {me.first_name} ({me.id})")
+        await userbot.idle()
     except Exception as e:
-        print(f"⚠️ خطا در راه‌اندازی userbot: {e}")
-
-
-async def _run_userbot():
-    """اجرای واقعی یوزربات (داخل تسک جداگانه)"""
-    await userbot.start()
-    me = await userbot.get_me()
-    print(f"✅ Userbot logged in as {me.first_name} ({me.id})")
-
-    await userbot.idle()  # تا همیشه فعال بمونه
+        print(f"⚠️ خطا در اجرای userbot: {e}")
