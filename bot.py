@@ -1889,28 +1889,20 @@ if __name__ == "__main__":
     # 🚀 اجرای همزمان Bot Token و Userbot
     # ==========================================================
 
-import threading
 import asyncio
 
-def run_bot():
-    """اجرای ربات اصلی با ساخت دستی event loop"""
-    try:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        app.run_polling(allowed_updates=Update.ALL_TYPES)
-    except Exception as e:
-        print(f"⚠️ خطا در اجرای Bot Token: {e}")
-
 async def run_both():
-    """اجرای همزمان Bot Token و Userbot"""
+    """اجرای همزمان Bot Token و Userbot (بدون تداخل signal)"""
     print("🚀 در حال راه‌اندازی خنگول + یوزربات ...")
 
-    # اجرای ربات در Thread مجزا (با لوپ مستقل)
-    bot_thread = threading.Thread(target=run_bot, daemon=True)
-    bot_thread.start()
+    # اجرای یوزربات در یک تسک جدا
+    userbot_task = asyncio.create_task(start_userbot())
 
-    # اجرای Userbot در حلقه اصلی
-    await start_userbot()
+    # اجرای ربات اصلی به‌صورت بلوک‌کننده
+    await asyncio.to_thread(app.run_polling, allowed_updates=Update.ALL_TYPES)
+
+    # اگر ربات متوقف شد، userbot رو هم متوقف کن
+    userbot_task.cancel()
 
 if __name__ == "__main__":
     try:
