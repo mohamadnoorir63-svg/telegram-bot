@@ -1885,33 +1885,32 @@ if __name__ == "__main__":
 # ==========================================================
 # 🚀 اجرای همزمان Bot Token و Userbot
 # ==========================================================
-import threading
+# ======================= 🚀 اجرای همزمان Bot Token و Userbot =======================
 import asyncio
 
-def run_bot_sync():
-    """اجرای ربات اصلی به‌صورت synchronous (در thread مجزا)"""
-    try:
-        print("🤖 Bot Token Starting ...")
-        # run_polling به صورت کامل sync اجرا می‌شود
-        app.run_polling(allowed_updates=Update.ALL_TYPES)
-    except Exception as e:
-        print(f"⚠️ خطا در اجرای Bot Token: {e}")
-
-async def start_both():
-    """اجرای هم‌زمان ربات و یوزربات"""
+async def main():
     print("🚀 در حال راه‌اندازی خنگول + یوزربات ...")
 
-    # اجرای bot در thread جدا
-    bot_thread = threading.Thread(target=run_bot_sync, daemon=True)
-    bot_thread.start()
-
-    # اجرای userbot در event loop اصلی
-    await start_userbot()
-
-# فقط یک __main__ نهایی
-if __name__ == "__main__":
     try:
-        asyncio.run(start_both())
+        # اجرای ربات اصلی در یک تسک جدا
+        bot_task = asyncio.create_task(
+            app.run_polling(allowed_updates=Update.ALL_TYPES)
+        )
+
+        # اجرای یوزربات در تسک دیگر
+        userbot_task = asyncio.create_task(start_userbot())
+
+        # اجرای همزمان هر دو تسک
+        await asyncio.gather(bot_task, userbot_task)
+
     except Exception as e:
         print(f"⚠️ خطا در اجرای مشترک Bot + Userbot: {e}")
-    
+
+if __name__ == "__main__":
+    print("🤖 خنگول فارسی 8.7 Cloud+ Supreme Pro Stable+ آماده به خدمت است ...")
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        print("🛑 ربات متوقف شد توسط کاربر.")
+    except Exception as e:
+        print(f"❌ خطای غیرمنتظره: {e}")
