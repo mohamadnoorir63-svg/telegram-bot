@@ -1874,71 +1874,48 @@ if __name__ == "__main__":
     # 🔹 وظایف استارتاپ
     # ==========================================================
 
-    async def on_startup(app):
-        await notify_admin_on_startup(app)
-        app.create_task(auto_backup(app.bot))
-        app.create_task(start_auto_brain_loop(app.bot))
-        print("🌙 [SYSTEM] Startup tasks scheduled ✅")
-
-    app.post_init = on_startup
-# ======================= 🚀 اجرای همزمان Bot Token و Userbot =======================
+    import threading
 import asyncio
 
-async def on_startup(app):
-    """وظایف استارتاپی ربات"""
-    await notify_admin_on_startup(app)
-    app.create_task(auto_backup(app.bot))
-    app.create_task(start_auto_brain_loop(app.bot))
-    print("🌙 [SYSTEM] Startup tasks scheduled ✅")
 
-# اتصال وظایف استارتاپی
-app.post_init = on_startup
+def start_userbot_thread():
+    """اجرای یوزربات در Thread جدا با event loop مخصوص خودش"""
+    from weather_module.userbot_runner import start_userbot
 
-# ======================= 🚀 اجرای همزمان Bot Token و Userbot =======================
-import asyncio
+    def run_userbot():
+        try:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            loop.run_until_complete(start_userbot())
+        except Exception as e:
+            print(f"⚠️ خطا در اجرای Userbot: {e}")
 
-async def on_startup(app):
-    """وظایف استارتاپی ربات"""
-    await notify_admin_on_startup(app)
-    app.create_task(auto_backup(app.bot))
-    app.create_task(start_auto_brain_loop(app.bot))
-    print("🌙 [SYSTEM] Startup tasks scheduled ✅")
+    thread = threading.Thread(target=run_userbot, daemon=True)
+    thread.start()
+    print("🚀 Userbot thread started...")
 
-# اتصال وظایف استارتاپی
-app.post_init = on_startup
 
-# ======================= ⚙️ اجرای همزمان Bot + Userbot =======================
-async def run_both():
+def run_both():
+    """اجرای همزمان Bot Token و Userbot"""
     print("🚀 در حال راه‌اندازی خنگول + یوزربات ...")
 
     try:
-        # 🧩 مرحله ۱: راه‌اندازی ربات تلگرام (python-telegram-bot)
-        await app.initialize()
-        await app.start()
-        await app.updater.start_polling()
+        # اجرای Userbot در ترد جدا
+        start_userbot_thread()
+
+        # اجرای Bot Token (بدون await)
         print("🤖 Bot Token connected and polling started ✅")
-
-        # 🧩 مرحله ۲: اجرای یوزربات (Pyrogram/Telethon)
-        await start_userbot()  # این خودش داخل حلقه asyncio اجرا می‌شود
-        print("✅ Userbot connected successfully.")
-
-        # 🧩 مرحله ۳: تا وقتی یکی متوقف نشده، در حالت گوش دادن بمان
-        await app.updater.idle()
+        app.run_polling()
 
     except Exception as e:
         print(f"⚠️ خطا در اجرای مشترک Bot + Userbot: {e}")
 
-    finally:
-        await app.stop()
-        await app.shutdown()
-        print("🛑 ربات متوقف شد.")
 
-# ======================= 🔰 اجرای نهایی =======================
 if __name__ == "__main__":
     print("🤖 خنگول فارسی 8.7 Cloud+ Supreme Pro Stable+ آماده به خدمت است ...")
 
     try:
-        asyncio.run(run_both())
+        run_both()
     except KeyboardInterrupt:
         print("🛑 توقف توسط کاربر (Ctrl+C).")
     except Exception as e:
