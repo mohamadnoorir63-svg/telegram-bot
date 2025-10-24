@@ -1887,41 +1887,14 @@ async def send_song_request_from_bot(query, chat_id):
         return False
 
 
-# ================== 🚀 اجرای یوزربات ==================
-async def run_userbot():
-    """اجرای اصلی userbot"""
-    try:
-        print("🚀 Starting userbot...")
-        await userbot.start()
-        me = await userbot.get_me()
-        print(f"✅ Userbot وارد شد: {me.first_name} ({me.id})")
-        await userbot.idle()
-    except Exception as e:
-        print(f"⚠️ خطا در اجرای userbot: {e}")
-
-
-def start_userbot():
-    """اجرای Userbot در Thread جداگانه برای جلوگیری از تداخل asyncio"""
-    def _worker():
-        asyncio.run(run_userbot())
-
-    t = threading.Thread(target=_worker, daemon=True)
-    t.start()
-    print("🌀 Userbot thread started...")
-
-    # ثبت هندلر آهنگ در خنگول
-    app.add_handler(MessageHandler(filters.Regex("^آهنگ "), request_song))
-
-    # 🔹 وظایف استارتاپ
-    # ==========================================================
 # ================== 🚀 اجرای همزمان Bot Token و Userbot ==================
 import threading
 import asyncio
-from weather_module.userbot_runner import start_userbot  # ✅ یوزربوت اصلی
+from weather_module.userbot_runner import start_userbot  # ✅ یوزربوت اصلی بدون تداخل
 
 def run_both():
     """اجرای همزمان Bot Token و Userbot"""
-    print("🚀 در حال راه‌اندازی خنگول + یوزربوت ...")
+    print("🚀 در حال راه‌اندازی خنگول + یوزربات ...")
 
     try:
         # 🎧 اجرای Userbot در ترد جداگانه
