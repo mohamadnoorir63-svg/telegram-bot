@@ -1871,20 +1871,21 @@ if __name__ == "__main__":
     # ==========================================================
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, reply), group=2)
     # ==========================================================
-    # ================== ⚡ اتصال بین Userbot و Bot Token ==================
-    async def send_song_request_from_bot(query, chat_id):
-        """ارسال درخواست آهنگ از Bot Token به Userbot"""
-        try:
-            if not userbot.is_connected:
-                print("⚠️ Userbot هنوز بالا نیامده!")
-                return False
-
-             await userbot.send_message(chat_id, f"آهنگ {query}")
-             print(f"📤 درخواست آهنگ برای Userbot ارسال شد: {query}")
-            return True
-            except Exception as e:
-            print(f"⚠️ خطا در ارسال پیام از Bot به Userbot: {e}")
+# ================== ⚡ اتصال بین Userbot و Bot Token ==================
+async def send_song_request_from_bot(query, chat_id):
+    """ارسال درخواست آهنگ از Bot Token به Userbot"""
+    try:
+        if not userbot.is_connected:
+            print("⚠️ Userbot هنوز بالا نیامده!")
             return False
+
+        await userbot.send_message(chat_id, f"آهنگ {query}")
+        print(f"📤 درخواست آهنگ برای Userbot ارسال شد: {query}")
+        return True
+
+    except Exception as e:
+        print(f"⚠️ خطا در ارسال پیام از Bot به Userbot: {e}")
+        return False
 
 
 # ================== 🚀 اجرای یوزربات ==================
@@ -1908,12 +1909,16 @@ def start_userbot():
     t = threading.Thread(target=_worker, daemon=True)
     t.start()
     print("🌀 Userbot thread started...")
+
     # ثبت هندلر آهنگ در خنگول
     app.add_handler(MessageHandler(filters.Regex("^آهنگ "), request_song))
+
     # 🔹 وظایف استارتاپ
     # ==========================================================
 
-    import threading
+
+# ================== 🚀 اجرای همزمان Bot Token و Userbot ==================
+import threading
 import asyncio
 
 
@@ -1950,6 +1955,7 @@ def run_both():
         print(f"⚠️ خطا در اجرای مشترک Bot + Userbot: {e}")
 
 
+# ================== 🔰 اجرای نهایی ==================
 if __name__ == "__main__":
     print("🤖 خنگول فارسی 8.7 Cloud+ Supreme Pro Stable+ آماده به خدمت است ...")
 
