@@ -1897,24 +1897,19 @@ app.post_init = on_startup
 # ======================= ⚙️ اجرای همزمان Bot + Userbot =======================
 async def run_both():
     print("🚀 در حال راه‌اندازی خنگول + یوزربات ...")
-
     try:
-        # 🧩 مرحله ۱: راه‌اندازی ربات تلگرام (python-telegram-bot)
-        await app.initialize()
-        await app.start()
-        await app.updater.start_polling()
+        # 🧩 اجرای ربات اصلی
+        bot_task = asyncio.create_task(app.run_polling())
         print("🤖 Bot Token connected and polling started ✅")
 
-        # 🧩 مرحله ۲: اجرای یوزربات (Pyrogram/Telethon)
-        await start_userbot()  # این خودش داخل حلقه asyncio اجرا می‌شود
+        # 🧩 اجرای یوزربات
+        await start_userbot()
         print("✅ Userbot connected successfully.")
 
-        # 🧩 مرحله ۳: تا وقتی یکی متوقف نشده، در حالت گوش دادن بمان
-        await app.updater.idle()
+        await bot_task  # تا وقتی ربات فعاله، برنامه ادامه داشته باشه
 
     except Exception as e:
         print(f"⚠️ خطا در اجرای مشترک Bot + Userbot: {e}")
-
     finally:
         await app.stop()
         await app.shutdown()
