@@ -1895,33 +1895,34 @@ async def on_startup(app):
 app.post_init = on_startup
 
 # ======================= ⚙️ اجرای همزمان Bot + Userbot =======================
+import asyncio
+
 async def run_both():
     print("🚀 در حال راه‌اندازی خنگول + یوزربات ...")
-    try:
-        # 🧩 اجرای ربات اصلی
-        bot_task = asyncio.create_task(app.run_polling())
-        print("🤖 Bot Token connected and polling started ✅")
 
-        # 🧩 اجرای یوزربات
-        await start_userbot()
-        print("✅ Userbot connected successfully.")
+    async def userbot_task():
+        try:
+            await start_userbot()
+        except Exception as e:
+            print(f"❌ خطا در Userbot: {e}")
 
-        await bot_task  # تا وقتی ربات فعاله، برنامه ادامه داشته باشه
+    # اجرای userbot در پس‌زمینه
+    asyncio.create_task(userbot_task())
 
-    except Exception as e:
-        print(f"⚠️ خطا در اجرای مشترک Bot + Userbot: {e}")
-    finally:
-        await app.stop()
-        await app.shutdown()
-        print("🛑 ربات متوقف شد.")
+    # اجرای ربات اصلی در همون حلقه
+    print("🤖 Bot Token connected and polling started ✅")
+    await app.run_polling(close_loop=False)  # ⬅️ مهم: نزار loop بسته بشه!
 
-# ======================= 🔰 اجرای نهایی =======================
+    print("🛑 سیستم متوقف شد.")
+
+
 if __name__ == "__main__":
     print("🤖 خنگول فارسی 8.7 Cloud+ Supreme Pro Stable+ آماده به خدمت است ...")
 
     try:
+        # اجرای مستقیم با asyncio
         asyncio.run(run_both())
-    except KeyboardInterrupt:
-        print("🛑 توقف توسط کاربر (Ctrl+C).")
+    except (KeyboardInterrupt, SystemExit):
+        print("🛑 توقف دستی یا خروج از سیستم.")
     except Exception as e:
         print(f"❌ خطای غیرمنتظره: {e}")
