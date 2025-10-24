@@ -1842,8 +1842,7 @@ if __name__ == "__main__":
     
     app.add_handler(MessageHandler(filters.Regex(r"^اذان"), get_azan_time))
     app.add_handler(MessageHandler(filters.Regex(r"^رمضان"), get_ramadan_status))
-    # ======================= 📰 اخبار =======================
-    app.add_handler(MessageHandler(filters.Regex(r"^اخبار"), get_news))
+    
     # ==========================================================
     # 🌦 آب‌وهوا — باید قبل از reply و سایر MessageHandlerها باشه
     # ==========================================================
