@@ -1845,7 +1845,7 @@ async def show_custom_guide(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ======================= ⚙️ سیستم مدیریت گروه =======================
 
     
-        # ======================= ⚙️ سیستم مدیریت گروه =======================
+ # ======================= ⚙️ سیستم مدیریت گروه =======================
 import json, os
 from telegram import Update, ChatPermissions
 from telegram.ext import ContextTypes
@@ -1907,26 +1907,27 @@ async def is_authorized(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def can_act_on_target(update, context, target):
     bot = await context.bot.get_me()
     chat = update.effective_chat
-# اگر روی خود ربات اجرا بشه 😎
-if target.id == bot.id:
-    replies = [
-        "😏 می‌خوای منو بن کنی؟ من اینجارو ساختم!",
-        "😂 جدی؟ منو سکوت می‌کنی؟ خودت خفه شو بهتره.",
-        "😎 منو اخطار می‌دی؟ خودتو جمع کن رفیق."
-    ]
-    await update.message.reply_text(replies[hash(target.id) % len(replies)])
-    return False  # ⬅️ اضافه شد تا ادامه متوقف بشه
-    
-        
+
+    # اگر روی خود ربات اجرا بشه 😎
+    if target.id == bot.id:
+        replies = [
+            "😏 می‌خوای منو بن کنی؟ من اینجارو ساختم!",
+            "😂 جدی؟ منو سکوت می‌کنی؟ خودت خفه شو بهتره.",
+            "😎 منو اخطار می‌دی؟ خودتو جمع کن رفیق."
+        ]
+        await update.message.reply_text(replies[hash(target.id) % len(replies)])
+        return False  # ⬅️ اضافه شد تا ادامه متوقف بشه
 
     # اگر سودو / مدیر / سازنده بود
     if target.id in SUDO_IDS or target.id == int(os.getenv("ADMIN_ID", "7089376754")):
-        return await update.message.reply_text("⚠️ این کاربر از مدیران ارشد یا سازنده است — نمی‌تونی کاریش کنی!")
+        await update.message.reply_text("⚠️ این کاربر از مدیران ارشد یا سازنده است — نمی‌تونی کاریش کنی!")
+        return False
 
     try:
         member = await context.bot.get_chat_member(chat.id, target.id)
         if member.status in ["administrator", "creator"]:
-            return await update.message.reply_text("⚠️ نمی‌تونی روی مدیر گروه کاری انجام بدی!")
+            await update.message.reply_text("⚠️ نمی‌تونی روی مدیر گروه کاری انجام بدی!")
+            return False
     except:
         pass
 
@@ -2044,7 +2045,7 @@ async def handle_unmute(update, context):
         await update.message.reply_text(f"⚠️ خطا در رفع سکوت:\n<code>{e}</code>", parse_mode="HTML")
 
 
-# 👑 افزودن مدیر (اصلاح شده)
+# 👑 افزودن مدیر
 async def handle_addadmin(update, context):
     if not await is_authorized(update, context):
         return await update.message.reply_text("⛔ فقط مدیر اصلی یا سودوها می‌تونن مدیر اضافه کنن!")
@@ -2153,7 +2154,7 @@ async def handle_alias(update, context):
 async def group_command_handler(update, context):
     text = update.message.text.strip().lower()
 
-    # اگر alias بود (برای تغییر دستور)
+    # اگر alias بود
     if text.startswith("alias "):
         parts = text.split()
         if len(parts) >= 3:
@@ -2162,7 +2163,6 @@ async def group_command_handler(update, context):
         else:
             return await update.message.reply_text("🔹 استفاده: alias [دستور_اصلی] [نام_جدید]")
 
-    # چک دستورات موجود
     for cmd, aliases in ALIASES.items():
         if text in aliases:
             handlers = {
@@ -2175,7 +2175,9 @@ async def group_command_handler(update, context):
             }
             if cmd in handlers:
                 return await handlers[cmd](update, context)
-    return
+    return       
+        
+         
 
 # ======================= 🚀 اجرای نهایی =======================
 
