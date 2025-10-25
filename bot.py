@@ -2564,15 +2564,15 @@ async def group_text_handler_adv(update, context):
                     "tagactive": handle_tagactive
                 }
                 if cmd in handlers:
-     
+                         # ======================= 🚀 اجرای نهایی =======================
+from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, CallbackQueryHandler, filters
 
-    # ======================= 🚀 اجرای نهایی =======================
-    if __name__ == "__main__":
-    from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, CallbackQueryHandler, filters
+if __name__ == "__main__":
     print("🤖 خنگول فارسی 8.7 Cloud+ Supreme Pro Stable+ آماده به خدمت است ...")
 
     app = ApplicationBuilder().token(TOKEN).build()
-    ...
+    app.add_error_handler(handle_error)
+
     # ✅ هندلرهای سودو
     app.add_handler(CommandHandler("addsudo", add_sudo))
     app.add_handler(CommandHandler("delsudo", del_sudo))
@@ -2599,7 +2599,7 @@ async def group_text_handler_adv(update, context):
     app.add_handler(CommandHandler("leave", leave))
     app.add_handler(CommandHandler("reply", toggle_reply_mode))
 
-    # 👑 مدیریت وضعیت ادمین (ورود/خروج) + پاکسازی هنگام حذف ربات
+    # 👑 مدیریت وضعیت ادمین (ورود/خروج)
     app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, detect_admin_movement))
     app.add_handler(MessageHandler(filters.StatusUpdate.LEFT_CHAT_MEMBER, detect_admin_movement))
     app.add_handler(MessageHandler(filters.StatusUpdate.LEFT_CHAT_MEMBER, handle_left_chat))
@@ -2607,10 +2607,10 @@ async def group_text_handler_adv(update, context):
     # 🤖 پاسخ به "ربات" توسط سودو
     app.add_handler(MessageHandler(filters.Regex("(?i)^ربات$"), sudo_bot_call))
 
-    # 📣 کنترل دستورات گروهی (بدون /)
+    # 📣 دستورات گروهی بدون /
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, group_command_handler))
 
-    # 🎨 فونت‌ساز خنگول (گفت‌وگویی)
+    # 🎨 فونت‌ساز خنگول
     from telegram.ext import ConversationHandler
     from font_maker import font_maker, receive_font_name, next_font, prev_font, ASK_NAME
 
@@ -2631,7 +2631,7 @@ async def group_text_handler_adv(update, context):
     app.add_handler(MessageHandler(filters.Regex("^(خاموش|/خاموش)$"), stop_ai_chat))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, chat), group=3)
 
-    # 🎉 خوشامد پویا و تنظیمات گروه
+    # 🎉 خوشامد پویا
     app.add_handler(MessageHandler(filters.Regex("^خوشامد$"), open_welcome_panel), group=-1)
     app.add_handler(CallbackQueryHandler(welcome_panel_buttons, pattern="^welcome_"), group=-1)
     app.add_handler(MessageHandler(filters.Regex("^ثبت خوشامد$"), set_welcome_text), group=-1)
@@ -2661,7 +2661,7 @@ async def group_text_handler_adv(update, context):
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, group_text_handler_adv), group=0)
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, check_filtered_messages), group=1)
 
-    # ✉️ دستورات سفارشی ذخیره‌شده
+    # ✉️ دستورات سفارشی
     app.add_handler(CommandHandler("save", save_command))
     app.add_handler(CommandHandler("del", delete_command))
     app.add_handler(CommandHandler("listcmds", list_commands))
@@ -2685,4 +2685,5 @@ async def group_text_handler_adv(update, context):
         app.run_polling(allowed_updates=Update.ALL_TYPES)
     except Exception as e:
         print(f"⚠️ خطا در اجرای ربات:\n{e}")
-        print("♻️ ربات به‌صورت خودکار توسط هاست ری‌استارت خواهد شد ✅")
+        print("♻️ ربات به‌صورت خودکار توسط هاست ری‌استارت خواهد شد ✅")   
+   
