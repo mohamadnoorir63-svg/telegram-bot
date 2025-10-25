@@ -1907,15 +1907,17 @@ async def is_authorized(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def can_act_on_target(update, context, target):
     bot = await context.bot.get_me()
     chat = update.effective_chat
-
-    # اگر روی خود ربات اجرا بشه 😎
-    if target.id == bot.id:
-        replies = [
-            "😏 می‌خوای منو بن کنی؟ من اینجارو ساختم!",
-            "😂 جدی؟ منو سکوت می‌کنی؟ خودت خفه شو بهتره.",
-            "😎 منو اخطار می‌دی؟ خودتو جمع کن رفیق."
-        ]
-        return await update.message.reply_text(replies[hash(target.id) % len(replies)])
+# اگر روی خود ربات اجرا بشه 😎
+if target.id == bot.id:
+    replies = [
+        "😏 می‌خوای منو بن کنی؟ من اینجارو ساختم!",
+        "😂 جدی؟ منو سکوت می‌کنی؟ خودت خفه شو بهتره.",
+        "😎 منو اخطار می‌دی؟ خودتو جمع کن رفیق."
+    ]
+    await update.message.reply_text(replies[hash(target.id) % len(replies)])
+    return False  # ⬅️ اضافه شد تا ادامه متوقف بشه
+    
+        
 
     # اگر سودو / مدیر / سازنده بود
     if target.id in SUDO_IDS or target.id == int(os.getenv("ADMIN_ID", "7089376754")):
