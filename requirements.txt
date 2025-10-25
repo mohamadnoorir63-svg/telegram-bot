@@ -1,7 +1,5 @@
-# ==== Core Telegram Libraries ====
+# ==== Core Telegram Library ====
 python-telegram-bot==20.7
-pyrogram==2.0.106
-tgcrypto==1.2.5
 
 # ==== Async and HTTP ====
 aiofiles==23.2.1
@@ -17,7 +15,7 @@ imageio==2.36.0
 
 # ==== Database ====
 pymongo==4.10.1
-dnspython==2.6.1  # ✅ برای MongoDB لازم است
+dnspython==2.6.1    # ✅ برای MongoDB لازم است
 
 # ==== AI & NLP ====
 openai==0.28
@@ -37,4 +35,3 @@ khayyam==3.0.17
 tqdm==4.66.5
 Flask==3.0.3
 gunicorn==23.0.0
-yt-dlp>=2025.9.22
