@@ -2163,6 +2163,205 @@ async def group_command_handler(update, context):
                 if cmd in handlers:
                     return await handlers[cmd](update, context)
     return
+    # ======================= 🔒 سیستم قفل‌های پیشرفته گروه =======================
+from telegram import ChatPermissions
+from datetime import datetime
+
+# ✅ لیست قفل‌های پشتیبانی‌شده
+LOCK_TYPES = {
+    "links": "ارسال لینک‌ها",
+    "photos": "ارسال عکس",
+    "videos": "ارسال ویدیو",
+    "files": "ارسال فایل",
+    "gifs": "ارسال گیف",
+    "voices": "ارسال ویس",
+    "vmsgs": "ارسال ویدیو مسیج",
+    "stickers": "ارسال استیکر",
+    "forward": "ارسال فوروارد",
+    "ads": "ارسال تبلیغ / تبچی",
+    "usernames": "ارسال یوزرنیم / تگ",
+    "bots": "افزودن ربات",
+    "join": "ورود عضو جدید",
+    "chat": "ارسال پیام در چت",
+    "media": "ارسال تمام مدیاها"
+}
+
+# ✅ alias پیش‌فرض برای هر قفل
+for lock in LOCK_TYPES:
+    ALIASES[f"lock_{lock}"] = [f"lock {lock}"]
+    ALIASES[f"unlock_{lock}"] = [f"unlock {lock}"]
+
+save_json_file(ALIASES_FILE, ALIASES)
+
+# ⚙️ تابع کمکی: بروزرسانی وضعیت قفل
+def set_lock_status(chat_id, lock_name, status):
+    chat_id = str(chat_id)
+    group = group_data.get(chat_id, {"locks": {}})
+    locks = group.get("locks", {})
+    locks[lock_name] = status
+    group["locks"] = locks
+    group_data[chat_id] = group
+    save_json_file(GROUP_CTRL_FILE, group_data)
+
+# 📊 گرفتن وضعیت قفل‌ها
+def get_lock_status(chat_id, lock_name):
+    chat_id = str(chat_id)
+    group = group_data.get(chat_id, {"locks": {}})
+    locks = group.get("locks", {})
+    return locks.get(lock_name, False)
+
+# 🔐 قفل یک بخش
+async def handle_lock_generic(update, context, lock_name):
+    if not await is_authorized(update, context):
+        return await update.message.reply_text("🚫 فقط مدیران یا سودوها می‌توانند قفل کنند!")
+
+    chat = update.effective_chat
+    chat_id = str(chat.id)
+    user = update.effective_user
+
+    if get_lock_status(chat_id, lock_name):
+        return await update.message.reply_text(f"🔒 {LOCK_TYPES[lock_name]} از قبل قفل بوده است!")
+
+    set_lock_status(chat_id, lock_name, True)
+    time_str = datetime.now().strftime("%H:%M - %d/%m/%Y")
+    await update.message.reply_text(
+        f"🔒 <b>{LOCK_TYPES[lock_name]} قفل شد!</b>\n"
+        f"📵 اعضا اجازه انجام آن را ندارند.\n\n"
+        f"👤 توسط: <b>{user.first_name}</b>\n🕒 {time_str}",
+        parse_mode="HTML"
+    )
+
+# 🔓 باز کردن قفل
+async def handle_unlock_generic(update, context, lock_name):
+    if not await is_authorized(update, context):
+        return await update.message.reply_text("🚫 فقط مدیران یا سودوها می‌توانند باز کنند!")
+
+    chat = update.effective_chat
+    chat_id = str(chat.id)
+    user = update.effective_user
+
+    if not get_lock_status(chat_id, lock_name):
+        return await update.message.reply_text(f"🔓 {LOCK_TYPES[lock_name]} از قبل باز بوده است!")
+
+    set_lock_status(chat_id, lock_name, False)
+    time_str = datetime.now().strftime("%H:%M - %d/%m/%Y")
+    await update.message.reply_text(
+        f"🔓 <b>{LOCK_TYPES[lock_name]} باز شد!</b>\n"
+        f"💬 اعضا اکنون می‌توانند از آن استفاده کنند.\n\n"
+        f"👤 توسط: <b>{user.first_name}</b>\n🕒 {time_str}",
+        parse_mode="HTML"
+    )
+
+# 🧹 بررسی و حذف پیام‌های خلاف قفل‌ها
+async def check_message_locks(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not update.message:
+        return
+
+    chat_id = str(update.effective_chat.id)
+    user = update.effective_user
+    message = update.message
+
+    locks = group_data.get(chat_id, {}).get("locks", {})
+    if not locks:
+        return
+
+    delete_reason = None
+
+    # 🔍 بررسی نوع پیام
+    if locks.get("links") and ("t.me/" in message.text.lower() or "http" in message.text.lower()):
+        delete_reason = "ارسال لینک"
+    elif locks.get("photos") and message.photo:
+        delete_reason = "ارسال عکس"
+    elif locks.get("videos") and message.video:
+        delete_reason = "ارسال ویدیو"
+    elif locks.get("files") and message.document:
+        delete_reason = "ارسال فایل"
+    elif locks.get("gifs") and message.animation:
+        delete_reason = "ارسال گیف"
+    elif locks.get("voices") and message.voice:
+        delete_reason = "ارسال ویس"
+    elif locks.get("vmsgs") and message.video_note:
+        delete_reason = "ارسال ویدیو مسیج"
+    elif locks.get("stickers") and message.sticker:
+        delete_reason = "ارسال استیکر"
+    elif locks.get("forward") and message.forward_from:
+        delete_reason = "ارسال فوروارد"
+    elif locks.get("ads") and ("join" in message.text.lower() or "channel" in message.text.lower()):
+        delete_reason = "ارسال تبلیغ / تبچی"
+    elif locks.get("usernames") and ("@" in message.text):
+        delete_reason = "ارسال یوزرنیم یا تگ"
+    elif locks.get("media") and (message.photo or message.video or message.animation):
+        delete_reason = "ارسال مدیا (قفل کلی)"
+    elif locks.get("chat") and message.text:
+        delete_reason = "ارسال پیام متنی"
+
+    if delete_reason:
+        try:
+            await message.delete()
+        except:
+            return
+
+        warn_msg = await message.chat.send_message(
+            f"🚫 پیام <b>{user.first_name}</b> حذف شد!\n🎯 دلیل: <b>{delete_reason}</b>",
+            parse_mode="HTML"
+        )
+
+        # حذف پیام هشدار بعد از چند ثانیه برای تمیزی
+        try:
+            await context.application.create_task(
+                context.bot.delete_message(chat_id, warn_msg.message_id)
+            )
+        except:
+            pass
+
+# 🧾 وضعیت همه قفل‌ها
+async def handle_locks_status(update, context):
+    chat_id = str(update.effective_chat.id)
+    locks = group_data.get(chat_id, {}).get("locks", {})
+
+    if not locks:
+        return await update.message.reply_text("🔓 هیچ قفلی فعال نیست!", parse_mode="HTML")
+
+    text = "🧱 <b>وضعیت قفل‌های گروه:</b>\n\n"
+    for lock, desc in LOCK_TYPES.items():
+        status = "🔒 فعال" if locks.get(lock, False) else "🔓 غیرفعال"
+        text += f"▫️ <b>{desc}:</b> {status}\n"
+
+    await update.message.reply_text(text, parse_mode="HTML")
+
+# 🎮 اضافه کردن همه هندلرها به group_command_handler
+async def group_command_handler(update, context):
+    text = update.message.text.strip().lower()
+
+    # alias اختصاصی تغییر نام
+    if text.startswith("alias "):
+        return await handle_alias(update, context)
+
+    # وضعیت قفل‌ها
+    if text in ["locks", "lock status", "وضعیت قفل"]:
+        return await handle_locks_status(update, context)
+
+    # بررسی دستورات قفل / باز کردن
+    for cmd, aliases in ALIASES.items():
+        if text in aliases:
+            # lock_xx / unlock_xx
+            for lock in LOCK_TYPES:
+                if cmd == f"lock_{lock}":
+                    return await handle_lock_generic(update, context, lock)
+                elif cmd == f"unlock_{lock}":
+                    return await handle_unlock_generic(update, context, lock)
+
+            # بقیه دستورات (مثل بن، سکوت، ... از قبل داری)
+            handlers = {
+                "ban": handle_ban, "unban": handle_unban,
+                "warn": handle_warn, "unwarn": handle_warn,
+                "mute": handle_mute, "unmute": handle_unmute,
+                "addadmin": handle_addadmin, "removeadmin": handle_removeadmin,
+                "admins": handle_admins
+            }
+            if cmd in handlers:
+                return await handlers[cmd](update, context)
+    return
     
 # ======================= 🚀 اجرای نهایی =======================
 
