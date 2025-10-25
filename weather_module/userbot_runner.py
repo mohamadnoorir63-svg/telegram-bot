@@ -1,5 +1,5 @@
 from pyrogram import Client, filters
-import os, threading, asyncio, yt_dlp, re
+import os, threading, asyncio, yt_dlp
 
 # ⚙️ تنظیمات محیطی
 API_ID = int(os.getenv("API_ID", "0"))
@@ -13,6 +13,12 @@ userbot = Client(
     session_string=SESSION
 )
 
+# 📁 مسیر دانلود آهنگ‌ها
+DOWNLOAD_PATH = os.getenv("DOWNLOAD_PATH", "downloads")
+os.makedirs(DOWNLOAD_PATH, exist_ok=True)
+
+
+# 🎵 تابع جستجو و دانلود آهنگ از سایت‌های ایرانی
 def download_precise(query: str):
     """
     جستجو و دانلود آهنگ از سایت‌های ایرانی (Aparat, Namasha, Tamasha)
@@ -60,7 +66,8 @@ def download_precise(query: str):
 
     return None, None, None
 
-# 💬 هندل پیام‌ها
+
+# 💬 پاسخ به پیام‌ها
 @userbot.on_message(filters.text & (filters.private | filters.me))
 async def handle_message(client, message):
     text = (message.text or "").strip()
@@ -69,8 +76,9 @@ async def handle_message(client, message):
     if text.lower() == "ping":
         return await message.reply_text("✅ Userbot فعال است!")
 
-    if text.startswith("آهنگ "):
-        query = text.replace("آهنگ", "").strip()
+    # ✅ پشتیبانی از هر دو حالت "آهنگ" و "اهنگ"
+    if text.startswith(("آهنگ", "اهنگ")):
+        query = text.replace("آهنگ", "").replace("اهنگ", "").strip()
         if not query:
             return await message.reply_text("❗ لطفاً بعد از 'آهنگ' نام آهنگ را بنویس.")
 
