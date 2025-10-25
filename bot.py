@@ -37,11 +37,12 @@ from auto_brain.command_manager import (
     list_commands,
     cleanup_group_commands
 )
-from group_control import (
+from group_control.group_control import (
     group_command_handler,
     check_message_locks,
     group_text_handler_adv
 )
+
 from context_memory import ContextMemory  # ✅ باید قبل از استفاده ازش باشه
 from brain_bridge_group import process_group_message
 # 🧠 حافظه کوتاه‌مدت گفتگو برای Context AI
