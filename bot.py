@@ -1843,6 +1843,9 @@ async def show_custom_guide(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return await update.message.reply_text("ℹ️ هنوز متنی برای راهنما ثبت نشده.")
     await update.message.reply_text(text)
 # ======================= ⚙️ سیستم مدیریت گروه =======================
+
+    
+        # ======================= ⚙️ سیستم مدیریت گروه =======================
 import json, os
 from telegram import Update, ChatPermissions
 from telegram.ext import ContextTypes
@@ -1866,7 +1869,8 @@ ALIASES = {
     "alias": ["alias", "تغییر"]
 }
 
-# 📂 بارگذاری داده‌های مدیریتی
+
+# 📂 بارگذاری فایل‌ها
 def load_json_file(path, default):
     if os.path.exists(path):
         try:
@@ -1876,15 +1880,17 @@ def load_json_file(path, default):
             pass
     return default
 
+
 def save_json_file(path, data):
     with open(path, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
+
 
 group_data = load_json_file(GROUP_CTRL_FILE, {})
 ALIASES = load_json_file(ALIASES_FILE, ALIASES)
 
 
-# 🧠 بررسی مجاز بودن (ادمین / سودو / سازنده)
+# 🧠 بررسی مجاز بودن
 async def is_authorized(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     chat = update.effective_chat
@@ -1897,6 +1903,34 @@ async def is_authorized(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return False
 
 
+# 🧱 بررسی اینکه هدف قابل اقدام است یا نه
+async def can_act_on_target(update, context, target):
+    bot = await context.bot.get_me()
+    chat = update.effective_chat
+
+    # اگر روی خود ربات اجرا بشه 😎
+    if target.id == bot.id:
+        replies = [
+            "😏 می‌خوای منو بن کنی؟ من اینجارو ساختم!",
+            "😂 جدی؟ منو سکوت می‌کنی؟ خودت خفه شو بهتره.",
+            "😎 منو اخطار می‌دی؟ خودتو جمع کن رفیق."
+        ]
+        return await update.message.reply_text(replies[hash(target.id) % len(replies)])
+
+    # اگر سودو / مدیر / سازنده بود
+    if target.id in SUDO_IDS or target.id == int(os.getenv("ADMIN_ID", "7089376754")):
+        return await update.message.reply_text("⚠️ این کاربر از مدیران ارشد یا سازنده است — نمی‌تونی کاریش کنی!")
+
+    try:
+        member = await context.bot.get_chat_member(chat.id, target.id)
+        if member.status in ["administrator", "creator"]:
+            return await update.message.reply_text("⚠️ نمی‌تونی روی مدیر گروه کاری انجام بدی!")
+    except:
+        pass
+
+    return True
+
+
 # 🚫 بن و رفع‌بن
 async def handle_ban(update, context):
     if not await is_authorized(update, context):
@@ -1907,15 +1941,8 @@ async def handle_ban(update, context):
     target = update.message.reply_to_message.from_user
     chat = update.effective_chat
 
-    if target.id in SUDO_IDS or target.id == int(os.getenv("ADMIN_ID", "7089376754")):
-        return await update.message.reply_text("⚠️ نمی‌توان مدیر ارشد یا سازنده را بن کرد.")
-
-    try:
-        member = await context.bot.get_chat_member(chat.id, target.id)
-        if member.status in ["administrator", "creator"]:
-            return await update.message.reply_text("⚠️ نمی‌توان مدیر گروه را بن کرد.")
-    except:
-        pass
+    if not await can_act_on_target(update, context, target):
+        return
 
     try:
         await context.bot.ban_chat_member(chat.id, target.id)
@@ -1927,8 +1954,8 @@ async def handle_ban(update, context):
 async def handle_unban(update, context):
     if not await is_authorized(update, context):
         return await update.message.reply_text("⛔ فقط مدیران یا سودوها مجازند!")
-
     chat = update.effective_chat
+
     user_id = None
     if update.message.reply_to_message:
         user_id = update.message.reply_to_message.from_user.id
@@ -1944,7 +1971,7 @@ async def handle_unban(update, context):
         await update.message.reply_text(f"⚠️ خطا در رفع بن:\n<code>{e}</code>", parse_mode="HTML")
 
 
-# ⚠️ اخطار و حذف اخطار
+# ⚠️ اخطار
 async def handle_warn(update, context):
     if not await is_authorized(update, context):
         return await update.message.reply_text("⛔ فقط مدیران یا سودوها مجازند!")
@@ -1953,6 +1980,9 @@ async def handle_warn(update, context):
         return await update.message.reply_text("🔹 باید روی پیام کاربر ریپلای بزنی.")
     target = update.message.reply_to_message.from_user
     chat_id = str(update.effective_chat.id)
+
+    if not await can_act_on_target(update, context, target):
+        return
 
     group = group_data.get(chat_id, {"warns": {}, "admins": []})
     warns = group["warns"]
@@ -1979,23 +2009,7 @@ async def handle_warn(update, context):
         )
 
 
-async def handle_unwarn(update, context):
-    if not await is_authorized(update, context):
-        return await update.message.reply_text("⛔ فقط مدیران یا سودوها مجازند!")
-    if not update.message.reply_to_message:
-        return await update.message.reply_text("🔹 باید روی پیام کاربر ریپلای بزنی.")
-
-    target = update.message.reply_to_message.from_user
-    chat_id = str(update.effective_chat.id)
-    group = group_data.get(chat_id, {"warns": {}, "admins": []})
-    group["warns"][str(target.id)] = 0
-    group_data[chat_id] = group
-    save_json_file(GROUP_CTRL_FILE, group_data)
-
-    await update.message.reply_text(f"✅ تمام اخطارهای <b>{target.first_name}</b> حذف شد.", parse_mode="HTML")
-
-
-# 🤐 سکوت و رفع سکوت
+# 🤐 سکوت / رفع سکوت
 async def handle_mute(update, context):
     if not await is_authorized(update, context):
         return await update.message.reply_text("⛔ فقط مدیران یا سودوها مجازند!")
@@ -2003,6 +2017,10 @@ async def handle_mute(update, context):
         return await update.message.reply_text("🔹 باید روی پیام کاربر ریپلای بزنی.")
     target = update.message.reply_to_message.from_user
     chat = update.effective_chat
+
+    if not await can_act_on_target(update, context, target):
+        return
+
     try:
         await context.bot.restrict_chat_member(chat.id, target.id, permissions=ChatPermissions(can_send_messages=False))
         await update.message.reply_text(f"🤐 <b>{target.first_name}</b> ساکت شد.", parse_mode="HTML")
@@ -2024,7 +2042,7 @@ async def handle_unmute(update, context):
         await update.message.reply_text(f"⚠️ خطا در رفع سکوت:\n<code>{e}</code>", parse_mode="HTML")
 
 
-# 👑 افزودن / حذف مدیر
+# 👑 افزودن مدیر (اصلاح شده)
 async def handle_addadmin(update, context):
     if not await is_authorized(update, context):
         return await update.message.reply_text("⛔ فقط مدیر اصلی یا سودوها می‌تونن مدیر اضافه کنن!")
@@ -2035,6 +2053,7 @@ async def handle_addadmin(update, context):
     user = update.message.reply_to_message.from_user
     group = group_data.get(chat_id, {"warns": {}, "admins": []})
     admins = group.get("admins", [])
+
     if user.id in admins:
         return await update.message.reply_text("⚠️ این کاربر از قبل مدیر است!")
 
@@ -2045,16 +2064,18 @@ async def handle_addadmin(update, context):
     await update.message.reply_text(f"👑 <b>{user.first_name}</b> مدیر گروه شد.", parse_mode="HTML")
 
 
+# ❌ حذف مدیر
 async def handle_removeadmin(update, context):
     if not await is_authorized(update, context):
-        return await update.message.reply_text("⛔ فقط مدیر اصلی یا سودوها مجازند!")
+        return await update.message.reply_text("⛔ فقط مدیر اصلی یا سودوها می‌تونن مدیر حذف کنن!")
     if not update.message.reply_to_message:
         return await update.message.reply_text("🔹 باید روی پیام مدیر ریپلای بزنی.")
 
     chat_id = str(update.effective_chat.id)
     user = update.message.reply_to_message.from_user
-    group = group_data.get(chat_id, {"warns": {}, "admins": []})
+    group = group_data.get(chat_id, {"admins": []})
     admins = group.get("admins", [])
+
     if user.id not in admins:
         return await update.message.reply_text("ℹ️ این کاربر مدیر ثبت‌شده نیست.")
 
@@ -2070,8 +2091,9 @@ async def handle_admins(update, context):
     chat_id = str(update.effective_chat.id)
     group = group_data.get(chat_id, {"admins": []})
     admins = group.get("admins", [])
+
     if not admins:
-        return await update.message.reply_text("ℹ️ هنوز هیچ مدیری ثبت نشده.")
+        return await update.message.reply_text("ℹ️ هنوز هیچ مدیری برای این گروه ثبت نشده.")
 
     text = "👑 <b>لیست مدیران گروه:</b>\n\n"
     for i, uid in enumerate(admins, start=1):
@@ -2080,6 +2102,7 @@ async def handle_admins(update, context):
             text += f"{i}. {user.user.first_name} (<code>{uid}</code>)\n"
         except:
             text += f"{i}. <code>{uid}</code>\n"
+
     await update.message.reply_text(text, parse_mode="HTML")
 
 
@@ -2093,6 +2116,7 @@ async def handle_lock(update, context):
         "🔒 <b>گروه با موفقیت قفل شد!</b>\n📵 فقط مدیران و سودوها می‌توانند پیام بفرستند.",
         parse_mode="HTML"
     )
+
 
 async def handle_unlock(update, context):
     if not await is_authorized(update, context):
@@ -2123,20 +2147,25 @@ async def handle_alias(update, context):
     await update.message.reply_text(f"✅ دستور <b>{base}</b> اکنون با <b>{new}</b> نیز قابل اجراست.", parse_mode="HTML")
 
 
-# 📡 هندلر نهایی همه دستورات
+# 📡 هندلر نهایی همه دستورات بدون /
 async def group_command_handler(update, context):
     text = update.message.text.strip().lower()
+
+    # اگر alias بود (برای تغییر دستور)
     if text.startswith("alias "):
         parts = text.split()
         if len(parts) >= 3:
             context.args = parts[1:]
             return await handle_alias(update, context)
+        else:
+            return await update.message.reply_text("🔹 استفاده: alias [دستور_اصلی] [نام_جدید]")
 
+    # چک دستورات موجود
     for cmd, aliases in ALIASES.items():
         if text in aliases:
             handlers = {
                 "ban": handle_ban, "unban": handle_unban,
-                "warn": handle_warn, "unwarn": handle_unwarn,
+                "warn": handle_warn, "unwarn": handle_warn,
                 "mute": handle_mute, "unmute": handle_unmute,
                 "addadmin": handle_addadmin, "removeadmin": handle_removeadmin,
                 "admins": handle_admins, "lock": handle_lock,
@@ -2145,6 +2174,7 @@ async def group_command_handler(update, context):
             if cmd in handlers:
                 return await handlers[cmd](update, context)
     return
+
 # ======================= 🚀 اجرای نهایی =======================
 
 if __name__ == "__main__":
