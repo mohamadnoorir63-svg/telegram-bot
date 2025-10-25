@@ -1858,13 +1858,13 @@ if __name__ == "__main__":
     # 🧩 ساخت اپلیکیشن اصلی تلگرام
     app = ApplicationBuilder().token(TOKEN).build()
     # هندلر اصلی دستورات گروه (بدون /)
-application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, group_command_handler))
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, group_command_handler))
 
-# چک کردن پیام‌های خلاف قفل‌ها
-application.add_handler(MessageHandler(filters.ALL, check_message_locks))
+    # چک کردن پیام‌های خلاف قفل‌ها
+    application.add_handler(MessageHandler(filters.ALL, check_message_locks))
 
-# فیلتر کلمات و تگ همه
-application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, group_text_handler_adv))
+    # فیلتر کلمات و تگ همه
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, group_text_handler_adv))
 
     # ⚙️ مدیریت خطاهای کلی
     app.add_error_handler(handle_error)
