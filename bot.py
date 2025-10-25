@@ -45,7 +45,6 @@ from ai_chat.chatgpt_panel import show_ai_panel, chat, start_ai_chat, stop_ai_ch
 from weather_module.weather_panel import show_weather
 from modules.azan_module import get_azan_time, get_ramadan_status
 
-from weather_module.userbot_runner import start_userbot
 # 🧠 نکته مهم:
 # ❌ از اینجا دیگه admin_panel رو import نکن!
 # ✅ اون رو بعد از ساخت app در بخش اصلی فایل (پایین) اضافه خواهیم کرد.
@@ -1870,7 +1869,11 @@ if __name__ == "__main__":
     # ==========================================================
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, reply), group=2)
     # ==========================================================
-async def on_startup(app):
+    # ==========================================================
+    # 🔹 وظایف استارتاپ
+    # ==========================================================
+
+    async def on_startup(app):
         await notify_admin_on_startup(app)
         app.create_task(auto_backup(app.bot))
         app.create_task(start_auto_brain_loop(app.bot))
