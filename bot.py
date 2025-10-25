@@ -50,7 +50,24 @@ from modules.azan_module import get_azan_time, get_ramadan_status
 # ✅ اون رو بعد از ساخت app در بخش اصلی فایل (پایین) اضافه خواهیم کرد.
 # 🎯 تنظیمات پایه
 TOKEN = os.getenv("BOT_TOKEN")
-ADMIN_ID = int(os.getenv("ADMIN_ID", "7089376754"))
+import json
+
+ADMIN_FILE = "sudo_list.json"
+
+def load_sudos():
+    if os.path.exists(ADMIN_FILE):
+        try:
+            with open(ADMIN_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except:
+            pass
+    return [7089376754]  # آیدی مدیر اصلی به‌صورت پیش‌فرض
+
+def save_sudos(data):
+    with open(ADMIN_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
+SUDO_IDS = load_sudos()
 init_files()
 
 status = {
@@ -1823,6 +1840,59 @@ if __name__ == "__main__":
     app.add_handler(CommandHandler("reset", reset_memory))
     app.add_handler(CommandHandler("reload", reload_memory))
     app.add_handler(CommandHandler("broadcast", broadcast))
+    # ======================= 👑 مدیریت سودوها =======================
+from telegram import Update
+from telegram.ext import ContextTypes
+
+async def add_sudo(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    if user.id not in SUDO_IDS:
+        return await update.message.reply_text("⛔ فقط مدیر اصلی یا سودوها می‌تونن سودو اضافه کنن!")
+
+    if not context.args:
+        return await update.message.reply_text("🔹 استفاده: /addsudo <ID>")
+
+    try:
+        new_id = int(context.args[0])
+        if new_id in SUDO_IDS:
+            return await update.message.reply_text("⚠️ این کاربر از قبل سودو هست!")
+
+        SUDO_IDS.append(new_id)
+        save_sudos(SUDO_IDS)
+        await update.message.reply_text(f"✅ کاربر با آیدی <code>{new_id}</code> به لیست سودوها اضافه شد.", parse_mode="HTML")
+    except:
+        await update.message.reply_text("⚠️ لطفاً آیدی عددی معتبر وارد کن!")
+
+
+async def del_sudo(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    if user.id not in SUDO_IDS:
+        return await update.message.reply_text("⛔ فقط مدیر اصلی یا سودوها می‌تونن حذف کنن!")
+
+    if not context.args:
+        return await update.message.reply_text("🔹 استفاده: /delsudo <ID>")
+
+    try:
+        rem_id = int(context.args[0])
+        if rem_id not in SUDO_IDS:
+            return await update.message.reply_text("⚠️ این کاربر سودو نیست!")
+
+        SUDO_IDS.remove(rem_id)
+        save_sudos(SUDO_IDS)
+        await update.message.reply_text(f"🗑️ کاربر <code>{rem_id}</code> از لیست سودوها حذف شد.", parse_mode="HTML")
+    except:
+        await update.message.reply_text("⚠️ آیدی معتبر وارد کن!")
+
+
+async def list_sudos(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id not in SUDO_IDS:
+        return await update.message.reply_text("⛔ فقط سودوها مجازند!")
+
+    text = "👑 <b>لیست سودوهای فعلی:</b>\n\n"
+    for i, sid in enumerate(SUDO_IDS, start=1):
+        text += f"{i}. <code>{sid}</code>\n"
+
+    await update.message.reply_text(text, parse_mode="HTML")
     app.add_handler(CommandHandler("cloudsync", cloudsync))
     app.add_handler(CommandHandler("leave", leave))
     app.add_handler(CommandHandler("reply", toggle_reply_mode))
@@ -1867,6 +1937,9 @@ if __name__ == "__main__":
     app.add_handler(MessageHandler(filters.Regex(r"^تنظیم قوانین"), set_rules_link), group=-1)
     app.add_handler(MessageHandler(filters.Regex(r"^تنظیم حذف"), set_welcome_timer), group=-1)
     app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome), group=-1)
+    app.add_handler(CommandHandler("addsudo", add_sudo))
+    app.add_handler(CommandHandler("delsudo", del_sudo))
+    app.add_handler(CommandHandler("listsudos", list_sudos))
     # ======================= 🕌 اذان =======================
     
     app.add_handler(MessageHandler(filters.Regex(r"^اذان"), get_azan_time))
