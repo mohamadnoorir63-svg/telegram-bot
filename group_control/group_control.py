@@ -463,3 +463,122 @@ async def handle_addfilter(update, context):
     filters_data[chat_id] = chat_filters
     save_filters(filters_data)
     await update.message.reply_text(f"✅ کلمه <b>{word}</b> به لیست فیلتر اضافه شد.", parse_mode="HTML")
+    # ❌ حذف فیلتر
+async def handle_delfilter(update, context):
+    if not await can_manage(update, context):
+        return await update.message.reply_text("🚫 فقط مدیران یا سودوها مجازند!")
+
+    if len(context.args) < 1:
+        return await update.message.reply_text("📝 استفاده: delfilter [کلمه]\nمثلاً: delfilter تبلیغ")
+
+    word = " ".join(context.args).strip().lower()
+    chat_id = str(update.effective_chat.id)
+    chat_filters = filters_data.get(chat_id, [])
+
+    if word not in chat_filters:
+        return await update.message.reply_text("⚠️ این کلمه در فیلتر وجود ندارد!")
+
+    chat_filters.remove(word)
+    filters_data[chat_id] = chat_filters
+    save_filters(filters_data)
+    await update.message.reply_text(f"🗑️ کلمه <b>{word}</b> از فیلتر حذف شد.", parse_mode="HTML")
+
+
+# 📋 لیست فیلترها
+async def handle_filters(update, context):
+    chat_id = str(update.effective_chat.id)
+    chat_filters = filters_data.get(chat_id, [])
+    if not chat_filters:
+        return await update.message.reply_text("ℹ️ هنوز هیچ کلمه‌ای فیلتر نشده است.")
+    text = "🚫 <b>لیست کلمات فیلتر شده:</b>\n\n" + "\n".join([f"{i+1}. {w}" for i, w in enumerate(chat_filters)])
+    await update.message.reply_text(text, parse_mode="HTML")
+
+
+# 📣 تگ همه کاربران
+async def handle_tagall(update, context):
+    if not await can_manage(update, context):
+        return await update.message.reply_text("🚫 فقط مدیران یا سودوها مجازند!")
+
+    chat = update.effective_chat
+    args_text = " ".join(context.args) if context.args else ""
+    await update.message.reply_text("📣 درحال منشن همه کاربران...\n⏳ لطفاً صبر کنید.", parse_mode="HTML")
+
+    members = []
+    try:
+        async for member in context.bot.get_chat_administrators(chat.id):
+            if not member.user.is_bot:
+                members.append(member.user)
+    except Exception as e:
+        return await update.message.reply_text(f"⚠️ خطا:\n<code>{e}</code>", parse_mode="HTML")
+
+    text_group = ""
+    counter = 0
+    for user in members:
+        text_group += f"[{user.first_name}](tg://user?id={user.id}) "
+        counter += 1
+        if counter % TAG_LIMIT == 0:
+            try:
+                await context.bot.send_message(chat.id, f"{text_group}\n\n{args_text}", parse_mode="Markdown")
+            except:
+                pass
+            text_group = ""
+    if text_group:
+        await context.bot.send_message(chat.id, f"{text_group}\n\n{args_text}", parse_mode="Markdown")
+
+    await update.message.reply_text("✅ تگ همه کاربران انجام شد.", parse_mode="HTML")
+
+
+# 👥 تگ کاربران فعال (پریمیوم یا فعال)
+async def handle_tagactive(update, context):
+    if not await can_manage(update, context):
+        return await update.message.reply_text("🚫 فقط مدیران یا سودوها مجازند!")
+
+    chat = update.effective_chat
+    args_text = " ".join(context.args) if context.args else ""
+    await update.message.reply_text("👥 درحال منشن کاربران فعال...", parse_mode="HTML")
+
+    members = []
+    try:
+        async for member in context.bot.get_chat_administrators(chat.id):
+            if not member.user.is_bot and member.user.is_premium:
+                members.append(member.user)
+    except Exception as e:
+        return await update.message.reply_text(f"⚠️ خطا:\n<code>{e}</code>", parse_mode="HTML")
+
+    if not members:
+        return await update.message.reply_text("ℹ️ کاربر فعالی یافت نشد.")
+
+    text_group = ""
+    counter = 0
+    for user in members:
+        text_group += f"[{user.first_name}](tg://user?id={user.id}) "
+        counter += 1
+        if counter % TAG_LIMIT == 0:
+            try:
+                await context.bot.send_message(chat.id, f"{text_group}\n\n{args_text}", parse_mode="Markdown")
+            except:
+                pass
+            text_group = ""
+    if text_group:
+        await context.bot.send_message(chat.id, f"{text_group}\n\n{args_text}", parse_mode="Markdown")
+
+    await update.message.reply_text("✅ تگ کاربران فعال انجام شد.", parse_mode="HTML")
+
+
+# 🧠 هندلر کلی (alias پیشرفته فیلترها و تگ‌ها)
+async def group_text_handler_adv(update, context):
+    text = update.message.text.strip().lower()
+    for cmd, aliases in ALIASES_ADV.items():
+        for alias in aliases:
+            if text.startswith(alias):
+                args = text.replace(alias, "").strip().split()
+                context.args = args
+                handlers = {
+                    "addfilter": handle_addfilter,
+                    "delfilter": handle_delfilter,
+                    "filters": handle_filters,
+                    "tagall": handle_tagall,
+                    "tagactive": handle_tagactive
+                }
+                if cmd in handlers:
+                    return await handlers[cmd](update, context)
