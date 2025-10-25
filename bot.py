@@ -1850,73 +1850,17 @@ async def show_custom_guide(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(text)
 
     
-
 # ======================= 🚀 اجرای نهایی =======================
 
 if __name__ == "__main__":
     print("🤖 خنگول فارسی 8.7 Cloud+ Supreme Pro Stable+ آماده به خدمت است ...")
+
     # 🧩 ساخت اپلیکیشن اصلی تلگرام
     application = ApplicationBuilder().token(TOKEN).build()
 
     # ⚙️ مدیریت خطاهای کلی
     application.add_error_handler(handle_error)
 
-    # هندلر اصلی دستورات گروه (بدون /)
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, group_command_handler))
-
-    # چک کردن پیام‌های خلاف قفل‌ها
-    application.add_handler(MessageHandler(filters.ALL, check_message_locks))
-
-    # فیلتر کلمات و تگ همه
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, group_text_handler_adv))
-
-    
-
-    # ==========================================================
-    app.add_handler(CommandHandler("addsudo", add_sudo))
-    app.add_handler(CommandHandler("delsudo", del_sudo))
-    app.add_handler(CommandHandler("listsudos", list_sudos))
-    # 💾 دستورات شخصی (ذخیره، حذف، اجرای دستورها)
-    # ==========================================================
-    app.add_handler(CommandHandler("save", save_command))
-    app.add_handler(CommandHandler("del", delete_command))
-    app.add_handler(CommandHandler("listcmds", list_commands))
-
-    # ✉️ پیام‌های متنی غیر از کامند → هندلر دستورات ذخیره‌شده
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_custom_command), group=-4)
-
-    # ==========================================================
-    # 👑 مدیریت وضعیت ادمین (ورود و خروج)
-    # ==========================================================
-    app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, detect_admin_movement))
-    app.add_handler(MessageHandler(filters.StatusUpdate.LEFT_CHAT_MEMBER, detect_admin_movement))
-    # 🧹 پاکسازی خودکار دستورات گروه هنگام حذف ربات
-    app.add_handler(MessageHandler(filters.StatusUpdate.LEFT_CHAT_MEMBER, handle_left_chat))
-
-    # ==========================================================
-    # 🤖 پاسخ به "ربات" توسط سودو
-    # ==========================================================
-    app.add_handler(MessageHandler(filters.Regex("(?i)^ربات$"), sudo_bot_call))
-
-    # ==========================================================
-    # 🔹 دستورات اصلی سیستم
-    # ==========================================================
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("help", help_command))
-    app.add_handler(CommandHandler("toggle", toggle))
-    app.add_handler(CommandHandler("welcome", toggle_welcome))
-    app.add_handler(CommandHandler("lock", lock_learning))
-    app.add_handler(CommandHandler("unlock", unlock_learning))
-    app.add_handler(CommandHandler("mode", mode_change))
-    app.add_handler(CommandHandler("stats", stats))
-    app.add_handler(CommandHandler("fullstats", fullstats))
-    app.add_handler(CommandHandler("backup", backup))
-    app.add_handler(CommandHandler("selectivebackup", selective_backup_menu))
-    app.add_handler(CallbackQueryHandler(selective_backup_buttons, pattern="^selbk_"))
-    app.add_handler(CommandHandler("restore", restore))
-    app.add_handler(CommandHandler("reset", reset_memory))
-    app.add_handler(CommandHandler("reload", reload_memory))
-    app.add_handler(CommandHandler("broadcast", broadcast))
     # ======================= 👑 مدیریت سودوها =======================
     async def list_sudos(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if update.effective_user.id not in SUDO_IDS:
@@ -1925,105 +1869,145 @@ if __name__ == "__main__":
         text = "👑 <b>لیست سودوهای فعلی:</b>\n\n"
         for i, sid in enumerate(SUDO_IDS, start=1):
             text += f"{i}. <code>{sid}</code>\n"
-
         await update.message.reply_text(text, parse_mode="HTML")
 
-    # ✅ اضافه‌شدن به هندلرها باید بیرون از تابع باشه
-    app.add_handler(CommandHandler("cloudsync", cloudsync))
-    app.add_handler(CommandHandler("leave", leave))
-    app.add_handler(CommandHandler("reply", toggle_reply_mode))
-    
     # ==========================================================
-    # 🎨 فونت‌ساز خنگول (با حالت گفت‌وگویی و ضد اسپم گروه)
+    # 👑 هندلرهای مدیریتی
+    # ==========================================================
+    application.add_handler(CommandHandler("addsudo", add_sudo))
+    application.add_handler(CommandHandler("delsudo", del_sudo))
+    application.add_handler(CommandHandler("listsudos", list_sudos))
+
+    # 💾 دستورات شخصی (ذخیره، حذف، اجرای دستورها)
+    application.add_handler(CommandHandler("save", save_command))
+    application.add_handler(CommandHandler("del", delete_command))
+    application.add_handler(CommandHandler("listcmds", list_commands))
+
+    # ✉️ پیام‌های متنی غیر از کامند → هندلر دستورات ذخیره‌شده
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_custom_command), group=-4)
+
+    # 👑 مدیریت وضعیت ادمین (ورود و خروج)
+    application.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, detect_admin_movement))
+    application.add_handler(MessageHandler(filters.StatusUpdate.LEFT_CHAT_MEMBER, detect_admin_movement))
+    application.add_handler(MessageHandler(filters.StatusUpdate.LEFT_CHAT_MEMBER, handle_left_chat))
+
+    # 🤖 پاسخ به "ربات" توسط سودو
+    application.add_handler(MessageHandler(filters.Regex("(?i)^ربات$"), sudo_bot_call))
+
+    # ==========================================================
+    # 🔹 دستورات اصلی سیستم
+    # ==========================================================
+    application.add_handler(CommandHandler("start", start))
+    application.add_handler(CommandHandler("help", help_command))
+    application.add_handler(CommandHandler("toggle", toggle))
+    application.add_handler(CommandHandler("welcome", toggle_welcome))
+    application.add_handler(CommandHandler("lock", lock_learning))
+    application.add_handler(CommandHandler("unlock", unlock_learning))
+    application.add_handler(CommandHandler("mode", mode_change))
+    application.add_handler(CommandHandler("stats", stats))
+    application.add_handler(CommandHandler("fullstats", fullstats))
+    application.add_handler(CommandHandler("backup", backup))
+    application.add_handler(CommandHandler("selectivebackup", selective_backup_menu))
+    application.add_handler(CallbackQueryHandler(selective_backup_buttons, pattern="^selbk_"))
+    application.add_handler(CommandHandler("restore", restore))
+    application.add_handler(CommandHandler("reset", reset_memory))
+    application.add_handler(CommandHandler("reload", reload_memory))
+    application.add_handler(CommandHandler("broadcast", broadcast))
+    application.add_handler(CommandHandler("cloudsync", cloudsync))
+    application.add_handler(CommandHandler("leave", leave))
+    application.add_handler(CommandHandler("reply", toggle_reply_mode))
+
+    # ==========================================================
+    # 🎨 فونت‌ساز خنگول
     # ==========================================================
     from telegram.ext import ConversationHandler
     from font_maker import font_maker, receive_font_name, next_font, prev_font, ASK_NAME
 
-    # 💎 گفت‌وگوی فونت‌ساز
     font_handler = ConversationHandler(
         entry_points=[MessageHandler(filters.TEXT & filters.Regex(r"^فونت"), font_maker)],
-        states={
-            ASK_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, receive_font_name)],
-        },
+        states={ASK_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, receive_font_name)]},
         fallbacks=[],
     )
-    app.add_handler(font_handler)
+    application.add_handler(font_handler)
+    application.add_handler(CallbackQueryHandler(next_font, pattern="^next_font"))
+    application.add_handler(CallbackQueryHandler(prev_font, pattern="^prev_font"))
+    application.add_handler(CallbackQueryHandler(feature_back, pattern="^feature_back$"))
 
-    # 🔁 کنترل صفحات فونت
-    app.add_handler(CallbackQueryHandler(next_font, pattern="^next_font"))
-    app.add_handler(CallbackQueryHandler(prev_font, pattern="^prev_font"))
-    app.add_handler(CallbackQueryHandler(feature_back, pattern="^feature_back$"))
-
-    # ======================= 🤖 پنل ChatGPT هوش مصنوعی =======================
+    # ==========================================================
+    # 🤖 پنل ChatGPT هوش مصنوعی
+    # ==========================================================
     from ai_chat.chatgpt_panel import show_ai_panel, chat, start_ai_chat, stop_ai_chat
-
-    # ⚡️ ترتیب مهم است: ChatGPT باید قبل از panel_handler بیاید
-    app.add_handler(CallbackQueryHandler(show_ai_panel, pattern="^panel_chatgpt$"))
-    app.add_handler(CallbackQueryHandler(start_ai_chat, pattern="^start_ai_chat$"))
-    app.add_handler(MessageHandler(filters.Regex("^(خاموش|/خاموش)$"), stop_ai_chat))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, chat), group=3)
+    application.add_handler(CallbackQueryHandler(show_ai_panel, pattern="^panel_chatgpt$"))
+    application.add_handler(CallbackQueryHandler(start_ai_chat, pattern="^start_ai_chat$"))
+    application.add_handler(MessageHandler(filters.Regex("^(خاموش|/خاموش)$"), stop_ai_chat))
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, chat), group=3)
 
     # ==========================================================
     # 🎉 خوشامد پویا و تنظیمات گروه
     # ==========================================================
-    app.add_handler(MessageHandler(filters.Regex("^خوشامد$"), open_welcome_panel), group=-1)
-    app.add_handler(CallbackQueryHandler(welcome_panel_buttons, pattern="^welcome_"), group=-1)
-    app.add_handler(MessageHandler(filters.Regex("^ثبت خوشامد$"), set_welcome_text), group=-1)
-    app.add_handler(MessageHandler(filters.Regex("^ثبت عکس خوشامد$"), set_welcome_media), group=-1)
-    app.add_handler(MessageHandler(filters.Regex(r"^تنظیم قوانین"), set_rules_link), group=-1)
-    app.add_handler(MessageHandler(filters.Regex(r"^تنظیم حذف"), set_welcome_timer), group=-1)
-    app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome), group=-1)
-    
-    # ======================= 🕌 اذان =======================
-    
-    app.add_handler(MessageHandler(filters.Regex(r"^اذان"), get_azan_time))
-    app.add_handler(MessageHandler(filters.Regex(r"^رمضان"), get_ramadan_status))
-    
+    application.add_handler(MessageHandler(filters.Regex("^خوشامد$"), open_welcome_panel), group=-1)
+    application.add_handler(CallbackQueryHandler(welcome_panel_buttons, pattern="^welcome_"), group=-1)
+    application.add_handler(MessageHandler(filters.Regex("^ثبت خوشامد$"), set_welcome_text), group=-1)
+    application.add_handler(MessageHandler(filters.Regex("^ثبت عکس خوشامد$"), set_welcome_media), group=-1)
+    application.add_handler(MessageHandler(filters.Regex(r"^تنظیم قوانین"), set_rules_link), group=-1)
+    application.add_handler(MessageHandler(filters.Regex(r"^تنظیم حذف"), set_welcome_timer), group=-1)
+    application.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome), group=-1)
+
     # ==========================================================
-    # 🌦 آب‌وهوا — باید قبل از reply و سایر MessageHandlerها باشه
+    # 🕌 اذان و رمضان
     # ==========================================================
-    app.add_handler(CallbackQueryHandler(show_weather, pattern="^panel_weather$"), group=-3)
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, show_weather), group=-3)
+    application.add_handler(MessageHandler(filters.Regex(r"^اذان"), get_azan_time))
+    application.add_handler(MessageHandler(filters.Regex(r"^رمضان"), get_ramadan_status))
+
+    # ==========================================================
+    # 🌦 آب‌وهوا
+    # ==========================================================
+    application.add_handler(CallbackQueryHandler(show_weather, pattern="^panel_weather$"), group=-3)
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, show_weather), group=-3)
 
     # ==========================================================
     # 🧾 راهنمای قابل ویرایش
     # ==========================================================
-    app.add_handler(CommandHandler("help", help_command))
-    app.add_handler(MessageHandler(filters.Regex("^ثبت help$"), save_help))
-    app.add_handler(MessageHandler(filters.Regex("^راهنما$"), show_custom_guide))
-    app.add_handler(MessageHandler(filters.Regex("^ثبت راهنما$"), save_custom_guide))
-    
+    application.add_handler(CommandHandler("help", help_command))
+    application.add_handler(MessageHandler(filters.Regex("^ثبت help$"), save_help))
+    application.add_handler(MessageHandler(filters.Regex("^راهنما$"), show_custom_guide))
+    application.add_handler(MessageHandler(filters.Regex("^ثبت راهنما$"), save_custom_guide))
+
     # ==========================================================
     # 📂 فایل‌ها و پنل‌ها
     # ==========================================================
-    app.add_handler(MessageHandler(filters.Document.ALL, handle_document), group=1)
+    application.add_handler(MessageHandler(filters.Document.ALL, handle_document), group=1)
+    application.add_handler(CallbackQueryHandler(panel_handler))
 
-    # ⚠️ این باید آخرین CallbackQueryHandler باشد
-    app.add_handler(CallbackQueryHandler(panel_handler))
-    
     # ==========================================================
-    # 🎭 پاسخ هوشمند خنگول (در انتهای اولویت)
+    # 🎭 پاسخ هوشمند خنگول
     # ==========================================================
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, reply), group=2)
-    # ==========================================================
-    # ==========================================================
-    # 🔹 وظایف استارتاپ
-    # ==========================================================
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, reply), group=2)
 
+    # ==========================================================
+    # ⚙️ سیستم مدیریت گروه
+    # ==========================================================
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, group_command_handler))
+    application.add_handler(MessageHandler(filters.ALL, check_message_locks))
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, group_text_handler_adv))
+
+    # ==========================================================
+    # 🧠 وظایف استارتاپ
+    # ==========================================================
     async def on_startup(app):
         await notify_admin_on_startup(app)
         app.create_task(auto_backup(app.bot))
         app.create_task(start_auto_brain_loop(app.bot))
         print("🌙 [SYSTEM] Startup tasks scheduled ✅")
 
-    app.post_init = on_startup
+    application.post_init = on_startup
 
     # ==========================================================
     # 🚀 اجرای نهایی ربات (بدون خطای Event loop)
     # ==========================================================
     try:
         print("🔄 در حال اجرای ربات...")
-        app.run_polling(allowed_updates=Update.ALL_TYPES)
+        application.run_polling(allowed_updates=Update.ALL_TYPES)
     except Exception as e:
         print(f"⚠️ خطا در اجرای ربات:\n{e}")
         print("♻️ ربات به‌صورت خودکار توسط هاست ری‌استارت خواهد شد ✅")
