@@ -1858,6 +1858,9 @@ if __name__ == "__main__":
 
     # 🧩 ساخت اپلیکیشن اصلی تلگرام
     app = ApplicationBuilder().token(TOKEN).build()
+    # ⚙️ مدیریت خطاهای کلی
+    app.add_error_handler(handle_error)
+    
     # هندلر اصلی دستورات گروه (بدون /)
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, group_command_handler))
 
@@ -1867,8 +1870,7 @@ if __name__ == "__main__":
     # فیلتر کلمات و تگ همه
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, group_text_handler_adv))
 
-    # ⚙️ مدیریت خطاهای کلی
-    app.add_error_handler(handle_error)
+    
 
     # ==========================================================
     app.add_handler(CommandHandler("addsudo", add_sudo))
