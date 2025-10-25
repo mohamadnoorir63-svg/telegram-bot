@@ -2563,14 +2563,13 @@ async def group_text_handler_adv(update, context):
                     "tagall": handle_tagall,
                     "tagactive": handle_tagactive
                 }
-                if cmd in handlers:
-                         # ======================= 🚀 اجرای نهایی =======================
+                if cmd in handlers:  
+# ======================= 🚀 اجرای نهایی =======================
     from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, CallbackQueryHandler, filters
 
 if __name__ == "__main__":
+    print("✅ تست موفق! ربات به درستی اجرا شد ✅")
     
-    print("🤖 خنگول فارسی 8.7 Cloud+ Supreme Pro Stable+ آماده به خدمت است ...")
-
     app = ApplicationBuilder().token(TOKEN).build()
     app.add_error_handler(handle_error)
 
