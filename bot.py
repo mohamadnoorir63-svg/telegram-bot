@@ -2564,10 +2564,11 @@ async def group_text_handler_adv(update, context):
                     "tagactive": handle_tagactive
                 }
                 if cmd in handlers:  
-# ======================= 🚀 اجرای نهایی =======================
+                    
+    # ======================= 🚀 اجرای نهایی =======================
     from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, CallbackQueryHandler, filters
 
-if __name__ == "__main__":
+    if __name__ == "__main__":
     print("✅ تست موفق! ربات به درستی اجرا شد ✅")
     
     app = ApplicationBuilder().token(TOKEN).build()
