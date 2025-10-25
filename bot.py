@@ -1890,15 +1890,28 @@ async def send_song_request_from_bot(query, chat_id):
 # ================== 🚀 اجرای همزمان Bot Token و Userbot ==================
 import threading
 import asyncio
-from weather_module.userbot_runner import start_userbot  # ✅ یوزربوت اصلی بدون تداخل
+from weather_module.userbot_runner import start_userbot  # یوزربوت اصلی
+from pyrogram import Client  # اگه توی start_userbot از Client استفاده می‌کنی
+# فرض می‌کنیم app هم در جای دیگه تعریف شده (ربات اصلی)
+
+def safe_userbot():
+    """اجرای userbot با event loop مجزا برای جلوگیری از تداخل"""
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        loop.run_until_complete(start_userbot())  # اجرای async تابع userbot
+    except Exception as e:
+        print(f"⚠️ خطا در اجرای userbot: {e}")
+    finally:
+        loop.close()
 
 def run_both():
     """اجرای همزمان Bot Token و Userbot"""
     print("🚀 در حال راه‌اندازی خنگول + یوزربات ...")
 
     try:
-        # 🎧 اجرای Userbot در ترد جداگانه
-        threading.Thread(target=start_userbot, daemon=True).start()
+        # 🎧 اجرای Userbot در ترد جداگانه با loop مجزا
+        threading.Thread(target=safe_userbot, daemon=True).start()
         print("🌀 Userbot thread started...")
 
         # 🤖 اجرای Bot Token
