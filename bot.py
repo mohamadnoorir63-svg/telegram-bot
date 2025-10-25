@@ -1843,15 +1843,20 @@ async def show_custom_guide(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return await update.message.reply_text("ℹ️ هنوز متنی برای راهنما ثبت نشده.")
     await update.message.reply_text(text)
 # ======================= ⚙️ سیستم مدیریت گروه =======================
-# ======================= ⚙️ سیستم مدیریت گروه =======================
+# ======================= ⚙️ سیستم مدیریت گروه (نسخه نهایی) =======================
 import json, os
+from datetime import datetime
 from telegram import Update, ChatPermissions
 from telegram.ext import ContextTypes
 
+# 🔧 فایل‌های ذخیره
 GROUP_CTRL_FILE = "group_control.json"
 ALIASES_FILE = "aliases.json"
 
-# ✅ alias پیش‌فرض (قابل تغییر)
+# 👑 سودوها (آی‌دی خودت و افراد مجاز)
+SUDO_IDS = [123456789, 987654321]  # 👈 آی‌دی‌هات رو اینجا بذار
+
+# ✅ alias پیش‌فرض (قابل تغییر توسط سودوها)
 ALIASES = {
     "ban": ["ban", "بن", "اخراج"],
     "unban": ["unban", "آزاد", "رفع‌بن"],
@@ -1867,7 +1872,7 @@ ALIASES = {
     "alias": ["alias", "تغییر"]
 }
 
-# 📂 بارگذاری / ذخیره‌سازی فایل‌ها
+# 📂 بارگذاری و ذخیره فایل‌ها
 def load_json_file(path, default):
     if os.path.exists(path):
         try:
@@ -1896,7 +1901,7 @@ async def is_authorized(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except:
         return False
 
-# 🧱 بررسی اینکه هدف قابل اقدام است یا نه
+# 🧱 بررسی هدف (تا روی مدیر / سودو / ربات اجرا نشه)
 async def can_act_on_target(update, context, target):
     bot = await context.bot.get_me()
     chat = update.effective_chat
@@ -1923,6 +1928,7 @@ async def can_act_on_target(update, context, target):
         pass
     return True
 
+
 # 🚫 بن و رفع‌بن
 async def handle_ban(update, context):
     if not await is_authorized(update, context):
@@ -1942,12 +1948,14 @@ async def handle_ban(update, context):
     except Exception as e:
         await update.message.reply_text(f"⚠️ خطا:\n<code>{e}</code>", parse_mode="HTML")
 
+
 async def handle_unban(update, context):
     if not await is_authorized(update, context):
         return await update.message.reply_text("⛔ فقط مدیران یا سودوها مجازند!")
-    chat = update.effective_chat
 
+    chat = update.effective_chat
     user_id = None
+
     if update.message.reply_to_message:
         user_id = update.message.reply_to_message.from_user.id
     elif context.args:
@@ -1961,7 +1969,8 @@ async def handle_unban(update, context):
     except Exception as e:
         await update.message.reply_text(f"⚠️ خطا در رفع بن:\n<code>{e}</code>", parse_mode="HTML")
 
-# ⚠️ اخطار
+
+# ⚠️ اخطار (۳ اخطار = بن)
 async def handle_warn(update, context):
     if not await is_authorized(update, context):
         return await update.message.reply_text("⛔ فقط مدیران یا سودوها مجازند!")
@@ -1985,127 +1994,136 @@ async def handle_warn(update, context):
     if count >= 3:
         try:
             await context.bot.ban_chat_member(chat_id, target.id)
-            await update.message.reply_text(
-                f"🚫 <b>{target.first_name}</b> سه اخطار گرفت و بن شد!",
-                parse_mode="HTML"
-            )
+            await update.message.reply_text(f"🚫 <b>{target.first_name}</b> سه اخطار گرفت و بن شد!", parse_mode="HTML")
             warns[str(target.id)] = 0
         except:
             pass
     else:
-        await update.message.reply_text(
-            f"⚠️ <b>{target.first_name}</b> اخطار شماره <b>{count}</b> گرفت.",
-            parse_mode="HTML"
-        )
+        await update.message.reply_text(f"⚠️ <b>{target.first_name}</b> اخطار شماره <b>{count}</b> گرفت.", parse_mode="HTML")
 
-# 🤐 سکوت / رفع سکوت
+
+# 🤐 سکوت / رفع سکوت (بهبود یافته)
 async def handle_mute(update, context):
     if not await is_authorized(update, context):
         return await update.message.reply_text("⛔ فقط مدیران یا سودوها مجازند!")
+
     if not update.message.reply_to_message:
         return await update.message.reply_text("🔹 باید روی پیام کاربر ریپلای بزنی.")
+
     target = update.message.reply_to_message.from_user
     chat = update.effective_chat
+    user = update.effective_user
 
     if not await can_act_on_target(update, context, target):
         return
 
     try:
         await context.bot.restrict_chat_member(chat.id, target.id, permissions=ChatPermissions(can_send_messages=False))
-        await update.message.reply_text(f"🤐 <b>{target.first_name}</b> ساکت شد.", parse_mode="HTML")
-    except Exception as e:
-        await update.message.reply_text(f"⚠️ خطا:\n<code>{e}</code>", parse_mode="HTML")
+        time_str = datetime.now().strftime("%H:%M - %d/%m/%Y")
+        await update.message.reply_text(
+            f"🤐 <b>{target.first_name}</b> ساکت شد و دیگر نمی‌تواند پیام بفرستد.\n\n"
+            f"👤 <b>توسط:</b> {user.first_name}\n"
+            f"🕒 <b>زمان:</b> {time_str}",
+            parse_mode="HTML"
+        )
+    except:
+        await update.message.reply_text("⚠️ نمی‌توان این کاربر را ساکت کرد (احتمالاً مدیر یا مالک است).", parse_mode="HTML")
+
 
 async def handle_unmute(update, context):
     if not await is_authorized(update, context):
         return await update.message.reply_text("⛔ فقط مدیران یا سودوها مجازند!")
+
     if not update.message.reply_to_message:
         return await update.message.reply_text("🔹 باید روی پیام کاربر ریپلای بزنی.")
+
     target = update.message.reply_to_message.from_user
     chat = update.effective_chat
+    user = update.effective_user
+
     try:
         await context.bot.restrict_chat_member(chat.id, target.id, permissions=ChatPermissions(can_send_messages=True))
-        await update.message.reply_text(f"🔊 <b>{target.first_name}</b> از حالت سکوت خارج شد.", parse_mode="HTML")
-    except Exception as e:
-        await update.message.reply_text(f"⚠️ خطا در رفع سکوت:\n<code>{e}</code>", parse_mode="HTML")
+        time_str = datetime.now().strftime("%H:%M - %d/%m/%Y")
+        await update.message.reply_text(
+            f"🔊 <b>{target.first_name}</b> از حالت سکوت خارج شد و اکنون می‌تواند صحبت کند.\n\n"
+            f"👤 <b>توسط:</b> {user.first_name}\n"
+            f"🕒 <b>زمان:</b> {time_str}",
+            parse_mode="HTML"
+        )
+    except:
+        await update.message.reply_text("⚠️ نمی‌توان سکوت این کاربر را برداشت (احتمالاً مدیر یا صاحب گروه است).", parse_mode="HTML")
 
-# 👑 افزودن / حذف مدیر + لیست مدیران
-async def handle_addadmin(update, context):
-    if not await is_authorized(update, context):
-        return await update.message.reply_text("⛔ فقط مدیر اصلی یا سودوها می‌تونن مدیر اضافه کنن!")
-    if not update.message.reply_to_message:
-        return await update.message.reply_text("🔹 باید روی پیام کاربر ریپلای بزنی.")
 
-    chat_id = str(update.effective_chat.id)
-    user = update.message.reply_to_message.from_user
-    group = group_data.get(chat_id, {"warns": {}, "admins": []})
-    admins = group.get("admins", [])
-
-    if user.id in admins:
-        return await update.message.reply_text("⚠️ این کاربر از قبل مدیر است!")
-
-    admins.append(user.id)
-    group["admins"] = admins
-    group_data[chat_id] = group
-    save_json_file(GROUP_CTRL_FILE, group_data)
-    await update.message.reply_text(f"👑 <b>{user.first_name}</b> مدیر گروه شد.", parse_mode="HTML")
-
-async def handle_removeadmin(update, context):
-    if not await is_authorized(update, context):
-        return await update.message.reply_text("⛔ فقط مدیر اصلی یا سودوها می‌تونن مدیر حذف کنن!")
-    if not update.message.reply_to_message:
-        return await update.message.reply_text("🔹 باید روی پیام مدیر ریپلای بزنی.")
-
-    chat_id = str(update.effective_chat.id)
-    user = update.message.reply_to_message.from_user
-    group = group_data.get(chat_id, {"admins": []})
-    admins = group.get("admins", [])
-
-    if user.id not in admins:
-        return await update.message.reply_text("ℹ️ این کاربر مدیر ثبت‌شده نیست.")
-
-    admins.remove(user.id)
-    group["admins"] = admins
-    group_data[chat_id] = group
-    save_json_file(GROUP_CTRL_FILE, group_data)
-    await update.message.reply_text(f"❌ <b>{user.first_name}</b> از لیست مدیران حذف شد.", parse_mode="HTML")
-
-async def handle_admins(update, context):
-    chat_id = str(update.effective_chat.id)
-    group = group_data.get(chat_id, {"admins": []})
-    admins = group.get("admins", [])
-
-    if not admins:
-        return await update.message.reply_text("ℹ️ هنوز هیچ مدیری برای این گروه ثبت نشده.")
-
-    text = "👑 <b>لیست مدیران گروه:</b>\n\n"
-    for i, uid in enumerate(admins, start=1):
-        try:
-            user = await context.bot.get_chat_member(chat_id, uid)
-            text += f"{i}. {user.user.first_name} (<code>{uid}</code>)\n"
-        except:
-            text += f"{i}. <code>{uid}</code>\n"
-    await update.message.reply_text(text, parse_mode="HTML")
-
-# 🔐 قفل / باز کردن گروه
+# 🔐 قفل / باز کردن گروه (با وضعیت، زمان و اجراکننده)
 async def handle_lock(update, context):
     if not await is_authorized(update, context):
         return await update.message.reply_text("⛔ فقط مدیران یا سودوها مجازند قفل کنند!")
+
     chat = update.effective_chat
-    await context.bot.set_chat_permissions(chat.id, ChatPermissions(can_send_messages=False))
-    await update.message.reply_text("🔒 <b>گروه قفل شد!</b>\n📵 فقط مدیران و سودوها می‌توانند پیام بفرستند.", parse_mode="HTML")
+    chat_id = str(chat.id)
+    user = update.effective_user
+
+    group = group_data.get(chat_id, {"locked": False})
+    locked = group.get("locked", False)
+
+    if locked:
+        return await update.message.reply_text("🔒 گروه از قبل قفل بوده است!", parse_mode="HTML")
+
+    try:
+        await context.bot.set_chat_permissions(chat.id, ChatPermissions(can_send_messages=False))
+        group["locked"] = True
+        group_data[chat_id] = group
+        save_json_file(GROUP_CTRL_FILE, group_data)
+
+        time_str = datetime.now().strftime("%H:%M - %d/%m/%Y")
+        await update.message.reply_text(
+            f"🔒 <b>گروه با موفقیت قفل شد!</b>\n"
+            f"📵 فقط مدیران و سودوها می‌توانند پیام بفرستند.\n\n"
+            f"👤 <b>توسط:</b> {user.first_name}\n"
+            f"🕒 <b>زمان:</b> {time_str}",
+            parse_mode="HTML"
+        )
+    except Exception as e:
+        await update.message.reply_text(f"⚠️ خطا در قفل کردن:\n<code>{e}</code>", parse_mode="HTML")
+
 
 async def handle_unlock(update, context):
     if not await is_authorized(update, context):
         return await update.message.reply_text("⛔ فقط مدیران یا سودوها مجازند باز کنند!")
-    chat = update.effective_chat
-    await context.bot.set_chat_permissions(chat.id, ChatPermissions(can_send_messages=True))
-    await update.message.reply_text("🔓 <b>گروه باز شد!</b>\n💬 همه اعضا می‌توانند گفتگو کنند.", parse_mode="HTML")
 
-# ⚙️ تغییر alias از درون گروه (پشتیبانی از چندکلمه‌ای)
+    chat = update.effective_chat
+    chat_id = str(chat.id)
+    user = update.effective_user
+
+    group = group_data.get(chat_id, {"locked": False})
+    locked = group.get("locked", False)
+
+    if not locked:
+        return await update.message.reply_text("🔓 گروه از قبل باز بوده است!", parse_mode="HTML")
+
+    try:
+        await context.bot.set_chat_permissions(chat.id, ChatPermissions(can_send_messages=True))
+        group["locked"] = False
+        group_data[chat_id] = group
+        save_json_file(GROUP_CTRL_FILE, group_data)
+
+        time_str = datetime.now().strftime("%H:%M - %d/%m/%Y")
+        await update.message.reply_text(
+            f"🔓 <b>گروه باز شد!</b>\n"
+            f"💬 همه اعضا می‌توانند گفتگو کنند.\n\n"
+            f"👤 <b>توسط:</b> {user.first_name}\n"
+            f"🕒 <b>زمان:</b> {time_str}",
+            parse_mode="HTML"
+        )
+    except Exception as e:
+        await update.message.reply_text(f"⚠️ خطا در باز کردن:\n<code>{e}</code>", parse_mode="HTML")
+
+
+# ⚙️ alias فقط توسط سودوها
 async def handle_alias(update, context):
-    if not await is_authorized(update, context):
-        return await update.message.reply_text("⛔ فقط مدیران یا سودوها می‌تونن alias تغییر بدن!")
+    user = update.effective_user
+    if user.id not in SUDO_IDS:
+        return await update.message.reply_text("🚫 فقط سودوها می‌توانند alias را تغییر دهند!")
 
     text = update.message.text.split(" ", 2)
     if len(text) < 3:
@@ -2125,15 +2143,14 @@ async def handle_alias(update, context):
     save_json_file(ALIASES_FILE, ALIASES)
     await update.message.reply_text(f"✅ دستور <b>{base}</b> اکنون با <b>{new}</b> نیز قابل اجراست.", parse_mode="HTML")
 
-# 📡 هندلر نهایی همه دستورات (بدون / و با alias چندکلمه‌ای)
+
+# 📡 هندلر نهایی برای تمام alias‌ها (بدون /)
 async def group_command_handler(update, context):
     text = update.message.text.strip().lower()
 
-    # بررسی alias جدید
     if text.startswith("alias "):
         return await handle_alias(update, context)
 
-    # جستجو در aliasها (پشتیبانی از چندکلمه‌ای)
     for cmd, aliases in ALIASES.items():
         for alias in aliases:
             if text == alias:
@@ -2141,9 +2158,7 @@ async def group_command_handler(update, context):
                     "ban": handle_ban, "unban": handle_unban,
                     "warn": handle_warn, "unwarn": handle_warn,
                     "mute": handle_mute, "unmute": handle_unmute,
-                    "addadmin": handle_addadmin, "removeadmin": handle_removeadmin,
-                    "admins": handle_admins, "lock": handle_lock,
-                    "unlock": handle_unlock
+                    "lock": handle_lock, "unlock": handle_unlock
                 }
                 if cmd in handlers:
                     return await handlers[cmd](update, context)
