@@ -2566,18 +2566,23 @@ async def group_text_handler_adv(update, context):
                 if cmd in handlers:  
                     
    
+
+
+
+    
 # ======================= 🚀 اجرای نهایی =======================
+from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, CallbackQueryHandler, filters
 
 if __name__ == "__main__":
     print("🤖 خنگول فارسی 8.7 Cloud+ Supreme Pro Stable+ آماده به خدمت است ...")
 
-    # 🧩 ساخت اپلیکیشن اصلی تلگرام
     app = ApplicationBuilder().token(TOKEN).build()
-
-    # ⚙️ مدیریت خطاهای کلی
     app.add_error_handler(handle_error)
-    
 
+    # اینجا ادامه‌ی بقیه‌ی هندلرها و تنظیمات تو میاد
+    # مثل:
+    # app.add_handler(CommandHandler("start", start))
+    # app.run_polling()
     # ✅ هندلرهای سودو
     app.add_handler(CommandHandler("addsudo", add_sudo))
     app.add_handler(CommandHandler("delsudo", del_sudo))
