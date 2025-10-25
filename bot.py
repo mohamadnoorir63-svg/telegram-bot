@@ -1841,49 +1841,6 @@ if __name__ == "__main__":
     app.add_handler(CommandHandler("reload", reload_memory))
     app.add_handler(CommandHandler("broadcast", broadcast))
     # ======================= 👑 مدیریت سودوها =======================
-from telegram import Update
-from telegram.ext import ContextTypes
-
-async def add_sudo(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user = update.effective_user
-    if user.id not in SUDO_IDS:
-        return await update.message.reply_text("⛔ فقط مدیر اصلی یا سودوها می‌تونن سودو اضافه کنن!")
-
-    if not context.args:
-        return await update.message.reply_text("🔹 استفاده: /addsudo <ID>")
-
-    try:
-        new_id = int(context.args[0])
-        if new_id in SUDO_IDS:
-            return await update.message.reply_text("⚠️ این کاربر از قبل سودو هست!")
-
-        SUDO_IDS.append(new_id)
-        save_sudos(SUDO_IDS)
-        await update.message.reply_text(f"✅ کاربر با آیدی <code>{new_id}</code> به لیست سودوها اضافه شد.", parse_mode="HTML")
-    except:
-        await update.message.reply_text("⚠️ لطفاً آیدی عددی معتبر وارد کن!")
-
-
-async def del_sudo(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user = update.effective_user
-    if user.id not in SUDO_IDS:
-        return await update.message.reply_text("⛔ فقط مدیر اصلی یا سودوها می‌تونن حذف کنن!")
-
-    if not context.args:
-        return await update.message.reply_text("🔹 استفاده: /delsudo <ID>")
-
-    try:
-        rem_id = int(context.args[0])
-        if rem_id not in SUDO_IDS:
-            return await update.message.reply_text("⚠️ این کاربر سودو نیست!")
-
-        SUDO_IDS.remove(rem_id)
-        save_sudos(SUDO_IDS)
-        await update.message.reply_text(f"🗑️ کاربر <code>{rem_id}</code> از لیست سودوها حذف شد.", parse_mode="HTML")
-    except:
-        await update.message.reply_text("⚠️ آیدی معتبر وارد کن!")
-
-
 async def list_sudos(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id not in SUDO_IDS:
         return await update.message.reply_text("⛔ فقط سودوها مجازند!")
@@ -1893,10 +1850,12 @@ async def list_sudos(update: Update, context: ContextTypes.DEFAULT_TYPE):
         text += f"{i}. <code>{sid}</code>\n"
 
     await update.message.reply_text(text, parse_mode="HTML")
-    app.add_handler(CommandHandler("cloudsync", cloudsync))
-    app.add_handler(CommandHandler("leave", leave))
-    app.add_handler(CommandHandler("reply", toggle_reply_mode))
 
+# ✅ اضافه‌شدن به هندلرها باید بیرون از تابع باشه
+app.add_handler(CommandHandler("cloudsync", cloudsync))
+app.add_handler(CommandHandler("leave", leave))
+app.add_handler(CommandHandler("reply", toggle_reply_mode))
+    
     # ==========================================================
     # 🎨 فونت‌ساز خنگول (با حالت گفت‌وگویی و ضد اسپم گروه)
     # ==========================================================
