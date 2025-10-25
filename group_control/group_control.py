@@ -28,6 +28,7 @@ ALIASES = {
     "alias": ["alias", "تغییر"]
 }
 
+
 # 📂 بارگذاری و ذخیره فایل‌ها
 def load_json_file(path, default):
     if os.path.exists(path):
@@ -38,12 +39,15 @@ def load_json_file(path, default):
             pass
     return default
 
+
 def save_json_file(path, data):
     with open(path, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
+
 group_data = load_json_file(GROUP_CTRL_FILE, {})
 ALIASES = load_json_file(ALIASES_FILE, ALIASES)
+
 
 # 🧠 بررسی مجاز بودن
 async def is_authorized(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -56,6 +60,7 @@ async def is_authorized(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return member.status in ["administrator", "creator"]
     except:
         return False
+
 
 # 🧱 بررسی هدف
 async def can_act_on_target(update, context, target):
@@ -84,6 +89,7 @@ async def can_act_on_target(update, context, target):
         pass
     return True
 
+
 # 🚫 بن و رفع‌بن
 async def handle_ban(update, context):
     if not await is_authorized(update, context):
@@ -104,6 +110,7 @@ async def handle_ban(update, context):
     except Exception as e:
         await update.message.reply_text(f"⚠️ خطا:\n<code>{e}</code>", parse_mode="HTML")
 
+
 async def handle_unban(update, context):
     if not await is_authorized(update, context):
         return await update.message.reply_text("⛔ فقط مدیران یا سودوها مجازند!")
@@ -123,7 +130,9 @@ async def handle_unban(update, context):
         await update.message.reply_text("✅ کاربر از بن خارج شد.")
     except Exception as e:
         await update.message.reply_text(f"⚠️ خطا در رفع بن:\n<code>{e}</code>", parse_mode="HTML")
-        # ⚠️ اخطار (۳ اخطار = بن)
+
+
+# ⚠️ اخطار (۳ اخطار = بن)
 async def handle_warn(update, context):
     if not await is_authorized(update, context):
         return await update.message.reply_text("⛔ فقط مدیران یا سودوها مجازند!")
@@ -155,6 +164,7 @@ async def handle_warn(update, context):
     else:
         await update.message.reply_text(f"⚠️ <b>{target.first_name}</b> اخطار شماره <b>{count}</b> گرفت.", parse_mode="HTML")
 
+
 # 🤐 سکوت / رفع سکوت
 async def handle_mute(update, context):
     if not await is_authorized(update, context):
@@ -182,6 +192,7 @@ async def handle_mute(update, context):
     except:
         await update.message.reply_text("⚠️ نمی‌توان این کاربر را ساکت کرد (احتمالاً مدیر یا مالک است).", parse_mode="HTML")
 
+
 async def handle_unmute(update, context):
     if not await is_authorized(update, context):
         return await update.message.reply_text("⛔ فقط مدیران یا سودوها مجازند!")
@@ -204,6 +215,7 @@ async def handle_unmute(update, context):
         )
     except:
         await update.message.reply_text("⚠️ نمی‌توان سکوت این کاربر را برداشت (احتمالاً مدیر یا صاحب گروه است).", parse_mode="HTML")
+
 
 # ======================= 🔒 سیستم قفل‌های پیشرفته گروه =======================
 
@@ -231,6 +243,7 @@ for lock in LOCK_TYPES:
 
 save_json_file(ALIASES_FILE, ALIASES)
 
+
 def set_lock_status(chat_id, lock_name, status):
     chat_id = str(chat_id)
     group = group_data.get(chat_id, {"locks": {}})
@@ -240,13 +253,13 @@ def set_lock_status(chat_id, lock_name, status):
     group_data[chat_id] = group
     save_json_file(GROUP_CTRL_FILE, group_data)
 
+
 def get_lock_status(chat_id, lock_name):
     chat_id = str(chat_id)
     group = group_data.get(chat_id, {"locks": {}})
     locks = group.get("locks", {})
     return locks.get(lock_name, False)
-
-# 🔐 قفل و باز کردن
+    # 🔐 قفل و باز کردن
 async def handle_lock_generic(update, context, lock_name):
     if not await is_authorized(update, context):
         return await update.message.reply_text("🚫 فقط مدیران یا سودوها می‌توانند قفل کنند!")
@@ -268,6 +281,7 @@ async def handle_lock_generic(update, context, lock_name):
         parse_mode="HTML"
     )
 
+
 async def handle_unlock_generic(update, context, lock_name):
     if not await is_authorized(update, context):
         return await update.message.reply_text("🚫 فقط مدیران یا سودوها می‌توانند باز کنند!")
@@ -288,6 +302,7 @@ async def handle_unlock_generic(update, context, lock_name):
         f"👤 توسط: <b>{user.first_name}</b>\n🕒 {time_str}",
         parse_mode="HTML"
     )
+
 
 # 🧹 بررسی و حذف پیام‌های خلاف قفل‌ها
 async def check_message_locks(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -341,6 +356,7 @@ async def check_message_locks(update: Update, context: ContextTypes.DEFAULT_TYPE
             parse_mode="HTML"
         )
 
+
 # 🧾 وضعیت قفل‌ها
 async def handle_locks_status(update, context):
     chat_id = str(update.effective_chat.id)
@@ -356,52 +372,12 @@ async def handle_locks_status(update, context):
 
     await update.message.reply_text(text, parse_mode="HTML")
 
+
 # 🎮 هندلر اصلی دستورات گروه
 async def group_command_handler(update, context):
-    # 🧩 تغییر یا افزودن alias جدید
-async def handle_alias(update, context):
-    if not await is_authorized(update, context):
-        return await update.message.reply_text("⛔ فقط مدیران یا سودوها می‌توانند alias را تغییر دهند!")
-
-    text = update.message.text.strip()
-    parts = text.split(" ", 1)
-    if len(parts) < 2:
-        return await update.message.reply_text(
-            "📝 استفاده:\n<code>alias [alias]=[command]</code>\n\nمثلاً:\n<code>alias بن=ban</code>",
-            parse_mode="HTML"
-        )
-
-    try:
-        alias_part = parts[1]
-        if "=" not in alias_part:
-            return await update.message.reply_text(
-                "⚠️ فرمت اشتباه است!\nباید از <code>=</code> بین alias و دستور استفاده کنی.",
-                parse_mode="HTML"
-            )
-
-        alias_word, command_name = [p.strip().lower() for p in alias_part.split("=", 1)]
-        if not command_name or not alias_word:
-            return await update.message.reply_text("⚠️ مقدارها نباید خالی باشند!", parse_mode="HTML")
-
-        # اطمینان از اینکه دستور معتبر است
-        if command_name not in ALIASES:
-            return await update.message.reply_text(f"⚠️ دستور <b>{command_name}</b> وجود ندارد.", parse_mode="HTML")
-
-        # افزودن alias جدید
-        if alias_word not in ALIASES[command_name]:
-            ALIASES[command_name].append(alias_word)
-            save_json_file(ALIASES_FILE, ALIASES)
-            await update.message.reply_text(
-                f"✅ alias جدید ثبت شد:\n<code>{alias_word}</code> → <b>{command_name}</b>",
-                parse_mode="HTML"
-            )
-        else:
-            await update.message.reply_text("ℹ️ این alias از قبل وجود دارد.", parse_mode="HTML")
-
-    except Exception as e:
-        await update.message.reply_text(f"⚠️ خطا در ثبت alias:\n<code>{e}</code>", parse_mode="HTML")
     text = update.message.text.strip().lower()
 
+    # 🧩 تغییر یا افزودن alias جدید
     if text.startswith("alias "):
         return await handle_alias(update, context)
 
@@ -427,7 +403,9 @@ async def handle_alias(update, context):
             if cmd in handlers:
                 return await handlers[cmd](update, context)
     return
-    # ======================= 🧠 فیلتر کلمات + تگ کاربران =======================
+
+
+# ======================= 🧠 فیلتر کلمات + تگ کاربران =======================
 
 import re
 FILTER_FILE = "filters.json"
@@ -441,6 +419,7 @@ ALIASES_ADV = {
     "tagactive": ["tagactive", "تگ‌فعال", "تگ‌آنلاین"]
 }
 
+
 # 📁 فایل فیلترها
 def load_filters():
     if os.path.exists(FILTER_FILE):
@@ -451,11 +430,14 @@ def load_filters():
             pass
     return {}
 
+
 def save_filters(data):
     with open(FILTER_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
+
 filters_data = load_filters()
+
 
 # 🧩 بررسی مجاز بودن
 async def can_manage(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -468,8 +450,7 @@ async def can_manage(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return member.status in ["administrator", "creator"]
     except:
         return False
-
-# ➕ افزودن فیلتر
+        # ➕ افزودن فیلتر
 async def handle_addfilter(update, context):
     if not await can_manage(update, context):
         return await update.message.reply_text("🚫 فقط مدیران یا سودوها می‌توانند فیلتر اضافه کنند!")
@@ -488,6 +469,7 @@ async def handle_addfilter(update, context):
     filters_data[chat_id] = chat_filters
     save_filters(filters_data)
     await update.message.reply_text(f"✅ کلمه <b>{word}</b> به لیست فیلتر اضافه شد.", parse_mode="HTML")
+
 
 # ❌ حذف فیلتر
 async def handle_delfilter(update, context):
@@ -509,6 +491,7 @@ async def handle_delfilter(update, context):
     save_filters(filters_data)
     await update.message.reply_text(f"🗑️ کلمه <b>{word}</b> از فیلتر حذف شد.", parse_mode="HTML")
 
+
 # 📋 لیست فیلترها
 async def handle_filters(update, context):
     chat_id = str(update.effective_chat.id)
@@ -517,6 +500,7 @@ async def handle_filters(update, context):
         return await update.message.reply_text("ℹ️ هنوز هیچ کلمه‌ای فیلتر نشده است.")
     text = "🚫 <b>لیست کلمات فیلتر شده:</b>\n\n" + "\n".join([f"{i+1}. {w}" for i, w in enumerate(chat_filters)])
     await update.message.reply_text(text, parse_mode="HTML")
+
 
 # 📣 تگ همه کاربران
 async def handle_tagall(update, context):
@@ -550,6 +534,7 @@ async def handle_tagall(update, context):
         await context.bot.send_message(chat.id, f"{text_group}\n\n{args_text}", parse_mode="Markdown")
 
     await update.message.reply_text("✅ تگ همه کاربران انجام شد.", parse_mode="HTML")
+
 
 # 👥 تگ کاربران فعال (پریمیوم یا فعال)
 async def handle_tagactive(update, context):
@@ -586,6 +571,7 @@ async def handle_tagactive(update, context):
         await context.bot.send_message(chat.id, f"{text_group}\n\n{args_text}", parse_mode="Markdown")
 
     await update.message.reply_text("✅ تگ کاربران فعال انجام شد.", parse_mode="HTML")
+
 
 # 🧠 هندلر کلی alias پیشرفته
 async def group_text_handler_adv(update, context):
