@@ -1870,18 +1870,20 @@ if __name__ == "__main__":
             text += f"{i}. <code>{sid}</code>\n"
         await update.message.reply_text(text, parse_mode="HTML")
 
-    # ==========================================================
-    # ⚙️ سیستم مدیریت گروه (اولویت بالا)
+            # ==========================================================
+    # ⚙️ سیستم مدیریت گروه (اولویت بسیار بالا)
     # ==========================================================
     # حذف پیام‌های خلاف قفل‌ها
-    application.add_handler(MessageHandler(filters.ALL, check_message_locks), group=-5)
-    # دستورات مدیریتی مثل بن، اخطار، قفل گروه
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, group_command_handler), group=-4)
-    # فیلتر کلمات و تگ کاربران
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, group_text_handler_adv), group=-3)
+    application.add_handler(MessageHandler(filters.ALL, check_message_locks), group=-10)
+
+    # دستورات مدیریتی مثل بن / اخطار / سکوت / قفل‌ها / مدیرها
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, group_command_handler), group=-9)
+
+    # فیلتر کلمات + تگ کاربران
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, group_text_handler_adv), group=-8)
 
     # ==========================================================
-    # 👑 هندلرهای مدیریتی
+    # 👑 مدیریت سودوها
     # ==========================================================
     application.add_handler(CommandHandler("addsudo", add_sudo))
     application.add_handler(CommandHandler("delsudo", del_sudo))
@@ -1891,7 +1893,9 @@ if __name__ == "__main__":
     application.add_handler(CommandHandler("save", save_command))
     application.add_handler(CommandHandler("del", delete_command))
     application.add_handler(CommandHandler("listcmds", list_commands))
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_custom_command), group=-2)
+
+    # ✉️ پیام‌های متنی غیر از کامند → هندلر دستورات ذخیره‌شده
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_custom_command), group=-4)
 
     # 👑 مدیریت وضعیت ادمین (ورود و خروج)
     application.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, detect_admin_movement))
@@ -1975,7 +1979,6 @@ if __name__ == "__main__":
     # ==========================================================
     # 🧾 راهنمای قابل ویرایش
     # ==========================================================
-    application.add_handler(CommandHandler("help", help_command))
     application.add_handler(MessageHandler(filters.Regex("^ثبت help$"), save_help))
     application.add_handler(MessageHandler(filters.Regex("^راهنما$"), show_custom_guide))
     application.add_handler(MessageHandler(filters.Regex("^ثبت راهنما$"), save_custom_guide))
@@ -1987,7 +1990,7 @@ if __name__ == "__main__":
     application.add_handler(CallbackQueryHandler(panel_handler))
 
     # ==========================================================
-    # 🎭 پاسخ هوشمند خنگول (در آخر)
+    # 🎭 پاسخ هوشمند خنگول (در انتها)
     # ==========================================================
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, reply), group=5)
 
@@ -2011,4 +2014,3 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"⚠️ خطا در اجرای ربات:\n{e}")
         print("♻️ ربات به‌صورت خودکار توسط هاست ری‌استارت خواهد شد ✅")
-        
