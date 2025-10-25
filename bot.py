@@ -1855,20 +1855,20 @@ async def show_custom_guide(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 if __name__ == "__main__":
     print("🤖 خنگول فارسی 8.7 Cloud+ Supreme Pro Stable+ آماده به خدمت است ...")
-# 🧩 ساخت اپلیکیشن اصلی تلگرام
-application = ApplicationBuilder().token(TOKEN).build()
+    # 🧩 ساخت اپلیکیشن اصلی تلگرام
+    application = ApplicationBuilder().token(TOKEN).build()
 
-# ⚙️ مدیریت خطاهای کلی
-application.add_error_handler(handle_error)
+    # ⚙️ مدیریت خطاهای کلی
+    application.add_error_handler(handle_error)
 
-# هندلر اصلی دستورات گروه (بدون /)
-application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, group_command_handler))
+    # هندلر اصلی دستورات گروه (بدون /)
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, group_command_handler))
 
-# چک کردن پیام‌های خلاف قفل‌ها
-application.add_handler(MessageHandler(filters.ALL, check_message_locks))
+    # چک کردن پیام‌های خلاف قفل‌ها
+    application.add_handler(MessageHandler(filters.ALL, check_message_locks))
 
-# فیلتر کلمات و تگ همه
-application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, group_text_handler_adv))
+    # فیلتر کلمات و تگ همه
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, group_text_handler_adv))
 
     
 
