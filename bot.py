@@ -2565,7 +2565,7 @@ async def group_text_handler_adv(update, context):
                 }
                 if cmd in handlers:
                          # ======================= 🚀 اجرای نهایی =======================
-from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, CallbackQueryHandler, filters
+    from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, CallbackQueryHandler, filters
 
 if __name__ == "__main__":
     print("🤖 خنگول فارسی 8.7 Cloud+ Supreme Pro Stable+ آماده به خدمت است ...")
