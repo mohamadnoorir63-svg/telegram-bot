@@ -1843,7 +1843,192 @@ async def show_custom_guide(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return await update.message.reply_text("ℹ️ هنوز متنی برای راهنما ثبت نشده.")
     await update.message.reply_text(text)
 
-    
+    # ======================= ⚙️ سیستم مدیریت گروه (بن / اخطار / سکوت / مدیر) =======================
+import json, os
+from telegram import Update
+from telegram.ext import ContextTypes
+
+GROUP_CTRL_FILE = "group_control.json"
+
+# ✅ alias قابل تغییر توسط صاحب ربات (بعداً می‌تونی با دستور خاص یا دستی عوضشون کنی)
+ALIASES = {
+    "ban": ["ban", "بن", "اخراج"],
+    "warn": ["warn", "اخطار", "هشدار"],
+    "mute": ["mute", "سکوت", "خفه"],
+    "addadmin": ["addadmin", "افزودنمدیر", "ادمین"],
+    "admins": ["admins", "مدیران", "ادمینها"]
+}
+
+def load_group_ctrl():
+    if os.path.exists(GROUP_CTRL_FILE):
+        try:
+            with open(GROUP_CTRL_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except:
+            pass
+    return {}
+
+def save_group_ctrl(data):
+    with open(GROUP_CTRL_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
+group_data = load_group_ctrl()
+
+
+# 🧠 بررسی مجاز بودن (ادمین گروه یا سودو)
+async def is_authorized(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    chat = update.effective_chat
+
+    if user.id in SUDO_IDS:
+        return True
+
+    try:
+        member = await context.bot.get_chat_member(chat.id, user.id)
+        return member.status in ["administrator", "creator"]
+    except:
+        return False
+
+
+# 🚫 بن کردن کاربر
+async def handle_ban(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not await is_authorized(update, context):
+        return await update.message.reply_text("⛔ فقط مدیران یا سودوها می‌توانند بن کنند!")
+
+    if not update.message.reply_to_message:
+        return await update.message.reply_text("🔹 باید به پیام کاربر ریپلای بزنی تا بن شود.")
+
+    user = update.message.reply_to_message.from_user
+    chat = update.effective_chat
+
+    try:
+        await context.bot.ban_chat_member(chat.id, user.id)
+        await update.message.reply_text(f"🚫 <b>{user.first_name}</b> از گروه بن شد.", parse_mode="HTML")
+    except Exception as e:
+        await update.message.reply_text(f"⚠️ خطا در بن کاربر:\n<code>{e}</code>", parse_mode="HTML")
+
+
+# ⚠️ اخطار دادن
+async def handle_warn(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not await is_authorized(update, context):
+        return await update.message.reply_text("⛔ فقط مدیران یا سودوها مجازند!")
+
+    if not update.message.reply_to_message:
+        return await update.message.reply_text("🔹 باید به پیام کاربر ریپلای بزنی تا اخطار بگیره.")
+
+    chat_id = str(update.effective_chat.id)
+    user = update.message.reply_to_message.from_user
+    group = group_data.get(chat_id, {"warns": {}, "admins": []})
+    warns = group["warns"]
+
+    warns[str(user.id)] = warns.get(str(user.id), 0) + 1
+    count = warns[str(user.id)]
+
+    group["warns"] = warns
+    group_data[chat_id] = group
+    save_group_ctrl(group_data)
+
+    if count >= 3:
+        try:
+            await context.bot.ban_chat_member(chat_id, user.id)
+            await update.message.reply_text(
+                f"🚫 <b>{user.first_name}</b> سه اخطار دریافت کرد و از گروه بن شد!",
+                parse_mode="HTML"
+            )
+            warns[str(user.id)] = 0
+        except:
+            pass
+    else:
+        await update.message.reply_text(
+            f"⚠️ <b>{user.first_name}</b> اخطار شماره <b>{count}</b> دریافت کرد.",
+            parse_mode="HTML"
+        )
+    save_group_ctrl(group_data)
+
+
+# 🤐 سکوت کاربر
+async def handle_mute(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not await is_authorized(update, context):
+        return await update.message.reply_text("⛔ فقط مدیران یا سودوها مجازند!")
+
+    if not update.message.reply_to_message:
+        return await update.message.reply_text("🔹 باید به پیام کاربر ریپلای بزنی تا سکوت شود.")
+
+    user = update.message.reply_to_message.from_user
+    chat = update.effective_chat
+
+    try:
+        await context.bot.restrict_chat_member(
+            chat.id,
+            user.id,
+            permissions={"can_send_messages": False}
+        )
+        await update.message.reply_text(f"🤐 <b>{user.first_name}</b> به حالت سکوت درآمد.", parse_mode="HTML")
+    except Exception as e:
+        await update.message.reply_text(f"⚠️ خطا در سکوت:\n<code>{e}</code>", parse_mode="HTML")
+
+
+# 👑 افزودن مدیر جدید
+async def handle_addadmin(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not await is_authorized(update, context):
+        return await update.message.reply_text("⛔ فقط مدیر اصلی یا سودوها می‌تونن مدیر اضافه کنن!")
+
+    if not update.message.reply_to_message:
+        return await update.message.reply_text("🔹 باید روی پیام کاربر ریپلای بزنی تا مدیر شود.")
+
+    chat_id = str(update.effective_chat.id)
+    user = update.message.reply_to_message.from_user
+
+    group = group_data.get(chat_id, {"warns": {}, "admins": []})
+    admins = group.get("admins", [])
+
+    if user.id in admins:
+        return await update.message.reply_text("⚠️ این کاربر از قبل مدیر است!")
+
+    admins.append(user.id)
+    group["admins"] = admins
+    group_data[chat_id] = group
+    save_group_ctrl(group_data)
+
+    await update.message.reply_text(f"👑 <b>{user.first_name}</b> به عنوان مدیر گروه افزوده شد.", parse_mode="HTML")
+
+
+# 📋 لیست مدیران
+async def handle_admins(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = str(update.effective_chat.id)
+    group = group_data.get(chat_id, {"admins": []})
+    admins = group.get("admins", [])
+
+    if not admins:
+        return await update.message.reply_text("ℹ️ هنوز هیچ مدیری برای این گروه ثبت نشده.")
+
+    text = "👑 <b>لیست مدیران گروه:</b>\n\n"
+    for i, uid in enumerate(admins, start=1):
+        try:
+            user = await context.bot.get_chat_member(chat_id, uid)
+            text += f"{i}. {user.user.first_name} (<code>{uid}</code>)\n"
+        except:
+            text += f"{i}. <code>{uid}</code>\n"
+
+    await update.message.reply_text(text, parse_mode="HTML")
+
+
+# ======================= 📡 هندلر برای دستورات بدون / و alias =======================
+async def group_command_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    text = update.message.text.strip().lower()
+    for cmd, aliases in ALIASES.items():
+        if text in aliases:
+            if cmd == "ban":
+                return await handle_ban(update, context)
+            elif cmd == "warn":
+                return await handle_warn(update, context)
+            elif cmd == "mute":
+                return await handle_mute(update, context)
+            elif cmd == "addadmin":
+                return await handle_addadmin(update, context)
+            elif cmd == "admins":
+                return await handle_admins(update, context)
+    return  # اگر هیچ‌کدام نبود، رد شو
 
 # ======================= 🚀 اجرای نهایی =======================
 
@@ -1901,6 +2086,8 @@ if __name__ == "__main__":
     app.add_handler(CommandHandler("reset", reset_memory))
     app.add_handler(CommandHandler("reload", reload_memory))
     app.add_handler(CommandHandler("broadcast", broadcast))
+    # 📡 اضافه کردن کنترل دستورات گروهی (بدون /)
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, group_command_handler))
     # ======================= 👑 مدیریت سودوها =======================
     async def list_sudos(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if update.effective_user.id not in SUDO_IDS:
