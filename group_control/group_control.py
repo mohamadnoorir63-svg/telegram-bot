@@ -358,6 +358,48 @@ async def handle_locks_status(update, context):
 
 # 🎮 هندلر اصلی دستورات گروه
 async def group_command_handler(update, context):
+    # 🧩 تغییر یا افزودن alias جدید
+async def handle_alias(update, context):
+    if not await is_authorized(update, context):
+        return await update.message.reply_text("⛔ فقط مدیران یا سودوها می‌توانند alias را تغییر دهند!")
+
+    text = update.message.text.strip()
+    parts = text.split(" ", 1)
+    if len(parts) < 2:
+        return await update.message.reply_text(
+            "📝 استفاده:\n<code>alias [alias]=[command]</code>\n\nمثلاً:\n<code>alias بن=ban</code>",
+            parse_mode="HTML"
+        )
+
+    try:
+        alias_part = parts[1]
+        if "=" not in alias_part:
+            return await update.message.reply_text(
+                "⚠️ فرمت اشتباه است!\nباید از <code>=</code> بین alias و دستور استفاده کنی.",
+                parse_mode="HTML"
+            )
+
+        alias_word, command_name = [p.strip().lower() for p in alias_part.split("=", 1)]
+        if not command_name or not alias_word:
+            return await update.message.reply_text("⚠️ مقدارها نباید خالی باشند!", parse_mode="HTML")
+
+        # اطمینان از اینکه دستور معتبر است
+        if command_name not in ALIASES:
+            return await update.message.reply_text(f"⚠️ دستور <b>{command_name}</b> وجود ندارد.", parse_mode="HTML")
+
+        # افزودن alias جدید
+        if alias_word not in ALIASES[command_name]:
+            ALIASES[command_name].append(alias_word)
+            save_json_file(ALIASES_FILE, ALIASES)
+            await update.message.reply_text(
+                f"✅ alias جدید ثبت شد:\n<code>{alias_word}</code> → <b>{command_name}</b>",
+                parse_mode="HTML"
+            )
+        else:
+            await update.message.reply_text("ℹ️ این alias از قبل وجود دارد.", parse_mode="HTML")
+
+    except Exception as e:
+        await update.message.reply_text(f"⚠️ خطا در ثبت alias:\n<code>{e}</code>", parse_mode="HTML")
     text = update.message.text.strip().lower()
 
     if text.startswith("alias "):
