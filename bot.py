@@ -1870,59 +1870,20 @@ if __name__ == "__main__":
     # ==========================================================
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, reply), group=2)
     # ==========================================================
-# ================== ⚡ اتصال بین Userbot و Bot Token ==================
-async def send_song_request_from_bot(query, chat_id):
-    """ارسال درخواست آهنگ از Bot Token به Userbot"""
+async def on_startup(app):
+        await notify_admin_on_startup(app)
+        app.create_task(auto_backup(app.bot))
+        app.create_task(start_auto_brain_loop(app.bot))
+        print("🌙 [SYSTEM] Startup tasks scheduled ✅")
+
+    app.post_init = on_startup
+
+    # ==========================================================
+    # 🚀 اجرای نهایی ربات (بدون خطای Event loop)
+    # ==========================================================
     try:
-        if not userbot.is_connected:
-            print("⚠️ Userbot هنوز بالا نیامده!")
-            return False
-
-        await userbot.send_message(chat_id, f"آهنگ {query}")
-        print(f"📤 درخواست آهنگ برای Userbot ارسال شد: {query}")
-        return True
-
+        print("🔄 در حال اجرای ربات...")
+        app.run_polling(allowed_updates=Update.ALL_TYPES)
     except Exception as e:
-        print(f"⚠️ خطا در ارسال پیام از Bot به Userbot: {e}")
-        return False
-
-
-# ================== 🚀 اجرای همزمان Bot Token و Userbot ==================
-import threading
-import asyncio
-from weather_module.userbot_runner import start_userbot  # یوزربوت اصلی
-from pyrogram import Client  # اگه توی start_userbot از Client استفاده می‌کنی
-# فرض می‌کنیم app هم در جای دیگه تعریف شده (ربات اصلی)
-
-def safe_userbot():
-    """اجرای userbot با event loop مجزا برای جلوگیری از تداخل"""
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    try:
-        loop.run_until_complete(start_userbot())  # اجرای async تابع userbot
-    except Exception as e:
-        print(f"⚠️ خطا در اجرای userbot: {e}")
-    finally:
-        loop.close()
-
-def run_both():
-    """اجرای همزمان Bot Token و Userbot"""
-    print("🚀 در حال راه‌اندازی خنگول + یوزربات ...")
-
-    try:
-        # 🎧 اجرای Userbot در ترد جداگانه با loop مجزا
-        threading.Thread(target=safe_userbot, daemon=True).start()
-        print("🌀 Userbot thread started...")
-
-        # 🤖 اجرای Bot Token
-        print("🤖 Bot Token connected and polling started ✅")
-        app.run_polling()
-
-    except Exception as e:
-        print(f"⚠️ خطا در اجرای مشترک Bot + Userbot: {e}")
-
-
-# ================== 🔰 اجرای نهایی ==================
-if __name__ == "__main__":
-    print("🤖 خنگول فارسی 8.7 Cloud+ Supreme Pro Stable+ آماده به خدمت است ...")
-    run_both()
+        print(f"⚠️ خطا در اجرای ربات:\n{e}")
+        print("♻️ ربات به‌صورت خودکار توسط هاست ری‌استارت خواهد شد ✅")
