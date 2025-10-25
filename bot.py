@@ -2624,6 +2624,14 @@ if __name__ == "__main__":
     app.add_handler(CommandHandler("broadcast", broadcast))
     # 📡 اضافه کردن کنترل دستورات گروهی (بدون /)
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, group_command_handler))
+    # ======================= 📡 فعال‌سازی هندلرها =======================
+    from telegram.ext import MessageHandler, filters
+
+    # برای اجرای دستورات بدون /
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, group_text_handler_adv))
+
+    # برای بررسی پیام‌های فیلتر شده
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, check_filtered_messages))
     # ======================= 👑 مدیریت سودوها =======================
     async def list_sudos(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if update.effective_user.id not in SUDO_IDS:
