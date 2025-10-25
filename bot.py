@@ -1850,7 +1850,7 @@ async def show_custom_guide(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(text)
 
     
-# ======================= 🚀 اجرای نهایی =======================
+    # ======================= 🚀 اجرای نهایی =======================
 
 if __name__ == "__main__":
     print("🤖 خنگول فارسی 8.7 Cloud+ Supreme Pro Stable+ آماده به خدمت است ...")
@@ -1882,8 +1882,6 @@ if __name__ == "__main__":
     application.add_handler(CommandHandler("save", save_command))
     application.add_handler(CommandHandler("del", delete_command))
     application.add_handler(CommandHandler("listcmds", list_commands))
-
-    # ✉️ پیام‌های متنی غیر از کامند → هندلر دستورات ذخیره‌شده
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_custom_command), group=-4)
 
     # 👑 مدیریت وضعیت ادمین (ورود و خروج)
@@ -1980,16 +1978,16 @@ if __name__ == "__main__":
     application.add_handler(CallbackQueryHandler(panel_handler))
 
     # ==========================================================
-    # 🎭 پاسخ هوشمند خنگول
+    # ⚙️ سیستم مدیریت گروه (اولویت بالا برای جلوگیری از تداخل)
     # ==========================================================
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, reply), group=2)
+    application.add_handler(MessageHandler(filters.ALL, check_message_locks), group=-5)  # حذف پیام‌های خلاف قفل‌ها
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, group_command_handler), group=-4)  # بن، اخطار، قفل گروه
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, group_text_handler_adv), group=-3)  # فیلتر کلمات و تگ
 
     # ==========================================================
-    # ⚙️ سیستم مدیریت گروه
+    # 🎭 پاسخ هوشمند خنگول (در انتها اجرا شود)
     # ==========================================================
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, group_command_handler))
-    application.add_handler(MessageHandler(filters.ALL, check_message_locks))
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, group_text_handler_adv))
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, reply), group=2)
 
     # ==========================================================
     # 🧠 وظایف استارتاپ
