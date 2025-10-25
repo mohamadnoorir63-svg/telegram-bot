@@ -2576,6 +2576,7 @@ if __name__ == "__main__":
 
     # ⚙️ مدیریت خطاهای کلی
     app.add_error_handler(handle_error)
+    
 
     # ✅ هندلرهای سودو
     app.add_handler(CommandHandler("addsudo", add_sudo))
