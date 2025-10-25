@@ -1,3 +1,85 @@
-{
-  "hidden": {}
-}
+import json
+import os
+import random
+from datetime import datetime
+from fix_memory import fix_json
+
+FILE = "shadow_memory.json"
+
+# ========================= 📂 آماده‌سازی =========================
+def init_shadow():
+    if not os.path.exists(FILE):
+        with open(FILE, "w", encoding="utf-8") as f:
+            json.dump({"hidden": {}}, f, ensure_ascii=False, indent=2)
+    print("🌙 حافظه‌ی سایه آماده است.")
+
+# ========================= 💾 عملیات پایه =========================
+def load_shadow():
+    try:
+        with open(FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except json.JSONDecodeError:
+        print("⚠️ JSON خراب در shadow_memory.json — در حال تعمیر...")
+        fix_json(FILE)
+        with open(FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return {"hidden": {}}
+
+def save_shadow(data):
+    try:
+        with open(FILE, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        print(f"❌ خطا در ذخیره حافظه سایه: {e}")
+
+# ========================= 🧠 یادگیری سایه =========================
+def shadow_learn(phrase, response):
+    """ذخیره پاسخ‌ها به‌صورت خودکار و تصادفی در حافظه‌ی سایه"""
+    if not phrase or not response:
+        return
+
+    phrase, response = phrase.strip(), response.strip()
+    data = load_shadow()
+
+    if phrase not in data["hidden"]:
+        data["hidden"][phrase] = [{"text": response, "weight": 1}]
+    else:
+        # اگر پاسخ تکراری نباشه اضافه می‌کنیم
+        existing_texts = [r["text"] for r in data["hidden"][phrase]]
+        if response not in existing_texts:
+            data["hidden"][phrase].append({"text": response, "weight": 1})
+
+    save_shadow(data)
+    print(f"🌑 [Shadow Learn] '{phrase}' → '{response}'")
+
+# ========================= 💬 پاسخ‌دهی سایه =========================
+def shadow_reply(text):
+    """پاسخ تصادفی از حافظه سایه"""
+    data = load_shadow().get("hidden", {})
+    matches = [k for k in data.keys() if k in text]
+    if not matches:
+        return None
+
+    key = random.choice(matches)
+    responses = data[key]
+
+    # انتخاب بر اساس وزن
+    weights = [r["weight"] for r in responses]
+    chosen = random.choices(responses, weights=weights, k=1)[0]
+
+    # افزایش وزن پاسخ منتخب
+    chosen["weight"] = min(chosen.get("weight", 1) + random.randint(1, 2), 10)
+
+    # کاهش جزئی وزن سایر پاسخ‌ها
+    for r in responses:
+        if r != chosen and r["weight"] > 1:
+            r["weight"] -= 1
+
+    save_shadow({"hidden": data})
+
+    reply = chosen["text"]
+    if random.random() < 0.3:
+        reply += " " + random.choice(["😏", "😉", "😄", "😅", "🤭", "✨"])
+
+    return reply
