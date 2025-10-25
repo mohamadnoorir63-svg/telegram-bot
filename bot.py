@@ -2565,14 +2565,11 @@ async def group_text_handler_adv(update, context):
                 }
                 if cmd in handlers:
      
-    # ======================= 🚀 اجرای نهایی =======================
-     from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, CallbackQueryHandler, filters
-
-     if __name__ == "__main__":
-        print("🤖 خنگول فارسی 8.7 Cloud+ Supreme Pro Stable+ آماده به خدمت است ...")
-
+if __name__ == "__main__":
+    from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, CallbackQueryHandler, filters
+    print("🤖 خنگول فارسی آماده به خدمت است ...")
     app = ApplicationBuilder().token(TOKEN).build()
-    app.add_error_handler(handle_error)
+    ...
     
     # ✅ هندلرهای سودو
     app.add_handler(CommandHandler("addsudo", add_sudo))
