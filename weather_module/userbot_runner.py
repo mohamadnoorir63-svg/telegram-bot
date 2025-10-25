@@ -13,14 +13,9 @@ userbot = Client(
     session_string=SESSION
 )
 
-DOWNLOAD_PATH = "downloads"
-os.makedirs(DOWNLOAD_PATH, exist_ok=True)
-
-
-# 🎵 تابع دانلود چندمنبعی
 def download_precise(query: str):
     """
-    جستجو و دانلود آهنگ از YouTube → YouTube Music → SoundCloud
+    جستجو و دانلود آهنگ از سایت‌های ایرانی (Aparat, Namasha, Tamasha)
     """
     base_opts = {
         "format": "bestaudio/best",
@@ -38,9 +33,9 @@ def download_precise(query: str):
     }
 
     sources = [
-        ("YouTube", f"ytsearch5:{query}"),
-        ("YouTube Music", f"ytmusicsearch5:{query}"),
-        ("SoundCloud", f"scsearch5:{query}")
+        ("Aparat", f"https://www.aparat.com/result/{query}"),
+        ("Namasha", f"https://www.namasha.com/search?query={query}"),
+        ("Tamasha", f"https://www.tamasha.com/search?query={query}")
     ]
 
     for source_name, expr in sources:
@@ -64,7 +59,6 @@ def download_precise(query: str):
             print(f"[❌ {source_name} ERROR] {e}")
 
     return None, None, None
-
 
 # 💬 هندل پیام‌ها
 @userbot.on_message(filters.text & (filters.private | filters.me))
