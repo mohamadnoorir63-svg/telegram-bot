@@ -2564,7 +2564,8 @@ async def group_text_handler_adv(update, context):
                     "tagactive": handle_tagactive
                 }
                 if cmd in handlers:
-     # ======================= 🚀 اجرای نهایی =======================
+     
+# ======================= 🚀 اجرای نهایی =======================
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, CallbackQueryHandler, filters
 
 if __name__ == "__main__":
@@ -2572,7 +2573,7 @@ if __name__ == "__main__":
 
     app = ApplicationBuilder().token(TOKEN).build()
     app.add_error_handler(handle_error)
-
+    
     # ✅ هندلرهای سودو
     app.add_handler(CommandHandler("addsudo", add_sudo))
     app.add_handler(CommandHandler("delsudo", del_sudo))
