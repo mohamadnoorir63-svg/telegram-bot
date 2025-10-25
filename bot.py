@@ -2362,6 +2362,209 @@ async def group_command_handler(update, context):
             if cmd in handlers:
                 return await handlers[cmd](update, context)
     return
+    # ======================= 🧠 فیلتر کلمات + تگ کاربران =======================
+import json, os, re, asyncio
+from telegram import Update
+from telegram.ext import ContextTypes, MessageHandler, filters
+
+FILTER_FILE = "filters.json"
+TAG_LIMIT = 5  # چند نفر در هر پیام تگ شوند
+
+# ✅ alias‌ها
+ALIASES_ADV = {
+    "addfilter": ["addfilter", "addfilterword", "افزودن‌فیلتر", "فیلترکن"],
+    "delfilter": ["delfilter", "removefilter", "حذف‌فیلتر", "پاک‌فیلتر"],
+    "filters": ["filters", "filterlist", "لیست‌فیلتر", "فیلترها"],
+    "tagall": ["tagall", "تگ‌کاربران", "تگ‌همه", "منشن‌همگانی"],
+    "tagactive": ["tagactive", "تگ‌فعال", "تگ‌آنلاین"]
+}
+
+# 📁 فایل فیلترها
+def load_filters():
+    if os.path.exists(FILTER_FILE):
+        try:
+            with open(FILTER_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except:
+            pass
+    return {}
+
+def save_filters(data):
+    with open(FILTER_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
+filters_data = load_filters()
+
+# 🧩 بررسی مجاز بودن
+async def can_manage(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    chat = update.effective_chat
+    if user.id in SUDO_IDS:
+        return True
+    try:
+        member = await context.bot.get_chat_member(chat.id, user.id)
+        return member.status in ["administrator", "creator"]
+    except:
+        return False
+
+# ➕ افزودن فیلتر
+async def handle_addfilter(update, context):
+    if not await can_manage(update, context):
+        return await update.message.reply_text("🚫 فقط مدیران یا سودوها می‌توانند فیلتر اضافه کنند!")
+
+    if len(context.args) < 1:
+        return await update.message.reply_text("📝 استفاده: addfilter [کلمه]\nمثلاً: addfilter تبلیغ")
+
+    word = " ".join(context.args).strip().lower()
+    chat_id = str(update.effective_chat.id)
+    chat_filters = filters_data.get(chat_id, [])
+
+    if word in chat_filters:
+        return await update.message.reply_text("⚠️ این کلمه از قبل در فیلتر است!")
+
+    chat_filters.append(word)
+    filters_data[chat_id] = chat_filters
+    save_filters(filters_data)
+    await update.message.reply_text(f"✅ کلمه <b>{word}</b> به لیست فیلتر اضافه شد.", parse_mode="HTML")
+
+# ❌ حذف فیلتر
+async def handle_delfilter(update, context):
+    if not await can_manage(update, context):
+        return await update.message.reply_text("🚫 فقط مدیران یا سودوها مجازند!")
+
+    if len(context.args) < 1:
+        return await update.message.reply_text("📝 استفاده: delfilter [کلمه]\nمثلاً: delfilter تبلیغ")
+
+    word = " ".join(context.args).strip().lower()
+    chat_id = str(update.effective_chat.id)
+    chat_filters = filters_data.get(chat_id, [])
+
+    if word not in chat_filters:
+        return await update.message.reply_text("⚠️ این کلمه در فیلتر وجود ندارد!")
+
+    chat_filters.remove(word)
+    filters_data[chat_id] = chat_filters
+    save_filters(filters_data)
+    await update.message.reply_text(f"🗑️ کلمه <b>{word}</b> از فیلتر حذف شد.", parse_mode="HTML")
+
+# 📋 لیست فیلترها
+async def handle_filters(update, context):
+    chat_id = str(update.effective_chat.id)
+    chat_filters = filters_data.get(chat_id, [])
+    if not chat_filters:
+        return await update.message.reply_text("ℹ️ هنوز هیچ کلمه‌ای فیلتر نشده است.")
+    text = "🚫 <b>لیست کلمات فیلتر شده:</b>\n\n" + "\n".join([f"{i+1}. {w}" for i, w in enumerate(chat_filters)])
+    await update.message.reply_text(text, parse_mode="HTML")
+
+# 🧹 بررسی پیام‌ها و حذف موارد فیلترشده
+async def check_filtered_messages(update, context):
+    if not update.message or not update.message.text:
+        return
+    chat_id = str(update.effective_chat.id)
+    chat_filters = filters_data.get(chat_id, [])
+    text = update.message.text.lower()
+    for word in chat_filters:
+        if word in text:
+            try:
+                await update.message.delete()
+                await context.bot.send_message(
+                    chat_id,
+                    f"🚫 پیام از <b>{update.effective_user.first_name}</b> حذف شد.\n"
+                    f"🧾 دلیل: استفاده از کلمه‌ی فیلتر شده <b>{word}</b>",
+                    parse_mode="HTML"
+                )
+            except:
+                pass
+            return
+
+# 📣 تگ همه کاربران
+async def handle_tagall(update, context):
+    if not await can_manage(update, context):
+        return await update.message.reply_text("🚫 فقط مدیران یا سودوها مجازند!")
+
+    chat = update.effective_chat
+    args_text = " ".join(context.args) if context.args else ""
+    await update.message.reply_text("📣 درحال منشن همه کاربران...\n⏳ لطفاً صبر کنید.", parse_mode="HTML")
+
+    members = []
+    try:
+        async for member in context.bot.get_chat_members(chat.id, limit=200):
+            if not member.user.is_bot:
+                members.append(member.user)
+    except Exception as e:
+        return await update.message.reply_text(f"⚠️ خطا:\n<code>{e}</code>", parse_mode="HTML")
+
+    text_group = ""
+    counter = 0
+    for user in members:
+        text_group += f"[{user.first_name}](tg://user?id={user.id}) "
+        counter += 1
+        if counter % TAG_LIMIT == 0:
+            try:
+                await context.bot.send_message(chat.id, f"{text_group}\n\n{args_text}", parse_mode="Markdown")
+            except:
+                pass
+            await asyncio.sleep(1.5)
+            text_group = ""
+    if text_group:
+        await context.bot.send_message(chat.id, f"{text_group}\n\n{args_text}", parse_mode="Markdown")
+
+    await update.message.reply_text("✅ تگ همه کاربران انجام شد.", parse_mode="HTML")
+
+# 👥 تگ کاربران فعال (آنلاین / پریمیوم)
+async def handle_tagactive(update, context):
+    if not await can_manage(update, context):
+        return await update.message.reply_text("🚫 فقط مدیران یا سودوها مجازند!")
+
+    chat = update.effective_chat
+    args_text = " ".join(context.args) if context.args else ""
+    await update.message.reply_text("👥 درحال منشن کاربران فعال...", parse_mode="HTML")
+
+    members = []
+    try:
+        async for member in context.bot.get_chat_members(chat.id, limit=300):
+            if not member.user.is_bot and member.user.is_premium:
+                members.append(member.user)
+    except Exception as e:
+        return await update.message.reply_text(f"⚠️ خطا:\n<code>{e}</code>", parse_mode="HTML")
+
+    if not members:
+        return await update.message.reply_text("ℹ️ کاربر فعالی یافت نشد.")
+
+    text_group = ""
+    counter = 0
+    for user in members:
+        text_group += f"[{user.first_name}](tg://user?id={user.id}) "
+        counter += 1
+        if counter % TAG_LIMIT == 0:
+            try:
+                await context.bot.send_message(chat.id, f"{text_group}\n\n{args_text}", parse_mode="Markdown")
+            except:
+                pass
+            await asyncio.sleep(1.5)
+            text_group = ""
+    if text_group:
+        await context.bot.send_message(chat.id, f"{text_group}\n\n{args_text}", parse_mode="Markdown")
+
+    await update.message.reply_text("✅ تگ کاربران فعال انجام شد.", parse_mode="HTML")
+
+# 🧠 هندلر کلی (alias)
+async def group_text_handler_adv(update, context):
+    text = update.message.text.strip().lower()
+    for cmd, aliases in ALIASES_ADV.items():
+        for alias in aliases:
+            if text.startswith(alias):
+                args = text.replace(alias, "").strip().split()
+                context.args = args
+                handlers = {
+                    "addfilter": handle_addfilter,
+                    "delfilter": handle_delfilter,
+                    "filters": handle_filters,
+                    "tagall": handle_tagall,
+                    "tagactive": handle_tagactive
+                }
+                if cmd in handlers:
+                    return await handlers[cmd](update, context)
     
 # ======================= 🚀 اجرای نهایی =======================
 
