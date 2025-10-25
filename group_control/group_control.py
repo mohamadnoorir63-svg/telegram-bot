@@ -680,39 +680,20 @@ async def group_text_handler_adv(update, context):
 
 # ======================= 🧩 سیستم alias برای شخصی‌سازی دستورات =======================
 
-async def handle_alias(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """افزودن یا تغییر alias برای دستورها توسط سودوها"""
-    if not await is_authorized(update, context):
-        return await update.message.reply_text("🚫 فقط مدیران یا سودوها مجاز به تغییر alias هستند!")
-
-    text = update.message.text.strip()
-    parts = text.split(maxsplit=2)
-
-    if len(parts) < 3:
-        return await update.message.reply_text(
-            "🧩 استفاده صحیح:\n\n"
-            "<code>alias [دستور] [عبارت جدید]</code>\n\n"
-            "مثلاً:\n"
-            "<code>alias ban محروم</code>",
-            parse_mode="HTML"
-        )
-
-    _, command, new_alias = parts
-    command = command.lower().strip()
-    new_alias = new_alias.strip().lower()
-
-    if command not in ALIASES:
-        return await update.message.reply_text("⚠️ همچین دستوری پیدا نشد!")
-
-    # افزودن alias جدید
-    if new_alias not in ALIASES[command]:
-        ALIASES[command].append(new_alias)
-        save_json_file(ALIASES_FILE, ALIASES)
-        await update.message.reply_text(f"✅ alias جدید برای <b>{command}</b> ثبت شد: <b>{new_alias}</b>", parse_mode="HTML")
-    else:
-        await update.message.reply_text("ℹ️ این alias از قبل وجود دارد.", parse_mode="HTML")
-
-
-# ======================= ✅ پایان سیستم مدیریت گروه =======================
-
-print("✅ [Group Control System] با موفقیت بارگذاری شد.")
+async def group_text_handler_adv(update, context):
+    text = update.message.text.strip().lower()
+    for cmd, aliases in ALIASES_ADV.items():
+        for alias in aliases:
+            if text.startswith(alias):
+                args = text.replace(alias, "").strip().split()
+                context.args = args
+                handlers = {
+                    "addfilter": handle_addfilter,
+                    "delfilter": handle_delfilter,
+                    "filters": handle_filters,
+                    "tagall": handle_tagall,
+                    "tagactive": handle_tagactive
+                }
+                if cmd in handlers:
+                    return await handlers[cmd](update, context)
+    return
