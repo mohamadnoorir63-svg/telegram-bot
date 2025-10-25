@@ -1841,20 +1841,20 @@ if __name__ == "__main__":
     app.add_handler(CommandHandler("reload", reload_memory))
     app.add_handler(CommandHandler("broadcast", broadcast))
     # ======================= 👑 مدیریت سودوها =======================
-async def list_sudos(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id not in SUDO_IDS:
-        return await update.message.reply_text("⛔ فقط سودوها مجازند!")
+    async def list_sudos(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        if update.effective_user.id not in SUDO_IDS:
+            return await update.message.reply_text("⛔ فقط سودوها مجازند!")
 
-    text = "👑 <b>لیست سودوهای فعلی:</b>\n\n"
-    for i, sid in enumerate(SUDO_IDS, start=1):
-        text += f"{i}. <code>{sid}</code>\n"
+        text = "👑 <b>لیست سودوهای فعلی:</b>\n\n"
+        for i, sid in enumerate(SUDO_IDS, start=1):
+            text += f"{i}. <code>{sid}</code>\n"
 
-    await update.message.reply_text(text, parse_mode="HTML")
+        await update.message.reply_text(text, parse_mode="HTML")
 
-# ✅ اضافه‌شدن به هندلرها باید بیرون از تابع باشه
-app.add_handler(CommandHandler("cloudsync", cloudsync))
-app.add_handler(CommandHandler("leave", leave))
-app.add_handler(CommandHandler("reply", toggle_reply_mode))
+    # ✅ اضافه‌شدن به هندلرها باید بیرون از تابع باشه
+    app.add_handler(CommandHandler("cloudsync", cloudsync))
+    app.add_handler(CommandHandler("leave", leave))
+    app.add_handler(CommandHandler("reply", toggle_reply_mode))
     
     # ==========================================================
     # 🎨 فونت‌ساز خنگول (با حالت گفت‌وگویی و ضد اسپم گروه)
