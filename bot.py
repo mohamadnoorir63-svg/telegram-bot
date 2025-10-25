@@ -59,6 +59,34 @@ status = {
     "welcome": True,
     "locked": False
 }
+# ======================= 🧠 جلوگیری از پاسخ تکراری و پاسخ به خودش =======================
+def is_valid_message(update):
+    """فیلتر برای جلوگیری از پاسخ تکراری یا پاسخ به پیام‌های ربات"""
+    msg = update.effective_message
+    if not msg:
+        return False
+
+    # جلوگیری از پاسخ به خودش (پیام ربات)
+    if msg.from_user and msg.from_user.is_bot:
+        return False
+
+    text = msg.text or msg.caption or ""
+    if not text.strip():
+        return False
+
+    # حافظه کوتاه برای جلوگیری از تکرار
+    global LAST_MESSAGES
+    if "LAST_MESSAGES" not in globals():
+        LAST_MESSAGES = {}
+
+    user_id = msg.from_user.id if msg.from_user else None
+    last_msg = LAST_MESSAGES.get(user_id)
+
+    if last_msg == text:
+        return False  # پیام تکراری → پاسخ نده
+
+    LAST_MESSAGES[user_id] = text
+    return True
 # ======================= 💬 ریپلی مود گروهی و محدود به مدیران =======================
 REPLY_FILE = "reply_status.json"
 
@@ -784,6 +812,8 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ======================= 💬 پاسخ و هوش مصنوعی =======================
 async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """پاسخ‌دهی اصلی هوش مصنوعی و سیستم یادگیری"""
+    if not is_valid_message(update):
+        return
 
     # 🚫 جلوگیری از پاسخ هوشمند در صورت اجرای دستور سفارشی
     if context.user_data.get("custom_handled"):
