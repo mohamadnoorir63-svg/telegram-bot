@@ -2565,12 +2565,16 @@ async def group_text_handler_adv(update, context):
                 }
                 if cmd in handlers:
      
+
+    # ======================= 🚀 اجرای نهایی =======================
+from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, CallbackQueryHandler, filters
+
 if __name__ == "__main__":
-    from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, CallbackQueryHandler, filters
-    print("🤖 خنگول فارسی آماده به خدمت است ...")
+    print("🤖 خنگول فارسی 8.7 Cloud+ Supreme Pro Stable+ آماده به خدمت است ...")
+
     app = ApplicationBuilder().token(TOKEN).build()
-    ...
-    
+    app.add_error_handler(handle_error)
+
     # ✅ هندلرهای سودو
     app.add_handler(CommandHandler("addsudo", add_sudo))
     app.add_handler(CommandHandler("delsudo", del_sudo))
@@ -2642,22 +2646,20 @@ if __name__ == "__main__":
     app.add_handler(MessageHandler(filters.Regex(r"^اذان"), get_azan_time))
     app.add_handler(MessageHandler(filters.Regex(r"^رمضان"), get_ramadan_status))
 
-    # 🌦 آب‌وهوا — قبل از reply
+    # 🌦 آب‌وهوا
     app.add_handler(CallbackQueryHandler(show_weather, pattern="^panel_weather$"), group=-3)
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, show_weather), group=-3)
 
-    # 🧾 راهنمای قابل ویرایش (فقط یکبار ثبت help — تکراری حذف شد)
+    # 🧾 راهنمای قابل ویرایش
     app.add_handler(MessageHandler(filters.Regex("^ثبت help$"), save_help))
     app.add_handler(MessageHandler(filters.Regex("^راهنما$"), show_custom_guide))
     app.add_handler(MessageHandler(filters.Regex("^ثبت راهنما$"), save_custom_guide))
 
-    # 📂 مدیریت فایل‌ها (بازیابی و ...)
+    # 📂 فایل‌ها و پنل‌ها
     app.add_handler(MessageHandler(filters.Document.ALL, handle_document), group=1)
-
-    # ⚠️ آخرین CallbackQueryHandler
     app.add_handler(CallbackQueryHandler(panel_handler))
 
-    # 🧠 فیلترها و دستورات متنی سطح گروه (اولویت‌ها)
+    # 🧠 فیلترها و دستورات متنی
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, group_text_handler_adv), group=0)
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, check_filtered_messages), group=1)
 
@@ -2667,7 +2669,7 @@ if __name__ == "__main__":
     app.add_handler(CommandHandler("listcmds", list_commands))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_custom_command), group=-4)
 
-    # 🎭 پاسخ هوشمند خنگول (انتهای زنجیره)
+    # 🎭 پاسخ هوشمند خنگول
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, reply), group=2)
 
     # 🔹 وظایف استارتاپ
@@ -2685,4 +2687,4 @@ if __name__ == "__main__":
         app.run_polling(allowed_updates=Update.ALL_TYPES)
     except Exception as e:
         print(f"⚠️ خطا در اجرای ربات:\n{e}")
-        print("♻️ ربات به‌صورت خودکار توسط هاست ری‌استارت خواهد شد ✅")               return await handlers[cmd](update, context)
+        print("♻️ ربات به‌صورت خودکار توسط هاست ری‌استارت خواهد شد ✅")
