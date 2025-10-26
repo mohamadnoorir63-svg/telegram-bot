@@ -52,7 +52,7 @@ from brain_bridge_group import process_group_message
 
 # 🧠 حافظه کوتاه‌مدت گفتگو برای Context AI
 context_memory = ContextMemory()
-(
+
 from ai_chat.chatgpt_panel import show_ai_panel, chat, start_ai_chat, stop_ai_chat
 from weather_module.weather_panel import show_weather
 from modules.azan_module import get_azan_time, get_ramadan_status
