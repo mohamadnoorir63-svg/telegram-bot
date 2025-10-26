@@ -33,7 +33,7 @@ from memory_manager import (
     list_phrases
 )
 
-)
+
 from jokes_manager import save_joke, list_jokes
 from fortune_manager import save_fortune, list_fortunes, send_random_fortune
 from group_manager import register_group_activity, get_group_stats
