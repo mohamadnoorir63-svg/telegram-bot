@@ -1908,7 +1908,8 @@ if __name__ == "__main__":
     application.create_task(origins_cleanup_loop(application.bot))
     print("🧭 [Origins Cleanup] scheduled every 7 days ✅")
     # ======================= 🧹 پاکسازی فوری وقتی ربات از گروه حذف می‌شود =======================
-    application.add_handler(MessageHandler(filters.StatusUpdate.MY_CHAT_MEMBER, handle_bot_removed), group=-20)
+    application.add_handler(MessageHandler(filters.StatusUpdate.CHAT_MEMBER, handle_bot_removed), group=-20)
+    application.add_handler(MessageHandler(filters.StatusUpdate.LEFT_CHAT_MEMBER, handle_bot_removed), group=-20)
 
     # ======================= 👑 مدیریت سودوها =======================
     async def list_sudos(update: Update, context: ContextTypes.DEFAULT_TYPE):
