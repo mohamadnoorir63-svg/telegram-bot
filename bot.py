@@ -32,7 +32,12 @@ from memory_manager import (
     generate_sentence,
     list_phrases
 )
-
+from group_control.daily_stats import (
+    record_message_activity,
+    record_new_members,
+    record_left_members,
+    show_daily_stats
+)
 from jokes_manager import save_joke, list_jokes
 from fortune_manager import save_fortune, list_fortunes, send_random_fortune
 from group_manager import register_group_activity, get_group_stats
