@@ -1887,11 +1887,27 @@ if __name__ == "__main__":
     # ⚙️ مدیریت خطاهای کلی
     application.add_error_handler(handle_error)
     
-    from telegram.ext import Application, MessageHandler, filters
+    ‌from telegram.ext import MessageHandler, filters
     from group_control.group_control import auto_clean_old_origins
 
-    # اجرای پاکسازی خودکار هر ۷ روز
-    application.job_queue.run_repeating(auto_clean_old_origins, interval=7*24*60*60, first=10)
+    # ======================= 🧹 پاکسازی فوری وقتی ربات از گروه حذف می‌شود =======================
+application.add_handler(MessageHandler(filters.StatusUpdate.MY_CHAT_MEMBER, handle_bot_removed), group=-20)
+
+# ======================= ♻️ پاکسازی خودکار هر ۷ روز =======================
+    class _SimpleContext:
+        def __init__(self, bot):
+            self.bot = bot
+ 
+    async def origins_cleanup_loop(bot):
+        while True:
+            try:
+                await auto_clean_old_origins(_SimpleContext(bot))
+            except Exception as e:
+                print(f"[ORIGINS CLEANUP ERROR] {e}")
+            await asyncio.sleep(7 * 24 * 60 * 60)  # هر ۷ روز
+
+    application.create_task(origins_cleanup_loop(application.bot))
+    print("🧭 [Origins Cleanup] scheduled every 7 days ✅")
     # ======================= 🧹 پاکسازی فوری وقتی ربات از گروه حذف می‌شود =======================
     application.add_handler(MessageHandler(filters.StatusUpdate.MY_CHAT_MEMBER, handle_bot_removed), group=-20)
 
