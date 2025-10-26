@@ -81,32 +81,52 @@ from modules.azan_module import get_azan_time, get_ramadan_status
 import asyncio
 from group_control.group_control import auto_clean_old_origins, handle_bot_removed
 # ======================= ⚙️ تنظیمات پایه و سودوها =======================
-import os, json
+# ======================= ⚙️ تنظیمات پایه و سودوها + وضعیت عملکرد =======================
+import os
+import json
 
-# 🔑 توکن ربات از ENV (Heroku یا لوکال)
+# 🔑 خواندن توکن ربات از متغیر محیطی (Heroku یا لوکال)
 TOKEN = os.getenv("BOT_TOKEN")
-if not TOKEN:
-    raise RuntimeError("❌ BOT_TOKEN تعریف نشده است! در Heroku Config Vars مقدار بده.")
 
-# 📁 فایل لیست سودوها
+if not TOKEN:
+    raise RuntimeError("❌ BOT_TOKEN تعریف نشده است! لطفاً در تنظیمات Heroku مقدار بده.")
+
+# 📁 فایل ذخیره سودوها
 SUDO_FILE = "sudo_list.json"
 
 def load_sudos():
+    """بارگذاری لیست سودوها از فایل"""
     if os.path.exists(SUDO_FILE):
         try:
             with open(SUDO_FILE, "r", encoding="utf-8") as f:
-                return json.load(f)
-        except:
-            pass
-    # اگر فایل وجود ندارد یا خراب است، فقط سودوی اصلی
+                data = json.load(f)
+                # بررسی اینکه داده واقعاً لیست باشه
+                if isinstance(data, list):
+                    return data
+        except Exception as e:
+            print(f"⚠️ خطا در خواندن {SUDO_FILE}: {e}")
+    # در صورت نبود فایل یا خرابی، سودوی اصلی (مدیر اصلی) برگردون
     return [7089376754]
 
 def save_sudos(data):
-    with open(SUDO_FILE, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
+    """ذخیره‌سازی لیست سودوها در فایل"""
+    try:
+        with open(SUDO_FILE, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        print(f"⚠️ خطا در ذخیره {SUDO_FILE}: {e}")
 
-# ✅ بارگذاری سودوها در شروع
+# ✅ بارگذاری سودوها هنگام شروع ربات
 SUDO_IDS = load_sudos()
+
+# 🧠 وضعیت عملکرد ربات (برای کنترل حالت‌ها)
+status = {
+    "active": True,      # وضعیت کلی ربات (فعال / غیرفعال)
+    "learning": True,    # حالت یادگیری روشن
+    "welcome": True,     # پیام خوش‌آمد فعال
+    "locked": False      # قفل کلی ربات (در صورت True، فقط سودو می‌تواند کار کند)
+}
+
 # ======================= 🧠 جلوگیری از پاسخ تکراری و پاسخ به خودش =======================
 def is_valid_message(update):
     """فیلتر برای جلوگیری از پاسخ تکراری یا پاسخ به پیام‌های ربات"""
