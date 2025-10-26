@@ -32,11 +32,7 @@ from memory_manager import (
     generate_sentence,
     list_phrases
 )
-from group_control.daily_stats import (
-    record_message_activity,
-    record_new_members,
-    record_left_members,
-    show_daily_stats
+
 )
 from jokes_manager import save_joke, list_jokes
 from fortune_manager import save_fortune, list_fortunes, send_random_fortune
@@ -67,7 +63,11 @@ from group_control.group_control import (
     handle_unpin,      # 📍 برداشتن پین
     is_authorized      # ✅ بررسی مدیر یا سودو
 )
-
+from group_control.daily_stats import (
+    record_message_activity,
+    record_new_members,
+    record_left_members,
+    show_daily_stats
 from context_memory import ContextMemory
 from brain_bridge_group import process_group_message
 
@@ -1998,9 +1998,7 @@ if __name__ == "__main__":
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, record_message_activity))
     application.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, record_new_members))
     application.add_handler(MessageHandler(filters.StatusUpdate.LEFT_CHAT_MEMBER, record_left_members))
-    application.add_handler(MessageHandler(filters.Regex("^آمار$"), show_daily_stats))
- 
-    application.add_handler(MessageHandler(filters.Regex("^آمار$"), show_daily_stats))
+    application.add_handler(MessageHandler(filters.Regex("^(آمار|آمار امروز)$"), show_daily_stats))
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("toggle", toggle))
     application.add_handler(CommandHandler("welcome", toggle_welcome))
