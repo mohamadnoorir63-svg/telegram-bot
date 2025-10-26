@@ -81,10 +81,95 @@ from modules.azan_module import get_azan_time, get_ramadan_status
 import asyncio
 from group_control.group_control import auto_clean_old_origins, handle_bot_removed
 # ======================= ⚙️ تنظیمات پایه و سودوها =======================
-# ======================= ⚙️ تنظیمات پایه و سودوها + وضعیت عملکرد =======================
+from telegram import Update
+from telegram.ext import ContextTypes
+
+async def add_sudo(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    if user.id not in SUDO_IDS:
+        return await update.message.reply_text("⛔ فقط مدیر اصلی یا سودوها می‌تونن سودو اضافه کنن!")
+
+    if not context.args:
+        return await update.message.reply_text("🔹 استفاده: /addsudo <ID>")
+
+    try:
+        new_id = int(context.args[0])
+        if new_id in SUDO_IDS:
+            return await update.message.reply_text("⚠️ این کاربر از قبل سودو هست!")
+
+        SUDO_IDS.append(new_id)
+        save_sudos(SUDO_IDS)
+        await update.message.reply_text(
+            f"✅ کاربر با آیدی <code>{new_id}</code> به لیست سودوها اضافه شد.",
+            parse_mode="HTML"
+        )
+    except:
+        await update.message.reply_text("⚠️ لطفاً آیدی عددی معتبر وارد کن!")
 
 
+async def del_sudo(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    if user.id not in SUDO_IDS:
+        return await update.message.reply_text("⛔ فقط مدیر اصلی یا سودوها می‌تونن حذف کنن!")
 
+    if not context.args:
+        return await update.message.reply_text("🔹 استفاده: /delsudo <ID>")
+
+    try:
+        rem_id = int(context.args[0])
+        if rem_id not in SUDO_IDS:
+            return await update.message.reply_text("⚠️ این کاربر سودو نیست!")
+
+        SUDO_IDS.remove(rem_id)
+        save_sudos(SUDO_IDS)
+        await update.message.reply_text(
+            f"🗑️ کاربر <code>{rem_id}</code> از لیست سودوها حذف شد.",
+            parse_mode="HTML"
+        )
+    except:
+        await update.message.reply_text("⚠️ آیدی معتبر وارد کن!")
+
+
+async def list_sudos(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id not in SUDO_IDS:
+        return await update.message.reply_text("⛔ فقط سودوها مجازند!")
+
+    text = "👑 <b>لیست سودوهای فعلی:</b>\n\n"
+    for i, sid in enumerate(SUDO_IDS, start=1):
+        text += f"{i}. <code>{sid}</code>\n"
+
+    await update.message.reply_text(text, parse_mode="HTML")
+# 🧠 نکته مهم:
+# ❌ از اینجا دیگه admin_panel رو import نکن!
+# ✅ اون رو بعد از ساخت app در بخش اصلی فایل (پایین) اضافه خواهیم کرد.
+# 🎯 تنظیمات پایه
+TOKEN = os.getenv("BOT_TOKEN")
+import json
+
+ADMIN_FILE = "sudo_list.json"
+
+def load_sudos():
+    if os.path.exists(ADMIN_FILE):
+        try:
+            with open(ADMIN_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except:
+            pass
+    return [7089376754]  # آیدی مدیر اصلی به‌صورت پیش‌فرض
+
+def save_sudos(data):
+    with open(ADMIN_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
+SUDO_IDS = load_sudos()
+init_files()
+
+status = {
+    "active": True,
+    "learning": True,
+    "welcome": True,
+    "locked": False
+}
 # ======================= 🧠 جلوگیری از پاسخ تکراری و پاسخ به خودش =======================
 def is_valid_message(update):
     """فیلتر برای جلوگیری از پاسخ تکراری یا پاسخ به پیام‌های ربات"""
