@@ -1880,7 +1880,9 @@ if __name__ == "__main__":
     # ⚙️ مدیریت خطاهای کلی
     application.add_error_handler(handle_error)
 
-    # ======================= 🧹 پاکسازی داده‌های گروه وقتی ربات حذف شد =======================
+    # ==========================================================
+    # 🧹 پاکسازی داده‌های گروه وقتی ربات حذف یا بیرون انداخته می‌شود
+    # ==========================================================
     from telegram.ext import ChatMemberHandler
     from group_control.group_control import origins, save_origins
 
@@ -1925,7 +1927,9 @@ if __name__ == "__main__":
     # 🧠 فیلتر کلمات و تگ کاربران
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, group_text_handler_adv), group=-8)
 
-    # ====================== 🧹 پاکسازی بدون / (فارسی + انگلیسی) ======================
+    # ==========================================================
+    # 🧹 پاکسازی فارسی و انگلیسی بدون اسلش
+    # ==========================================================
     import re
 
     async def clean_handler(update, context):
@@ -1944,10 +1948,7 @@ if __name__ == "__main__":
 
     clean_pattern = r"^(پاکسازی|پاک کن|پاک|حذف پیام|نظافت|delete|clear|clean)(.*)$"
 
-    application.add_handler(
-        MessageHandler(filters.Regex(clean_pattern) & filters.TEXT, clean_handler),
-        group=-7
-    )
+    application.add_handler(MessageHandler(filters.Regex(clean_pattern) & filters.TEXT, clean_handler), group=-7)
 
     # ==========================================================
     # 👑 مدیریت سودوها
@@ -1956,7 +1957,9 @@ if __name__ == "__main__":
     application.add_handler(CommandHandler("delsudo", del_sudo))
     application.add_handler(CommandHandler("listsudos", list_sudos))
 
+    # ==========================================================
     # 💾 دستورات شخصی (ذخیره، حذف، اجرای دستورها)
+    # ==========================================================
     application.add_handler(CommandHandler("save", save_command))
     application.add_handler(CommandHandler("del", delete_command))
     application.add_handler(CommandHandler("listcmds", list_commands))
@@ -1964,7 +1967,9 @@ if __name__ == "__main__":
     # ✉️ پیام‌های متنی غیر از کامند → هندلر دستورات ذخیره‌شده
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_custom_command), group=-4)
 
+    # ==========================================================
     # 👑 مدیریت وضعیت ادمین (ورود و خروج)
+    # ==========================================================
     application.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, detect_admin_movement))
     application.add_handler(MessageHandler(filters.StatusUpdate.LEFT_CHAT_MEMBER, detect_admin_movement))
     application.add_handler(MessageHandler(filters.StatusUpdate.LEFT_CHAT_MEMBER, handle_left_chat))
