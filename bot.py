@@ -1894,8 +1894,8 @@ application.add_handler(MessageHandler(filters.StatusUpdate.MY_CHAT_MEMBER, hand
 
 # ======================= ♻️ پاکسازی خودکار هر ۷ روز =======================
     class _SimpleContext:
-        def __init__(self, bot):
-            self.bot = bot
+    def __init__(self, bot):
+        self.bot = bot
  
     async def origins_cleanup_loop(bot):
         while True:
