@@ -1881,6 +1881,9 @@ if __name__ == "__main__":
 
     # فیلتر کلمات + تگ کاربران
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, group_text_handler_adv), group=-8)
+    # 🧹 پاکسازی (برای حالت /clean یا /پاکسازی با اسلش)
+    from group_control import handle_clean
+    application.add_handler(CommandHandler(["clean", "پاکسازی"], handle_clean))
 
     # ==========================================================
     # 👑 مدیریت سودوها
