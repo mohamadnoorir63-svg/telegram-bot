@@ -36,7 +36,6 @@ from auto_brain.command_manager import (
     handle_custom_command,
     list_commands,
     cleanup_group_commands
-)
 
 from group_control.group_control import (
     group_command_handler,
@@ -44,8 +43,10 @@ from group_control.group_control import (
     group_text_handler_adv,
     handle_clean,      # 🧹 پاکسازی
     handle_pin,        # 📌 پین پیام
-    handle_unpin       # 📍 برداشتن پین
+    handle_unpin,      # 📍 برداشتن پین
+    is_authorized      # ✅ برای بررسی مجوز مدیر یا سودو
 )
+
 
 from context_memory import ContextMemory  # ✅ باید قبل از استفاده ازش باشه
 from brain_bridge_group import process_group_message
