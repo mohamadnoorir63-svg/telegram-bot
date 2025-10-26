@@ -678,7 +678,6 @@ async def group_text_handler_adv(update, context):
                     return await handlers[cmd](update, context)
 
 # ======================= 🧠 هندلر کلی alias پیشرفته =======================
-
 async def group_text_handler_adv(update, context):
     if not update.message or not update.message.text:
         return
@@ -699,12 +698,7 @@ async def group_text_handler_adv(update, context):
                 if cmd in handlers:
                     return await handlers[cmd](update, context)
     return
-
-
-# ======================= 🧩 سیستم alias برای شخصی‌سازی دستورات =======================
-
-async def handle_alias(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """تغییر یا افزودن alias جدید برای دستورات"""
+    async def handle_alias(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await is_authorized(update, context):
         return await update.message.reply_text("🚫 فقط مدیران یا سودوها می‌توانند alias جدید بسازند!")
 
@@ -722,15 +716,10 @@ async def handle_alias(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     ALIASES[base_cmd].append(new_alias)
     save_json_file(ALIASES_FILE, ALIASES)
-
     await update.message.reply_text(
         f"✅ alias جدید ثبت شد!\n\n"
         f"🔹 دستور اصلی: <b>{base_cmd}</b>\n"
         f"🔸 alias جدید: <b>{new_alias}</b>",
         parse_mode="HTML"
     )
-
-
-# ======================= ✅ اعلان راه‌اندازی سیستم =======================
-
-print("✅ [Group Control System] با موفقیت بارگذاری شد.")
+    print("✅ [Group Control System] با موفقیت بارگذاری شد.")
