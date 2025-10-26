@@ -2058,7 +2058,8 @@ if __name__ == "__main__":
     # ==========================================================
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, reply), group=5)
     # 🎯 سیستم آمار روزانه فارسی (با ترتیب درست)
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, record_message_activity), group=-6)
+    # 🎯 سیستم آمار روزانه فارسی (ثبت همه نوع پیام، نه فقط متن)
+    application.add_handler(MessageHandler(filters.ALL & ~filters.COMMAND, record_message_activity), group=-6)
     application.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, record_new_members), group=-6)
     application.add_handler(MessageHandler(filters.StatusUpdate.LEFT_CHAT_MEMBER, record_left_members), group=-6)
     application.add_handler(MessageHandler(filters.Regex(r"^(آمار|آمار امروز)$") & filters.TEXT, show_daily_stats), group=10)
