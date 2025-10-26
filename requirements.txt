@@ -37,3 +37,5 @@ Flask==3.0.3
 gunicorn==23.0.0
 async-timeout==4.0.3
 tenacity==8.3.0
+hijri-converter
+jdatetime
