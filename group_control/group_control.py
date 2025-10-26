@@ -264,24 +264,7 @@ async def handle_clean(update, context):
         pass
 
 
-    target = update.message.reply_to_message.from_user
-    chat = update.effective_chat
-    user = update.effective_user
-
-    try:
-        await context.bot.restrict_chat_member(chat.id, target.id, permissions=ChatPermissions(can_send_messages=True))
-        time_str = datetime.now().strftime("%H:%M - %d/%m/%Y")
-        await update.message.reply_text(
-            f"🔊 <b>{target.first_name}</b> از حالت سکوت خارج شد و اکنون می‌تواند صحبت کند.\n\n"
-            f"👤 <b>توسط:</b> {user.first_name}\n"
-            f"🕒 <b>زمان:</b> {time_str}",
-            parse_mode="HTML"
-        )
-    except:
-        await update.message.reply_text("⚠️ نمی‌توان سکوت این کاربر را برداشت (احتمالاً مدیر یا صاحب گروه است).", parse_mode="HTML")
-     
-
-
+    
 # 📌 پین کردن پیام (با ریپلای)
 async def handle_pin(update, context):
     if not await is_authorized(update, context):
