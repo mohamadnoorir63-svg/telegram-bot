@@ -1888,13 +1888,13 @@ if __name__ == "__main__":
 
     async def handle_bot_removed(update: Update, context: ContextTypes.DEFAULT_TYPE):
         """وقتی ربات از گروه حذف یا بیرون انداخته می‌شود، داده‌های اون گروه پاک می‌شود."""
-        my = update.my_chat_member
-        if not my:
+        if not update.my_chat_member:
             return
 
-        new_status = my.new_chat_member.status
-        if new_status in ("kicked", "left"):  # ربات از گروه حذف یا خارج شد
-            chat_id = str(update.effective_chat.id)
+        chat_id = str(update.effective_chat.id)
+        status = update.my_chat_member.new_chat_member.status
+
+        if status in ("kicked", "left"):
             if chat_id in origins:
                 del origins[chat_id]
                 save_origins(origins)
@@ -1947,7 +1947,6 @@ if __name__ == "__main__":
         await handle_clean(update, context)
 
     clean_pattern = r"^(پاکسازی|پاک کن|پاک|حذف پیام|نظافت|delete|clear|clean)(.*)$"
-
     application.add_handler(MessageHandler(filters.Regex(clean_pattern) & filters.TEXT, clean_handler), group=-7)
 
     # ==========================================================
@@ -2052,7 +2051,7 @@ if __name__ == "__main__":
     # ==========================================================
     try:
         print("🔄 در حال اجرای ربات...")
-        application.run_polling(allowed_updates=Update.ALL_TYPES)
+        application.run_polling(allowed_updates=["message", "chat_member", "my_chat_member", "callback_query"])
     except Exception as e:
         print(f"⚠️ خطا در اجرای ربات:\n{e}")
         print("♻️ ربات به‌صورت خودکار توسط هاست ری‌استارت خواهد شد ✅")
