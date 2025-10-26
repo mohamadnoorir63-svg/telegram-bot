@@ -2,6 +2,7 @@
 
 import os
 import json
+import asyncio
 from datetime import datetime, timedelta
 import jdatetime
 from telegram import Update
@@ -136,26 +137,69 @@ async def show_daily_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
         today = datetime.now().strftime("%Y-%m-%d")
         text_input = update.message.text.strip().lower()
 
-        # 📌 آیدی
+        # 📌 حالت "آیدی"
         if text_input in ["آیدی", "id"]:
+            # اگر روی پیام کسی ریپلای شده → آیدی همون فرد
+            if update.message.reply_to_message:
+                target = update.message.reply_to_message.from_user
+            else:
+                target = user  # در غیر اینصورت، خود فرد
+
             jalali_date = jdatetime.datetime.now().strftime("%A %d %B %Y")
             time_str = datetime.now().strftime("%H:%M:%S")
-            user_link = f"<a href='tg://user?id={user.id}'>{user.first_name}</a>"
+            user_link = f"<a href='tg://user?id={target.id}'>{target.first_name}</a>"
+
             text = (
-                f"🧿 <b>اطلاعات شما:</b>\n\n"
+                f"🧿 <b>اطلاعات کاربر:</b>\n\n"
                 f"👤 {user_link}\n"
-                f"🆔 <b>ID:</b> <code>{user.id}</code>\n"
+                f"🆔 <b>ID:</b> <code>{target.id}</code>\n"
                 f"💬 <b>گروه:</b> {update.effective_chat.title}\n"
                 f"🏷 <b>Chat ID:</b> <code>{chat_id}</code>\n"
                 f"📆 <b>تاریخ:</b> {jalali_date}\n"
                 f"🕒 <b>ساعت:</b> {time_str}"
             )
-            await update.message.reply_text(text, parse_mode="HTML")
+
+            try:
+                # 📸 دریافت عکس پروفایل هدف
+                photos = await context.bot.get_user_profile_photos(target.id, limit=1)
+                if photos.total_count > 0:
+                    photo = photos.photos[0][-1].file_id
+                    msg = await context.bot.send_photo(
+                        chat_id=chat_id,
+                        photo=photo,
+                        caption=text,
+                        parse_mode="HTML"
+                    )
+                else:
+                    msg = await update.message.reply_text(text, parse_mode="HTML")
+
+                # 🕒 حذف خودکار پیام بعد از 15 ثانیه
+                await asyncio.sleep(15)
+                try:
+                    await context.bot.delete_message(chat_id, msg.message_id)
+                except:
+                    pass
+
+            except Exception as e:
+                print(f"⚠️ خطا در دریافت عکس پروفایل: {e}")
+                msg = await update.message.reply_text(text, parse_mode="HTML")
+                await asyncio.sleep(15)
+                try:
+                    await context.bot.delete_message(chat_id, msg.message_id)
+                except:
+                    pass
+
             return
 
         # 📊 آمار روزانه
         if chat_id not in stats or today not in stats[chat_id]:
-            return await update.message.reply_text("ℹ️ هنوز فعالیتی برای امروز ثبت نشده است.")
+            msg = await update.message.reply_text("ℹ️ هنوز فعالیتی برای امروز ثبت نشده است.")
+            await asyncio.sleep(15)
+            try:
+                await context.bot.delete_message(chat_id, msg.message_id)
+            except:
+                pass
+            return
 
         data = stats[chat_id][today]
         now = datetime.now()
@@ -200,7 +244,14 @@ async def show_daily_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"✧ <b>اعضای لفت داده :</b> {data['lefts']}\n"
         )
 
-        await update.message.reply_text(text, parse_mode="HTML")
+        msg = await update.message.reply_text(text, parse_mode="HTML")
+
+        # 🕒 حذف خودکار پیام آمار بعد از 15 ثانیه
+        await asyncio.sleep(15)
+        try:
+            await context.bot.delete_message(chat_id, msg.message_id)
+        except:
+            pass
 
     except Exception as e:
         print(f"⚠️ خطا در show_daily_stats: {e}")
