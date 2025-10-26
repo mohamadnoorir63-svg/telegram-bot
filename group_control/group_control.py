@@ -214,7 +214,7 @@ async def handle_unmute(update, context):
 
     try:
         await context.bot.restrict_chat_member(
-            chat.id,
+            chat.id, 
             target.id,
             permissions=ChatPermissions(can_send_messages=True)
         )
@@ -250,7 +250,6 @@ async def handle_clean(update, context):
             parse_mode="HTML"
         )
 
-    # تنظیم limit
     limit = 100
     if args and args[0].isdigit():
         limit = min(int(args[0]), 500)
@@ -262,15 +261,21 @@ async def handle_clean(update, context):
 
     progress = await message.reply_text("🧹 در حال پاکسازی...", parse_mode="HTML")
 
+    protected_ids = {message.message_id, progress.message_id}
+
     async def delete_safely(msg_id):
         nonlocal deleted
         try:
+            if msg_id in protected_ids:
+                return
             await context.bot.delete_message(chat.id, msg_id)
             deleted += 1
-            # فاصله‌ی تصادفی بین هر حذف برای جلوگیری از پر شدن pool
-            await asyncio.sleep(random.uniform(0.25, 0.5))
+            await asyncio.sleep(random.uniform(0.25, 0.45))
             if deleted % 20 == 0:
-                await progress.edit_text(f"🧹 حذف شده: {deleted}/{limit}", parse_mode="HTML")
+                try:
+                    await progress.edit_text(f"🧹 حذف شده: {deleted}/{limit}", parse_mode="HTML")
+                except:
+                    pass
         except RetryAfter as e:
             await asyncio.sleep(e.retry_after + 1)
         except (BadRequest, TimedOut):
@@ -279,7 +284,6 @@ async def handle_clean(update, context):
             await asyncio.sleep(0.3)
 
     try:
-        # گرفتن پیام‌ها با متد جدید (بدون get_chat_history)
         last_msg_id = message.message_id
         for i in range(limit):
             msg_id = last_msg_id - i - 1
@@ -296,7 +300,6 @@ async def handle_clean(update, context):
         return await progress.edit_text(f"⚠️ خطا در پاکسازی:\n<code>{e}</code>", parse_mode="HTML")
 
     await progress.edit_text(f"✅ پاکسازی انجام شد.\n🗑 تعداد حذف‌شده: <b>{deleted}</b>", parse_mode="HTML")
- 
 
 
     
