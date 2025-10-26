@@ -1004,12 +1004,6 @@ async def group_text_handler_adv(update, context):
 
     text = update.message.text.strip().lower()
 
-    # 🧿 دستورات مربوط به «اصل» برای هر گروه
-    if text.startswith("ثبت اصل") or text.startswith("set origin") or text.startswith("setorigin"):
-        return await handle_set_origin(update, context)
-
-    if text in ["اصل", "اصلش", "origin", "اصل من", "اصل خودم", "my origin"]:
-        return await handle_show_origin(update, context)
 
     # ⚙️ aliasهای پیشرفته (فیلترها و تگ‌ها)
     for cmd, aliases in ALIASES_ADV.items():
