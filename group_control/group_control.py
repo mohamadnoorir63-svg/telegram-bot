@@ -310,6 +310,8 @@ async def handle_clean(update, context):
         # ❌ هیچ خطایی نمایش داده نمی‌شود
         pass
 
+            
+
         # 📌 پیام پایانی تمیزکاری (پین می‌شود)
         try:
             clean_note = await context.bot.send_message(
