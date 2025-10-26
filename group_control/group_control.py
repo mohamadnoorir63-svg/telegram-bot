@@ -620,15 +620,15 @@ async def handle_admins(update, context):
         text += f"{idx}. <a href='tg://user?id={admin_id}'>مدیر {idx}</a>\n"
 
     await update.message.reply_text(text, parse_mode="HTML")
-    
-# ======================= 🧿 سیستم «اصل» مخصوص هر گروه =======================
+# ======================= 💎 سیستم «اصل» پیشرفته مخصوص هر گروه =======================
 import json, os
 from telegram import Update
 from telegram.ext import ContextTypes
 
 ORIGIN_FILE = "origins.json"
-SUDO_IDS = [7089376754]  # 👈 آی‌دی‌های سودو (مدیران کل ربات)
+SUDO_IDS = [7089376754]  # 👑 آی‌دی سودوها
 
+# 📂 بارگذاری و ذخیره‌سازی
 def load_origins():
     if os.path.exists(ORIGIN_FILE):
         try:
@@ -644,8 +644,7 @@ def save_origins(data):
 
 origins = load_origins()
 
-
-# 🧠 بررسی مدیر یا سودو بودن
+# 👑 بررسی مدیر یا سودو بودن
 async def is_admin_or_sudo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     chat = update.effective_chat
@@ -660,17 +659,16 @@ async def is_admin_or_sudo(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return False
 
 
-# 🧹 پاکسازی خودکار داده وقتی ربات از گروه حذف شود
+# 🧹 پاکسازی داده‌های گروه وقتی ربات حذف شد
 async def handle_bot_removed(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    chat = update.effective_chat
-    chat_id = str(chat.id)
+    chat_id = str(update.effective_chat.id)
     if chat_id in origins:
         del origins[chat_id]
         save_origins(origins)
-        print(f"🧹 داده‌های گروه {chat_id} حذف شد چون ربات از گروه خارج شد.")
+        print(f"🧹 داده‌های گروه {chat_id} پاک شد (ربات از گروه حذف شد).")
 
 
-# ➕ ثبت اصل (فقط برای مدیرها و سودوها)
+# ➕ ثبت اصل (فقط مدیرها و سودوها)
 async def handle_set_origin(update, context):
     message = update.message
     user = update.effective_user
@@ -681,43 +679,51 @@ async def handle_set_origin(update, context):
         return await message.reply_text("🚫 فقط مدیران گروه یا سودوها می‌توانند اصل ثبت کنند!")
 
     raw_text = message.text.strip()
+    origin_text = ""
 
-    # حذف کلیدواژه‌های شروع
+    # حذف عبارت‌های شروع دستور
     for key in ["ثبت اصل", "set origin", "setorigin"]:
         if raw_text.lower().startswith(key):
             origin_text = raw_text[len(key):].strip()
             break
-    else:
-        origin_text = ""
 
+    # 🎯 اگر فقط نوشته "ثبت اصل" و ریپلای کرده → متن پیام اون فرد بشه اصل
+    if not origin_text and message.reply_to_message:
+        origin_text = message.reply_to_message.text or ""
+
+    # ⚠️ اگر باز هم خالی بود
     if not origin_text:
-        return await message.reply_text(
-            "🧾 لطفاً بعد از دستور، متن اصل را بنویس.\nمثلاً:\n<b>ثبت اصل گرگ خاکستری</b>",
-            parse_mode="HTML"
-        )
+        return await message.reply_text("⚠️ لطفاً متن اصل را بنویس یا روی پیام فردی ریپلای بزن.")
 
-    # اگر ریپلای کرده بود → برای آن کاربر، در غیر این صورت برای خودش
-    if message.reply_to_message:
-        target = message.reply_to_message.from_user
-    else:
-        target = user
+    # 🎯 هدف: ریپلای → اون کاربر / بدون ریپلای → خودش
+    target = message.reply_to_message.from_user if message.reply_to_message else user
 
-    # اگر گروه هنوز در فایل نیست، بساز
+    # ساخت فضای مخصوص گروه
     if chat_id not in origins:
         origins[chat_id] = {}
 
-    # ثبت اصل
+    # ذخیره‌سازی اصل
     origins[chat_id][str(target.id)] = origin_text
     save_origins(origins)
 
-    await message.reply_text(
-        f"✅ <b>اصل</b> برای <a href='tg://user?id={target.id}'>{target.first_name}</a> در این گروه ذخیره شد:\n"
-        f"🧿 <b>{origin_text}</b>",
-        parse_mode="HTML"
-    )
+    # ✨ پیام نهایی زیبا
+    if target.id == user.id:
+        # خودش برای خودش ثبت کرده
+        msg = (
+            f"💫 اصل شخصی شما با موفقیت ثبت شد ❤️\n\n"
+            f"🧿 <b>{origin_text}</b>"
+        )
+    else:
+        # مدیر برای کسی دیگه ثبت کرده
+        msg = (
+            f"✅ اصل جدید برای <a href='tg://user?id={target.id}'>{target.first_name}</a> ثبت شد 💠\n\n"
+            f"🧿 <b>{origin_text}</b>"
+        )
+
+    await message.reply_text(msg, parse_mode="HTML")
 
 
-# 🔍 نمایش اصل (برای همه کاربران)
+# 🔍 نمایش اصل (برای همه)
 async def handle_show_origin(update, context):
     message = update.message
     text = message.text.strip().lower()
@@ -725,13 +731,16 @@ async def handle_show_origin(update, context):
     chat_id = str(update.effective_chat.id)
 
     target = None
+
+    # اگر ریپلای کرده → اصل اون فرد رو نشون بده
     if message.reply_to_message:
         target = message.reply_to_message.from_user
-    else:
-        if text in ["اصل من", "اصل خودم", "my origin"]:
-            target = user
-        elif text in ["اصل", "اصلش", "origin"]:
-            return  # چیزی نگو
+    # اگر نوشته "اصل من" → خودش
+    elif text in ["اصل من", "اصل خودم", "my origin"]:
+        target = user
+    # اگر فقط نوشت "اصل" بدون ریپلای → هیچی نگو
+    elif text in ["اصل", "اصلش", "origin"]:
+        return
 
     if not target:
         return
@@ -739,18 +748,20 @@ async def handle_show_origin(update, context):
     group_origins = origins.get(chat_id, {})
     origin_text = group_origins.get(str(target.id))
 
+    # اگر اصل داشت نشون بده، نداشت سکوت کن
     if origin_text:
-        try:
+        if target.id == user.id:
+            # خودش داره اصل خودش رو می‌بینه
+            await message.reply_text(
+                f"🌿 <b>اصل شما:</b>\n{origin_text}",
+                parse_mode="HTML"
+            )
+        else:
+            # داره اصل کس دیگه رو می‌بینه
             await message.reply_text(
                 f"🧿 <b>اصل {target.first_name}:</b>\n{origin_text}",
                 parse_mode="HTML"
-            )
-        except:
-            pass
-    else:
-        return  # اگر اصل نداشت، سکوت کن
-
-
+        )
 # ======================= 🎮 هندلر اصلی دستورات گروه (نسخه نهایی کامل) =======================
 
 async def group_command_handler(update, context):
