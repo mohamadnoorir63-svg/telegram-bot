@@ -698,6 +698,7 @@ async def group_text_handler_adv(update, context):
                 if cmd in handlers:
                     return await handlers[cmd](update, context)
     return
+    
     async def handle_alias(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await is_authorized(update, context):
         return await update.message.reply_text("🚫 فقط مدیران یا سودوها می‌توانند alias جدید بسازند!")
