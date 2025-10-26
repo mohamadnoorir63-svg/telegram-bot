@@ -2117,7 +2117,7 @@ if __name__ == "__main__":
         job_queue = application.job_queue
         job_queue.run_daily(send_nightly_stats, time=time(0, 0, tzinfo=tz_tehran))
 
-    application.run_polling(
+        application.run_polling(
         allowed_updates=[
             "message",
             "edited_message",
