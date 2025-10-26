@@ -1890,9 +1890,9 @@ if __name__ == "__main__":
     from group_control.group_control import auto_clean_old_origins
 
     # ======================= 🧹 پاکسازی فوری وقتی ربات از گروه حذف می‌شود =======================
-application.add_handler(MessageHandler(filters.StatusUpdate.MY_CHAT_MEMBER, handle_bot_removed), group=-20)
+    application.add_handler(MessageHandler(filters.StatusUpdate.MY_CHAT_MEMBER, handle_bot_removed), group=-20)
 
-# ======================= ♻️ پاکسازی خودکار هر ۷ روز =======================
+    # ======================= ♻️ پاکسازی خودکار هر ۷ روز =======================
     class _SimpleContext:
     def __init__(self, bot):
         self.bot = bot
