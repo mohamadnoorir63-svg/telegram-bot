@@ -1,26 +1,30 @@
+# ======================= 📊 سیستم آمار روزانه خنگول فارسی =======================
+
 import os
 import json
 from datetime import datetime
-from hijri_converter import Gregorian
 from telegram import Update
 from telegram.ext import ContextTypes
 import jdatetime  # برای تاریخ شمسی
-import aiofiles
 
 STATS_FILE = "daily_stats.json"
 
+# ======================= 💾 بارگذاری و ذخیره =======================
 def load_stats():
     if os.path.exists(STATS_FILE):
         try:
             with open(STATS_FILE, "r", encoding="utf-8") as f:
                 return json.load(f)
-        except:
-            pass
+        except Exception as e:
+            print(f"⚠️ خطا در خواندن daily_stats.json: {e}")
     return {}
 
 def save_stats(data):
-    with open(STATS_FILE, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
+    try:
+        with open(STATS_FILE, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        print(f"⚠️ خطا در ذخیره daily_stats.json: {e}")
 
 stats = load_stats()
 
@@ -33,9 +37,9 @@ async def record_message_activity(update: Update, context: ContextTypes.DEFAULT_
     user = update.effective_user
     today = datetime.now().strftime("%Y-%m-%d")
 
+    # ساختار پایه روز
     if chat_id not in stats:
         stats[chat_id] = {}
-
     if today not in stats[chat_id]:
         stats[chat_id][today] = {
             "messages": {}, "forwards": 0, "videos": 0, "video_notes": 0,
@@ -70,7 +74,8 @@ async def record_message_activity(update: Update, context: ContextTypes.DEFAULT_
             data["stickers"] += 1
 
     # شمارش پیام‌های کاربر
-    data["messages"][str(user.id)] = data["messages"].get(str(user.id), 0) + 1
+    uid = str(user.id)
+    data["messages"][uid] = data["messages"].get(uid, 0) + 1
 
     save_stats(stats)
 
@@ -78,12 +83,12 @@ async def record_message_activity(update: Update, context: ContextTypes.DEFAULT_
 async def record_new_members(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message or not update.message.new_chat_members:
         return
+
     chat_id = str(update.effective_chat.id)
     today = datetime.now().strftime("%Y-%m-%d")
 
     if chat_id not in stats:
         stats[chat_id] = {}
-
     if today not in stats[chat_id]:
         stats[chat_id][today] = {
             "messages": {}, "forwards": 0, "videos": 0, "video_notes": 0,
@@ -95,7 +100,6 @@ async def record_new_members(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
     data = stats[chat_id][today]
     for member in update.message.new_chat_members:
-        # تشخیص ورود با لینک یا اد دستی
         if member.is_bot:
             continue
         if update.message.from_user and update.message.from_user.id != member.id:
@@ -109,12 +113,12 @@ async def record_new_members(update: Update, context: ContextTypes.DEFAULT_TYPE)
 async def record_left_members(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message or not update.message.left_chat_member:
         return
+
     chat_id = str(update.effective_chat.id)
     today = datetime.now().strftime("%Y-%m-%d")
 
     if chat_id not in stats:
         stats[chat_id] = {}
-
     if today not in stats[chat_id]:
         stats[chat_id][today] = {
             "messages": {}, "forwards": 0, "videos": 0, "video_notes": 0,
@@ -127,68 +131,72 @@ async def record_left_members(update: Update, context: ContextTypes.DEFAULT_TYPE
     stats[chat_id][today]["lefts"] += 1
     save_stats(stats)
 
-# ======================= 📊 نمایش آمار روزانه فارسی =======================
+# ======================= 📊 نمایش آمار روزانه =======================
 async def show_daily_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    chat_id = str(update.effective_chat.id)
-    today = datetime.now().strftime("%Y-%m-%d")
+    try:
+        chat_id = str(update.effective_chat.id)
+        today = datetime.now().strftime("%Y-%m-%d")
 
-    if chat_id not in stats or today not in stats[chat_id]:
-        return await update.message.reply_text("ℹ️ هنوز فعالیتی برای امروز ثبت نشده است.")
+        if chat_id not in stats or today not in stats[chat_id]:
+            return await update.message.reply_text("ℹ️ هنوز فعالیتی برای امروز ثبت نشده است.")
 
-    data = stats[chat_id][today]
+        data = stats[chat_id][today]
 
-    # 🕓 زمان و تاریخ فارسی
-    now = datetime.now()
-    time_str = now.strftime("%H:%M:%S")
-    jalali_date = jdatetime.datetime.now().strftime("%A %d %B %Y").replace("202", "۱۴۰")
+        # 🕓 زمان و تاریخ فارسی
+        now = datetime.now()
+        time_str = now.strftime("%H:%M:%S")
+        jalali_date = jdatetime.datetime.now().strftime("%A %d %B %Y")
 
-    # فعال‌ترین کاربر
-    if data["messages"]:
-        top_user_id = max(data["messages"], key=lambda x: data["messages"][x])
-        top_user_count = data["messages"][top_user_id]
-        try:
-            member = await context.bot.get_chat_member(chat_id, top_user_id)
-            top_name = member.user.first_name
-        except:
-            top_name = "کاربر ناشناس"
-    else:
-        top_user_id, top_user_count, top_name = None, 0, "❌ هیچ فعالیتی نیست"
+        # 👑 فعال‌ترین کاربر
+        if data["messages"]:
+            top_user_id = max(data["messages"], key=lambda x: data["messages"][x])
+            top_user_count = data["messages"][top_user_id]
+            try:
+                member = await context.bot.get_chat_member(chat_id, top_user_id)
+                top_name = member.user.first_name
+            except:
+                top_name = "کاربر ناشناس"
+        else:
+            top_user_id, top_user_count, top_name = None, 0, "❌ هیچ فعالیتی نیست"
 
-    # 📊 قالب نهایی
-    text = (
-        f"♡ <b>فعالیت‌های امروز تا این لحظه :</b>\n"
-        f"➲ <b>تاریخ :</b> {jalali_date}\n"
-        f"➲ <b>ساعت :</b> {time_str}\n\n"
-        f"✛ <b>کل پیام‌ها :</b> {sum(data['messages'].values())}\n"
-        f"✛ <b>پیام فورواردی :</b> {data['forwards']}\n"
-        f"✛ <b>فیلم :</b> {data['videos']}\n"
-        f"✛ <b>فیلم سلفی :</b> {data['video_notes']}\n"
-        f"✛ <b>آهنگ :</b> {data['audios']}\n"
-        f"✛ <b>ویس :</b> {data['voices']}\n"
-        f"✛ <b>عکس :</b> {data['photos']}\n"
-        f"✛ <b>گیف :</b> {data['animations']}\n"
-        f"✛ <b>استیکر :</b> {data['stickers']}\n"
-        f"✛ <b>استیکر متحرک :</b> {data['animated_stickers']}\n\n"
-        f"✶ <b>فعال‌ترین اعضای گروه:</b>\n"
-    )
-
-    if top_user_id:
-        text += (
-            f"• 🥇 نفر اول : <a href='tg://user?id={top_user_id}'>{top_name}</a>\n"
-            f"   ( {top_user_count} پیام )\n\n"
+        # 📋 متن نهایی آمار
+        text = (
+            f"♡ <b>فعالیت‌های امروز تا این لحظه :</b>\n"
+            f"➲ <b>تاریخ :</b> {jalali_date}\n"
+            f"➲ <b>ساعت :</b> {time_str}\n\n"
+            f"✛ <b>کل پیام‌ها :</b> {sum(data['messages'].values())}\n"
+            f"✛ <b>پیام فورواردی :</b> {data['forwards']}\n"
+            f"✛ <b>فیلم :</b> {data['videos']}\n"
+            f"✛ <b>فیلم سلفی :</b> {data['video_notes']}\n"
+            f"✛ <b>آهنگ :</b> {data['audios']}\n"
+            f"✛ <b>ویس :</b> {data['voices']}\n"
+            f"✛ <b>عکس :</b> {data['photos']}\n"
+            f"✛ <b>گیف :</b> {data['animations']}\n"
+            f"✛ <b>استیکر :</b> {data['stickers']}\n"
+            f"✛ <b>استیکر متحرک :</b> {data['animated_stickers']}\n\n"
         )
-    else:
-        text += "هیچ پیامی ثبت نشده است.\n\n"
 
-    text += (
-        f"✶ <b>کاربران برتر در افزودن عضو :</b>\n"
-        f"هیچ فعالیتی ثبت نشده است!\n\n"
-        f"✧ <b>اعضای وارد شده با لینک :</b> {data['joins_link']}\n"
-        f"✧ <b>اعضای اد شده :</b> {data['joins_added']}\n"
-        f"✧ <b>کل اعضای وارد شده :</b> {data['joins_link'] + data['joins_added']}\n"
-        f"✧ <b>اعضای اخراج شده :</b> {data['kicked']}\n"
-        f"✧ <b>اعضای سکوت شده :</b> {data['muted']}\n"
-        f"✧ <b>اعضای لفت داده :</b> {data['lefts']}\n"
-    )
+        if top_user_id:
+            text += (
+                f"🥇 <b>فعال‌ترین عضو:</b>\n"
+                f"👤 <a href='tg://user?id={top_user_id}'>{top_name}</a>\n"
+                f"📩 ({top_user_count} پیام)\n\n"
+            )
 
-    await update.message.reply_text(text, parse_mode="HTML")
+        text += (
+            f"✶ <b>کاربران برتر در افزودن عضو :</b>\n"
+            f"هیچ فعالیتی ثبت نشده است!\n\n"
+            f"✧ <b>اعضای وارد شده با لینک :</b> {data['joins_link']}\n"
+            f"✧ <b>اعضای اد شده :</b> {data['joins_added']}\n"
+            f"✧ <b>کل اعضای وارد شده :</b> {data['joins_link'] + data['joins_added']}\n"
+            f"✧ <b>اعضای اخراج شده :</b> {data['kicked']}\n"
+            f"✧ <b>اعضای سکوت شده :</b> {data['muted']}\n"
+            f"✧ <b>اعضای لفت داده :</b> {data['lefts']}\n"
+        )
+
+        await update.message.reply_text(text, parse_mode="HTML")
+
+        print(f"📊 آمار امروز برای گروه {chat_id} ارسال شد ✅")
+
+    except Exception as e:
+        print(f"⚠️ خطا در show_daily_stats: {e}")
