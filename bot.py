@@ -1875,7 +1875,12 @@ if __name__ == "__main__":
     print("🤖 خنگول فارسی 8.7 Cloud+ Supreme Pro Stable+ آماده به خدمت است ...")
 
     # 🧩 ساخت اپلیکیشن اصلی تلگرام
-    application = ApplicationBuilder().token(TOKEN).build()
+    application = (
+        ApplicationBuilder()
+        .token(TOKEN)
+        .concurrent_updates(True)
+        .build()
+    )
 
     # ⚙️ مدیریت خطاهای کلی
     application.add_error_handler(handle_error)
@@ -1888,11 +1893,12 @@ if __name__ == "__main__":
 
     async def handle_bot_removed(update: Update, context: ContextTypes.DEFAULT_TYPE):
         """وقتی ربات از گروه حذف یا بیرون انداخته می‌شود، داده‌های اون گروه پاک می‌شود."""
-        if not update.my_chat_member:
+        member = update.my_chat_member or update.chat_member
+        if not member:
             return
 
+        status = member.new_chat_member.status
         chat_id = str(update.effective_chat.id)
-        status = update.my_chat_member.new_chat_member.status
 
         if status in ("kicked", "left"):
             if chat_id in origins:
@@ -1900,8 +1906,9 @@ if __name__ == "__main__":
                 save_origins(origins)
                 print(f"🧹 داده‌های گروه {chat_id} حذف شدند (ربات از گروه خارج شد).")
 
-    # 📌 افزودن هندلر مخصوص تغییر وضعیت خود ربات
+    # 📌 افزودن هندلر برای هر دو حالت (my_chat_member و chat_member)
     application.add_handler(ChatMemberHandler(handle_bot_removed, ChatMemberHandler.MY_CHAT_MEMBER), group=-20)
+    application.add_handler(ChatMemberHandler(handle_bot_removed, ChatMemberHandler.CHAT_MEMBER), group=-19)
 
     # ==========================================================
     # 👑 مدیریت سودوها
@@ -1916,7 +1923,7 @@ if __name__ == "__main__":
         await update.message.reply_text(text, parse_mode="HTML")
 
     # ==========================================================
-    # ⚙️ سیستم مدیریت گروه (اولویت بسیار بالا)
+    # ⚙️ سیستم مدیریت گروه (اولویت بالا)
     # ==========================================================
     # 🔒 قفل‌ها
     application.add_handler(MessageHandler(filters.ALL, check_message_locks), group=-10)
@@ -2051,7 +2058,9 @@ if __name__ == "__main__":
     # ==========================================================
     try:
         print("🔄 در حال اجرای ربات...")
-        application.run_polling(allowed_updates=["message", "chat_member", "my_chat_member", "callback_query"])
+        application.run_polling(
+            allowed_updates=["message", "edited_message", "callback_query", "chat_member", "my_chat_member"]
+        )
     except Exception as e:
         print(f"⚠️ خطا در اجرای ربات:\n{e}")
         print("♻️ ربات به‌صورت خودکار توسط هاست ری‌استارت خواهد شد ✅")
