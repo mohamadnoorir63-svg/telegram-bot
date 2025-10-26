@@ -1925,13 +1925,8 @@ if __name__ == "__main__":
     # ==========================================================
     # ⚙️ سیستم مدیریت گروه (اولویت بالا)
     # ==========================================================
-    # 🔒 قفل‌ها
     application.add_handler(MessageHandler(filters.ALL, check_message_locks), group=-10)
-
-    # 🧰 دستورات متنی مثل بن، سکوت، پاکسازی (بدون /)
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, group_command_handler), group=-9)
-
-    # 🧠 فیلتر کلمات و تگ کاربران
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, group_text_handler_adv), group=-8)
 
     # ==========================================================
@@ -1970,6 +1965,14 @@ if __name__ == "__main__":
     application.add_handler(CommandHandler("del", delete_command))
     application.add_handler(CommandHandler("listcmds", list_commands))
 
+    # ==========================================================
+    # 🧾 راهنمای قابل ویرایش (بازگردانده‌شده)
+    # ==========================================================
+    application.add_handler(CommandHandler("help", help_command), group=-6)
+    application.add_handler(MessageHandler(filters.Regex("^ثبت help$"), save_help), group=-6)
+    application.add_handler(MessageHandler(filters.Regex("^راهنما$"), show_custom_guide), group=-6)
+    application.add_handler(MessageHandler(filters.Regex("^ثبت راهنما$"), save_custom_guide), group=-6)
+
     # ✉️ پیام‌های متنی غیر از کامند → هندلر دستورات ذخیره‌شده
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_custom_command), group=-4)
 
@@ -1987,7 +1990,6 @@ if __name__ == "__main__":
     # 🔹 دستورات اصلی سیستم
     # ==========================================================
     application.add_handler(CommandHandler("start", start))
-    application.add_handler(CommandHandler("help", help_command))
     application.add_handler(CommandHandler("toggle", toggle))
     application.add_handler(CommandHandler("welcome", toggle_welcome))
     application.add_handler(CommandHandler("lock", lock_learning))
@@ -2032,9 +2034,22 @@ if __name__ == "__main__":
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, chat), group=3)
 
     # ==========================================================
+    # 🕌 اذان و 🌦 آب‌وهوا (بازگردانده‌شده)
+    # ==========================================================
+    application.add_handler(MessageHandler(filters.Regex(r"^اذان"), get_azan_time))
+    application.add_handler(MessageHandler(filters.Regex(r"^رمضان"), get_ramadan_status))
+    application.add_handler(CallbackQueryHandler(show_weather, pattern="^panel_weather$"), group=-3)
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, show_weather), group=-3)
+
+    # ==========================================================
+    # 📂 فایل‌ها و Callback کلی (بازگردانده‌شده)
+    # ==========================================================
+    application.add_handler(MessageHandler(filters.Document.ALL, handle_document), group=1)
+    application.add_handler(CallbackQueryHandler(panel_handler))
+
+    # ==========================================================
     # 🎭 سخنگوی خنگول (پاسخ معمولی)
     # ==========================================================
-    # اگر تابع reply در همین فایل است، نیازی به import نیست
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, reply), group=5)
 
     # ==========================================================
