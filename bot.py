@@ -2061,27 +2061,32 @@ if __name__ == "__main__":
     # ======================= 📊 سیستم آمار و آیدی خنگول فارسی =======================
 
     # ✅ ثبت تمام پیام‌ها (متن، مدیا، استیکر و غیره)
+    # این باید قبل از آمار ثبت بشه ولی بعد از قفل‌ها
     application.add_handler(
         MessageHandler(filters.ALL & ~filters.COMMAND, record_message_activity),
-        group=-6
+        group=-5
     )
 
     # 👥 ثبت اعضای جدید
     application.add_handler(
         MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, record_new_members),
-        group=-6
+        group=-5
     )
 
     # 🚪 ثبت اعضای لفت داده
     application.add_handler(
         MessageHandler(filters.StatusUpdate.LEFT_CHAT_MEMBER, record_left_members),
-        group=-6
+        group=-5
     )
 
-    # 📊 آمار روزانه و آیدی (هر دو در یک دستور)
+    # 📊 نمایش آمار روزانه و آیدی (هر دو در یک دستور)
+    # این باید بعد از همه پاکسازی‌ها اجرا بشه تا حذف نشه
     application.add_handler(
-        MessageHandler(filters.Regex(r"^(آمار|آمار امروز|آیدی|id)$") & filters.TEXT, show_daily_stats),
-        group=10
+        MessageHandler(
+            filters.Regex(r"^(آمار|آمار امروز|آیدی|id)$") & filters.TEXT,
+            show_daily_stats
+        ),
+        group=15  # 👈 بالاتر از همه تا پیام قبلش حذف نشه
     )
     # ==========================================================
     # 🎉 خوشامد پویا و تنظیمات گروه
