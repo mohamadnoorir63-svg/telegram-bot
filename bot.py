@@ -72,12 +72,7 @@ from ai_chat.chatgpt_panel import show_ai_panel, chat, start_ai_chat, stop_ai_ch
 from weather_module.weather_panel import show_weather
 from modules.azan_module import get_azan_time, get_ramadan_status
 import asyncio
-from group_control.origin_system import auto_clean_old_origins, handle_bot_removed
-
-# ساخت Context ساده برای تابع auto_clean_old_origins
-class _SimpleContext:
-    def __init__(self, bot):
-        self.bot = bot
+from group_control.group_control import auto_clean_old_origins, handle_bot_removed
 # ======================= 👑 مدیریت سودوها =======================
 from telegram import Update
 from telegram.ext import ContextTypes
