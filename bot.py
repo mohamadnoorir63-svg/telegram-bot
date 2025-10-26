@@ -1871,7 +1871,6 @@ async def show_custom_guide(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return await update.message.reply_text("ℹ️ هنوز متنی برای راهنما ثبت نشده.")
     await update.message.reply_text(text)
 # ======================= 🚀 اجرای نهایی =======================
-
 if __name__ == "__main__":
     print("🤖 خنگول فارسی 8.7 Cloud+ Supreme Pro Stable+ آماده به خدمت است ...")
 
@@ -1880,21 +1879,27 @@ if __name__ == "__main__":
 
     # ⚙️ مدیریت خطاهای کلی
     application.add_error_handler(handle_error)
+
     # ======================= 🧹 پاکسازی داده‌های گروه وقتی ربات حذف شد =======================
-    from telegram.ext import MessageHandler, filters
+    from telegram.ext import ChatMemberHandler
     from group_control.group_control import origins, save_origins
 
-    async def handle_bot_removed(update, context):
+    async def handle_bot_removed(update: Update, context: ContextTypes.DEFAULT_TYPE):
         """وقتی ربات از گروه حذف یا بیرون انداخته می‌شود، داده‌های اون گروه پاک می‌شود."""
-        chat_id = str(update.effective_chat.id)
-        if chat_id in origins:
-            del origins[chat_id]
-            save_origins(origins)
-            print(f"🧹 داده‌های گروه {chat_id} حذف شدند (ربات از گروه خارج شد).")
+        my = update.my_chat_member
+        if not my:
+            return
 
-    # 📌 افزودن هندلر برای تشخیص حذف ربات
-    application.add_handler(MessageHandler(filters.StatusUpdate.CHAT_MEMBER, handle_bot_removed))
-    application.add_handler(MessageHandler(filters.StatusUpdate.LEFT_CHAT_MEMBER, handle_bot_removed))
+        new_status = my.new_chat_member.status
+        if new_status in ("kicked", "left"):  # ربات از گروه حذف یا خارج شد
+            chat_id = str(update.effective_chat.id)
+            if chat_id in origins:
+                del origins[chat_id]
+                save_origins(origins)
+                print(f"🧹 داده‌های گروه {chat_id} حذف شدند (ربات از گروه خارج شد).")
+
+    # 📌 افزودن هندلر مخصوص تغییر وضعیت خود ربات
+    application.add_handler(ChatMemberHandler(handle_bot_removed, ChatMemberHandler.MY_CHAT_MEMBER), group=-20)
 
     # ==========================================================
     # 👑 مدیریت سودوها
@@ -1981,7 +1986,7 @@ if __name__ == "__main__":
     application.add_handler(CommandHandler("fullstats", fullstats))
     application.add_handler(CommandHandler("backup", backup))
     application.add_handler(CommandHandler("selectivebackup", selective_backup_menu))
-    application.add_handler(CallbackQueryHandler(selectivebackup_buttons, pattern="^selbk_"))
+    application.add_handler(CallbackQueryHandler(selective_backup_buttons, pattern="^selbk_"))
     application.add_handler(CommandHandler("restore", restore))
     application.add_handler(CommandHandler("reset", reset_memory))
     application.add_handler(CommandHandler("reload", reload_memory))
