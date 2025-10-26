@@ -228,8 +228,7 @@ async def handle_unmute(update, context):
     except:
         await update.message.reply_text("⚠️ نمی‌توان سکوت این کاربر را برداشت (احتمالاً مدیر یا صاحب گروه است).", parse_mode="HTML")
         
-
-# ======================= 🧹 پاکسازی نهایی حرفه‌ای =======================
+# ======================= 🧹 پاکسازی نهایی بدون خطا =======================
 import asyncio
 from telegram.error import BadRequest, RetryAfter
 
@@ -286,16 +285,19 @@ async def handle_clean(update, context):
             continue
 
     # پیام نهایی
-    done_msg = await progress.edit_text(
-        f"✅ پاکسازی انجام شد.\n🗑 تعداد حذف‌شده: <b>{deleted}</b>",
-        parse_mode="HTML"
-    )
-
-    # 🧼 حذف پیام‌های اطلاع‌رسانی بعد از چند ثانیه
-    await asyncio.sleep(5)
     try:
+        done_msg = await progress.edit_text(
+            f"✅ پاکسازی انجام شد.\n🗑 تعداد حذف‌شده: <b>{deleted}</b>",
+            parse_mode="HTML"
+        )
+
+        # 🧼 حذف پیام‌های اطلاع‌رسانی بعد از چند ثانیه
+        await asyncio.sleep(5)
         await context.bot.delete_message(chat.id, done_msg.message_id)
-        await context.bot.delete_message(chat.id, message.message_id)
+        try:
+            await context.bot.delete_message(chat.id, message.message_id)
+        except:
+            pass
     except:
         pass
 
