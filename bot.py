@@ -1996,7 +1996,8 @@ if __name__ == "__main__":
     # ==========================================================
     # 🎯 سیستم آمار روزانه فارسی
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, record_message_activity))
-    application.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, record_new_members))  چ   application.add_handler(MessageHandler(filters.StatusUpdate.LEFT_CHAT_MEMBER, record_left_members))
+    application.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, record_new_members))
+    application.add_handler(MessageHandler(filters.StatusUpdate.LEFT_CHAT_MEMBER, record_left_members))
     application.add_handler(CommandHandler("آمار", show_daily_stats))
     application.add_handler(MessageHandler(filters.Regex("^آمار$"), show_daily_stats))
     application.add_handler(CommandHandler("start", start))
