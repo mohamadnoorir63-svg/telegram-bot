@@ -657,27 +657,8 @@ async def handle_tagactive(update, context):
 
     await update.message.reply_text("✅ تگ کاربران فعال انجام شد.", parse_mode="HTML")
 
-
-# 🧠 هندلر کلی alias پیشرفته
-async def group_text_handler_adv(update, context):
-    text = update.message.text.strip().lower()
-    for cmd, aliases in ALIASES_ADV.items():
-        for alias in aliases:
-            if text.startswith(alias):
-                args = text.replace(alias, "").strip().split()
-                context.args = args
-                handlers = {
-                    "addfilter": handle
-                "addfilter": handle_addfilter,
-                    "delfilter": handle_delfilter,
-                    "filters": handle_filters,
-                    "tagall": handle_tagall,
-                    "tagactive": handle_tagactive
-                }
-                if cmd in handlers:
-                    return await handlers[cmd](update, context)
-
 # ======================= 🧠 هندلر کلی alias پیشرفته =======================
+
 async def group_text_handler_adv(update, context):
     if not update.message or not update.message.text:
         return
@@ -698,14 +679,20 @@ async def group_text_handler_adv(update, context):
                 if cmd in handlers:
                     return await handlers[cmd](update, context)
     return
-    
-    async def handle_alias(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+
+# ======================= 🧩 سیستم alias برای شخصی‌سازی دستورات =======================
+
+async def handle_alias(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """تغییر یا افزودن alias جدید برای دستورات"""
     if not await is_authorized(update, context):
         return await update.message.reply_text("🚫 فقط مدیران یا سودوها می‌توانند alias جدید بسازند!")
 
     text = update.message.text.strip().split(" ", 2)
     if len(text) < 3:
-        return await update.message.reply_text("🧩 استفاده: alias [دستور اصلی] [نام جدید]\nمثلاً: alias ban محروم")
+        return await update.message.reply_text(
+            "🧩 استفاده: alias [دستور اصلی] [نام جدید]\nمثلاً: alias ban محروم"
+        )
 
     base_cmd, new_alias = text[1].lower(), text[2].strip().lower()
 
@@ -717,10 +704,15 @@ async def group_text_handler_adv(update, context):
 
     ALIASES[base_cmd].append(new_alias)
     save_json_file(ALIASES_FILE, ALIASES)
+
     await update.message.reply_text(
         f"✅ alias جدید ثبت شد!\n\n"
         f"🔹 دستور اصلی: <b>{base_cmd}</b>\n"
         f"🔸 alias جدید: <b>{new_alias}</b>",
         parse_mode="HTML"
     )
-    print("✅ [Group Control System] با موفقیت بارگذاری شد.")
+
+
+# ======================= ✅ اعلان راه‌اندازی سیستم =======================
+
+print("✅ [Group Control System] با موفقیت بارگذاری شد.")
