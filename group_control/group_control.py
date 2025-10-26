@@ -228,12 +228,12 @@ async def handle_unmute(update, context):
     except:
         await update.message.reply_text("⚠️ نمی‌توان سکوت این کاربر را برداشت (احتمالاً مدیر یا صاحب گروه است).", parse_mode="HTML")
 
-       # ======================= 🧹 پاکسازی سایلنت + پیام پایانی =======================
+        # ======================= 🧹 پاکسازی سایلنت نهایی =======================
 import asyncio
 from telegram.error import BadRequest, RetryAfter
 
 async def handle_clean(update, context):
-    """🧹 پاکسازی بی‌صدا با پیام پایان (بدون خطا یا ارور)"""
+    """🧹 پاکسازی بی‌صدا (بدون هیچ پیام خطا یا هشدار)"""
     try:
         if not await is_authorized(update, context):
             return await update.message.reply_text("🚫 فقط مدیران یا سودوها می‌توانند پاکسازی کنند!")
@@ -242,7 +242,7 @@ async def handle_clean(update, context):
         message = update.message
         args = context.args if context.args else []
 
-        # تعیین محدوده
+        # محدوده پاکسازی
         limit = 500
         if args and args[0].isdigit():
             limit = min(int(args[0]), 1000)
@@ -252,6 +252,7 @@ async def handle_clean(update, context):
         target_id = message.reply_to_message.from_user.id if message.reply_to_message else None
         deleted = 0
 
+        # پیام اولیه‌ی وضعیت
         progress = await context.bot.send_message(chat.id, "🧹 در حال پاکسازی...")
 
         last_id = update.message.message_id
@@ -262,8 +263,8 @@ async def handle_clean(update, context):
                 break
 
             try:
-                # در حالت ریپلای، فقط پیام‌های همان کاربر حذف می‌شود
                 if target_id:
+                    # فوروارد برای تشخیص فرستنده (در حالت ریپلای)
                     fwd = await context.bot.forward_message(chat.id, chat.id, last_id)
                     sender_id = fwd.forward_from.id if fwd.forward_from else None
                     await context.bot.delete_message(chat.id, fwd.message_id)
@@ -273,7 +274,7 @@ async def handle_clean(update, context):
                 await context.bot.delete_message(chat.id, last_id)
                 deleted += 1
 
-                # هر 25 پیام یکبار نمایش پیشرفت
+                # هر 25 پیام یه آپدیت وضعیت
                 if deleted % 25 == 0:
                     try:
                         await progress.edit_text(f"🧹 در حال پاکسازی...\n🗑 {deleted}/{limit} پیام حذف شد.")
@@ -290,24 +291,24 @@ async def handle_clean(update, context):
             except Exception:
                 continue
 
-        # پیام نهایی
+        # نتیجه نهایی
         try:
             done_msg = await progress.edit_text(
                 f"✅ پاکسازی کامل شد.\n🗑 تعداد حذف‌شده: <b>{deleted}</b>",
                 parse_mode="HTML"
             )
-            await asyncio.sleep(3)
-            # حذف پیام وضعیت
-            try:
-                await context.bot.delete_message(chat.id, done_msg.message_id)
-            except:
-                pass
+            await asyncio.sleep(5)
+            await context.bot.delete_message(chat.id, done_msg.message_id)
             try:
                 await context.bot.delete_message(chat.id, message.message_id)
             except:
                 pass
         except:
             pass
+
+    except:
+        # ❌ هیچ خطایی نمایش داده نمی‌شود
+        pass
 
         # 📌 پیام پایانی تمیزکاری (پین می‌شود)
         try:
