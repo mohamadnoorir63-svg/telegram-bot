@@ -239,7 +239,7 @@ async def handle_clean(update, context):
     message = update.message
     args = context.args if context.args else []
 
-    # راهنما
+    # 🧾 راهنما
     if not args and not message.reply_to_message:
         return await message.reply_text(
             "🧹 <b>دستورات پاکسازی:</b>\n\n"
@@ -250,6 +250,7 @@ async def handle_clean(update, context):
             parse_mode="HTML"
         )
 
+    # 📊 حالت عددی / همه
     limit = 100
     if args and args[0].isdigit():
         limit = min(int(args[0]), 500)
@@ -260,47 +261,35 @@ async def handle_clean(update, context):
     deleted = 0
 
     progress = await message.reply_text("🧹 در حال پاکسازی...", parse_mode="HTML")
-
     protected_ids = {message.message_id, progress.message_id}
 
-    async def delete_safely(msg_id):
-        nonlocal deleted
-        try:
-            if msg_id in protected_ids:
-                return
-            await context.bot.delete_message(chat.id, msg_id)
-            deleted += 1
-            await asyncio.sleep(random.uniform(0.25, 0.45))
-            if deleted % 20 == 0:
-                try:
-                    await progress.edit_text(f"🧹 حذف شده: {deleted}/{limit}", parse_mode="HTML")
-                except:
-                    pass
-        except RetryAfter as e:
-            await asyncio.sleep(e.retry_after + 1)
-        except (BadRequest, TimedOut):
-            await asyncio.sleep(0.2)
-        except Exception:
-            await asyncio.sleep(0.3)
-
     try:
-        last_msg_id = message.message_id
-        for i in range(limit):
-            msg_id = last_msg_id - i - 1
-            if msg_id <= 0:
-                break
+        async for msg in context.bot.iter_history(chat.id, limit=limit):
+            # از پاک کردن پیام خود بات جلوگیری کن
+            if msg.message_id in protected_ids:
+                continue
+
+            # حالت ریپلای → فقط پیام‌های آن کاربر حذف شود
+            if target_id and (not msg.from_user or msg.from_user.id != target_id):
+                continue
+
             try:
-                msg = await context.bot.get_message(chat.id, msg_id)
-                if target_id and (not msg.from_user or msg.from_user.id != target_id):
-                    continue
-                await delete_safely(msg.message_id)
+                await context.bot.delete_message(chat.id, msg.message_id)
+                deleted += 1
+                await asyncio.sleep(random.uniform(0.2, 0.35))
+                if deleted % 20 == 0:
+                    await progress.edit_text(f"🧹 حذف شده: {deleted}/{limit}", parse_mode="HTML")
+            except RetryAfter as e:
+                await asyncio.sleep(e.retry_after + 1)
+            except (BadRequest, TimedOut):
+                await asyncio.sleep(0.3)
             except Exception:
                 await asyncio.sleep(0.3)
+
     except Exception as e:
         return await progress.edit_text(f"⚠️ خطا در پاکسازی:\n<code>{e}</code>", parse_mode="HTML")
 
     await progress.edit_text(f"✅ پاکسازی انجام شد.\n🗑 تعداد حذف‌شده: <b>{deleted}</b>", parse_mode="HTML")
-
 
     
 # 📌 پین کردن پیام (با ریپلای)
