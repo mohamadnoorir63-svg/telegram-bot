@@ -1879,6 +1879,12 @@ if __name__ == "__main__":
 
     # ⚙️ مدیریت خطاهای کلی
     application.add_error_handler(handle_error)
+    
+    from telegram.ext import Application, MessageHandler, filters
+    from group_control.group_control import auto_clean_old_origins
+
+    # اجرای پاکسازی خودکار هر ۷ روز
+    application.job_queue.run_repeating(auto_clean_old_origins, interval=7*24*60*60, first=10)
 
     # ======================= 👑 مدیریت سودوها =======================
     async def list_sudos(update: Update, context: ContextTypes.DEFAULT_TYPE):
