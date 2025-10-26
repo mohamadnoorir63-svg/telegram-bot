@@ -1,137 +1,3 @@
-# ======================= 📊 سیستم آمار و آیدی خنگول فارسی =======================
-
-import os
-import json
-from datetime import datetime, timedelta
-import jdatetime
-from telegram import Update
-from telegram.ext import ContextTypes
-
-STATS_FILE = "daily_stats.json"
-SUDO_ID = 7089376754  # 👈 آیدی سودو (خودت رو بذار اینجا)
-
-# ======================= 💾 بارگذاری و ذخیره =======================
-def load_stats():
-    if os.path.exists(STATS_FILE):
-        try:
-            with open(STATS_FILE, "r", encoding="utf-8") as f:
-                return json.load(f)
-        except Exception as e:
-            print(f"⚠️ خطا در خواندن daily_stats.json: {e}")
-    return {}
-
-def save_stats(data):
-    try:
-        with open(STATS_FILE, "w", encoding="utf-8") as f:
-            json.dump(data, f, ensure_ascii=False, indent=2)
-    except Exception as e:
-        print(f"⚠️ خطا در ذخیره daily_stats.json: {e}")
-
-stats = load_stats()
-
-# ======================= 🧠 ثبت فعالیت پیام‌ها =======================
-async def record_message_activity(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not update.message or update.effective_chat.type not in ["group", "supergroup"]:
-        return
-
-    chat_id = str(update.effective_chat.id)
-    user = update.effective_user
-    today = datetime.now().strftime("%Y-%m-%d")
-
-    # ایجاد ساختار روزانه
-    if chat_id not in stats:
-        stats[chat_id] = {}
-    if today not in stats[chat_id]:
-        stats[chat_id][today] = {
-            "messages": {}, "forwards": 0, "videos": 0, "video_notes": 0,
-            "audios": 0, "voices": 0, "photos": 0, "animations": 0,
-            "stickers": 0, "animated_stickers": 0,
-            "joins_link": 0, "joins_added": 0,
-            "lefts": 0, "kicked": 0, "muted": 0
-        }
-
-    data = stats[chat_id][today]
-    msg = update.message
-
-    # نوع پیام
-    if msg.forward_from or msg.forward_from_chat:
-        data["forwards"] += 1
-    elif msg.video:
-        data["videos"] += 1
-    elif msg.video_note:
-        data["video_notes"] += 1
-    elif msg.audio:
-        data["audios"] += 1
-    elif msg.voice:
-        data["voices"] += 1
-    elif msg.photo:
-        data["photos"] += 1
-    elif msg.animation:
-        data["animations"] += 1
-    elif msg.sticker:
-        if msg.sticker.is_animated:
-            data["animated_stickers"] += 1
-        else:
-            data["stickers"] += 1
-
-    # شمارش پیام‌های کاربر
-    uid = str(user.id)
-    data["messages"][uid] = data["messages"].get(uid, 0) + 1
-
-    save_stats(stats)
-
-# ======================= 👥 ثبت ورود اعضا =======================
-async def record_new_members(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not update.message or not update.message.new_chat_members:
-        return
-
-    chat_id = str(update.effective_chat.id)
-    today = datetime.now().strftime("%Y-%m-%d")
-
-    if chat_id not in stats:
-        stats[chat_id] = {}
-    if today not in stats[chat_id]:
-        stats[chat_id][today] = {
-            "messages": {}, "forwards": 0, "videos": 0, "video_notes": 0,
-            "audios": 0, "voices": 0, "photos": 0, "animations": 0,
-            "stickers": 0, "animated_stickers": 0,
-            "joins_link": 0, "joins_added": 0,
-            "lefts": 0, "kicked": 0, "muted": 0
-        }
-
-    data = stats[chat_id][today]
-    for member in update.message.new_chat_members:
-        if member.is_bot:
-            continue
-        if update.message.from_user and update.message.from_user.id != member.id:
-            data["joins_added"] += 1
-        else:
-            data["joins_link"] += 1
-
-    save_stats(stats)
-
-# ======================= 🚪 ثبت خروج اعضا =======================
-async def record_left_members(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not update.message or not update.message.left_chat_member:
-        return
-
-    chat_id = str(update.effective_chat.id)
-    today = datetime.now().strftime("%Y-%m-%d")
-
-    if chat_id not in stats:
-        stats[chat_id] = {}
-    if today not in stats[chat_id]:
-        stats[chat_id][today] = {
-            "messages": {}, "forwards": 0, "videos": 0, "video_notes": 0,
-            "audios": 0, "voices": 0, "photos": 0, "animations": 0,
-            "stickers": 0, "animated_stickers": 0,
-            "joins_link": 0, "joins_added": 0,
-            "lefts": 0, "kicked": 0, "muted": 0
-        }
-
-    stats[chat_id][today]["lefts"] += 1
-    save_stats(stats)
-
 # ======================= 📊 نمایش آمار و آیدی =======================
 async def show_daily_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
@@ -155,9 +21,8 @@ async def show_daily_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 f"📆 <b>تاریخ:</b> {jalali_date}\n"
                 f"🕒 <b>ساعت:</b> {time_str}"
             )
-            msg = await update.message.reply_text(text, parse_mode="HTML")
-            await context.bot.delete_message(chat_id, msg.message_id)
-            await context.bot.delete_message(chat_id, update.message.message_id)
+            # 👇 فقط ارسال کن، حذف نکن
+            await update.message.reply_text(text, parse_mode="HTML")
             return
 
         # 📊 آمار روزانه
@@ -207,36 +72,8 @@ async def show_daily_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"✧ <b>اعضای لفت داده :</b> {data['lefts']}\n"
         )
 
-        msg = await update.message.reply_text(text, parse_mode="HTML")
-        await context.bot.delete_message(chat_id, update.message.message_id)
-        await context.bot.delete_message(chat_id, msg.message_id)
+        # 👇 فقط ارسال کن، هیچ پیام پاک نشه
+        await update.message.reply_text(text, parse_mode="HTML")
 
     except Exception as e:
         print(f"⚠️ خطا در show_daily_stats: {e}")
-
-# ======================= 🌙 آمار شبانه خودکار =======================
-async def send_nightly_stats(context: ContextTypes.DEFAULT_TYPE):
-    """ارسال آمار شب قبل و ریست اطلاعات روزانه"""
-    now = datetime.now()
-    yesterday = (now - timedelta(days=1)).strftime("%Y-%m-%d")
-
-    for chat_id, days in stats.items():
-        if yesterday in days:
-            data = days[yesterday]
-            total_msgs = sum(data["messages"].values())
-            report = (
-                f"🌙 <b>آمار شب گذشته ({yesterday})</b>\n"
-                f"📩 <b>کل پیام‌ها:</b> {total_msgs}\n"
-                f"👥 <b>اعضا اضافه‌شده:</b> {data['joins_added']}\n"
-                f"🚪 <b>اعضا خارج‌شده:</b> {data['lefts']}"
-            )
-            try:
-                await context.bot.send_message(chat_id, report, parse_mode="HTML")
-            except:
-                pass
-
-    # پاک کردن داده روز قبل
-    for chat_id in list(stats.keys()):
-        stats[chat_id] = {}
-    save_stats(stats)
-    print("🧹 آمار روز گذشته پاک شد ✅")
