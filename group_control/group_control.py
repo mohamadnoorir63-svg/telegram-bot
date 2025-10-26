@@ -29,14 +29,14 @@ ALIASES = {
     "lock": ["lock", "قفل"],
     "unlock": ["unlock", "باز"],
     "alias": ["alias", "تغییر"]
-    # ➕ alias دستورات پاکسازی و پین
+}
+
+# ➕ alias دستورات پاکسازی و پین
 ALIASES.update({
     "clean": ["clean", "پاکسازی", "پاک", "حذفعدد", "clear"],
     "pin": ["pin", "پین", "سنجاق"],
     "unpin": ["unpin", "بردارپین", "بردارسنجاق"]
 })
-}
-
 
 # 📂 بارگذاری و ذخیره فایل‌ها
 def load_json_file(path, default):
@@ -575,7 +575,8 @@ async def handle_admins(update, context):
     await update.message.reply_text(text, parse_mode="HTML")
 
 
-# ======================= 🧩 هندلر اصلی دستورات گروه =======================
+# ======================= 🎮 هندلر اصلی دستورات گروه =======================
+
 async def group_command_handler(update, context):
     text = update.message.text.strip().lower()
 
@@ -583,39 +584,45 @@ async def group_command_handler(update, context):
     if text.startswith("alias "):
         return await handle_alias(update, context)
 
+    # 📋 نمایش وضعیت قفل‌ها
     if text in ["locks", "lock status", "وضعیت قفل"]:
         return await handle_locks_status(update, context)
 
+    # 🔄 بررسی همه alias‌ها
     for cmd, aliases in ALIASES.items():
         if text in aliases:
-            # قفل‌ها
+            # 🧱 بررسی قفل‌های خاص
             for lock in LOCK_TYPES:
                 if cmd == f"lock_{lock}":
                     return await handle_lock_generic(update, context, lock)
                 elif cmd == f"unlock_{lock}":
                     return await handle_unlock_generic(update, context, lock)
 
-            # دستورات عمومی
+            # ⚙️ لیست تمام هندلرهای شناسایی‌شده
             handlers = {
-    "ban": handle_ban,
-    "unban": handle_unban,
-    "warn": handle_warn,
-    "unwarn": handle_warn,
-    "mute": handle_mute,
-    "unmute": handle_unmute,
-    "clean": handle_clean,       # 🧹 پاکسازی پیشرفته
-    "pin": handle_pin,           # 📌 پین پیام
-    "unpin": handle_unpin        # 📍 برداشتن پین
+                "ban": handle_ban,
+                "unban": handle_unban,
+                "warn": handle_warn,
+                "unwarn": handle_warn,
+                "mute": handle_mute,
+                "unmute": handle_unmute,
+                "clean": handle_clean,           # 🧹 پاکسازی پیشرفته
+                "pin": handle_pin,               # 📌 پین پیام
+                "unpin": handle_unpin,           # 📍 برداشتن پین
+                "lockgroup": handle_lockgroup,   # 🔒 قفل گروه کامل
+                "unlockgroup": handle_unlockgroup, # 🔓 بازگروه
+                "addadmin": handle_addadmin,     # 👑 افزودن مدیر
+                "removeadmin": handle_removeadmin, # ❌ حذف مدیر
+                "admins": handle_admins          # 👥 لیست مدیران
             }
-                "lockgroup": handle_lockgroup,
-                "unlockgroup": handle_unlockgroup,
-                "addadmin": handle_addadmin,
-                "removeadmin": handle_removeadmin,
-                "admins": handle_admins
-            }
+
+            # 🔍 اجرای تابع مرتبط با دستور
             if cmd in handlers:
                 return await handlers[cmd](update, context)
+
+    # 💤 در صورت ناهماهنگی دستور
     return
+    
 
 
 # ======================= 🧠 فیلتر کلمات + تگ کاربران =======================
