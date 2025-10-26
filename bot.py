@@ -1886,8 +1886,7 @@ if __name__ == "__main__":
 
     # ⚙️ مدیریت خطاهای کلی
     application.add_error_handler(handle_error)
-    
-    ‌from telegram.ext import MessageHandler, filters
+    from telegram.ext import MessageHandler, filters
     from group_control.group_control import auto_clean_old_origins
 
     # ======================= 🧹 پاکسازی فوری وقتی ربات از گروه حذف می‌شود =======================
