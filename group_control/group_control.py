@@ -29,6 +29,12 @@ ALIASES = {
     "lock": ["lock", "قفل"],
     "unlock": ["unlock", "باز"],
     "alias": ["alias", "تغییر"]
+    # ➕ alias دستورات پاکسازی و پین
+ALIASES.update({
+    "clean": ["clean", "پاکسازی", "پاک", "حذفعدد", "clear"],
+    "pin": ["pin", "پین", "سنجاق"],
+    "unpin": ["unpin", "بردارپین", "بردارسنجاق"]
+})
 }
 
 
@@ -218,7 +224,123 @@ async def handle_unmute(update, context):
         )
     except:
         await update.message.reply_text("⚠️ نمی‌توان سکوت این کاربر را برداشت (احتمالاً مدیر یا صاحب گروه است).", parse_mode="HTML")
+        
+# ======================= 🧹 پاکسازی فوق‌پیشرفته + پین پیام =======================
+import asyncio
 
+# 🧹 پاکسازی فوق‌العاده (عددی، کامل یا کاربر خاص)
+async def handle_clean(update, context):
+    if not await is_authorized(update, context):
+        return await update.message.reply_text("⛔ فقط مدیران و سودوها می‌توانند پاکسازی کنند!")
+
+    chat = update.effective_chat
+    user = update.effective_user
+    reply = update.message.reply_to_message
+    arg_text = " ".join(context.args).lower() if context.args else ""
+    deleted = 0
+
+    # 📘 راهنما
+    if not arg_text and not reply:
+        return await update.message.reply_text(
+            "🧹 <b>دستورات پاکسازی:</b>\n\n"
+            "1️⃣ <code>پاکسازی 50</code> — حذف ۵۰ پیام اخیر\n"
+            "2️⃣ <code>پاکسازی همه</code> — حذف تمام پیام‌های گروه (در حد توان)\n"
+            "3️⃣ ریپلای کن و بزن <code>پاکسازی</code> — حذف تمام پیام‌های آن کاربر\n\n"
+            "📌 توجه: در گروه‌های بزرگ ممکن است چند ثانیه طول بکشد.",
+            parse_mode="HTML"
+        )
+
+    msg = await update.message.reply_text("🧹 درحال پردازش پاکسازی...", parse_mode="HTML")
+
+    # 🧍 حالت ریپلای → حذف پیام‌های آن کاربر
+    if reply:
+        target = reply.from_user
+        try:
+            async for m in context.bot.get_chat_history(chat.id, limit=1000):
+                if m.from_user and m.from_user.id == target.id:
+                    try:
+                        await m.delete()
+                        deleted += 1
+                        if deleted % 50 == 0:
+                            await asyncio.sleep(0.5)
+                    except:
+                        pass
+        except Exception as e:
+            return await msg.edit_text(f"⚠️ خطا در پاکسازی:\n<code>{e}</code>", parse_mode="HTML")
+
+        return await msg.edit_text(
+            f"🧹 تمام پیام‌های اخیر از <b>{target.first_name}</b> حذف شدند ✅\n"
+            f"📦 مجموع: <b>{deleted}</b> پیام",
+            parse_mode="HTML"
+        )
+
+    # 🧨 حالت پاکسازی همه
+    if arg_text in ["همه", "all", "everything"]:
+        try:
+            async for m in context.bot.get_chat_history(chat.id, limit=0):
+                try:
+                    await m.delete()
+                    deleted += 1
+                    if deleted % 50 == 0:
+                        await asyncio.sleep(1)
+                except:
+                    pass
+        except Exception as e:
+            return await msg.edit_text(f"⚠️ خطا در پاکسازی:\n<code>{e}</code>", parse_mode="HTML")
+
+        return await msg.edit_text(
+            f"✅ پاکسازی کامل انجام شد.\n🧹 مجموع: <b>{deleted}</b> پیام حذف شد.",
+            parse_mode="HTML"
+        )
+
+    # 🔢 حالت عددی (پاکسازی 50)
+    try:
+        count = int(arg_text)
+        if count < 1 or count > 1000:
+            return await msg.edit_text("⚠️ لطفاً عددی بین 1 تا 1000 وارد کنید.")
+    except:
+        return await msg.edit_text("❗ مقدار ورودی معتبر نیست. باید عدد یا کلمه 'همه' باشه.")
+
+    try:
+        async for m in context.bot.get_chat_history(chat.id, limit=count + 1):
+            try:
+                await m.delete()
+                deleted += 1
+                if deleted % 50 == 0:
+                    await asyncio.sleep(0.5)
+            except:
+                pass
+    except Exception as e:
+        return await msg.edit_text(f"⚠️ خطا در حذف پیام‌ها:\n<code>{e}</code>", parse_mode="HTML")
+
+    await msg.edit_text(f"🧹 <b>{deleted - 1}</b> پیام اخیر حذف شد ✅", parse_mode="HTML")
+
+
+# 📌 پین کردن پیام (با ریپلای)
+async def handle_pin(update, context):
+    if not await is_authorized(update, context):
+        return await update.message.reply_text("⛔ فقط مدیران یا سودوها مجازند!")
+
+    if not update.message.reply_to_message:
+        return await update.message.reply_text("📌 باید روی پیام ریپلای بزنی تا سنجاق بشه.")
+
+    try:
+        await context.bot.pin_chat_message(update.effective_chat.id, update.message.reply_to_message.id)
+        await update.message.reply_text("📍 پیام با موفقیت سنجاق شد.", parse_mode="HTML")
+    except Exception as e:
+        await update.message.reply_text(f"⚠️ خطا در سنجاق پیام:\n<code>{e}</code>", parse_mode="HTML")
+
+
+# 📍 برداشتن تمام پین‌ها
+async def handle_unpin(update, context):
+    if not await is_authorized(update, context):
+        return await update.message.reply_text("⛔ فقط مدیران یا سودوها مجازند!")
+
+    try:
+        await context.bot.unpin_all_chat_messages(update.effective_chat.id)
+        await update.message.reply_text("📍 تمام پیام‌های سنجاق‌شده برداشته شدند.", parse_mode="HTML")
+    except Exception as e:
+        await update.message.reply_text(f"⚠️ خطا در برداشتن پین:\n<code>{e}</code>", parse_mode="HTML")
 
 # 🔒 قفل و باز کردن کل گروه
 async def handle_lockgroup(update, context):
@@ -475,12 +597,16 @@ async def group_command_handler(update, context):
 
             # دستورات عمومی
             handlers = {
-                "ban": handle_ban,
-                "unban": handle_unban,
-                "warn": handle_warn,
-                "unwarn": handle_warn,
-                "mute": handle_mute,
-                "unmute": handle_unmute,
+    "ban": handle_ban,
+    "unban": handle_unban,
+    "warn": handle_warn,
+    "unwarn": handle_warn,
+    "mute": handle_mute,
+    "unmute": handle_unmute,
+    "clean": handle_clean,       # 🧹 پاکسازی پیشرفته
+    "pin": handle_pin,           # 📌 پین پیام
+    "unpin": handle_unpin        # 📍 برداشتن پین
+            }
                 "lockgroup": handle_lockgroup,
                 "unlockgroup": handle_unlockgroup,
                 "addadmin": handle_addadmin,
