@@ -67,7 +67,8 @@ from group_control.daily_stats import (
     record_message_activity,
     record_new_members,
     record_left_members,
-    show_daily_stats,
+    show_daily_stats,  # هم آمار روزانه داره هم آیدی رو هندل می‌کنه
+    send_nightly_stats  # برای آمار شبانه خودکار
 )
 from context_memory import ContextMemory
 from brain_bridge_group import process_group_message
@@ -2057,12 +2058,31 @@ if __name__ == "__main__":
     # 🎭 سخنگوی خنگول (پاسخ معمولی)
     # ==========================================================
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, reply), group=5)
-    # 🎯 سیستم آمار روزانه فارسی (با ترتیب درست)
-    # 🎯 سیستم آمار روزانه فارسی (ثبت همه نوع پیام، نه فقط متن)
-    application.add_handler(MessageHandler(filters.ALL & ~filters.COMMAND, record_message_activity), group=-6)
-    application.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, record_new_members), group=-6)
-    application.add_handler(MessageHandler(filters.StatusUpdate.LEFT_CHAT_MEMBER, record_left_members), group=-6)
-    application.add_handler(MessageHandler(filters.Regex(r"^(آمار|آمار امروز)$") & filters.TEXT, show_daily_stats), group=10)
+    # ======================= 📊 سیستم آمار و آیدی خنگول فارسی =======================
+
+    # ✅ ثبت تمام پیام‌ها (متن، مدیا، استیکر و غیره)
+    application.add_handler(
+        MessageHandler(filters.ALL & ~filters.COMMAND, record_message_activity),
+        group=-6
+    )
+
+    # 👥 ثبت اعضای جدید
+    application.add_handler(
+        MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, record_new_members),
+        group=-6
+    )
+
+    # 🚪 ثبت اعضای لفت داده
+    application.add_handler(
+        MessageHandler(filters.StatusUpdate.LEFT_CHAT_MEMBER, record_left_members),
+        group=-6
+    )
+
+    # 📊 آمار روزانه و آیدی (هر دو در یک دستور)
+    application.add_handler(
+        MessageHandler(filters.Regex(r"^(آمار|آمار امروز|آیدی|id)$") & filters.TEXT, show_daily_stats),
+        group=10
+    )
     # ==========================================================
     # 🎉 خوشامد پویا و تنظیمات گروه
     # ==========================================================
