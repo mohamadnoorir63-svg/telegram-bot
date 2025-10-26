@@ -13,30 +13,55 @@ FILTER_FILE = "filters.json"
 # 👑 سودوها (آی‌دی خودت و افراد مجاز)
 SUDO_IDS = [123456789, 7089376754]  # 👈 آی‌دی خودت رو بذار
 
-# ✅ alias پیش‌فرض (قابل تغییر توسط سودوها)
+# ======================= ✅ alias پیش‌فرض (نسخه نهایی و کامل) =======================
+
 ALIASES = {
-    "ban": ["ban", "بن", "اخراج"],
-    "unban": ["unban", "آزاد", "رفع‌بن"],
+    # 🚫 دستورات مدیریتی اصلی
+    "ban": ["ban", "بن", "اخراج", "حذف کاربر"],
+    "unban": ["unban", "آزاد", "رفع‌بن", "آزادکردن"],
     "warn": ["warn", "اخطار", "هشدار"],
-    "unwarn": ["unwarn", "پاک‌اخطار", "حذف‌اخطار"],
+    "unwarn": ["unwarn", "پاک‌اخطار", "حذف‌اخطار", "رفع‌اخطار"],
     "mute": ["mute", "سکوت", "خفه"],
-    "unmute": ["unmute", "آزادسکوت", "رفع‌سکوت"],
-    "addadmin": ["addadmin", "افزودنمدیر", "ادمین"],
-    "removeadmin": ["removeadmin", "حذفمدیر", "برکنار"],
-    "admins": ["admins", "مدیران", "ادمینها"],
-    "lockgroup": ["lockgroup", "قفل‌گروه", "قفل گروه"],
-    "unlockgroup": ["unlockgroup", "بازگروه", "باز گروه"],
+    "unmute": ["unmute", "آزادسکوت", "رفع‌سکوت", "بازکردن سکوت"],
+    "addadmin": ["addadmin", "افزودنمدیر", "مدیرکن", "ادمین"],
+    "removeadmin": ["removeadmin", "حذفمدیر", "برکنار", "حذف ادمین"],
+    "admins": ["admins", "مدیران", "ادمینها", "لیست مدیران"],
+
+    # 🔒 قفل و باز کردن گروه
+    "lockgroup": ["lockgroup", "قفل‌گروه", "قفل گروه", "ببند گروه"],
+    "unlockgroup": ["unlockgroup", "بازگروه", "باز گروه", "باز کن گروه"],
     "lock": ["lock", "قفل"],
     "unlock": ["unlock", "باز"],
-    "alias": ["alias", "تغییر"]
-}
 
-# ➕ alias دستورات پاکسازی و پین
-ALIASES.update({
-    "clean": ["clean", "پاکسازی", "پاک", "حذفعدد", "clear"],
-    "pin": ["pin", "پین", "سنجاق"],
-    "unpin": ["unpin", "بردارپین", "بردارسنجاق"]
-})
+    # 🧹 پاکسازی
+    "clean": ["clean", "پاکسازی", "پاک", "حذفعدد", "clear", "نظافت"],
+
+    # 📌 پین و آن‌پین
+    "pin": ["pin", "پین", "سنجاق", "پین کن"],
+    "unpin": ["unpin", "بردارپین", "بردارسنجاق", "آن‌پین"],
+
+    # 🧿 سیستم «اصل»
+    "setorigin": ["setorigin", "set origin", "ثبت اصل", "اصل بده"],
+    "showorigin": ["showorigin", "origin", "اصل", "اصل من", "اصلش", "اصل خودم"],
+
+    # 🧩 alias
+    "alias": ["alias", "تغییر", "تغییرنام", "نام مستعار"],
+
+    # 🚫 فیلتر کلمات
+    "addfilter": ["addfilter", "افزودن‌فیلتر", "فیلترکن"],
+    "delfilter": ["delfilter", "حذف‌فیلتر", "پاک‌فیلتر"],
+    "filters": ["filters", "فیلترها", "لیست‌فیلتر"],
+
+    # 📣 تگ کاربران
+    "tagall": ["tagall", "تگ‌همه", "منشن‌همگانی"],
+    "tagactive": ["tagactive", "تگ‌فعال", "تگ‌آنلاین"],
+
+    # 🧱 قفل رسانه‌ها و پیام‌ها
+    "locklinks": ["lock links", "قفل لینک", "قفل‌لینک‌ها"],
+    "unlocklinks": ["unlock links", "باز لینک", "باز‌لینک‌ها"],
+    "lockmedia": ["lock media", "قفل مدیا", "قفل رسانه"],
+    "unlockmedia": ["unlock media", "باز مدیا", "باز رسانه"]
+}
 
 # 📂 بارگذاری و ذخیره فایل‌ها
 def load_json_file(path, default):
@@ -595,7 +620,135 @@ async def handle_admins(update, context):
         text += f"{idx}. <a href='tg://user?id={admin_id}'>مدیر {idx}</a>\n"
 
     await update.message.reply_text(text, parse_mode="HTML")
+    
+# ======================= 🧿 سیستم «اصل» مخصوص هر گروه =======================
+import json, os
+from telegram import Update
+from telegram.ext import ContextTypes
 
+ORIGIN_FILE = "origins.json"
+SUDO_IDS = [7089376754]  # 👈 آی‌دی‌های سودو (مدیران کل ربات)
+
+def load_origins():
+    if os.path.exists(ORIGIN_FILE):
+        try:
+            with open(ORIGIN_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except:
+            pass
+    return {}
+
+def save_origins(data):
+    with open(ORIGIN_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
+origins = load_origins()
+
+
+# 🧠 بررسی مدیر یا سودو بودن
+async def is_admin_or_sudo(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    chat = update.effective_chat
+
+    if user.id in SUDO_IDS:
+        return True
+
+    try:
+        member = await context.bot.get_chat_member(chat.id, user.id)
+        return member.status in ["administrator", "creator"]
+    except:
+        return False
+
+
+# 🧹 پاکسازی خودکار داده وقتی ربات از گروه حذف شود
+async def handle_bot_removed(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat = update.effective_chat
+    chat_id = str(chat.id)
+    if chat_id in origins:
+        del origins[chat_id]
+        save_origins(origins)
+        print(f"🧹 داده‌های گروه {chat_id} حذف شد چون ربات از گروه خارج شد.")
+
+
+# ➕ ثبت اصل (فقط برای مدیرها و سودوها)
+async def handle_set_origin(update, context):
+    message = update.message
+    user = update.effective_user
+    chat_id = str(update.effective_chat.id)
+
+    # فقط مدیران یا سودوها مجازند
+    if not await is_admin_or_sudo(update, context):
+        return await message.reply_text("🚫 فقط مدیران گروه یا سودوها می‌توانند اصل ثبت کنند!")
+
+    raw_text = message.text.strip()
+
+    # حذف کلیدواژه‌های شروع
+    for key in ["ثبت اصل", "set origin", "setorigin"]:
+        if raw_text.lower().startswith(key):
+            origin_text = raw_text[len(key):].strip()
+            break
+    else:
+        origin_text = ""
+
+    if not origin_text:
+        return await message.reply_text(
+            "🧾 لطفاً بعد از دستور، متن اصل را بنویس.\nمثلاً:\n<b>ثبت اصل گرگ خاکستری</b>",
+            parse_mode="HTML"
+        )
+
+    # اگر ریپلای کرده بود → برای آن کاربر، در غیر این صورت برای خودش
+    if message.reply_to_message:
+        target = message.reply_to_message.from_user
+    else:
+        target = user
+
+    # اگر گروه هنوز در فایل نیست، بساز
+    if chat_id not in origins:
+        origins[chat_id] = {}
+
+    # ثبت اصل
+    origins[chat_id][str(target.id)] = origin_text
+    save_origins(origins)
+
+    await message.reply_text(
+        f"✅ <b>اصل</b> برای <a href='tg://user?id={target.id}'>{target.first_name}</a> در این گروه ذخیره شد:\n"
+        f"🧿 <b>{origin_text}</b>",
+        parse_mode="HTML"
+    )
+
+
+# 🔍 نمایش اصل (برای همه کاربران)
+async def handle_show_origin(update, context):
+    message = update.message
+    text = message.text.strip().lower()
+    user = update.effective_user
+    chat_id = str(update.effective_chat.id)
+
+    target = None
+    if message.reply_to_message:
+        target = message.reply_to_message.from_user
+    else:
+        if text in ["اصل من", "اصل خودم", "my origin"]:
+            target = user
+        elif text in ["اصل", "اصلش", "origin"]:
+            return  # چیزی نگو
+
+    if not target:
+        return
+
+    group_origins = origins.get(chat_id, {})
+    origin_text = group_origins.get(str(target.id))
+
+    if origin_text:
+        try:
+            await message.reply_text(
+                f"🧿 <b>اصل {target.first_name}:</b>\n{origin_text}",
+                parse_mode="HTML"
+            )
+        except:
+            pass
+    else:
+        return  # اگر اصل نداشت، سکوت کن
 
 # ======================= 🎮 هندلر اصلی دستورات گروه =======================
 
@@ -819,10 +972,19 @@ async def group_text_handler_adv(update, context):
         return
 
     text = update.message.text.strip().lower()
+
+    # 🧿 دستورات مربوط به «اصل» برای هر گروه
+    if text.startswith("ثبت اصل") or text.startswith("set origin") or text.startswith("setorigin"):
+        return await handle_set_origin(update, context)
+
+    if text in ["اصل", "اصلش", "origin", "اصل من", "اصل خودم", "my origin"]:
+        return await handle_show_origin(update, context)
+
+    # ⚙️ aliasهای پیشرفته (فیلترها و تگ‌ها)
     for cmd, aliases in ALIASES_ADV.items():
         for alias in aliases:
             if text.startswith(alias):
-                args = text.replace(alias, "").strip().split()
+                args = text.replace(alias, "", 1).strip().split()
                 context.args = args
                 handlers = {
                     "addfilter": handle_addfilter,
@@ -839,29 +1001,51 @@ async def group_text_handler_adv(update, context):
 # ======================= 🧩 سیستم alias برای شخصی‌سازی دستورات =======================
 
 async def handle_alias(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """تغییر یا افزودن alias جدید برای دستورات"""
-    if not await is_authorized(update, context):
-        return await update.message.reply_text("🚫 فقط مدیران یا سودوها می‌توانند alias جدید بسازند!")
+    """
+    🧩 افزودن یا تغییر alias جدید برای دستورات گروهی
+    فقط مدیران یا سودوها مجازند
+    """
 
-    text = update.message.text.strip().split(" ", 2)
-    if len(text) < 3:
+    # بررسی سطح دسترسی
+    if not await is_authorized(update, context):
         return await update.message.reply_text(
-            "🧩 استفاده: alias [دستور اصلی] [نام جدید]\nمثلاً: alias ban محروم"
+            "🚫 فقط مدیران یا سودوها می‌توانند alias جدید بسازند!"
         )
 
-    base_cmd, new_alias = text[1].lower(), text[2].strip().lower()
+    # گرفتن آرگومان‌ها
+    parts = update.message.text.strip().split(" ", 2)
+    if len(parts) < 3:
+        return await update.message.reply_text(
+            "🧩 استفاده‌ی درست از دستور:\n"
+            "<code>alias [دستور اصلی] [نام جدید]</code>\n\n"
+            "مثلاً:\n<code>alias ban محروم</code>",
+            parse_mode="HTML"
+        )
 
+    base_cmd, new_alias = parts[1].lower(), parts[2].strip().lower()
+
+    # بررسی وجود دستور اصلی
     if base_cmd not in ALIASES:
-        return await update.message.reply_text("⚠️ همچین دستوری وجود ندارد!")
+        return await update.message.reply_text(
+            f"⚠️ همچین دستوری وجود ندارد!\n"
+            f"دستورات معتبر:\n<b>{', '.join(ALIASES.keys())}</b>",
+            parse_mode="HTML"
+        )
 
-    if new_alias in sum(ALIASES.values(), []):
-        return await update.message.reply_text("⚠️ این alias قبلاً استفاده شده!")
+    # بررسی تکراری بودن alias
+    all_aliases = [a for aliases in ALIASES.values() for a in aliases]
+    if new_alias in all_aliases:
+        return await update.message.reply_text(
+            "⚠️ این alias قبلاً برای دستور دیگری استفاده شده است!",
+            parse_mode="HTML"
+        )
 
+    # افزودن alias جدید
     ALIASES[base_cmd].append(new_alias)
     save_json_file(ALIASES_FILE, ALIASES)
 
     await update.message.reply_text(
-        f"✅ alias جدید ثبت شد!\n\n"
+        f"✅ alias جدید با موفقیت ثبت شد!\n\n"
         f"🔹 دستور اصلی: <b>{base_cmd}</b>\n"
         f"🔸 alias جدید: <b>{new_alias}</b>",
         parse_mode="HTML"
