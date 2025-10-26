@@ -36,13 +36,14 @@ from auto_brain.command_manager import (
     handle_custom_command,
     list_commands,
     cleanup_group_commands
-)
 from group_control.group_control import (
     group_command_handler,
     check_message_locks,
-    group_text_handler_adv
+    group_text_handler_adv,
+    handle_clean,      # 🧹 پاکسازی
+    handle_pin,        # 📌 پین پیام
+    handle_unpin       # 📍 برداشتن پین
 )
-
 from context_memory import ContextMemory  # ✅ باید قبل از استفاده ازش باشه
 from brain_bridge_group import process_group_message
 # 🧠 حافظه کوتاه‌مدت گفتگو برای Context AI
@@ -1870,19 +1871,20 @@ if __name__ == "__main__":
             text += f"{i}. <code>{sid}</code>\n"
         await update.message.reply_text(text, parse_mode="HTML")
 
-            # ==========================================================
+    # ==========================================================
     # ⚙️ سیستم مدیریت گروه (اولویت بسیار بالا)
     # ==========================================================
-    # حذف پیام‌های خلاف قفل‌ها
+    # 🔒 قفل‌ها
     application.add_handler(MessageHandler(filters.ALL, check_message_locks), group=-10)
 
-    # دستورات مدیریتی مثل بن / اخطار / سکوت / قفل‌ها / مدیرها
+    # 🧰 دستورات متنی مثل بن، سکوت، پاکسازی (بدون /)
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, group_command_handler), group=-9)
 
-    # فیلتر کلمات + تگ کاربران
+    # 🧠 فیلتر کلمات و تگ کاربران
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, group_text_handler_adv), group=-8)
-    # 🧹 پاکسازی (برای حالت /clean یا /پاکسازی با اسلش)
-    from group_control import handle_clean
+
+    # 🧹 پاکسازی با /clean یا /پاکسازی (با اسلش)
+    from group_control.group_control import handle_clean
     application.add_handler(CommandHandler(["clean", "پاکسازی"], handle_clean))
 
     # ==========================================================
