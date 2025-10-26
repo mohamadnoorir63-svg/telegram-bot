@@ -229,12 +229,12 @@ async def handle_unmute(update, context):
         await update.message.reply_text("⚠️ نمی‌توان سکوت این کاربر را برداشت (احتمالاً مدیر یا صاحب گروه است).", parse_mode="HTML")
         
 
-# ======================= 🧹 پاکسازی فوق پیشرفته مخصوص PTB 20.7 =======================
+# ======================= 🧹 پاکسازی نهایی حرفه‌ای =======================
 import asyncio
-from telegram.error import BadRequest
+from telegram.error import BadRequest, RetryAfter
 
 async def handle_clean(update, context):
-    """پاکسازی پیام‌ها: عددی، همه یا کاربر خاص"""
+    """پاکسازی پیام‌ها با پشتیبانی از فارسی و جلوگیری از توقف"""
     if not await is_authorized(update, context):
         return await update.message.reply_text("🚫 فقط مدیران یا سودوها می‌توانند پاکسازی کنند!")
 
@@ -242,18 +242,7 @@ async def handle_clean(update, context):
     message = update.message
     args = context.args if context.args else []
 
-    # 🧾 راهنما
-    if not args and not message.reply_to_message:
-        return await message.reply_text(
-            "🧹 <b>دستورات پاکسازی:</b>\n\n"
-            "1️⃣ پاکسازی 50 — حذف ۵۰ پیام اخیر\n"
-            "2️⃣ پاکسازی همه — حذف تا ۵۰۰ پیام اخیر (در حد توان)\n"
-            "3️⃣ ریپلای کن و بزن پاکسازی — حذف تمام پیام‌های آن کاربر\n\n"
-            "📌 توجه: تلگرام اجازه حذف پیام‌های خیلی قدیمی را نمی‌دهد.",
-            parse_mode="HTML"
-        )
-
-    # 🔢 حالت عددی یا همه
+    # تعیین محدوده‌ی پاکسازی
     limit = 500
     if args and args[0].isdigit():
         limit = min(int(args[0]), 1000)
@@ -264,29 +253,51 @@ async def handle_clean(update, context):
     deleted = 0
     progress = await message.reply_text("🧹 در حال پاکسازی...", parse_mode="HTML")
 
-    try:
-        last_message_id = update.message.message_id
-        for _ in range(limit):
-            last_message_id -= 1
-            try:
-                msg = await context.bot.get_chat(chat.id)
-                if target_id:
-                    fetched = await context.bot.get_chat_member(chat.id, target_id)
-                    if not fetched:
-                        continue
-                await context.bot.delete_message(chat.id, last_message_id)
-                deleted += 1
-                if deleted % 25 == 0:
-                    await progress.edit_text(f"🧹 در حال پاکسازی...\n🗑 {deleted}/{limit} پیام حذف شد.", parse_mode="HTML")
-                await asyncio.sleep(0.05)
-            except BadRequest:
-                continue
-            except Exception:
-                continue
-    except Exception as e:
-        return await progress.edit_text(f"⚠️ خطا در پاکسازی:\n<code>{e}</code>", parse_mode="HTML")
+    last_id = update.message.message_id
 
-    await progress.edit_text(f"✅ پاکسازی انجام شد.\n🗑 تعداد حذف‌شده: <b>{deleted}</b>", parse_mode="HTML")
+    for _ in range(limit):
+        last_id -= 1
+        try:
+            # فقط حذف پیام‌های کاربر خاص در حالت ریپلای
+            if target_id:
+                msg = await context.bot.forward_message(chat.id, chat.id, last_id)
+                sender_id = msg.forward_from.id if msg.forward_from else None
+                await context.bot.delete_message(chat.id, msg.message_id)
+                if sender_id != target_id:
+                    continue
+
+            await context.bot.delete_message(chat.id, last_id)
+            deleted += 1
+
+            # هر 25 پیام یکبار بروزرسانی وضعیت
+            if deleted % 25 == 0:
+                await progress.edit_text(f"🧹 در حال پاکسازی...\n🗑 {deleted}/{limit} پیام حذف شد.", parse_mode="HTML")
+
+            await asyncio.sleep(0.1)
+
+        except RetryAfter as e:
+            await asyncio.sleep(e.retry_after + 1)
+            continue
+        except BadRequest:
+            continue
+        except Exception as ex:
+            if "message to delete not found" in str(ex).lower():
+                break
+            continue
+
+    # پیام نهایی
+    done_msg = await progress.edit_text(
+        f"✅ پاکسازی انجام شد.\n🗑 تعداد حذف‌شده: <b>{deleted}</b>",
+        parse_mode="HTML"
+    )
+
+    # 🧼 حذف پیام‌های اطلاع‌رسانی بعد از چند ثانیه
+    await asyncio.sleep(5)
+    try:
+        await context.bot.delete_message(chat.id, done_msg.message_id)
+        await context.bot.delete_message(chat.id, message.message_id)
+    except:
+        pass
 
     
 # 📌 پین کردن پیام (با ریپلای)
