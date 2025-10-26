@@ -235,89 +235,76 @@ from telegram.error import BadRequest, RetryAfter, TimedOut
 
 async def handle_clean(update, context):
     """
-    پاکسازی پیام‌ها در سه حالت:
-    1) /clean 50  → حذف ۵۰ پیام آخر
-    2) /clean all → حذف تا ۵۰۰ پیام آخر
-    3) ریپلای + /clean → حذف پیام‌های همان کاربر
+    /clean 100  → حذف ۱۰۰ پیام اخیر
+    /clean all  → حذف تا ۵۰۰ پیام اخیر
+    ریپلای + /clean → حذف پیام‌های همان کاربر
     """
-    # 1) مجوز
     if not await is_authorized(update, context):
         return await update.message.reply_text("🚫 فقط مدیران یا سودوها می‌توانند پاکسازی کنند!")
 
-    chat = update.effective_chat  # ✅ Chat object
-    message = update.message
+    chat = update.effective_chat
+    msg = update.message
     args = context.args if context.args else []
 
-    # 2) راهنمای دستور
-    if not args and not message.reply_to_message:
-        return await message.reply_text(
+    # راهنمای دستور
+    if not args and not msg.reply_to_message:
+        return await msg.reply_text(
             "🧹 <b>دستورات پاکسازی:</b>\n\n"
             "1️⃣ <code>/clean 50</code> — حذف ۵۰ پیام اخیر\n"
             "2️⃣ <code>/clean all</code> — حذف تا ۵۰۰ پیام اخیر\n"
             "3️⃣ ریپلای کن و بزن <code>/clean</code> — حذف پیام‌های آن کاربر\n\n"
-            "📌 محدودیت: تلگرام اجازه حذف پیام‌های خیلی قدیمی را نمی‌دهد.",
+            "📌 تلگرام اجازه حذف پیام‌های خیلی قدیمی را نمی‌دهد.",
             parse_mode="HTML"
         )
 
-    # 3) تعیین حالت و تعداد
+    # تعیین تعداد
     limit = 100
     if args and args[0].isdigit():
         limit = min(int(args[0]), 500)
     elif args and args[0].lower() in ["all", "همه"]:
         limit = 500
 
-    # 4) اگر ریپلای باشد → فقط پیام‌های آن کاربر
-    target_id = message.reply_to_message.from_user.id if message.reply_to_message else None
+    target_id = msg.reply_to_message.from_user.id if msg.reply_to_message else None
     deleted = 0
 
-    # 5) پیام وضعیت
-    progress = await message.reply_text("🧹 در حال پاکسازی...", parse_mode="HTML")
+    # پیام وضعیت
+    progress = await msg.reply_text("🧹 در حال پاکسازی...", parse_mode="HTML")
+    protected = {msg.message_id, progress.message_id}
 
-    # محافظت از خود پیام‌ها که نباید حذف شوند
-    protected_ids = {message.message_id, progress.message_id}
+    last_id = msg.message_id
 
-    try:
-        # ✅ فقط از chat.get_history استفاده کن (PTB 20.7)
-        async for msg in chat.get_history(limit=limit):
-            # پیام‌های راهنما و خود دستور پاک نشوند
-            if msg.message_id in protected_ids:
+    for i in range(1, limit + 1):
+        message_id = last_id - i
+        if message_id <= 0:
+            break
+        try:
+            m = await context.bot.forward_message(chat.id, chat.id, message_id)
+            await context.bot.delete_message(chat.id, m.message_id)
+        except BadRequest as e:
+            # اگر پیام حذف‌شده یا قدیمی است، عبور کن
+            if "message to forward not found" in str(e):
                 continue
-
-            # حالت ریپلای → فقط پیام‌های همان کاربر حذف شود
-            if target_id:
-                if not msg.from_user or msg.from_user.id != target_id:
-                    continue
-
+        except RetryAfter as e:
+            await asyncio.sleep(e.retry_after + 1)
+        except TimedOut:
+            await asyncio.sleep(0.5)
+        except Exception:
+            await asyncio.sleep(0.3)
+            continue
+        deleted += 1
+        await asyncio.sleep(random.uniform(0.2, 0.4))
+        if deleted % 20 == 0:
             try:
-                # سریعتر: از متد خود پیام هم می‌تونی استفاده کنی
-                await msg.delete()
-                deleted += 1
-
-                # جلوگیری از فشار روی API (مهم برای Heroku)
-                await asyncio.sleep(random.uniform(0.18, 0.32))
-
-                if deleted % 20 == 0:
-                    try:
-                        await progress.edit_text(f"🧹 حذف شده: {deleted}/{limit}", parse_mode="HTML")
-                    except:
-                        pass
-
-            except RetryAfter as e:
-                await asyncio.sleep(e.retry_after + 1)
-            except (BadRequest, TimedOut):
-                await asyncio.sleep(0.3)
-            except Exception:
-                await asyncio.sleep(0.3)
-
-    except Exception as e:
-        return await progress.edit_text(f"⚠️ خطا در پاکسازی:\n<code>{e}</code>", parse_mode="HTML")
+                await progress.edit_text(f"🧹 حذف شده: {deleted}/{limit}", parse_mode="HTML")
+            except:
+                pass
 
     await progress.edit_text(f"✅ پاکسازی انجام شد.\n🗑 تعداد حذف‌شده: <b>{deleted}</b>", parse_mode="HTML")
 
-    # پاک‌کردن پیام دستور بعد از ۳ ثانیه
     try:
         await asyncio.sleep(3)
-        await message.delete()
+        await msg.delete()
+        await progress.delete()
     except:
         pass
     
