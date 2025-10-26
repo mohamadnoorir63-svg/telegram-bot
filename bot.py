@@ -1885,35 +1885,21 @@ if __name__ == "__main__":
 
     # ⚙️ مدیریت خطاهای کلی
     application.add_error_handler(handle_error)
+    # ======================= 🧹 پاکسازی داده‌های گروه وقتی ربات حذف شد =======================
+    from telegram.ext import MessageHandler, filters
+    from group_control.group_control import origins, save_origins
 
-    # ======================= 🧹 پاکسازی داده‌های گروه‌ها =======================
-    from telegram.ext import MessageHandler, ChatMemberHandler, filters
-    from group_control.origin_system import handle_bot_removed, auto_clean_old_origins
-    import asyncio
+    async def handle_bot_removed(update, context):
+        """وقتی ربات از گروه حذف یا بیرون انداخته می‌شود، داده‌های اون گروه پاک می‌شود."""
+        chat_id = str(update.effective_chat.id)
+        if chat_id in origins:
+            del origins[chat_id]
+            save_origins(origins)
+            print(f"🧹 داده‌های گروه {chat_id} حذف شدند (ربات از گروه خارج شد).")
 
-    # ✅ اگر ربات از گروه حذف شود یا وضعیتش تغییر کند
-    try:
-        application.add_handler(ChatMemberHandler(handle_bot_removed, ChatMemberHandler.MY_CHAT_MEMBER), group=-20)
-    except Exception:
-        # اگر نسخه از ChatMemberHandler پشتیبانی نکند
-        application.add_handler(MessageHandler(filters.StatusUpdate.CHAT_MEMBER, handle_bot_removed), group=-20)
-        application.add_handler(MessageHandler(filters.StatusUpdate.LEFT_CHAT_MEMBER, handle_bot_removed), group=-20)
-
-    # ✅ پاکسازی خودکار هر ۷ روز یک‌بار (حلقه پس‌زمینه)
-    class _SimpleContext:
-        def __init__(self, bot):
-            self.bot = bot
-
-    async def origins_cleanup_loop(bot):
-        while True:
-            try:
-                await auto_clean_old_origins(_SimpleContext(bot))
-            except Exception as e:
-                print(f"[ORIGINS CLEANUP ERROR] {e}")
-            await asyncio.sleep(7 * 24 * 60 * 60)  # هر ۷ روز
-
-    application.create_task(origins_cleanup_loop(application.bot))
-    print("🧭 [Origins Cleanup] scheduled every 7 days ✅")
+    # 📌 افزودن هندلر برای تشخیص حذف ربات
+    application.add_handler(MessageHandler(filters.StatusUpdate.CHAT_MEMBER, handle_bot_removed))
+    application.add_handler(MessageHandler(filters.StatusUpdate.LEFT_CHAT_MEMBER, handle_bot_removed))
 
     # ==========================================================
     # 👑 مدیریت سودوها
