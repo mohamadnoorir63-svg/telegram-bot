@@ -1959,7 +1959,9 @@ if __name__ == "__main__":
     application.add_handler(MessageHandler(filters.Regex(clean_pattern) & filters.TEXT, clean_handler), group=-7)
 
     # ==========================================================
-    
+    application.add_handler(CommandHandler("addsudo", add_sudo))
+    application.add_handler(CommandHandler("delsudo", del_sudo))
+    application.add_handler(CommandHandler("listsudo", list_sudos))
 
     # ==========================================================
     # 💾 دستورات شخصی (ذخیره، حذف، اجرای دستورها)
