@@ -80,7 +80,33 @@ from weather_module.weather_panel import show_weather
 from modules.azan_module import get_azan_time, get_ramadan_status
 import asyncio
 from group_control.group_control import auto_clean_old_origins, handle_bot_removed
+# ======================= ⚙️ تنظیمات پایه و سودوها =======================
+import os, json
 
+# 🔑 توکن ربات از ENV (Heroku یا لوکال)
+TOKEN = os.getenv("BOT_TOKEN")
+if not TOKEN:
+    raise RuntimeError("❌ BOT_TOKEN تعریف نشده است! در Heroku Config Vars مقدار بده.")
+
+# 📁 فایل لیست سودوها
+SUDO_FILE = "sudo_list.json"
+
+def load_sudos():
+    if os.path.exists(SUDO_FILE):
+        try:
+            with open(SUDO_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except:
+            pass
+    # اگر فایل وجود ندارد یا خراب است، فقط سودوی اصلی
+    return [7089376754]
+
+def save_sudos(data):
+    with open(SUDO_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
+# ✅ بارگذاری سودوها در شروع
+SUDO_IDS = load_sudos()
 # ======================= 🧠 جلوگیری از پاسخ تکراری و پاسخ به خودش =======================
 def is_valid_message(update):
     """فیلتر برای جلوگیری از پاسخ تکراری یا پاسخ به پیام‌های ربات"""
