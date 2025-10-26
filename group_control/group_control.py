@@ -839,11 +839,6 @@ async def group_command_handler(update, context):
                     "filters": handle_filters
                 }[cmd](update, context)
 
-            if cmd in ["tagall", "tagactive"]:
-                return await {
-                    "tagall": handle_tagall,
-                    "tagactive": handle_tagactive
-                }[cmd](update, context)
 
     # 🔄 بررسی تمام alias‌های مدیریتی و کنترلی
     for cmd, aliases in ALIASES.items():
