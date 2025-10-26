@@ -620,8 +620,9 @@ async def handle_admins(update, context):
         text += f"{idx}. <a href='tg://user?id={admin_id}'>مدیر {idx}</a>\n"
 
     await update.message.reply_text(text, parse_mode="HTML")
+
 # ======================= 💎 سیستم «اصل» پیشرفته مخصوص هر گروه =======================
-import json, os
+import json, os, asyncio
 from telegram import Update
 from telegram.ext import ContextTypes
 
@@ -693,7 +694,14 @@ async def handle_set_origin(update, context):
 
     # ⚠️ اگر باز هم خالی بود
     if not origin_text:
-        return await message.reply_text("⚠️ لطفاً متن اصل را بنویس یا روی پیام فردی ریپلای بزن.")
+        msg = await message.reply_text("⚠️ لطفاً متن اصل را بنویس یا روی پیام فردی ریپلای بزن.")
+        await asyncio.sleep(10)
+        try:
+            await msg.delete()
+            await message.delete()
+        except:
+            pass
+        return
 
     # 🎯 هدف: ریپلای → اون کاربر / بدون ریپلای → خودش
     target = message.reply_to_message.from_user if message.reply_to_message else user
@@ -708,19 +716,24 @@ async def handle_set_origin(update, context):
 
     # ✨ پیام نهایی زیبا
     if target.id == user.id:
-        # خودش برای خودش ثبت کرده
-        msg = (
+        msg_text = (
             f"💫 اصل شخصی شما با موفقیت ثبت شد ❤️\n\n"
             f"🧿 <b>{origin_text}</b>"
         )
     else:
-        # مدیر برای کسی دیگه ثبت کرده
-        msg = (
+        msg_text = (
             f"✅ اصل جدید برای <a href='tg://user?id={target.id}'>{target.first_name}</a> ثبت شد 💠\n\n"
             f"🧿 <b>{origin_text}</b>"
         )
 
-    await message.reply_text(msg, parse_mode="HTML")
+    # ارسال پیام و حذف بعد از ۱۰ ثانیه
+    msg_sent = await message.reply_text(msg_text, parse_mode="HTML")
+    await asyncio.sleep(10)
+    try:
+        await msg_sent.delete()
+        await message.delete()
+    except:
+        pass
 
 
 # 🔍 نمایش اصل (برای همه)
@@ -751,17 +764,16 @@ async def handle_show_origin(update, context):
     # اگر اصل داشت نشون بده، نداشت سکوت کن
     if origin_text:
         if target.id == user.id:
-            # خودش داره اصل خودش رو می‌بینه
             await message.reply_text(
                 f"🌿 <b>اصل شما:</b>\n{origin_text}",
                 parse_mode="HTML"
             )
         else:
-            # داره اصل کس دیگه رو می‌بینه
             await message.reply_text(
                 f"🧿 <b>اصل {target.first_name}:</b>\n{origin_text}",
                 parse_mode="HTML"
-        )
+)
+
 # ======================= 🎮 هندلر اصلی دستورات گروه (نسخه نهایی کامل) =======================
 
 async def group_command_handler(update, context):
