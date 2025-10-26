@@ -1887,8 +1887,36 @@ if __name__ == "__main__":
     # 🧠 فیلتر کلمات و تگ کاربران
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, group_text_handler_adv), group=-8)
 
-    # 🧹 پاکسازی (برای دستور /clean)
-    application.add_handler(CommandHandler("clean", handle_clean))
+    # ====================== 🧹 پاکسازی بدون / (فارسی + انگلیسی) ======================
+
+    from telegram.ext import MessageHandler, filters
+    import re
+
+    async def clean_handler(update, context):
+        """پاکسازی فارسی و انگلیسی بدون اسلش"""
+        if not await is_authorized(update, context):
+            return await update.message.reply_text("🚫 فقط مدیران یا سودوها مجازند!")
+
+        text = update.message.text.strip().lower()
+        # استخراج عدد از متن (مثلاً "پاکسازی 50" یا "clean 100")
+        match = re.search(r"(\d+)", text)
+        context.args = [match.group(1)] if match else []
+
+        # حالت “همه”
+        if any(word in text for word in ["all", "همه", "full", "کامل"]):
+            context.args = ["all"]
+
+        await handle_clean(update, context)
+
+    # 🎯 regex برای شناسایی همه حالت‌های متنی
+    clean_pattern = (
+        r"^(پاکسازی|پاک کن|پاک|حذف پیام|نظافت|delete|clear|clean)(.*)$"
+    )
+
+    application.add_handler(
+        MessageHandler(filters.Regex(clean_pattern) & filters.TEXT, clean_handler),
+        group=-7
+    )
     # ==========================================================
     # 👑 مدیریت سودوها
     # ==========================================================
