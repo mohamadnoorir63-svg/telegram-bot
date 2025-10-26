@@ -4,6 +4,7 @@ import random
 import re
 import zipfile
 from datetime import datetime
+
 from telegram import Update, InputFile
 from telegram.ext import (
     ApplicationBuilder,
@@ -14,11 +15,22 @@ from telegram.ext import (
     CallbackQueryHandler
 )
 import aiofiles
-from font_maker import font_maker, next_font, prev_font
+
 # 📦 ماژول‌ها
+from font_maker import font_maker, next_font, prev_font
+
 from memory_manager import (
-    init_files, load_data, save_data, learn, shadow_learn, get_reply,
-    set_mode, get_stats, enhance_sentence, generate_sentence, list_phrases
+    init_files,
+    load_data,
+    save_data,
+    learn,
+    shadow_learn,
+    get_reply,
+    set_mode,
+    get_stats,
+    enhance_sentence,
+    generate_sentence,
+    list_phrases
 )
 
 from jokes_manager import save_joke, list_jokes
@@ -27,16 +39,20 @@ from group_manager import register_group_activity, get_group_stats
 from ai_learning import auto_learn_from_text
 from smart_reply import detect_emotion, smart_response
 from emotion_memory import remember_emotion, get_last_emotion, emotion_context_reply
+
 from auto_brain.auto_brain import start_auto_brain_loop
 from selective_backup import selective_backup_menu, selective_backup_buttons
 from auto_brain import auto_backup
+
 from auto_brain.command_manager import (
     save_command,
     delete_command,
     handle_custom_command,
     list_commands,
     cleanup_group_commands
+)
 
+# 🧱 کنترل گروه (مدیریت + قفل‌ها + پاکسازی + پین)
 from group_control.group_control import (
     group_command_handler,
     check_message_locks,
@@ -44,16 +60,14 @@ from group_control.group_control import (
     handle_clean,      # 🧹 پاکسازی
     handle_pin,        # 📌 پین پیام
     handle_unpin,      # 📍 برداشتن پین
-    is_authorized      # ✅ برای بررسی مجوز مدیر یا سودو
+    is_authorized      # ✅ بررسی مدیر یا سودو
 )
 
-
-from context_memory import ContextMemory  # ✅ باید قبل از استفاده ازش باشه
+from context_memory import ContextMemory
 from brain_bridge_group import process_group_message
 
 # 🧠 حافظه کوتاه‌مدت گفتگو برای Context AI
 context_memory = ContextMemory()
-
 from ai_chat.chatgpt_panel import show_ai_panel, chat, start_ai_chat, stop_ai_chat
 from weather_module.weather_panel import show_weather
 from modules.azan_module import get_azan_time, get_ramadan_status
