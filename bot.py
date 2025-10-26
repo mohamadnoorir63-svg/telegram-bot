@@ -1995,11 +1995,6 @@ if __name__ == "__main__":
     # ==========================================================
     # 🔹 دستورات اصلی سیستم
     # ==========================================================
-    # 🎯 سیستم آمار روزانه فارسی
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, record_message_activity))
-    application.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, record_new_members))
-    application.add_handler(MessageHandler(filters.StatusUpdate.LEFT_CHAT_MEMBER, record_left_members))
-    application.add_handler(MessageHandler(filters.Regex("^(آمار|آمار امروز)$"), show_daily_stats))
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("toggle", toggle))
     application.add_handler(CommandHandler("welcome", toggle_welcome))
@@ -2062,7 +2057,11 @@ if __name__ == "__main__":
     # 🎭 سخنگوی خنگول (پاسخ معمولی)
     # ==========================================================
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, reply), group=5)
-
+    # 🎯 سیستم آمار روزانه فارسی
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, record_message_activity))
+    application.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, record_new_members))
+    application.add_handler(MessageHandler(filters.StatusUpdate.LEFT_CHAT_MEMBER, record_left_members))
+    application.add_handler(MessageHandler(filters.Regex("^(آمار|آمار امروز)$"), show_daily_stats))
     # ==========================================================
     # 🎉 خوشامد پویا و تنظیمات گروه
     # ==========================================================
