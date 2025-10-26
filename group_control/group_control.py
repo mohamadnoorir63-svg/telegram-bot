@@ -200,8 +200,34 @@ async def handle_mute(update, context):
         )
     except:
         await update.message.reply_text("⚠️ نمی‌توان این کاربر را ساکت کرد (احتمالاً مدیر یا مالک است).", parse_mode="HTML")
+        # 🔊 رفع سکوت کاربر
+async def handle_unmute(update, context):
+    if not await is_authorized(update, context):
+        return await update.message.reply_text("⛔ فقط مدیران یا سودوها مجازند!")
 
-# ======================= 🧹 پاکسازی مخصوص PTB 20.7 =======================
+    if not update.message.reply_to_message:
+        return await update.message.reply_text("🔹 باید روی پیام کاربر ریپلای بزنی.")
+
+    target = update.message.reply_to_message.from_user
+    chat = update.effective_chat
+    user = update.effective_user
+
+    try:
+        await context.bot.restrict_chat_member(
+            chat.id,
+            target.id,
+            permissions=ChatPermissions(can_send_messages=True)
+        )
+        time_str = datetime.now().strftime("%H:%M - %d/%m/%Y")
+        await update.message.reply_text(
+            f"🔊 <b>{target.first_name}</b> از حالت سکوت خارج شد و می‌تواند پیام بفرستد.\n\n"
+            f"👤 <b>توسط:</b> {user.first_name}\n"
+            f"🕒 <b>زمان:</b> {time_str}",
+            parse_mode="HTML"
+        )
+    except:
+        await update.message.reply_text("⚠️ نمی‌توان سکوت این کاربر را برداشت (احتمالاً مدیر یا صاحب گروه است).", parse_mode="HTML")
+        # ======================= 🧹 پاکسازی مخصوص PTB 20.7 =======================
 import asyncio
 from telegram.error import BadRequest
 
@@ -225,7 +251,6 @@ async def handle_clean(update, context):
             parse_mode="HTML"
         )
 
-    # تعیین حالت
     limit = 100
     if args and args[0].isdigit():
         limit = min(int(args[0]), 100)
@@ -262,7 +287,6 @@ async def handle_clean(update, context):
         await context.bot.delete_message(chat.id, message.message_id)
     except:
         pass
-
 
     
 # 📌 پین کردن پیام (با ریپلای)
