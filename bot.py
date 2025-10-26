@@ -1894,9 +1894,9 @@ if __name__ == "__main__":
 
     # ======================= ♻️ پاکسازی خودکار هر ۷ روز =======================
     class _SimpleContext:
-    def __init__(self, bot):
-        self.bot = bot
- 
+        def __init__(self, bot):
+            self.bot = bot
+
     async def origins_cleanup_loop(bot):
         while True:
             try:
