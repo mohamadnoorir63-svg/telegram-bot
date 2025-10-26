@@ -1,3 +1,5 @@
+from telegram import Update
+from telegram.ext import ContextTypes
 # ======================= 📊 نمایش آمار و آیدی =======================
 async def show_daily_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
