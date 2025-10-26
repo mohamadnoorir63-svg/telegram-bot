@@ -228,23 +228,24 @@ async def handle_unmute(update, context):
     except:
         await update.message.reply_text("⚠️ نمی‌توان سکوت این کاربر را برداشت (احتمالاً مدیر یا صاحب گروه است).", parse_mode="HTML")
 
-
-            # ======================= 🧹 نسخه تمیز و نهایی handle_clean =======================
+# ======================= 🧹 نسخه Stealth Clean Pro =======================
 import asyncio
 from telegram.error import BadRequest, RetryAfter
+from telegram import ChatPermissions
 
 async def handle_clean(update, context):
-    """🧹 پاکسازی بی‌صدا و پایدار (عدد، همه، یا ریپلای)"""
+    """🧹 پاکسازی کاملاً بی‌صدا — فقط مدیر مطلع می‌شود"""
     try:
-        # فقط برای مدیران
-        if not await is_authorized(update, context):
-            return await update.message.reply_text("🚫 فقط مدیران یا سودوها می‌توانند پاکسازی کنند!")
-
+        user = update.effective_user
         chat = update.effective_chat
         message = update.message
         args = context.args if context.args else []
 
-        # 🔢 تعیین محدودیت
+        # 🧠 بررسی سطح دسترسی
+        if not await is_authorized(update, context):
+            return await message.reply_text("🚫 فقط مدیران یا سودوها مجازند!")
+
+        # 🔢 محدوده پاکسازی
         limit = 500
         if args and args[0].isdigit():
             limit = min(int(args[0]), 1000)
@@ -252,74 +253,57 @@ async def handle_clean(update, context):
             limit = 1000
 
         target_id = message.reply_to_message.from_user.id if message.reply_to_message else None
-        deleted = 0
         last_id = message.message_id
+        deleted = 0
+        tasks = []
 
-        progress = await context.bot.send_message(chat.id, "🧹 در حال پاکسازی...")
+        async def safe_delete(msg_id):
+            try:
+                await context.bot.delete_message(chat.id, msg_id)
+                return 1
+            except (BadRequest, RetryAfter):
+                return 0
+            except Exception:
+                return 0
 
-        # 🧹 حلقه پاکسازی
+        # 🧹 پاکسازی دسته‌ای
         for _ in range(limit):
             last_id -= 1
             if last_id <= 0:
                 break
+            tasks.append(asyncio.create_task(safe_delete(last_id)))
 
-            try:
-                if target_id:
-                    fwd = await context.bot.forward_message(chat.id, chat.id, last_id)
-                    sender_id = fwd.forward_from.id if fwd.forward_from else None
-                    await context.bot.delete_message(chat.id, fwd.message_id)
-                    if sender_id != target_id:
-                        continue
+            if len(tasks) >= 50:
+                results = await asyncio.gather(*tasks)
+                deleted += sum(results)
+                tasks = []
+                await asyncio.sleep(0.5)
 
-                await context.bot.delete_message(chat.id, last_id)
-                deleted += 1
+        if tasks:
+            results = await asyncio.gather(*tasks)
+            deleted += sum(results)
 
-                # هر 25 پیام یک‌بار وضعیت بفرست
-                if deleted % 25 == 0:
-                    try:
-                        await progress.edit_text(
-                            f"🧹 در حال پاکسازی...\n🗑 {deleted}/{limit} پیام حذف شد."
-                        )
-                    except:
-                        pass
-
-                await asyncio.sleep(0.07)
-
-            except RetryAfter as e:
-                await asyncio.sleep(e.retry_after + 1)
-                continue
-            except BadRequest:
-                continue
-            except Exception:
-                continue
-
-        # ✅ پیام نهایی
+        # پیام‌ها خود پیام دستور هم حذف می‌شود
         try:
-            await progress.edit_text(
-                f"✅ پاکسازی کامل شد.\n🗑 تعداد حذف‌شده: <b>{deleted}</b>",
-                parse_mode="HTML"
-            )
-            await asyncio.sleep(5)
-            await context.bot.delete_message(chat.id, progress.message_id)
             await context.bot.delete_message(chat.id, message.message_id)
-        except Exception:
+        except:
             pass
 
-        # 📌 پیام پایانی (برای نظم گروه)
+        # 📩 فقط به مدیر گزارش بده (PV)
+        report = (
+            f"✅ <b>گزارش پاکسازی</b>\n\n"
+            f"🧹 <b>گروه:</b> {chat.title}\n"
+            f"👤 <b>توسط:</b> {user.first_name}\n"
+            f"🗑 <b>تعداد حذف‌شده:</b> {deleted}\n"
+            f"📆 <b>زمان:</b> {datetime.now().strftime('%H:%M:%S - %Y/%m/%d')}"
+        )
         try:
-            clean_note = await context.bot.send_message(
-                chat.id,
-                "✨ گروه با موفقیت تمیز شد!\n📌 لطفاً نظم گروه را حفظ کنید ❤️",
-                parse_mode="HTML"
-            )
-            await context.bot.pin_chat_message(chat.id, clean_note.message_id)
-            await asyncio.sleep(30)
-            await context.bot.delete_message(chat.id, clean_note.message_id)
-        except Exception:
+            await context.bot.send_message(user.id, report, parse_mode="HTML")
+        except:
+            # اگه PV بسته باشه، بی‌صدا رد میشه
             pass
 
     except Exception:
-        # هیچ خطایی نمایش داده نمی‌شود
         pass
     
 # 📌 پین کردن پیام (با ریپلای)
