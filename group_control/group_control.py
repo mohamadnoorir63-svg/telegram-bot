@@ -226,95 +226,65 @@ async def handle_unmute(update, context):
         await update.message.reply_text("⚠️ نمی‌توان سکوت این کاربر را برداشت (احتمالاً مدیر یا صاحب گروه است).", parse_mode="HTML")
         
 # ======================= 🧹 پاکسازی فوق‌پیشرفته + پین پیام =======================
-import asyncio
-
-# 🧹 پاکسازی فوق‌العاده (عددی، کامل یا کاربر خاص)
+# 🧹 پاکسازی پیشرفته (عددی، همه، یا کاربر خاص)
 async def handle_clean(update, context):
     if not await is_authorized(update, context):
-        return await update.message.reply_text("⛔ فقط مدیران و سودوها می‌توانند پاکسازی کنند!")
+        return await update.message.reply_text("🚫 فقط مدیران یا سودوها می‌توانند پاکسازی کنند!")
 
     chat = update.effective_chat
-    user = update.effective_user
-    reply = update.message.reply_to_message
-    arg_text = " ".join(context.args).lower() if context.args else ""
-    deleted = 0
+    message = update.message
+    args = context.args if context.args else []
 
-    # 📘 راهنما
-    if not arg_text and not reply:
-        return await update.message.reply_text(
-            "🧹 <b>دستورات پاکسازی:</b>\n\n"
-            "1️⃣ <code>پاکسازی 50</code> — حذف ۵۰ پیام اخیر\n"
-            "2️⃣ <code>پاکسازی همه</code> — حذف تمام پیام‌های گروه (در حد توان)\n"
-            "3️⃣ ریپلای کن و بزن <code>پاکسازی</code> — حذف تمام پیام‌های آن کاربر\n\n"
+    # 🧩 حالت راهنما (بدون عدد یا ریپلای)
+    if not args and not message.reply_to_message:
+        return await message.reply_text(
+            "🧹 دستورات پاکسازی:\n\n"
+            "1️⃣ پاکسازی 50 — حذف ۵۰ پیام اخیر\n"
+            "2️⃣ پاکسازی همه — حذف تمام پیام‌های گروه (در حد توان)\n"
+            "3️⃣ ریپلای کن و بزن پاکسازی — حذف تمام پیام‌های آن کاربر\n\n"
             "📌 توجه: در گروه‌های بزرگ ممکن است چند ثانیه طول بکشد.",
             parse_mode="HTML"
         )
 
-    msg = await update.message.reply_text("🧹 درحال پردازش پاکسازی...", parse_mode="HTML")
-
-    # 🧍 حالت ریپلای → حذف پیام‌های آن کاربر
-    if reply:
-        target = reply.from_user
-        try:
-            async for m in context.bot.get_chat_history(chat.id, limit=1000):
-                if m.from_user and m.from_user.id == target.id:
-                    try:
-                        await m.delete()
-                        deleted += 1
-                        if deleted % 50 == 0:
-                            await asyncio.sleep(0.5)
-                    except:
-                        pass
-        except Exception as e:
-            return await msg.edit_text(f"⚠️ خطا در پاکسازی:\n<code>{e}</code>", parse_mode="HTML")
-
-        return await msg.edit_text(
-            f"🧹 تمام پیام‌های اخیر از <b>{target.first_name}</b> حذف شدند ✅\n"
-            f"📦 مجموع: <b>{deleted}</b> پیام",
-            parse_mode="HTML"
-        )
-
-    # 🧨 حالت پاکسازی همه
-    if arg_text in ["همه", "all", "everything"]:
-        try:
-            async for m in context.bot.get_chat_history(chat.id, limit=0):
-                try:
-                    await m.delete()
-                    deleted += 1
-                    if deleted % 50 == 0:
-                        await asyncio.sleep(1)
-                except:
-                    pass
-        except Exception as e:
-            return await msg.edit_text(f"⚠️ خطا در پاکسازی:\n<code>{e}</code>", parse_mode="HTML")
-
-        return await msg.edit_text(
-            f"✅ پاکسازی کامل انجام شد.\n🧹 مجموع: <b>{deleted}</b> پیام حذف شد.",
-            parse_mode="HTML"
-        )
-
-    # 🔢 حالت عددی (پاکسازی 50)
-    try:
-        count = int(arg_text)
-        if count < 1 or count > 1000:
-            return await msg.edit_text("⚠️ لطفاً عددی بین 1 تا 1000 وارد کنید.")
-    except:
-        return await msg.edit_text("❗ مقدار ورودی معتبر نیست. باید عدد یا کلمه 'همه' باشه.")
-
-    try:
-        async for m in context.bot.get_chat_history(chat.id, limit=count + 1):
+    # 🧹 حالت حذف تمام پیام‌ها (clean all)
+    if args and (args[0] == "all" or args[0] == "همه"):
+        deleted = 0
+        async for msg in context.bot.get_chat_history(chat.id, limit=1000):
             try:
-                await m.delete()
+                await context.bot.delete_message(chat.id, msg.message_id)
                 deleted += 1
-                if deleted % 50 == 0:
-                    await asyncio.sleep(0.5)
             except:
                 pass
-    except Exception as e:
-        return await msg.edit_text(f"⚠️ خطا در حذف پیام‌ها:\n<code>{e}</code>", parse_mode="HTML")
+        return await message.reply_text(f"✅ پاکسازی کامل انجام شد.\n🗑 {deleted} پیام حذف شد.", parse_mode="HTML")
 
-    await msg.edit_text(f"🧹 <b>{deleted - 1}</b> پیام اخیر حذف شد ✅", parse_mode="HTML")
+    # 🔢 حالت عددی
+    if args and args[0].isdigit():
+        count = int(args[0])
+        if count > 1000:
+            count = 1000
+        deleted = 0
+        async for msg in context.bot.get_chat_history(chat.id, limit=count):
+            try:
+                await context.bot.delete_message(chat.id, msg.message_id)
+                deleted += 1
+            except:
+                pass
+        return await message.reply_text(f"✅ {deleted} پیام اخیر حذف شد.", parse_mode="HTML")
 
+    # 👤 حالت ریپلای به کاربر خاص
+    if message.reply_to_message:
+        target_id = message.reply_to_message.from_user.id
+        deleted = 0
+        async for msg in context.bot.get_chat_history(chat.id, limit=1000):
+            if msg.from_user and msg.from_user.id == target_id:
+                try:
+                    await context.bot.delete_message(chat.id, msg.message_id)
+                    deleted += 1
+                except:
+                    pass
+        return await message.reply_text(f"🧹 {deleted} پیام از کاربر هدف حذف شد.", parse_mode="HTML")
+
+    return await message.reply_text("⚠️ فرمت نادرست دستور پاکسازی.")
 
 # 📌 پین کردن پیام (با ریپلای)
 async def handle_pin(update, context):
