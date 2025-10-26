@@ -2109,18 +2109,24 @@ if __name__ == "__main__":
     # 🚀 اجرای نهایی ربات
     # ==========================================================
     try:
-    print("🔄 در حال اجرای ربات...")
+        print("🔄 در حال اجرای ربات...")
 
-    # 🌙 آمار خودکار شبانه (هر شب ساعت 00:00 به وقت تهران)
-    from datetime import time, timezone, timedelta
-    tz_tehran = timezone(timedelta(hours=3, minutes=30))
-    job_queue = application.job_queue
-    job_queue.run_daily(send_nightly_stats, time=time(0, 0, tzinfo=tz_tehran))
+        # 🌙 آمار خودکار شبانه (هر شب ساعت 00:00 به وقت تهران)
+        from datetime import time, timezone, timedelta
+        tz_tehran = timezone(timedelta(hours=3, minutes=30))
+        job_queue = application.job_queue
+        job_queue.run_daily(send_nightly_stats, time=time(0, 0, tzinfo=tz_tehran))
 
     application.run_polling(
-        allowed_updates=["message", "edited_message", "callback_query", "chat_member", "my_chat_member"]
-    )
+        allowed_updates=[
+            "message",
+            "edited_message",
+            "callback_query",
+            "chat_member",
+            "my_chat_member",
+            ]
+        )
 
     except Exception as e:
-    print(f"⚠️ خطا در اجرای ربات:\n{e}")
-    print("♻️ ربات به‌صورت خودکار توسط هاست ری‌استارت خواهد شد ✅")
+        print(f"⚠️ خطا در اجرای ربات:\n{e}")
+        print("♻️ ربات به‌صورت خودکار توسط هاست ری‌استارت خواهد شد ✅")
