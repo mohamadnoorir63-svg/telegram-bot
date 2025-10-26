@@ -1875,8 +1875,7 @@ async def show_custom_guide(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not text:
         return await update.message.reply_text("ℹ️ هنوز متنی برای راهنما ثبت نشده.")
     await update.message.reply_text(text)
-
-    # ======================= 🚀 اجرای نهایی =======================
+# ======================= 🚀 اجرای نهایی =======================
 
 if __name__ == "__main__":
     print("🤖 خنگول فارسی 8.7 Cloud+ Supreme Pro Stable+ آماده به خدمت است ...")
@@ -1886,13 +1885,21 @@ if __name__ == "__main__":
 
     # ⚙️ مدیریت خطاهای کلی
     application.add_error_handler(handle_error)
-    from telegram.ext import MessageHandler, filters
-    from group_control.group_control import auto_clean_old_origins
 
-    # ======================= 🧹 پاکسازی فوری وقتی ربات از گروه حذف می‌شود =======================
-    application.add_handler(MessageHandler(filters.StatusUpdate.MY_CHAT_MEMBER, handle_bot_removed), group=-20)
+    # ======================= 🧹 پاکسازی داده‌های گروه‌ها =======================
+    from telegram.ext import MessageHandler, ChatMemberHandler, filters
+    from group_control.origin_system import handle_bot_removed, auto_clean_old_origins
+    import asyncio
 
-    # ======================= ♻️ پاکسازی خودکار هر ۷ روز =======================
+    # ✅ اگر ربات از گروه حذف شود یا وضعیتش تغییر کند
+    try:
+        application.add_handler(ChatMemberHandler(handle_bot_removed, ChatMemberHandler.MY_CHAT_MEMBER), group=-20)
+    except Exception:
+        # اگر نسخه از ChatMemberHandler پشتیبانی نکند
+        application.add_handler(MessageHandler(filters.StatusUpdate.CHAT_MEMBER, handle_bot_removed), group=-20)
+        application.add_handler(MessageHandler(filters.StatusUpdate.LEFT_CHAT_MEMBER, handle_bot_removed), group=-20)
+
+    # ✅ پاکسازی خودکار هر ۷ روز یک‌بار (حلقه پس‌زمینه)
     class _SimpleContext:
         def __init__(self, bot):
             self.bot = bot
@@ -1907,13 +1914,10 @@ if __name__ == "__main__":
 
     application.create_task(origins_cleanup_loop(application.bot))
     print("🧭 [Origins Cleanup] scheduled every 7 days ✅")
-    
-    # پاکسازی وقتی وضعیت ربات تغییر می‌کنه (مثل حذف شدن)
-    application.add_handler(MessageHandler(filters.StatusUpdate.CHAT_MEMBER, handle_bot_removed), group=-20)
 
-    # پاکسازی وقتی ربات از گروه خارج میشه
-    application.add_handler(MessageHandler(filters.StatusUpdate.LEFT_CHAT_MEMBER, handle_bot_removed), group=-20)
-    # ======================= 👑 مدیریت سودوها =======================
+    # ==========================================================
+    # 👑 مدیریت سودوها
+    # ==========================================================
     async def list_sudos(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if update.effective_user.id not in SUDO_IDS:
             return await update.message.reply_text("⛔ فقط سودوها مجازند!")
@@ -1936,8 +1940,6 @@ if __name__ == "__main__":
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, group_text_handler_adv), group=-8)
 
     # ====================== 🧹 پاکسازی بدون / (فارسی + انگلیسی) ======================
-
-    from telegram.ext import MessageHandler, filters
     import re
 
     async def clean_handler(update, context):
@@ -1946,25 +1948,21 @@ if __name__ == "__main__":
             return await update.message.reply_text("🚫 فقط مدیران یا سودوها مجازند!")
 
         text = update.message.text.strip().lower()
-        # استخراج عدد از متن (مثلاً "پاکسازی 50" یا "clean 100")
         match = re.search(r"(\d+)", text)
         context.args = [match.group(1)] if match else []
 
-        # حالت “همه”
         if any(word in text for word in ["all", "همه", "full", "کامل"]):
             context.args = ["all"]
 
         await handle_clean(update, context)
 
-    # 🎯 regex برای شناسایی همه حالت‌های متنی
-    clean_pattern = (
-        r"^(پاکسازی|پاک کن|پاک|حذف پیام|نظافت|delete|clear|clean)(.*)$"
-    )
+    clean_pattern = r"^(پاکسازی|پاک کن|پاک|حذف پیام|نظافت|delete|clear|clean)(.*)$"
 
     application.add_handler(
         MessageHandler(filters.Regex(clean_pattern) & filters.TEXT, clean_handler),
         group=-7
     )
+
     # ==========================================================
     # 👑 مدیریت سودوها
     # ==========================================================
@@ -2002,7 +2000,7 @@ if __name__ == "__main__":
     application.add_handler(CommandHandler("fullstats", fullstats))
     application.add_handler(CommandHandler("backup", backup))
     application.add_handler(CommandHandler("selectivebackup", selective_backup_menu))
-    application.add_handler(CallbackQueryHandler(selective_backup_buttons, pattern="^selbk_"))
+    application.add_handler(CallbackQueryHandler(selectivebackup_buttons, pattern="^selbk_"))
     application.add_handler(CommandHandler("restore", restore))
     application.add_handler(CommandHandler("reset", reset_memory))
     application.add_handler(CommandHandler("reload", reload_memory))
@@ -2046,36 +2044,6 @@ if __name__ == "__main__":
     application.add_handler(MessageHandler(filters.Regex(r"^تنظیم قوانین"), set_rules_link), group=-1)
     application.add_handler(MessageHandler(filters.Regex(r"^تنظیم حذف"), set_welcome_timer), group=-1)
     application.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome), group=-1)
-
-    # ==========================================================
-    # 🕌 اذان و رمضان
-    # ==========================================================
-    application.add_handler(MessageHandler(filters.Regex(r"^اذان"), get_azan_time))
-    application.add_handler(MessageHandler(filters.Regex(r"^رمضان"), get_ramadan_status))
-
-    # ==========================================================
-    # 🌦 آب‌وهوا
-    # ==========================================================
-    application.add_handler(CallbackQueryHandler(show_weather, pattern="^panel_weather$"), group=-3)
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, show_weather), group=-3)
-
-    # ==========================================================
-    # 🧾 راهنمای قابل ویرایش
-    # ==========================================================
-    application.add_handler(MessageHandler(filters.Regex("^ثبت help$"), save_help))
-    application.add_handler(MessageHandler(filters.Regex("^راهنما$"), show_custom_guide))
-    application.add_handler(MessageHandler(filters.Regex("^ثبت راهنما$"), save_custom_guide))
-
-    # ==========================================================
-    # 📂 فایل‌ها و پنل‌ها
-    # ==========================================================
-    application.add_handler(MessageHandler(filters.Document.ALL, handle_document), group=1)
-    application.add_handler(CallbackQueryHandler(panel_handler))
-
-    # ==========================================================
-    # 🎭 پاسخ هوشمند خنگول (در انتها)
-    # ==========================================================
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, reply), group=5)
 
     # ==========================================================
     # 🧠 وظایف استارتاپ
