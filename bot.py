@@ -1870,7 +1870,7 @@ async def show_custom_guide(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not text:
         return await update.message.reply_text("ℹ️ هنوز متنی برای راهنما ثبت نشده.")
     await update.message.reply_text(text)
-    # ======================= 🚀 اجرای نهایی =======================
+# ======================= 🚀 اجرای نهایی =======================
 if __name__ == "__main__":
     print("🤖 خنگول فارسی 8.7 Cloud+ Supreme Pro Stable+ آماده به خدمت است ...")
 
@@ -2032,10 +2032,9 @@ if __name__ == "__main__":
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, chat), group=3)
 
     # ==========================================================
-    # 🎭 سخنگوی خنگول (پاسخ هوشمند معمولی)
+    # 🎭 سخنگوی خنگول (پاسخ معمولی)
     # ==========================================================
-    from reply_system import reply  # اگر فایل جدا دارد
-    # اگر تابع reply در همین فایل است، خط بالا را حذف کن
+    # اگر تابع reply در همین فایل است، نیازی به import نیست
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, reply), group=5)
 
     # ==========================================================
