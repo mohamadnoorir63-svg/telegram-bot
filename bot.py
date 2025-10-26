@@ -71,6 +71,13 @@ context_memory = ContextMemory()
 from ai_chat.chatgpt_panel import show_ai_panel, chat, start_ai_chat, stop_ai_chat
 from weather_module.weather_panel import show_weather
 from modules.azan_module import get_azan_time, get_ramadan_status
+import asyncio
+from group_control.origin_system import auto_clean_old_origins, handle_bot_removed
+
+# ساخت Context ساده برای تابع auto_clean_old_origins
+class _SimpleContext:
+    def __init__(self, bot):
+        self.bot = bot
 # ======================= 👑 مدیریت سودوها =======================
 from telegram import Update
 from telegram.ext import ContextTypes
@@ -1885,6 +1892,8 @@ if __name__ == "__main__":
 
     # اجرای پاکسازی خودکار هر ۷ روز
     application.job_queue.run_repeating(auto_clean_old_origins, interval=7*24*60*60, first=10)
+    # ======================= 🧹 پاکسازی فوری وقتی ربات از گروه حذف می‌شود =======================
+    application.add_handler(MessageHandler(filters.StatusUpdate.MY_CHAT_MEMBER, handle_bot_removed), group=-20)
 
     # ======================= 👑 مدیریت سودوها =======================
     async def list_sudos(update: Update, context: ContextTypes.DEFAULT_TYPE):
