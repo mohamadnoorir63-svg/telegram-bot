@@ -35,3 +35,5 @@ khayyam==3.0.17
 tqdm==4.66.5
 Flask==3.0.3
 gunicorn==23.0.0
+async-timeout==4.0.3
+tenacity==8.3.0
