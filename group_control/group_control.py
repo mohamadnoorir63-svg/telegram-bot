@@ -228,12 +228,10 @@ async def handle_unmute(update, context):
     except:
         await update.message.reply_text("⚠️ نمی‌توان سکوت این کاربر را برداشت (احتمالاً مدیر یا صاحب گروه است).", parse_mode="HTML")
         # ======================= 🧹 پاکسازی پیشرفته و هوشمند PTB 20.7 =======================
-import asyncio
-from telegram.error import BadRequest, TimedOut, RetryAfter
-import random
+import asyncio, random
+from telegram.error import BadRequest, RetryAfter, TimedOut
 
 async def handle_clean(update, context):
-    """پاکسازی گروه — عددی، همه، یا کاربر خاص"""
     if not await is_authorized(update, context):
         return await update.message.reply_text("🚫 فقط مدیران یا سودوها می‌توانند پاکسازی کنند!")
 
@@ -241,98 +239,64 @@ async def handle_clean(update, context):
     message = update.message
     args = context.args if context.args else []
 
-    # 🧾 نمایش راهنما
+    # راهنما
     if not args and not message.reply_to_message:
         return await message.reply_text(
             "🧹 <b>دستورات پاکسازی:</b>\n\n"
-            "1️⃣ پاکسازی 50 — حذف ۵۰ پیام اخیر\n"
-            "2️⃣ پاکسازی همه — حذف تا حداکثر توان مجاز تلگرام\n"
-            "3️⃣ ریپلای کن و بزن پاکسازی — حذف پیام‌های آن کاربر\n\n"
-            "⚠️ محدودیت: پیام‌های خیلی قدیمی قابل حذف نیستند.",
+            "1️⃣ /clean 50 — حذف ۵۰ پیام اخیر\n"
+            "2️⃣ /clean all — حذف تا ۵۰۰ پیام اخیر\n"
+            "3️⃣ ریپلای کن و بزن /clean — حذف پیام‌های آن کاربر\n\n"
+            "📌 تلگرام اجازه حذف پیام‌های خیلی قدیمی را نمی‌دهد.",
             parse_mode="HTML"
         )
 
-    # 🧩 تعیین حالت
-    target_id = message.reply_to_message.from_user.id if message.reply_to_message else None
+    # تنظیم limit
     limit = 100
-    mode_all = False
-    if args:
-        if args[0].isdigit():
-            limit = min(int(args[0]), 500)
-        elif args[0].lower() in ["all", "همه"]:
-            mode_all = True
+    if args and args[0].isdigit():
+        limit = min(int(args[0]), 500)
+    elif args and args[0].lower() in ["all", "همه"]:
+        limit = 500
 
+    target_id = message.reply_to_message.from_user.id if message.reply_to_message else None
     deleted = 0
+
     progress = await message.reply_text("🧹 در حال پاکسازی...", parse_mode="HTML")
 
-    async def delete_safely(chat_id, msg_id):
-        """تابع امن حذف پیام با کنترل خطا و flood"""
+    async def delete_safely(msg_id):
+        nonlocal deleted
         try:
-            await context.bot.delete_message(chat_id, msg_id)
-            await asyncio.sleep(random.uniform(0.05, 0.2))
-            return True
+            await context.bot.delete_message(chat.id, msg_id)
+            deleted += 1
+            # فاصله‌ی تصادفی بین هر حذف برای جلوگیری از پر شدن pool
+            await asyncio.sleep(random.uniform(0.25, 0.5))
+            if deleted % 20 == 0:
+                await progress.edit_text(f"🧹 حذف شده: {deleted}/{limit}", parse_mode="HTML")
         except RetryAfter as e:
             await asyncio.sleep(e.retry_after + 1)
-            return await delete_safely(chat_id, msg_id)
         except (BadRequest, TimedOut):
-            return False
+            await asyncio.sleep(0.2)
         except Exception:
-            return False
+            await asyncio.sleep(0.3)
 
     try:
-        # حالت پاکسازی کامل
-        if mode_all:
-            offset = 0
-            batch_size = 100
-            max_rounds = 500  # برای جلوگیری از لوپ بی‌نهایت
-            for _ in range(max_rounds):
-                updates = await context.bot.get_updates(offset=offset, limit=batch_size)
-                if not updates:
-                    break
-
-                for item in reversed(updates):
-                    msg = item.message
-                    if not msg or msg.chat.id != chat.id:
-                        continue
-                    if target_id and (not msg.from_user or msg.from_user.id != target_id):
-                        continue
-
-                    success = await delete_safely(chat.id, msg.message_id)
-                    if success:
-                        deleted += 1
-                        if deleted % 20 == 0:
-                            await progress.edit_text(f"🧹 حذف {deleted} پیام تا الان...", parse_mode="HTML")
-
-                offset += batch_size
-                await asyncio.sleep(0.2)
-            await progress.edit_text(f"✅ پاکسازی کامل انجام شد.\n🗑 پیام‌های حذف‌شده: <b>{deleted}</b>", parse_mode="HTML")
-
-        # حالت محدود (عدد مشخص)
-        else:
-            updates = await context.bot.get_updates(limit=limit)
-            for item in reversed(updates):
-                msg = item.message
-                if not msg or msg.chat.id != chat.id:
-                    continue
+        # گرفتن پیام‌ها با متد جدید (بدون get_chat_history)
+        last_msg_id = message.message_id
+        for i in range(limit):
+            msg_id = last_msg_id - i - 1
+            if msg_id <= 0:
+                break
+            try:
+                msg = await context.bot.get_message(chat.id, msg_id)
                 if target_id and (not msg.from_user or msg.from_user.id != target_id):
                     continue
-
-                success = await delete_safely(chat.id, msg.message_id)
-                if success:
-                    deleted += 1
-                    if deleted % 10 == 0:
-                        await progress.edit_text(f"🧹 حذف {deleted}/{limit} پیام...", parse_mode="HTML")
-
-            await progress.edit_text(f"✅ پاکسازی انجام شد.\n🗑 حذف‌شده: <b>{deleted}</b>", parse_mode="HTML")
-
+                await delete_safely(msg.message_id)
+            except Exception:
+                await asyncio.sleep(0.3)
     except Exception as e:
-        await progress.edit_text(f"⚠️ خطا در پاکسازی:\n<code>{e}</code>", parse_mode="HTML")
+        return await progress.edit_text(f"⚠️ خطا در پاکسازی:\n<code>{e}</code>", parse_mode="HTML")
 
-    try:
-        await asyncio.sleep(3)
-        await context.bot.delete_message(chat.id, message.message_id)
-    except:
-        pass
+    await progress.edit_text(f"✅ پاکسازی انجام شد.\n🗑 تعداد حذف‌شده: <b>{deleted}</b>", parse_mode="HTML")
+ 
 
 
     
