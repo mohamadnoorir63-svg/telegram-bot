@@ -750,12 +750,16 @@ async def handle_show_origin(update, context):
     else:
         return  # اگر اصل نداشت، سکوت کن
 
-# ======================= 🎮 هندلر اصلی دستورات گروه =======================
+
+# ======================= 🎮 هندلر اصلی دستورات گروه (نسخه نهایی کامل) =======================
 
 async def group_command_handler(update, context):
+    if not update.message or not update.message.text:
+        return
+
     text = update.message.text.strip().lower()
 
-    # 🧩 تغییر یا افزودن alias جدید
+    # 🧩 تغییر یا افزودن alias جدید (فقط سودو)
     if text.startswith("alias "):
         return await handle_alias(update, context)
 
@@ -763,7 +767,29 @@ async def group_command_handler(update, context):
     if text in ["locks", "lock status", "وضعیت قفل"]:
         return await handle_locks_status(update, context)
 
-    # 🔄 بررسی همه alias‌ها
+    # 🧿 دستورات مربوط به سیستم "اصل"
+    if text.startswith("ثبت اصل") or text.startswith("set origin") or text.startswith("setorigin"):
+        return await handle_set_origin(update, context)
+    elif text in ["اصل", "اصلش", "origin", "اصل من", "اصل خودم", "my origin"]:
+        return await handle_show_origin(update, context)
+
+    # 🚫 فیلترها و تگ‌ها
+    for cmd, aliases in ALIASES.items():
+        if text.startswith(tuple(aliases)):
+            if cmd in ["addfilter", "delfilter", "filters"]:
+                return await {
+                    "addfilter": handle_addfilter,
+                    "delfilter": handle_delfilter,
+                    "filters": handle_filters
+                }[cmd](update, context)
+
+            if cmd in ["tagall", "tagactive"]:
+                return await {
+                    "tagall": handle_tagall,
+                    "tagactive": handle_tagactive
+                }[cmd](update, context)
+
+    # 🔄 بررسی تمام alias‌های مدیریتی و کنترلی
     for cmd, aliases in ALIASES.items():
         if text in aliases:
             # 🧱 بررسی قفل‌های خاص
@@ -773,7 +799,7 @@ async def group_command_handler(update, context):
                 elif cmd == f"unlock_{lock}":
                     return await handle_unlock_generic(update, context, lock)
 
-            # ⚙️ لیست تمام هندلرهای شناسایی‌شده
+            # ⚙️ لیست تمام هندلرهای شناخته‌شده
             handlers = {
                 "ban": handle_ban,
                 "unban": handle_unban,
@@ -781,24 +807,29 @@ async def group_command_handler(update, context):
                 "unwarn": handle_warn,
                 "mute": handle_mute,
                 "unmute": handle_unmute,
-                "clean": handle_clean,           # 🧹 پاکسازی پیشرفته
-                "pin": handle_pin,               # 📌 پین پیام
-                "unpin": handle_unpin,           # 📍 برداشتن پین
-                "lockgroup": handle_lockgroup,   # 🔒 قفل گروه کامل
-                "unlockgroup": handle_unlockgroup, # 🔓 بازگروه
-                "addadmin": handle_addadmin,     # 👑 افزودن مدیر
-                "removeadmin": handle_removeadmin, # ❌ حذف مدیر
-                "admins": handle_admins          # 👥 لیست مدیران
+                "clean": handle_clean,
+                "pin": handle_pin,
+                "unpin": handle_unpin,
+                "lockgroup": handle_lockgroup,
+                "unlockgroup": handle_unlockgroup,
+                "addadmin": handle_addadmin,
+                "removeadmin": handle_removeadmin,
+                "admins": handle_admins
             }
 
             # 🔍 اجرای تابع مرتبط با دستور
             if cmd in handlers:
-                return await handlers[cmd](update, context)
+                try:
+                    return await handlers[cmd](update, context)
+                except Exception as e:
+                    try:
+                        await update.message.reply_text(f"⚠️ خطا:\n<code>{e}</code>", parse_mode="HTML")
+                    except:
+                        pass
+                    return
 
-    # 💤 در صورت ناهماهنگی دستور
+    # 💤 اگر هیچ دستوری تشخیص داده نشد
     return
-    
-
 
 # ======================= 🧠 فیلتر کلمات + تگ کاربران =======================
 
