@@ -498,14 +498,20 @@ async def unlock_learning(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("🔓 یادگیری باز شد!")
 # ======================= 📊 آمار خنگول واقعی =======================
 async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """نمایش آمار کلی — فقط برای مدیر اصلی یا سودوها"""
+    ADMIN_ID = int(os.getenv("ADMIN_ID", "7089376754"))
+    user = update.effective_user
+    user_id = user.id
+
+    # ✅ فقط مدیر اصلی یا سودوها مجازند
+    if user_id != ADMIN_ID and user_id not in SUDO_IDS:
+        return await update.message.reply_text("⛔ فقط مدیر اصلی یا سودوها اجازه مشاهده آمار را دارند.")
+
     data = get_stats()
     groups_data = load_data("group_data.json").get("groups", [])
 
     # ✅ شمارش گروه‌ها (سازگار با دیکشنری یا لیست)
-    if isinstance(groups_data, dict):
-        groups = len(groups_data)
-    else:
-        groups = len(groups_data)
+    groups = len(groups_data) if isinstance(groups_data, (dict, list)) else 0
 
     # ✅ شمارش کاربران از users.json
     users_list = []
@@ -525,25 +531,35 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"👥 گروه‌های فعال: <b>{groups}</b>\n"
         f"🧩 جملات ذخیره‌شده: <b>{data['phrases']}</b>\n"
         f"💬 پاسخ‌های یادگرفته: <b>{data['responses']}</b>\n"
-        f"🎭 مود فعلی: <b>{data['mode']}</b>"
+        f"🎭 مود فعلی: <b>{data['mode']}</b>\n"
+        f"━━━━━━━━━━━━━━━\n"
+        f"📨 <i>درخواست توسط:</i> <b>{user.first_name}</b> (<code>{user_id}</code>)"
     )
 
     await update.message.reply_text(msg, parse_mode="HTML")
 
 # ======================= 📊 آمار کامل گروه‌ها (اصلاح‌شده) =======================
 async def fullstats(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """نمایش آمار فقط برای گروه‌ها (فیلتر کاربران از group_data.json)"""
+    """نمایش آمار فقط برای گروه‌ها — فقط مدیر اصلی و سودوها"""
+    ADMIN_ID = int(os.getenv("ADMIN_ID", "7089376754"))
+    user = update.effective_user
+    user_id = user.id
+
+    # ✅ فقط مدیر اصلی یا سودوها مجازند
+    if user_id != ADMIN_ID and user_id not in SUDO_IDS:
+        return await update.message.reply_text("⛔ فقط مدیر اصلی یا سودوها اجازه مشاهده آمار کامل گروه‌ها را دارند.")
+
     try:
         data = load_data("group_data.json")
         groups = data.get("groups", {})
 
-        text = "📈 آمار کامل گروه‌ها:\n\n"
+        text = "📈 <b>آمار کامل گروه‌ها:</b>\n\n"
 
         # حالت 1: اگر groups لیست باشه
         if isinstance(groups, list):
             valid_groups = [g for g in groups if str(g.get("id", "")).startswith("-")]
             if not valid_groups:
-                return await update.message.reply_text("ℹ️ هنوز هیچ گروهی ثبت نشده.")
+                return await update.message.reply_text("ℹ️ هنوز هیچ گروهی ثبت نشده.", parse_mode="HTML")
             for g in valid_groups:
                 group_id = g.get("id")
                 title = g.get("title", f"Group_{group_id}")
@@ -556,13 +572,13 @@ async def fullstats(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 except:
                     pass
 
-                text += f"🏠 گروه: {title}\n👥 اعضا: {members}\n🕓 آخرین فعالیت: {last_active}\n\n"
+                text += f"🏠 <b>گروه:</b> {title}\n👥 <b>اعضا:</b> {members}\n🕓 <b>آخرین فعالیت:</b> {last_active}\n\n"
 
         # حالت 2: اگر groups دیکشنری باشه
         elif isinstance(groups, dict):
             valid_items = {gid: info for gid, info in groups.items() if str(gid).startswith("-")}
             if not valid_items:
-                return await update.message.reply_text("ℹ️ هنوز هیچ گروهی ثبت نشده.")
+                return await update.message.reply_text("ℹ️ هنوز هیچ گروهی ثبت نشده.", parse_mode="HTML")
             for gid, info in valid_items.items():
                 title = info.get("title", f"Group_{gid}")
                 members = len(info.get("members", []))
@@ -574,18 +590,20 @@ async def fullstats(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 except:
                     pass
 
-                text += f"🏠 گروه: {title}\n👥 اعضا: {members}\n🕓 آخرین فعالیت: {last_active}\n\n"
+                text += f"🏠 <b>گروه:</b> {title}\n👥 <b>اعضا:</b> {members}\n🕓 <b>آخرین فعالیت:</b> {last_active}\n\n"
 
         else:
-            return await update.message.reply_text("⚠️ ساختار فایل group_data.json نامعتبر است!")
+            return await update.message.reply_text("⚠️ ساختار فایل group_data.json نامعتبر است!", parse_mode="HTML")
 
         if len(text) > 4000:
             text = text[:3990] + "..."
 
-        await update.message.reply_text(text)
+        text += f"━━━━━━━━━━━━━━━\n📨 <i>درخواست توسط:</i> <b>{user.first_name}</b> (<code>{user_id}</code>)"
+
+        await update.message.reply_text(text, parse_mode="HTML")
 
     except Exception as e:
-        await update.message.reply_text(f"⚠️ خطا در آمار گروه‌ها:\n{e}")
+        await update.message.reply_text(f"⚠️ خطا در آمار گروه‌ها:\n{e}", parse_mode="HTML")
  # ======================= 👋 سیستم خوشامد پویا برای هر گروه =======================
 from telegram import InlineKeyboardMarkup, InlineKeyboardButton, Update
 from telegram.ext import ContextTypes
