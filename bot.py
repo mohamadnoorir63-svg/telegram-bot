@@ -897,21 +897,30 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
         with zipfile.ZipFile(restore_zip, "r") as zip_ref:
             zip_ref.extractall(restore_dir)
 
+        # 🧩 فایل‌های مهم برای بازیابی
         important_files = [
             "memory.json",
             "group_data.json",
             "jokes.json",
             "fortunes.json",
-            "aliases.json"          # 🧩 دستورات سفارشی
+            "aliases.json",                  # مسیر اصلی
+            "group_control/aliases.json"     # مسیر داخل پوشه
         ]
 
         moved_any = False
         for fname in important_files:
             src = os.path.join(restore_dir, fname)
-            if os.path.exists(src):
-                shutil.move(src, fname)
-                moved_any = True
+            dest = fname  # مسیر مقصد
+            dest_dir = os.path.dirname(dest)
 
+            if os.path.exists(src):
+                if dest_dir and not os.path.exists(dest_dir):
+                    os.makedirs(dest_dir, exist_ok=True)
+                shutil.move(src, dest)
+                moved_any = True
+                print(f"♻️ بازیابی فایل: {fname}")
+
+        # 🔁 بازسازی حافظه‌ها
         from memory_manager import init_files
         init_files()
 
@@ -929,6 +938,7 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if os.path.exists(restore_dir):
             shutil.rmtree(restore_dir)
         context.user_data["await_restore"] = False
+        
 # ======================= 💬 پاسخ و هوش مصنوعی =======================
 async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """پاسخ‌دهی اصلی هوش مصنوعی و سیستم یادگیری"""
