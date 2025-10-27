@@ -2063,9 +2063,8 @@ if __name__ == "__main__":
     # ==========================================================
     from sudo_manager import list_sudo_text, is_sudo, ADMIN_ID
 
-    async def list_sudos(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    async def my_function(update, context):
     user = update.effective_user
-
     if user.id != ADMIN_ID and not is_sudo(user.id):
         return await update.message.reply_text("⛔ فقط سودوها مجازند!")
 
