@@ -1755,7 +1755,7 @@ async def load_text(file_name, default_text):
 from telegram import InlineKeyboardMarkup, InlineKeyboardButton, Update
 from telegram.ext import ContextTypes
 
-async def show_main_panel(update: Update, context: ContextTypes.DEFAULT_TYPE, edit: bool = False):
+async def show_main_panel(update: Update, context: ContextTypes.DEFAULT_TYPE, edit=False):
     about = "🌙 <b>به منوی اصلی خنگول خوش آمدی!</b>\nاز دکمه‌های زیر یکی رو انتخاب کن 😎"
 
     keyboard = [
@@ -1781,7 +1781,7 @@ async def show_main_panel(update: Update, context: ContextTypes.DEFAULT_TYPE, ed
         ],
         [
             InlineKeyboardButton("🌤 آب و هوا", callback_data="main_weather"),
-            InlineKeyboardButton("🕌 اوقات شرعی", callback_data="main_azan")
+            InlineKeyboardButton("🕌 اوقات شرعی (اذان)", callback_data="main_azan")
         ],
         [
             InlineKeyboardButton("🧠 گفتگوی ChatGPT", callback_data="main_chatgpt")
@@ -1790,11 +1790,15 @@ async def show_main_panel(update: Update, context: ContextTypes.DEFAULT_TYPE, ed
 
     markup = InlineKeyboardMarkup(keyboard)
 
+    # ✅ جلوگیری از خطای "Message is not modified"
     if edit and getattr(update, "callback_query", None):
-        await update.callback_query.edit_message_text(about, reply_markup=markup, parse_mode="HTML")
+        try:
+            await update.callback_query.edit_message_text(about, reply_markup=markup, parse_mode="HTML")
+        except Exception as e:
+            if "Message is not modified" not in str(e):
+                print(f"[Panel Edit Error] {e}")
     else:
         await update.message.reply_text(about, reply_markup=markup, parse_mode="HTML")
-
 
 # ======================= 🔙 بازگشت به منوی اصلی پنل خنگول =======================
 async def feature_back(update: Update, context: ContextTypes.DEFAULT_TYPE):
