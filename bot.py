@@ -2028,7 +2028,7 @@ if __name__ == "__main__":
     application.add_handler(CommandHandler("selectivebackup", selective_backup_menu))
     application.add_handler(CallbackQueryHandler(selective_backup_buttons, pattern="^selbk_"))
     application.add_handler(CommandHandler("restore", restore))
-    application.add_handler(MessageHandler(filters.TEXT & filters.Regex(r"^لینک$"), link_panel))
+    application.add_handler(MessageHandler(filters.TEXT & filters.Regex(r"^(لینک|Link)$"), link_panel))
     application.add_handler(CallbackQueryHandler(link_panel_buttons, pattern="^link_"))
     # 🎛 پنل فارسی چندمرحله‌ای
     application.add_handler(MessageHandler(filters.TEXT & filters.Regex(r"^پنل$"), panel_menu))
