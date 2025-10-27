@@ -32,6 +32,7 @@ async def fast_replace(query, text, keyboard=None, parse_mode="HTML"):
         reply_markup=InlineKeyboardMarkup(keyboard) if keyboard else None
     )
 
+
 # ===================== 🧭 پنل اصلی =====================
 async def link_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat = update.effective_chat
@@ -45,6 +46,7 @@ async def link_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = generate_main_keyboard(lang)
     text = get_panel_text(lang)
     await update.message.reply_text(text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
+
 
 # ===================== ⚙️ کنترل دکمه‌ها =====================
 async def link_panel_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -65,16 +67,8 @@ async def link_panel_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE)
         save_group_data(gdata)
 
     # ========= تغییر زبان =========
-    if data == "lang_fa":
-        new_lang = "fa"
-    elif data == "lang_en":
-        new_lang = "en"
-    elif data == "lang_de":
-        new_lang = "de"
-    else:
-        new_lang = None
-
-    if new_lang:
+    if data == "link_toggle_lang":
+        new_lang = "en" if lang == "fa" else "fa"
         group["lang"] = new_lang
         gdata[str(chat_id)] = group
         save_group_data(gdata)
@@ -86,37 +80,42 @@ async def link_panel_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE)
     if data == "link_show":
         inv = group.get("invite")
         if inv and inv.get("link"):
-            text = get_text(lang, "current_link").format(link=inv["link"])
+            text = f"🔗 <b>{'Group Link' if lang == 'en' else 'لینک فعلی گروه'}:</b>\n\n{inv['link']}"
         else:
             try:
                 link = await context.bot.export_chat_invite_link(chat_id)
                 store_link(link, {"type": "default"})
-                text = get_text(lang, "new_link").format(link=link)
+                text = f"✅ {'New link created:' if lang == 'en' else 'لینک جدید ساخته شد:'}\n{link}"
             except Exception as e:
-                text = get_text(lang, "bot_admin_error").format(e=e)
+                text = f"⚠️ {'Bot must be admin to get link.' if lang == 'en' else 'ربات باید ادمین باشد تا لینک را بگیرد.'}\n\n<code>{e}</code>"
 
-        kb = [[InlineKeyboardButton(get_text(lang, "back"), callback_data="link_main")]]
+        kb = [[InlineKeyboardButton("🔙 Back" if lang == "en" else "🔙 بازگشت", callback_data="link_main")]]
         return await fast_replace(query, text, kb)
 
     # ========= ساخت لینک دائمی =========
     if data == "link_create_confirm":
         kb = [
-            [InlineKeyboardButton(get_text(lang, "yes_create"), callback_data="link_create_yes")],
-            [InlineKeyboardButton(get_text(lang, "cancel"), callback_data="link_main")]
+            [InlineKeyboardButton("✅ Yes, create" if lang == "en" else "✅ بله، بساز", callback_data="link_create_yes")],
+            [InlineKeyboardButton("❌ Cancel" if lang == "en" else "❌ خیر، انصراف", callback_data="link_main")]
         ]
-        return await fast_replace(query, get_text(lang, "confirm_text"), kb)
+        text = (
+            "Are you sure you want to create a new permanent link?\n\nOld link remains active."
+            if lang == "en"
+            else "آیا مطمئنی می‌خوای یک لینک جدید (دائمی) بسازی؟\n\nلینک قبلی همچنان فعال می‌مونه."
+        )
+        return await fast_replace(query, text, kb)
 
     if data == "link_create_yes":
         try:
             link_obj: ChatInviteLink = await context.bot.create_chat_invite_link(chat_id)
             store_link(link_obj.invite_link, {"type": "permanent"})
-            text = get_text(lang, "new_link").format(link=link_obj.invite_link)
+            text = f"✅ {'New link created:' if lang == 'en' else 'لینک جدید ساخته شد:'}\n{link_obj.invite_link}"
         except Exception:
             link = await context.bot.export_chat_invite_link(chat_id)
             store_link(link, {"type": "fallback"})
-            text = get_text(lang, "new_link").format(link=link)
+            text = f"✅ {'New link created:' if lang == 'en' else 'لینک جدید ساخته شد:'}\n{link}"
 
-        kb = [[InlineKeyboardButton(get_text(lang, "back"), callback_data="link_main")]]
+        kb = [[InlineKeyboardButton("🔙 Back" if lang == "en" else "🔙 بازگشت", callback_data="link_main")]]
         return await fast_replace(query, text, kb)
 
     # ========= ساخت لینک محدود =========
@@ -127,9 +126,10 @@ async def link_panel_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE)
                 InlineKeyboardButton("👥 5", callback_data="link_temp_5"),
                 InlineKeyboardButton("👥 10", callback_data="link_temp_10")
             ],
-            [InlineKeyboardButton(get_text(lang, "back"), callback_data="link_main")]
+            [InlineKeyboardButton("🔙 Back" if lang == "en" else "🔙 بازگشت", callback_data="link_main")]
         ]
-        return await fast_replace(query, get_text(lang, "ask_limit"), kb)
+        text = "How many people can use this link?" if lang == "en" else "🔢 چند نفر مجاز به استفاده از لینک باشند؟"
+        return await fast_replace(query, text, kb)
 
     # ========= لینک محدود انتخابی =========
     if data.startswith("link_temp_"):
@@ -141,17 +141,28 @@ async def link_panel_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE)
                 member_limit=limit
             )
             store_link(link_obj.invite_link, {"type": "temp", "limit": limit, "expire": "24h"})
-            text = get_text(lang, "temp_link").format(link=link_obj.invite_link, limit=limit)
+            text = (
+                f"🕒 Temporary link created:\n{link_obj.invite_link}\n\n⏳ Expire: 24h\n👥 Limit: {limit}"
+                if lang == "en"
+                else f"🕒 لینک موقت ساخته شد:\n{link_obj.invite_link}\n\n⏳ اعتبار: ۲۴ ساعت\n👥 محدودیت: {limit} نفر"
+            )
         except Exception as e:
-            text = get_text(lang, "temp_error").format(e=e)
+            text = f"⚠️ Error creating link:\n<code>{e}</code>" if lang == "en" else f"⚠️ خطا در ساخت لینک موقت:\n<code>{e}</code>"
 
-        kb = [[InlineKeyboardButton(get_text(lang, "back"), callback_data="link_main")]]
+        kb = [[InlineKeyboardButton("🔙 Back" if lang == "en" else "🔙 بازگشت", callback_data="link_main")]]
         return await fast_replace(query, text, kb)
 
     # ========= راهنما =========
     if data == "link_help":
-        text = get_text(lang, "help")
-        kb = [[InlineKeyboardButton(get_text(lang, "back"), callback_data="link_main")]]
+        text = (
+            "📘 <b>Link Help</b>\n\n"
+            "• Bot must be admin to create real links.\n"
+            "• Temporary links expire after 24h or limited members.\n"
+            "• To receive link in PM, you must start the bot first."
+            if lang == "en"
+            else "📘 <b>راهنمای لینک‌ها</b>\n\n• ساخت لینک جدید فقط برای مدیران مجاز است.\n• لینک موقت پس از ۲۴ ساعت یا تعداد مشخص منقضی می‌شود.\n• برای ارسال به پیوی، ابتدا باید به ربات پیام دهید."
+        )
+        kb = [[InlineKeyboardButton("🔙 Back" if lang == "en" else "🔙 بازگشت", callback_data="link_main")]]
         return await fast_replace(query, text, kb)
 
     # ========= بازگشت به منوی اصلی =========
@@ -168,80 +179,31 @@ async def link_panel_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE)
             pass
 
 
-# ===================== 🔤 زبان‌ها =====================
+# ===================== 🔤 توابع کمکی زبان =====================
 def generate_main_keyboard(lang):
-    return [
-        [
-            InlineKeyboardButton("🇮🇷🇦🇫 فارسی", callback_data="lang_fa"),
-            InlineKeyboardButton("🇬🇧 English", callback_data="lang_en"),
-            InlineKeyboardButton("🇩🇪 Deutsch", callback_data="lang_de")
-        ],
-        [InlineKeyboardButton(get_text(lang, "show_link_btn"), callback_data="link_show")],
-        [InlineKeyboardButton(get_text(lang, "create_link_btn"), callback_data="link_create_confirm")],
-        [InlineKeyboardButton(get_text(lang, "temp_link_btn"), callback_data="link_temp_ask")],
-        [InlineKeyboardButton(get_text(lang, "help_btn"), callback_data="link_help")],
-        [InlineKeyboardButton(get_text(lang, "close_btn"), callback_data="link_close")]
-    ]
+    if lang == "en":
+        return [
+            [InlineKeyboardButton("🇮🇷❣️🇦🇫 Switch to Persian", callback_data="link_toggle_lang")],
+            [InlineKeyboardButton("📄 Show Link", callback_data="link_show")],
+            [InlineKeyboardButton("🔁 Create New Link", callback_data="link_create_confirm")],
+            [InlineKeyboardButton("🧾 Temporary Link", callback_data="link_temp_ask")],
+            [InlineKeyboardButton("📚 Help", callback_data="link_help")],
+            [InlineKeyboardButton("❌ Close", callback_data="link_close")]
+        ]
+    else:
+        return [
+            [InlineKeyboardButton("🇬🇧 English Version", callback_data="link_toggle_lang")],
+            [InlineKeyboardButton("📄 نمایش لینک", callback_data="link_show")],
+            [InlineKeyboardButton("🔁 ساخت لینک جدید", callback_data="link_create_confirm")],
+            [InlineKeyboardButton("🧾 ساخت لینک محدود", callback_data="link_temp_ask")],
+            [InlineKeyboardButton("📚 راهنما", callback_data="link_help")],
+            [InlineKeyboardButton("❌ بستن", callback_data="link_close")]
+        ]
 
 
 def get_panel_text(lang):
-    texts = {
-        "fa": "🔗 <b>پنل مدیریت لینک گروه</b>\n\nاز گزینه‌های زیر برای مشاهده، ساخت یا ارسال لینک استفاده کن 👇",
-        "en": "🔗 <b>Group Link Panel</b>\n\nUse the buttons below to manage group links 👇",
-        "de": "🔗 <b>Gruppenlink-Verwaltung</b>\n\nNutze die folgenden Optionen 👇"
-    }
-    return texts.get(lang, texts["fa"])
-
-
-def get_text(lang, key):
-    data = {
-        "show_link_btn": {"fa": "📄 نمایش لینک", "en": "📄 Show Link", "de": "📄 Link anzeigen"},
-        "create_link_btn": {"fa": "🔁 ساخت لینک جدید", "en": "🔁 Create New Link", "de": "🔁 Neuen Link erstellen"},
-        "temp_link_btn": {"fa": "🧾 ساخت لینک محدود", "en": "🧾 Temporary Link", "de": "🧾 Temporären Link erstellen"},
-        "help_btn": {"fa": "📚 راهنما", "en": "📚 Help", "de": "📚 Hilfe"},
-        "close_btn": {"fa": "❌ بستن", "en": "❌ Close", "de": "❌ Schließen"},
-        "back": {"fa": "🔙 بازگشت", "en": "🔙 Back", "de": "🔙 Zurück"},
-        "yes_create": {"fa": "✅ بله، بساز", "en": "✅ Yes, create", "de": "✅ Ja, erstellen"},
-        "cancel": {"fa": "❌ خیر، انصراف", "en": "❌ Cancel", "de": "❌ Abbrechen"},
-        "confirm_text": {
-            "fa": "آیا مطمئنی می‌خوای یک لینک جدید بسازی؟ لینک قبلی همچنان فعال می‌مونه.",
-            "en": "Are you sure you want to create a new link? The old one remains active.",
-            "de": "Möchtest du wirklich einen neuen Link erstellen? Der alte bleibt weiterhin aktiv."
-        },
-        "current_link": {
-            "fa": "🔗 لینک فعلی گروه:\n{link}",
-            "en": "🔗 Current group link:\n{link}",
-            "de": "🔗 Aktueller Gruppenlink:\n{link}"
-        },
-        "new_link": {
-            "fa": "✅ لینک جدید ساخته شد:\n{link}",
-            "en": "✅ New link created:\n{link}",
-            "de": "✅ Neuer Link erstellt:\n{link}"
-        },
-        "bot_admin_error": {
-            "fa": "⚠️ ربات باید ادمین باشد تا لینک را بگیرد.\n<code>{e}</code>",
-            "en": "⚠️ Bot must be admin to get link.\n<code>{e}</code>",
-            "de": "⚠️ Der Bot muss Admin sein, um den Link zu erhalten.\n<code>{e}</code>"
-        },
-        "ask_limit": {
-            "fa": "🔢 چند نفر مجاز به استفاده از لینک باشند؟",
-            "en": "How many people can use this link?",
-            "de": "Wie viele Personen dürfen diesen Link benutzen?"
-        },
-        "temp_link": {
-            "fa": "🕒 لینک موقت ساخته شد:\n{link}\n⏳ اعتبار: ۲۴ ساعت\n👥 محدودیت: {limit} نفر",
-            "en": "🕒 Temporary link created:\n{link}\n⏳ Valid: 24h\n👥 Limit: {limit} users",
-            "de": "🕒 Temporärer Link erstellt:\n{link}\n⏳ Gültigkeit: 24h\n👥 Limit: {limit} Personen"
-        },
-        "temp_error": {
-            "fa": "⚠️ خطا در ساخت لینک:\n<code>{e}</code>",
-            "en": "⚠️ Error creating link:\n<code>{e}</code>",
-            "de": "⚠️ Fehler beim Erstellen des Links:\n<code>{e}</code>"
-        },
-        "help": {
-            "fa": "📘 <b>راهنمای لینک‌ها</b>\n• ربات باید ادمین باشد.\n• لینک موقت پس از ۲۴ ساعت منقضی می‌شود.",
-            "en": "📘 <b>Link Help</b>\n• Bot must be admin.\n• Temporary links expire after 24h.",
-            "de": "📘 <b>Link-Hilfe</b>\n• Der Bot muss Admin sein.\n• Temporäre Links laufen nach 24 Stunden ab."
-        }
-    }
-    return data.get(key, {}).get(lang, data[key]["fa"])
+    return (
+        "🔗 <b>Group Link Panel</b>\n\nUse the buttons below to manage group links."
+        if lang == "en"
+        else "🔗 <b>پنل مدیریت لینک گروه</b>\n\nاز گزینه‌های زیر برای مشاهده، ساخت یا ارسال لینک استفاده کن."
+    )
