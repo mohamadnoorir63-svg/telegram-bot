@@ -92,7 +92,7 @@ from group_control.group_control import auto_clean_old_origins, handle_bot_remov
 from panels.panel_menu import panel_menu, panel_buttons
 from telegram.ext import MessageHandler, CallbackQueryHandler, filters
 from panels.link_panel import link_panel, link_panel_buttons
-from sudo_manager import add_sudo, del_sudo, list_sudos, get_sudo_ids, is_sudo, ADMIN_ID, SUDO_DATA
+
 # ======================= ⚙️ تنظیمات پایه و سودوها =======================
 from telegram import Update
 from telegram.ext import ContextTypes
