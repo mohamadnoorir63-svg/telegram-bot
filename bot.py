@@ -2264,29 +2264,33 @@ async def list_sudos(update: Update, context: ContextTypes.DEFAULT_TYPE):
         print("🌙 [SYSTEM] Startup tasks scheduled ✅")
 
     application.post_init = on_startup
-
     # ==========================================================
-    # 🚀 اجرای نهایی ربات
-    # ==========================================================
-    try:
-        print("🔄 در حال اجرای ربات...")
+# 🚀 اجرای نهایی ربات (پایدار برای Heroku با ری‌استارت خودکار)
+# ==========================================================
+if __name__ == "__main__":
+    print("🔄 در حال اجرای ربات...")
 
-        # 🌙 آمار خودکار شبانه (هر شب ساعت 00:00 به وقت تهران)
-        from datetime import time, timezone, timedelta
-        tz_tehran = timezone(timedelta(hours=3, minutes=30))
-        job_queue = application.job_queue
-        job_queue.run_daily(send_nightly_stats, time=time(0, 0, tzinfo=tz_tehran))
+    from datetime import time, timezone, timedelta
+    tz_tehran = timezone(timedelta(hours=3, minutes=30))
+    job_queue = application.job_queue
+    job_queue.run_daily(send_nightly_stats, time=time(0, 0, tzinfo=tz_tehran))
 
-        application.run_polling(
-        allowed_updates=[
-            "message",
-            "edited_message",
-            "callback_query",
-            "chat_member",
-            "my_chat_member",
-            ]
-        )
+    import time as systime
 
-    except Exception as e:
-        print(f"⚠️ خطا در اجرای ربات:\n{e}")
-        print("♻️ ربات به‌صورت خودکار توسط هاست ری‌استارت خواهد شد ✅")
+    while True:
+        try:
+            print("🤖 ربات خنگول فارسی 8.7 Cloud+ Supreme Pro Stable+ فعال شد و در حال اجراست ...")
+            application.run_polling(
+                allowed_updates=[
+                    "message",
+                    "edited_message",
+                    "callback_query",
+                    "chat_member",
+                    "my_chat_member",
+                ]
+            )
+        except Exception as e:
+            print(f"⚠️ خطا در اجرای ربات:\n{e}")
+            print("♻️ تلاش برای ری‌استارت خودکار در ۵ ثانیه آینده ...")
+            systime.sleep(5)
+            continue
