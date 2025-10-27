@@ -1738,149 +1738,16 @@ async def leave(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await context.bot.leave_chat(update.message.chat.id)
 
  # ======================= 🌟 پنل نوری پلاس =======================
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-import aiofiles, os, asyncio
-from datetime import datetime
 
-TEXTS_PATH = "texts"
-
-async def load_text(file_name, default_text):
-    path = os.path.join(TEXTS_PATH, file_name)
-    if os.path.exists(path):
-        async with aiofiles.open(path, "r", encoding="utf-8") as f:
-            return await f.read()
-    return default_text
 
 # ======================= 🎛 پنل اصلی خنگول =======================
-from telegram import InlineKeyboardMarkup, InlineKeyboardButton, Update
-from telegram.ext import ContextTypes
 
-async def show_main_panel(update: Update, context: ContextTypes.DEFAULT_TYPE, edit=False):
-    about = "🌙 <b>به منوی اصلی خنگول خوش آمدی!</b>\nاز دکمه‌های زیر یکی رو انتخاب کن 😎"
-
-    keyboard = [
-        [
-            InlineKeyboardButton("💬 ارتباط با سازنده", url="https://t.me/NOORI_NOOR"),
-            InlineKeyboardButton("💭 گروه پشتیبانی", url="https://t.me/Poshtibahni")
-        ],
-        [
-            InlineKeyboardButton("➕ افزودن به گروه", url="https://t.me/Khenqol_bot?startgroup=true"),
-            InlineKeyboardButton("🧩 قابلیت‌های ربات", callback_data="main_features")
-        ],
-        [
-            InlineKeyboardButton("🤖 درباره خنگول", callback_data="main_about"),
-            InlineKeyboardButton("👨‍💻 درباره تیم ما", callback_data="main_team")
-        ],
-        [
-            InlineKeyboardButton("🔮 فال امروز", callback_data="main_fortune"),
-            InlineKeyboardButton("😂 جوک خنده‌دار", callback_data="main_joke")
-        ],
-        [
-            InlineKeyboardButton("🎨 فونت‌ساز حرفه‌ای", callback_data="main_font"),
-            InlineKeyboardButton("💳 آیدی خنگولی من", callback_data="main_stats")
-        ],
-        [
-            InlineKeyboardButton("🌤 آب و هوا", callback_data="main_weather"),
-            InlineKeyboardButton("🕌 اوقات شرعی (اذان)", callback_data="main_azan")
-        ],
-        [
-            InlineKeyboardButton("🧠 گفتگوی ChatGPT", callback_data="main_chatgpt")
-        ]
-    ]
-
-    markup = InlineKeyboardMarkup(keyboard)
-
-    # ✅ جلوگیری از خطای "Message is not modified"
-    if edit and getattr(update, "callback_query", None):
-        try:
-            await update.callback_query.edit_message_text(about, reply_markup=markup, parse_mode="HTML")
-        except Exception as e:
-            if "Message is not modified" not in str(e):
-                print(f"[Panel Edit Error] {e}")
-    else:
-        await update.message.reply_text(about, reply_markup=markup, parse_mode="HTML")
 
 # ======================= 🔙 بازگشت به منوی اصلی پنل خنگول =======================
-async def feature_back(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # اینجا نیازی به FakeUpdate نیست؛ چون در کال‌بک هستیم، مستقیماً به حالت edit برگرد
-    await show_main_panel(update, context, edit=True)
 
 
 # ======================= 🎛 کنترل پنل خنگول (فقط دکمه‌های main_ ) =======================
-async def panel_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    from datetime import datetime  # (همین import بالای فایل‌ت هم هست، اینجا هم اشکال ندارد)
-    query = update.callback_query
-    await query.answer()
 
-    user = query.from_user
-    now = datetime.now().strftime("%Y/%m/%d - %H:%M:%S")
-
-    panels = {
-        "main_about": ("about_khengol.txt", "💫 درباره خنگول"),
-        "main_team": ("team_noori.txt", "👨‍💻 تیم نوری"),
-        "main_features": ("features.txt", "🧩 قابلیت‌های ربات"),
-    }
-
-    data = query.data
-
-    # صفحات متنی
-    if data in panels:
-        file_name, title = panels[data]
-        text = await load_text(file_name, f"❗ هنوز {title} ثبت نشده!")
-        text += "\n\n🔙 برای بازگشت، روی دکمه زیر بزن:"
-        back_btn = [[InlineKeyboardButton("🔙 بازگشت", callback_data="main_back")]]
-        return await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(back_btn), parse_mode="HTML")
-
-    # آیدی خنگولی من
-    if data == "main_stats":
-        text = (
-            f"📊 <b>اطلاعات کاربر:</b>\n\n"
-            f"👤 نام: <b>{user.first_name}</b>\n"
-            f"🆔 آیدی: <code>{user.id}</code>\n"
-            f"📅 تاریخ و ساعت فعلی: <b>{now}</b>"
-        )
-        try:
-            photos = await context.bot.get_user_profile_photos(user.id, limit=1)
-            if photos.total_count > 0:
-                file_id = photos.photos[0][-1].file_id
-                return await query.message.reply_photo(photo=file_id, caption=text, parse_mode="HTML")
-        except:
-            pass
-        return await query.message.reply_text(text, parse_mode="HTML")
-
-    # آب‌وهوا
-    if data == "main_weather":
-        return await show_weather(update, context)
-
-    # فال
-    if data == "main_fortune":
-        return await query.message.reply_text("🔮 برای دیدن فال بنویس:\n<b>فال</b>", parse_mode="HTML")
-
-    # اذان
-    if data == "main_azan":
-        return await query.message.reply_text(
-            "🕌 برای دیدن اوقات شرعی شهرت بنویس:\n\n"
-            "<b>اذان تهران</b>\n<b>اذان شیراز</b>\n<b>اذان کابل</b>",
-            parse_mode="HTML"
-        )
-
-    # جوک
-    if data == "main_joke":
-        return await query.message.reply_text("😂 برای دیدن جوک بنویس:\n<b>جوک</b>", parse_mode="HTML")
-
-    # فونت
-    if data == "main_font":
-        return await query.message.reply_text("🎨 برای ساخت فونت بنویس:\n<b>فونت اسم‌ت</b>", parse_mode="HTML")
-
-    # ChatGPT
-    if data == "main_chatgpt":
-        # دکمه‌ی «شروع گفتگو» را نمایش بده
-        from ai_chat.chatgpt_panel import show_ai_panel  # همینی که خودت نوشتی
-        return await show_ai_panel(update, context)
-
-    # بازگشت به منوی اصلی پنل خنگول
-    if data == "main_back":
-        return await show_main_panel(update, context, edit=True)
 
 # ======================= 🔐 ثبت فایل‌ها فقط توسط مدیر اصلی =======================
 async def save_panel_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
