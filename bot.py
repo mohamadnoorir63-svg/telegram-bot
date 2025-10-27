@@ -202,7 +202,8 @@ def is_valid_message(update):
     LAST_MESSAGES[user_id] = text
     return True
 # ======================= 💬 ریپلی مود گروهی و محدود به مدیران =======================
-REPLY_FILE = "reply_status.json"
+
+    REPLY_FILE = "reply_status.json"
 
 def load_reply_status():
     """خواندن وضعیت ریپلی مود برای تمام گروه‌ها"""
@@ -232,7 +233,7 @@ def is_group_reply_enabled(chat_id):
 
 
 async def toggle_reply_mode(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """تغییر وضعیت ریپلی مود — فقط مدیران گروه یا ادمین اصلی مجازند"""
+    """تغییر وضعیت ریپلی مود — فقط مدیران گروه، سودوها یا ادمین اصلی مجازند"""
     chat = update.effective_chat
     user = update.effective_user
 
@@ -251,8 +252,11 @@ async def toggle_reply_mode(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except:
         pass
 
+    # ✅ بررسی دسترسی: مدیر گروه، سودو یا ادمین اصلی
     if not (is_main_admin or is_group_admin or user.id in SUDO_IDS):
-    return await update.message.reply_text("⛔ فقط مدیران گروه، سودوها یا ادمین اصلی می‌توانند این تنظیم را تغییر دهند!")
+        return await update.message.reply_text(
+            "⛔ فقط مدیران گروه، سودوها یا ادمین اصلی می‌توانند این تنظیم را تغییر دهند!"
+        )
 
     # تغییر وضعیت مخصوص همان گروه
     group_id = str(chat.id)
