@@ -1,10 +1,13 @@
 # panels/link_panel.py
-import os, json
+import os, json, io
 from datetime import datetime, timedelta
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ChatInviteLink
+from telegram import (
+    Update, InlineKeyboardButton, InlineKeyboardMarkup, ChatInviteLink, InputFile
+)
 from telegram.ext import ContextTypes
+from PIL import Image, ImageDraw, ImageFont
 
-# مسیر فایل اطلاعات گروه
+# مسیر فایل گروه برای ذخیره لینک‌ها
 GROUP_CTRL_FILE = os.path.join(os.path.dirname(os.path.dirname(__file__)), "group_control.json")
 
 def load_group_data():
@@ -19,6 +22,35 @@ def load_group_data():
 def save_group_data(data):
     with open(GROUP_CTRL_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
+
+# ساخت تصویر کارت لینک
+def make_link_card(group_name, link, expire=None, limit=None):
+    img = Image.new("RGB", (800, 400), (25, 25, 30))
+    draw = ImageDraw.Draw(img)
+
+    try:
+        font_title = ImageFont.truetype("arial.ttf", 40)
+        font_text = ImageFont.truetype("arial.ttf", 28)
+    except:
+        font_title = font_text = ImageFont.load_default()
+
+    draw.text((40, 50), "🔗 لینک گروه", fill="white", font=font_title)
+    draw.text((40, 120), f"📛 گروه: {group_name}", fill="white", font=font_text)
+    draw.text((40, 170), f"🌐 {link}", fill="#00ffcc", font=font_text)
+
+    if expire or limit:
+        draw.text((40, 230), "🕒 جزئیات لینک:", fill="white", font=font_text)
+        if expire:
+            draw.text((60, 270), f"⏳ اعتبار: {expire}", fill="#cccccc", font=font_text)
+        if limit:
+            draw.text((60, 310), f"👥 محدودیت عضو: {limit}", fill="#cccccc", font=font_text)
+
+    draw.text((40, 360), f"📅 {datetime.now().strftime('%Y-%m-%d %H:%M')}", fill="#888888", font=font_text)
+
+    buffer = io.BytesIO()
+    img.save(buffer, format="PNG")
+    buffer.seek(0)
+    return buffer
 
 
 # ========================== پنل اصلی لینک ==========================
@@ -36,14 +68,14 @@ async def link_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
         [InlineKeyboardButton("❌ بستن", callback_data="link_close")]
     ]
     text = (
-        "🔗 <b>مدیریت لینک گروه</b>\n\n"
-        "از گزینه‌های زیر برای مشاهده یا ساخت لینک استفاده کنید.\n"
-        "ربات باید در گروه ادمین باشد و اجازه ساخت لینک داشته باشد."
+        "🔗 <b>پنل مدیریت لینک گروه</b>\n\n"
+        "از دکمه‌های زیر برای مشاهده یا ساخت لینک استفاده کنید.\n"
+        "ربات باید ادمین باشد تا بتواند لینک واقعی بسازد."
     )
     await update.message.reply_text(text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
 
 
-# ========================== دکمه‌های پنل ==========================
+# ========================== کنترل دکمه‌ها ==========================
 async def link_panel_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -68,24 +100,32 @@ async def link_panel_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE)
     if data == "link_show":
         inv = group.get("invite")
         if inv and inv.get("link"):
-            text = (
-                f"🔗 <b>لینک فعلی گروه:</b>\n\n{inv['link']}\n\n"
-                f"📆 ساخته‌شده در: {inv.get('created')[:19].replace('T',' ')}"
-            )
+            link = inv["link"]
+            meta = inv.get("meta", {})
         else:
             try:
                 link = await context.bot.export_chat_invite_link(chat_id)
                 meta = {"type": "default"}
                 store_link(link, meta)
-                text = f"✅ لینک جدید ایجاد شد:\n\n{link}"
             except Exception as e:
-                text = f"⚠️ ربات باید ادمین باشد تا لینک را بگیرد.\n\n<code>{e}</code>"
+                return await query.edit_message_text(
+                    f"⚠️ ربات باید ادمین باشد تا لینک را بگیرد.\n\n<code>{e}</code>",
+                    parse_mode="HTML"
+                )
 
+        card = make_link_card(chat.title, link, meta.get("expire"), meta.get("limit"))
         keyboard = [
             [InlineKeyboardButton("🔙 بازگشت", callback_data="link_main")],
             [InlineKeyboardButton("❌ بستن", callback_data="link_close")]
         ]
-        await query.edit_message_text(text, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(keyboard))
+        await query.message.delete()
+        await context.bot.send_photo(
+            chat_id=chat_id,
+            photo=InputFile(card, filename="link_card.png"),
+            caption=f"🔗 لینک گروه:\n{link}",
+            parse_mode="HTML",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
         return
 
     # ========= ساخت لینک جدید =========
@@ -93,20 +133,24 @@ async def link_panel_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE)
         try:
             link_obj: ChatInviteLink = await context.bot.create_chat_invite_link(chat_id)
             store_link(link_obj.invite_link, {"type": "permanent"})
-            text = f"✅ لینک جدید ساخته شد:\n\n{link_obj.invite_link}"
-        except Exception as e:
-            try:
-                link = await context.bot.export_chat_invite_link(chat_id)
-                store_link(link, {"type": "fallback"})
-                text = f"✅ لینک جدید ساخته شد:\n\n{link}"
-            except Exception as err:
-                text = f"⚠️ خطا در ساخت لینک:\n<code>{err}</code>"
+            link = link_obj.invite_link
+        except Exception:
+            link = await context.bot.export_chat_invite_link(chat_id)
+            store_link(link, {"type": "fallback"})
 
+        card = make_link_card(chat.title, link)
         keyboard = [
             [InlineKeyboardButton("🔙 بازگشت", callback_data="link_main")],
             [InlineKeyboardButton("❌ بستن", callback_data="link_close")]
         ]
-        await query.edit_message_text(text, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(keyboard))
+        await query.message.delete()
+        await context.bot.send_photo(
+            chat_id=chat_id,
+            photo=InputFile(card, filename="link_card.png"),
+            caption=f"✅ لینک جدید ساخته شد:\n{link}",
+            parse_mode="HTML",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
         return
 
     # ========= لینک موقت =========
@@ -117,47 +161,65 @@ async def link_panel_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE)
                 expire_date=datetime.utcnow() + timedelta(hours=24),
                 member_limit=5
             )
-            store_link(link_obj.invite_link, {"type": "temp", "expire": "24h", "limit": 5})
-            text = (
-                f"🕒 لینک موقت ساخته شد:\n\n{link_obj.invite_link}\n\n"
-                "⏳ اعتبار: ۲۴ ساعت\n👥 محدودیت: ۵ نفر"
-            )
+            link = link_obj.invite_link
+            store_link(link, {"type": "temp", "expire": "24h", "limit": 5})
+            card = make_link_card(chat.title, link, "۲۴ ساعت", "۵ نفر")
         except Exception as e:
-            text = f"⚠️ خطا در ساخت لینک موقت:\n<code>{e}</code>"
+            return await query.edit_message_text(
+                f"⚠️ خطا در ساخت لینک موقت:\n<code>{e}</code>",
+                parse_mode="HTML"
+            )
 
         keyboard = [
             [InlineKeyboardButton("🔙 بازگشت", callback_data="link_main")],
             [InlineKeyboardButton("❌ بستن", callback_data="link_close")]
         ]
-        await query.edit_message_text(text, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(keyboard))
+        await query.message.delete()
+        await context.bot.send_photo(
+            chat_id=chat_id,
+            photo=InputFile(card, filename="link_card.png"),
+            caption=f"🕒 لینک موقت ساخته شد:\n{link}",
+            parse_mode="HTML",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
         return
 
-    # ========= ارسال به پیوی =========
+    # ========= ارسال لینک به پیوی =========
     if data == "link_send":
         inv = group.get("invite")
         if not inv or not inv.get("link"):
-            text = "ℹ️ هنوز هیچ لینکی ثبت نشده. ابتدا لینک بساز."
-        else:
             try:
-                await context.bot.send_message(user.id, f"🔗 لینک گروه:\n{inv['link']}")
-                text = "✅ لینک به پیوی شما ارسال شد."
-            except:
-                text = "⚠️ نمی‌توان لینک را به پیوی فرستاد. ابتدا به ربات پیام بده."
+                link = await context.bot.export_chat_invite_link(chat_id)
+                store_link(link, {"type": "default"})
+            except Exception as e:
+                return await query.edit_message_text(
+                    f"⚠️ ربات باید ادمین باشد تا لینک را بگیرد.\n\n<code>{e}</code>",
+                    parse_mode="HTML"
+                )
+        else:
+            link = inv["link"]
+
+        try:
+            await context.bot.send_message(user.id, f"🔗 لینک گروه:\n{link}")
+            text = "✅ لینک به پیوی شما ارسال شد."
+        except:
+            text = "⚠️ ابتدا به ربات پیام بده تا بتواند برایت بفرستد."
 
         keyboard = [
             [InlineKeyboardButton("🔙 بازگشت", callback_data="link_main")],
             [InlineKeyboardButton("❌ بستن", callback_data="link_close")]
         ]
-        await query.edit_message_text(text, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(keyboard))
+        await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
         return
 
     # ========= راهنما =========
     if data == "link_help":
         text = (
-            "📚 <b>راهنمای لینک</b>\n\n"
+            "📘 <b>راهنمای مدیریت لینک</b>\n\n"
             "• ربات باید ادمین باشد تا لینک واقعی بسازد.\n"
-            "• لینک موقت پس از ۲۴ ساعت یا ۵ عضو باطل می‌شود.\n"
-            "• برای ارسال به پیوی، ابتدا به ربات پیام بده.\n"
+            "• لینک موقت بعد از ۲۴ ساعت یا ۵ عضو باطل می‌شود.\n"
+            "• لینک‌ها در فایل group_control.json ذخیره می‌شوند.\n"
+            "• اگر پیوی بسته باشد، ارسال لینک به شما ممکن نیست."
         )
         keyboard = [
             [InlineKeyboardButton("🔙 بازگشت", callback_data="link_main")],
@@ -166,7 +228,7 @@ async def link_panel_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE)
         await query.edit_message_text(text, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(keyboard))
         return
 
-    # ========= بازگشت به صفحه اصلی =========
+    # ========= بازگشت به منوی اصلی =========
     if data == "link_main":
         keyboard = [
             [InlineKeyboardButton("📄 نمایش لینک", callback_data="link_show")],
@@ -177,8 +239,8 @@ async def link_panel_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE)
             [InlineKeyboardButton("❌ بستن", callback_data="link_close")]
         ]
         text = (
-            "🔗 <b>مدیریت لینک گروه</b>\n\n"
-            "از گزینه‌های زیر برای مشاهده یا ساخت لینک استفاده کنید."
+            "🔗 <b>پنل مدیریت لینک گروه</b>\n\n"
+            "از دکمه‌های زیر برای مشاهده یا ساخت لینک استفاده کنید."
         )
         await query.edit_message_text(text, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(keyboard))
         return
