@@ -19,8 +19,8 @@ ICONS = {
     "fortunes.json": "🔮",
     "jokes_manager.py": "😂",
     "custom_help.txt": "📘",
+    "group_control/aliases.json": "🧩",  # ✅ اضافه شد
 }
-
 
 # 📦 فایل‌هایی که میشه بک‌آپ گرفت
 BACKUP_TARGETS = {
@@ -31,6 +31,7 @@ BACKUP_TARGETS = {
     "fortunes.json": "فال‌ها",
     "jokes_manager.py": "جوک‌ها",
     "custom_help.txt": "راهنمای سفارشی",
+    "group_control/aliases.json": "دستورات سفارشی (alias)",  # ✅ اضافه شد
 }
 
 
@@ -79,6 +80,7 @@ async def selective_backup_buttons(update: Update, context: ContextTypes.DEFAULT
                 for file in selected:
                     if os.path.exists(file):
                         zipf.write(file)
+                        print(f"📁 افزودن فایل انتخابی: {file}")
                     else:
                         print(f"[⚠️ فایل یافت نشد]: {file}")
 
