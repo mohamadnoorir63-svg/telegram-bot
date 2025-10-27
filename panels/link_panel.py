@@ -1,3 +1,4 @@
+# panels/link_panel.py
 import os, json
 from datetime import datetime, timedelta
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ChatInviteLink
@@ -19,6 +20,18 @@ def save_group_data(data):
     with open(GROUP_CTRL_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
+# ⚡ بهبود سرعت ویرایش پیام (جلوگیری از ویرایش تکراری)
+async def safe_edit(query, text, **kwargs):
+    try:
+        if query.message and query.message.text == text:
+            return
+        await query.edit_message_text(text, **kwargs)
+    except:
+        try:
+            await query.message.delete()
+            await query.message.reply_text(text, **kwargs)
+        except:
+            pass
 
 # ===================== 🧭 پنل اصلی =====================
 async def link_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -39,7 +52,6 @@ async def link_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "از گزینه‌های زیر برای مشاهده، ساخت یا ارسال لینک استفاده کن."
     )
     await update.message.reply_text(text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
-
 
 # ===================== ⚙️ کنترل دکمه‌ها =====================
 async def link_panel_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -72,7 +84,7 @@ async def link_panel_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE)
                 text = f"⚠️ ربات باید ادمین باشد تا لینک را بگیرد.\n\n<code>{e}</code>"
 
         kb = [[InlineKeyboardButton("🔙 بازگشت", callback_data="link_main")]]
-        return await query.edit_message_text(text, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(kb))
+        return await safe_edit(query, text, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(kb))
 
     # ========= تایید ساخت لینک دائمی =========
     if data == "link_create_confirm":
@@ -80,7 +92,8 @@ async def link_panel_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE)
             [InlineKeyboardButton("✅ بله، بساز", callback_data="link_create_yes")],
             [InlineKeyboardButton("❌ خیر، انصراف", callback_data="link_main")]
         ]
-        return await query.edit_message_text(
+        return await safe_edit(
+            query,
             "آیا مطمئنی می‌خوای یک لینک جدید (دائمی) بسازی؟\n\nلینک قبلی همچنان فعال می‌مونه.",
             reply_markup=InlineKeyboardMarkup(kb)
         )
@@ -96,7 +109,7 @@ async def link_panel_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE)
             text = f"✅ لینک جدید ساخته شد:\n{link}"
 
         kb = [[InlineKeyboardButton("🔙 بازگشت", callback_data="link_main")]]
-        return await query.edit_message_text(text, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(kb))
+        return await safe_edit(query, text, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(kb))
 
     # ========= ساخت لینک محدود (پرسش تعداد) =========
     if data == "link_temp_ask":
@@ -108,8 +121,8 @@ async def link_panel_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE)
             ],
             [InlineKeyboardButton("🔙 بازگشت", callback_data="link_main")]
         ]
-        text = "چند نفر مجاز به استفاده از لینک باشند؟"
-        return await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(kb))
+        text = "🔢 چند نفر مجاز به استفاده از لینک باشند؟"
+        return await safe_edit(query, text, reply_markup=InlineKeyboardMarkup(kb))
 
     # ========= ساخت لینک محدود بر اساس انتخاب =========
     if data.startswith("link_temp_"):
@@ -126,7 +139,7 @@ async def link_panel_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE)
             text = f"⚠️ خطا در ساخت لینک موقت:\n<code>{e}</code>"
 
         kb = [[InlineKeyboardButton("🔙 بازگشت", callback_data="link_main")]]
-        return await query.edit_message_text(text, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(kb))
+        return await safe_edit(query, text, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(kb))
 
     # ========= ارسال به پیوی =========
     if data == "link_send":
@@ -136,7 +149,8 @@ async def link_panel_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE)
                 link = await context.bot.export_chat_invite_link(chat_id)
                 store_link(link, {"type": "default"})
             except Exception as e:
-                return await query.edit_message_text(
+                return await safe_edit(
+                    query,
                     f"⚠️ ربات باید ادمین باشد تا لینک را بگیرد.\n\n<code>{e}</code>",
                     parse_mode="HTML"
                 )
@@ -150,7 +164,7 @@ async def link_panel_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE)
             text = "⚠️ ابتدا به ربات پیام بده تا بتواند برایت بفرستد."
 
         kb = [[InlineKeyboardButton("🔙 بازگشت", callback_data="link_main")]]
-        return await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(kb))
+        return await safe_edit(query, text, reply_markup=InlineKeyboardMarkup(kb))
 
     # ========= راهنما =========
     if data == "link_help":
@@ -161,7 +175,7 @@ async def link_panel_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE)
             "• برای ارسال به پیوی، ابتدا باید به ربات پیام دهید."
         )
         kb = [[InlineKeyboardButton("🔙 بازگشت", callback_data="link_main")]]
-        return await query.edit_message_text(text, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(kb))
+        return await safe_edit(query, text, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(kb))
 
     # ========= بازگشت به منوی اصلی =========
     if data == "link_main":
@@ -174,8 +188,8 @@ async def link_panel_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE)
             [InlineKeyboardButton("❌ بستن", callback_data="link_close")]
         ]
         text = "🔗 <b>پنل مدیریت لینک گروه</b>\n\nاز گزینه‌های زیر استفاده کن 👇"
-        return await query.edit_message_text(text, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(kb))
+        return await safe_edit(query, text, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(kb))
 
     # ========= بستن =========
     if data == "link_close":
-        return await query.edit_message_text("❌ پنل بسته شد.")
+        return await safe_edit(query, "❌ پنل بسته شد.")
