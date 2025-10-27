@@ -1,46 +1,4 @@
-import asyncio
-import os
-import random
-import re
-import zipfile
-from datetime import datetime
-from telegram.ext import (
-    ApplicationBuilder,
-    CommandHandler,
-    MessageHandler,
-    ContextTypes,
-    filters,
-    CallbackQueryHandler,
-)
 
-from sudo_manager import (
-    add_sudo,
-    del_sudo,
-    list_sudo_text,
-    get_sudo_ids,
-    is_sudo,
-    ADMIN_ID,
-    SUDO_DATA
-)
-
-import aiofiles
-
-# 📦 ماژول‌ها
-from font_maker import font_maker, next_font, prev_font
-
-from memory_manager import (
-    init_files,
-    load_data,
-    save_data,
-    learn,
-    shadow_learn,
-    get_reply,
-    set_mode,
-    get_stats,
-    enhance_sentence,
-    generate_sentence,
-    list_phrases
-)
 
 
 from jokes_manager import save_joke, list_jokes
