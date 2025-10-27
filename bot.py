@@ -613,26 +613,9 @@ def get_persian_time():
     return f"{time_str} ( {date_str} )"
 
 
-# ✅ پنل تنظیم خوشامد
-async def open_welcome_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    chat = update.effective_chat
-    user = update.effective_user
-    member = await context.bot.get_chat_member(chat.id, user.id)
-
-    if member.status not in ["administrator", "creator"] and user.id not in SUDO_IDS and user.id != ADMIN_ID:
-        return await update.message.reply_text("⛔ فقط مدیران، سودوها یا ادمین اصلی می‌تونن خوشامد رو تنظیم کنن!")
-
-    chat_id = str(chat.id)
-    welcome_settings.setdefault(chat_id, {
-        "enabled": True,
-        "text": DEFAULT_WELCOME_TEXT,
-        "media": None,
-        "rules": None,
-        "delete_after": 0
-    })
-    save_welcome_settings(welcome_settings)
-
-    keyboard = [
+# ✅ سازنده کیبورد پنل (برای جلوگیری از تکرار)
+def build_welcome_keyboard():
+    return InlineKeyboardMarkup([
         [
             InlineKeyboardButton("🟢 فعال‌سازی", callback_data="welcome_enable"),
             InlineKeyboardButton("🔴 غیرفعال‌سازی", callback_data="welcome_disable")
@@ -651,7 +634,36 @@ async def open_welcome_panel(update: Update, context: ContextTypes.DEFAULT_TYPE)
         [
             InlineKeyboardButton("❌ بستن", callback_data="welcome_close")
         ]
-    ]
+    ])
+
+
+# ✅ پنل تنظیم خوشامد (هم از پیام و هم از کال‌بک پشتیبانی می‌کند)
+async def open_welcome_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # تشخیص اینکه از پیام آمده یا از کال‌بک
+    is_callback = bool(getattr(update, "callback_query", None))
+    chat = update.effective_chat if update.effective_chat else update.callback_query.message.chat
+    user = update.effective_user
+
+    # گرفتن وضعیت کاربر
+    member = await context.bot.get_chat_member(chat.id, user.id)
+
+    if member.status not in ["administrator", "creator"] and user.id not in SUDO_IDS and user.id != ADMIN_ID:
+        text = "⛔ فقط مدیران، سودوها یا ادمین اصلی می‌تونن خوشامد رو تنظیم کنن!"
+        if is_callback:
+            # در کال‌بک، بهتره پاسخ کوتاه بدیم (alert نه) یا پیام جدا بفرستیم
+            return await update.callback_query.answer(text, show_alert=True)
+        else:
+            return await update.message.reply_text(text)
+
+    chat_id = str(chat.id)
+    welcome_settings.setdefault(chat_id, {
+        "enabled": True,
+        "text": DEFAULT_WELCOME_TEXT,
+        "media": None,
+        "rules": None,
+        "delete_after": 0
+    })
+    save_welcome_settings(welcome_settings)
 
     panel_text = (
         "👋 <b>پنل تنظیم خوشامد خنگول</b>\n"
@@ -660,11 +672,23 @@ async def open_welcome_panel(update: Update, context: ContextTypes.DEFAULT_TYPE)
         "💡 <i>می‌تونی متن، عکس، زمان حذف یا لینک قوانین رو تغییر بدی</i>"
     )
 
-    await update.message.reply_text(
-        panel_text,
-        parse_mode="HTML",
-        reply_markup=InlineKeyboardMarkup(keyboard)
-    )
+    keyboard = build_welcome_keyboard()
+
+    # اگر از طریق کال‌بک آمده‌ایم، پیام قبلی را ادیت کن؛ وگرنه پیام جدید بفرست
+    if is_callback:
+        try:
+            return await update.callback_query.edit_message_text(
+                panel_text, parse_mode="HTML", reply_markup=keyboard
+            )
+        except:
+            # اگر ادیت نشد (مثلاً پیام از نوع مدیا بود)، پیام جدید بفرست
+            return await context.bot.send_message(
+                chat_id=chat.id, text=panel_text, parse_mode="HTML", reply_markup=keyboard
+            )
+    else:
+        return await update.message.reply_text(
+            panel_text, parse_mode="HTML", reply_markup=keyboard
+        )
 
 
 # ✅ کنترل دکمه‌های پنل خوشامد
@@ -715,6 +739,7 @@ async def welcome_panel_buttons(update: Update, context: ContextTypes.DEFAULT_TY
         )
         msg = f"👀 <b>پیش‌نمایش پیام خوشامد:</b>\n\n{sample}"
     elif data == "welcome_back":
+        # ✅ حالا این تابع بدون خطا پیام را ادیت می‌کند
         return await open_welcome_panel(update, context)
     elif data == "welcome_close":
         return await query.message.delete()
@@ -801,7 +826,6 @@ async def welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     pass
         except Exception as e:
             print(f"[WELCOME ERROR] {e}")
-  
 # ======================= ☁️ بک‌آپ خودکار و دستی (نسخه هماهنگ با bot.py) =======================
 import os
 import zipfile
