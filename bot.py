@@ -13,7 +13,17 @@ from telegram.ext import (
     ContextTypes,
     filters,
     CallbackQueryHandler
+# ======================= ⚙️ تنظیمات سودو =======================
+from sudo_manager import (
+    ADMIN_ID,
+    SUDO_DATA,
+    get_sudo_ids,
+    is_sudo,
+    add_sudo,
+    del_sudo,
+    list_sudo_text
 )
+
 import aiofiles
 
 # 📦 ماژول‌ها
@@ -87,6 +97,7 @@ from sudo_manager import add_sudo, del_sudo, list_sudos, get_sudo_ids, is_sudo, 
 # ======================= ⚙️ تنظیمات پایه و سودوها =======================
 from telegram import Update
 from telegram.ext import ContextTypes
+
 
 async def add_sudo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
@@ -2050,14 +2061,15 @@ if __name__ == "__main__":
     # ==========================================================
     # 👑 مدیریت سودوها
     # ==========================================================
-    async def list_sudos(update: Update, context: ContextTypes.DEFAULT_TYPE):
-        if update.effective_user.id not in SUDO_IDS:
-            return await update.message.reply_text("⛔ فقط سودوها مجازند!")
+    from sudo_manager import list_sudo_text, is_sudo, ADMIN_ID
 
-        text = "👑 <b>لیست سودوهای فعلی:</b>\n\n"
-        for i, sid in enumerate(SUDO_IDS, start=1):
-            text += f"{i}. <code>{sid}</code>\n"
-        await update.message.reply_text(text, parse_mode="HTML")
+    async def list_sudos(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+
+    if user.id != ADMIN_ID and not is_sudo(user.id):
+        return await update.message.reply_text("⛔ فقط سودوها مجازند!")
+
+    await update.message.reply_text(list_sudo_text(), parse_mode="HTML")
 
     # ==========================================================
     # ⚙️ سیستم مدیریت گروه (اولویت بالا)
@@ -2089,9 +2101,9 @@ if __name__ == "__main__":
     application.add_handler(MessageHandler(filters.Regex(clean_pattern) & filters.TEXT, clean_handler), group=-7)
 
     # ==========================================================
-    application.add_handler(CommandHandler("addsudo", add_sudo))
-    application.add_handler(CommandHandler("delsudo", del_sudo))
-    application.add_handler(CommandHandler("listsudo", list_sudos))
+    ‌application.add_handler(CommandHandler("addsudo", cmd_addsudo))
+    application.add_handler(CommandHandler("delsudo", cmd_delsudo))
+    application.add_handler(CommandHandler("listsudo", cmd_listsudo))
 
     # ==========================================================
     # 💾 دستورات شخصی (ذخیره، حذف، اجرای دستورها)
