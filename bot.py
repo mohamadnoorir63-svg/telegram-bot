@@ -833,6 +833,7 @@ async def welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         except Exception as e:
             print(f"[WELCOME ERROR] {e}")
+                
 # ======================= ☁️ بک‌آپ خودکار و دستی (نسخه هماهنگ با bot.py) =======================
 import os
 import zipfile
