@@ -1766,32 +1766,32 @@ async def show_main_panel(update: Update, context: ContextTypes.DEFAULT_TYPE, ed
         ],
         [
             InlineKeyboardButton("➕ افزودن به گروه", url="https://t.me/Khenqol_bot?startgroup=true"),
-            InlineKeyboardButton("🧩 قابلیت‌های ربات", callback_data="panel_features")
+            InlineKeyboardButton("🧩 قابلیت‌های ربات", callback_data="main_features")
         ],
         [
-            InlineKeyboardButton("🤖 درباره خنگول", callback_data="panel_about"),
-            InlineKeyboardButton("👨‍💻 درباره تیم ما", callback_data="panel_team")
+            InlineKeyboardButton("🤖 درباره خنگول", callback_data="main_about"),
+            InlineKeyboardButton("👨‍💻 درباره تیم ما", callback_data="main_team")
         ],
         [
-            InlineKeyboardButton("🔮 فال امروز", callback_data="panel_fortune"),
-            InlineKeyboardButton("😂 جوک خنده‌دار", callback_data="panel_joke")
+            InlineKeyboardButton("🔮 فال امروز", callback_data="main_fortune"),
+            InlineKeyboardButton("😂 جوک خنده‌دار", callback_data="main_joke")
         ],
         [
-            InlineKeyboardButton("🎨 فونت‌ساز حرفه‌ای", callback_data="panel_font"),
-            InlineKeyboardButton("💳 آیدی خنگولی من", callback_data="panel_stats")
+            InlineKeyboardButton("🎨 فونت‌ساز حرفه‌ای", callback_data="main_font"),
+            InlineKeyboardButton("💳 آیدی خنگولی من", callback_data="main_stats")
         ],
         [
-            InlineKeyboardButton("🌤 آب و هوا", callback_data="panel_weather"),
-            InlineKeyboardButton("🕌 اوقات شرعی", callback_data="panel_azan")
+            InlineKeyboardButton("🌤 آب و هوا", callback_data="main_weather"),
+            InlineKeyboardButton("🕌 اوقات شرعی", callback_data="main_azan")
         ],
         [
-            InlineKeyboardButton("🧠 گفتگوی ChatGPT", callback_data="panel_chatgpt")
+            InlineKeyboardButton("🧠 گفتگوی ChatGPT", callback_data="main_chatgpt")
         ]
     ]
 
     markup = InlineKeyboardMarkup(keyboard)
 
-    # نمایش فقط یک بار پیام اصلی
+    # ✅ نمایش فقط یک بار پیام اصلی (جلوگیری از تکرار)
     if edit:
         await update.callback_query.edit_message_text(about, reply_markup=markup, parse_mode="HTML")
     else:
@@ -1812,7 +1812,7 @@ async def feature_back(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 # ======================= 🎛 کنترل پنل =======================
-async def panel_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+   async def panel_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
 
@@ -1820,19 +1820,19 @@ async def panel_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     now = datetime.now().strftime("%Y/%m/%d - %H:%M:%S")
 
     panels = {
-        "panel_about": ("about_khengol.txt", "💫 درباره خنگول"),
-        "panel_team": ("team_noori.txt", "👨‍💻 تیم نوری"),
-        "panel_features": ("features.txt", "🧩 قابلیت‌های ربات"),
+        "main_about": ("about_khengol.txt", "💫 درباره خنگول"),
+        "main_team": ("team_noori.txt", "👨‍💻 تیم نوری"),
+        "main_features": ("features.txt", "🧩 قابلیت‌های ربات"),
     }
 
     if query.data in panels:
         file_name, title = panels[query.data]
         text = await load_text(file_name, f"❗ هنوز {title} ثبت نشده!")
         text += "\n\n🔙 برای بازگشت، روی دکمه زیر بزن:"
-        back_btn = [[InlineKeyboardButton("🔙 بازگشت", callback_data="back_main")]]
+        back_btn = [[InlineKeyboardButton("🔙 بازگشت", callback_data="main_back")]]
         await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(back_btn), parse_mode="HTML")
 
-    elif query.data == "panel_stats":
+    elif query.data == "main_stats":
         user = query.from_user
         now = datetime.now().strftime("%Y/%m/%d - %H:%M:%S")
 
@@ -1853,42 +1853,49 @@ async def panel_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except:
             await query.message.reply_text(text, parse_mode="HTML")
 
-    elif query.data == "panel_weather":
+    elif query.data == "main_weather":
         await show_weather(update, context)
 
-    elif query.data == "panel_fortune":
+    elif query.data == "main_fortune":
         await query.message.reply_text("🔮 برای دیدن فال بنویس:\n<b>فال</b>", parse_mode="HTML")
 
-    elif query.data == "panel_azan":
+    elif query.data == "main_azan":
         await query.message.reply_text(
             "🕌 برای دیدن اوقات شرعی شهرت بنویس:\n\n"
             "<b>اذان کابل</b>\n<b>اذان تهران</b>\n<b>اذان شیراز</b>",
             parse_mode="HTML"
         )
 
-    elif query.data == "panel_joke":
+    elif query.data == "main_joke":
         await query.message.reply_text("😂 برای دیدن جوک بنویس:\n<b>جوک</b>", parse_mode="HTML")
 
-    elif query.data == "panel_font":
+    elif query.data == "main_font":
         await query.message.reply_text("🎨 برای ساخت فونت بنویس:\n<b>فونت اسم‌ت</b>", parse_mode="HTML")
 
-    elif query.data == "back_main":
-        await show_main_panel(update, context, edit=True)   
+    elif query.data == "main_back":
+        await show_main_panel(update, context, edit=True)
 
 # ======================= 🔐 ثبت فایل‌ها فقط توسط مدیر اصلی =======================
 async def save_panel_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id != ADMIN_ID:
+    """ذخیره متن‌های پنل (فقط توسط مدیر اصلی)"""
+    ADMIN_ID = int(os.getenv("ADMIN_ID", "7089376754"))
+
+    user = update.effective_user
+    if user.id != ADMIN_ID:
         return await update.message.reply_text("⛔ فقط مدیر اصلی می‌تونه متن‌ها رو تغییر بده!")
 
+    # ✅ باید روی یک پیام ریپلای شده باشه
     if not update.message.reply_to_message or not update.message.reply_to_message.text:
         return await update.message.reply_text("❗ باید روی یک پیام متنی ریپلای بزنی!")
 
+    # ✅ بررسی دستور — مثلاً: «ثبت درباره»
     parts = update.message.text.strip().split(maxsplit=1)
     if len(parts) < 2:
-        return await update.message.reply_text("❗ بنویس: ثبت درباره یا ثبت تیم")
+        return await update.message.reply_text("❗ بنویس: ثبت درباره / ثبت تیم / ثبت قابلیت")
 
-    cmd = parts[1]
+    cmd = parts[1].strip()
     filename = None
+
     if cmd == "درباره":
         filename = "about_khengol.txt"
     elif cmd == "تیم":
@@ -1898,11 +1905,17 @@ async def save_panel_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if filename:
         os.makedirs(TEXTS_PATH, exist_ok=True)
+
         async with aiofiles.open(os.path.join(TEXTS_PATH, filename), "w", encoding="utf-8") as f:
             await f.write(update.message.reply_to_message.text)
-        await update.message.reply_text(f"✅ متن «{cmd}» ذخیره شد!")
+
+        await update.message.reply_text(f"✅ متن بخش «{cmd}» با موفقیت ذخیره شد!")
     else:
-        await update.message.reply_text("❗ دستور اشتباه است — باید یکی از این‌ها باشد:\nثبت درباره / ثبت تیم / ثبت قابلیت")
+        await update.message.reply_text(
+            "❗ دستور اشتباه است — باید یکی از این‌ها باشد:\n"
+            "<b>ثبت درباره</b>\n<b>ثبت تیم</b>\n<b>ثبت قابلیت</b>",
+            parse_mode="HTML"
+        )
 # ======================= 🧾 سیستم ثبت دستی راهنما و help =======================
 # بدون نیاز به ویرایش فایل‌ها یا پوشه‌ها
 # ==============================================================
@@ -2127,11 +2140,13 @@ if __name__ == "__main__":
     application.add_handler(CommandHandler("restore", restore))
     application.add_handler(MessageHandler(filters.TEXT & filters.Regex(r"^(لینک|Link)$"), link_panel))
     application.add_handler(CallbackQueryHandler(link_panel_buttons, pattern="^link_"))
-    # 🎛 پنل فارسی چندمرحله‌ای (در گروه و پیوی)
+    # 📘 پنل خنگول (پیوی / استارت)
     application.add_handler(
-        MessageHandler(filters.TEXT & filters.Regex(r"^پنل$"), panel_menu),
+        CallbackQueryHandler(panel_handler, pattern="^main_"),
         group=-3
     )
+
+    # 📗 پنل راهنما (فارسی / فقط با کلمه "پنل")
     application.add_handler(
         CallbackQueryHandler(panel_buttons, pattern="^panel_"),
         group=-3
