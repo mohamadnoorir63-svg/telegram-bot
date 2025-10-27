@@ -2147,11 +2147,7 @@ if __name__ == "__main__":
         group=-3
     )
 
-    # پنل خنگول (main panel) — کاملاً جدا از پنل راهنما
-    application.add_handler(
-        CallbackQueryHandler(panel_handler, pattern="^main_"),
-        group=-3
-        )
+    
     
     application.add_handler(CommandHandler("reset", reset_memory))
     application.add_handler(CommandHandler("reload", reload_memory))
