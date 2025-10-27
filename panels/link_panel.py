@@ -20,8 +20,7 @@ def save_group_data(data):
     with open(GROUP_CTRL_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
-
-# ⚡ حذف و ارسال سریع برای سرعت بیشتر
+# ⚡ تابع سریع برای جایگزینی پیام
 async def fast_replace(query, text, keyboard=None, parse_mode="HTML"):
     try:
         await query.message.delete()
@@ -32,7 +31,6 @@ async def fast_replace(query, text, keyboard=None, parse_mode="HTML"):
         parse_mode=parse_mode,
         reply_markup=InlineKeyboardMarkup(keyboard) if keyboard else None
     )
-
 
 # ===================== 🧭 پنل اصلی =====================
 async def link_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -48,36 +46,31 @@ async def link_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = get_panel_text(lang)
     await update.message.reply_text(text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
 
-
 # ===================== ⚙️ کنترل دکمه‌ها =====================
 async def link_panel_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     data = query.data
     chat = query.message.chat
-    chat_id = chat.id
-    user = query.from_user
+    chat_id = str(chat.id)
 
     gdata = load_group_data()
-    group = gdata.setdefault(str(chat_id), {})
+    group = gdata.setdefault(chat_id, {})
     lang = group.get("lang", "fa")
 
-    def store_link(link, meta):
-        group["invite"] = {"link": link, "created": datetime.now().isoformat(), "meta": meta}
-        gdata[str(chat_id)] = group
+    # ========= تغییر زبان =========
+    if data in ["lang_fa", "lang_en", "lang_de"]:
+        lang = data.replace("lang_", "")
+        group["lang"] = lang
+        gdata[chat_id] = group
         save_group_data(gdata)
 
-    # ========= تغییر زبان =========
-    if data.startswith("lang_"):
-        new_lang = data.replace("lang_", "")
-        group["lang"] = new_lang
-        gdata[str(chat_id)] = group
-        save_group_data(gdata)
-        keyboard = generate_main_keyboard(new_lang)
-        text = get_panel_text(new_lang)
+        # پنل جدید با زبان انتخاب‌شده نمایش داده می‌شود
+        keyboard = generate_main_keyboard(lang)
+        text = get_panel_text(lang)
         return await fast_replace(query, text, keyboard)
 
-    # ========= نمایش لینک =========
+    # ========= بقیه بخش‌ها =========
     if data == "link_show":
         inv = group.get("invite")
         if inv and inv.get("link"):
@@ -85,7 +78,9 @@ async def link_panel_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE)
         else:
             try:
                 link = await context.bot.export_chat_invite_link(chat_id)
-                store_link(link, {"type": "default"})
+                group["invite"] = {"link": link, "created": datetime.now().isoformat()}
+                gdata[chat_id] = group
+                save_group_data(gdata)
                 text = get_text(lang, "new_link") + f"\n{link}"
             except Exception as e:
                 text = get_text(lang, "bot_admin_error") + f"\n\n<code>{e}</code>"
@@ -93,7 +88,6 @@ async def link_panel_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE)
         kb = [[InlineKeyboardButton(get_text(lang, "back"), callback_data="link_main")]]
         return await fast_replace(query, text, kb)
 
-    # ========= ساخت لینک دائمی =========
     if data == "link_create_confirm":
         kb = [
             [InlineKeyboardButton(get_text(lang, "yes"), callback_data="link_create_yes")],
@@ -104,17 +98,20 @@ async def link_panel_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE)
     if data == "link_create_yes":
         try:
             link_obj: ChatInviteLink = await context.bot.create_chat_invite_link(chat_id)
-            store_link(link_obj.invite_link, {"type": "permanent"})
+            group["invite"] = {"link": link_obj.invite_link, "created": datetime.now().isoformat()}
+            gdata[chat_id] = group
+            save_group_data(gdata)
             text = get_text(lang, "new_link") + f"\n{link_obj.invite_link}"
         except Exception:
             link = await context.bot.export_chat_invite_link(chat_id)
-            store_link(link, {"type": "fallback"})
+            group["invite"] = {"link": link, "created": datetime.now().isoformat()}
+            gdata[chat_id] = group
+            save_group_data(gdata)
             text = get_text(lang, "new_link") + f"\n{link}"
 
         kb = [[InlineKeyboardButton(get_text(lang, "back"), callback_data="link_main")]]
         return await fast_replace(query, text, kb)
 
-    # ========= ساخت لینک محدود =========
     if data == "link_temp_ask":
         kb = [
             [
@@ -130,11 +127,13 @@ async def link_panel_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE)
         limit = int(data.split("_")[-1])
         try:
             link_obj: ChatInviteLink = await context.bot.create_chat_invite_link(
-                chat_id,
+                chat.id,
                 expire_date=datetime.utcnow() + timedelta(hours=24),
                 member_limit=limit
             )
-            store_link(link_obj.invite_link, {"type": "temp", "limit": limit, "expire": "24h"})
+            group["invite"] = {"link": link_obj.invite_link, "created": datetime.now().isoformat()}
+            gdata[chat_id] = group
+            save_group_data(gdata)
             text = get_text(lang, "temp_link").format(link=link_obj.invite_link, limit=limit)
         except Exception as e:
             text = get_text(lang, "temp_error").format(e=e)
@@ -142,19 +141,16 @@ async def link_panel_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE)
         kb = [[InlineKeyboardButton(get_text(lang, "back"), callback_data="link_main")]]
         return await fast_replace(query, text, kb)
 
-    # ========= راهنما =========
     if data == "link_help":
         text = get_text(lang, "help")
         kb = [[InlineKeyboardButton(get_text(lang, "back"), callback_data="link_main")]]
         return await fast_replace(query, text, kb)
 
-    # ========= بازگشت =========
     if data == "link_main":
         keyboard = generate_main_keyboard(lang)
         text = get_panel_text(lang)
         return await fast_replace(query, text, keyboard)
 
-    # ========= بستن =========
     if data == "link_close":
         try:
             await query.message.delete()
@@ -230,4 +226,4 @@ def get_text(lang, key):
             "de": "📘 <b>Link-Hilfe</b>\n• Der Bot muss Admin sein.\n• Temporäre Links laufen nach 24h ab."
         }
     }
-    return data[key][lang]
+    return data[key].get(lang, data[key]["fa"])
