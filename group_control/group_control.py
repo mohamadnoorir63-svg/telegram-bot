@@ -113,17 +113,32 @@ def save_json_file(path, data):
 group_data = load_json_file(GROUP_CTRL_FILE, {})
 ALIASES = load_json_file(ALIASES_FILE, ALIASES)
 
-# 🧠 بررسی مجاز بودن
+# 🧠 بررسی مجاز بودن (مدیران تلگرام + مدیران ثبت‌شده + سودوها)
 async def is_authorized(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     chat = update.effective_chat
+    chat_id = str(chat.id)
+
+    # 👑 سودوها همیشه مجازن
     if user.id in SUDO_IDS:
         return True
+
+    # ✅ اگر در لیست مدیران ثبت‌شده باشد (مدیرانی که با دستور «افزودنمدیر» اضافه شدن)
+    group = group_data.get(chat_id, {})
+    admins = group.get("admins", [])
+    if str(user.id) in admins:
+        return True
+
+    # 🔹 بررسی مدیران واقعی تلگرام
     try:
         member = await context.bot.get_chat_member(chat.id, user.id)
-        return member.status in ["administrator", "creator"]
+        if member.status in ["administrator", "creator"]:
+            return True
     except:
-        return False
+        pass
+
+    # 🚫 در غیر اینصورت مجاز نیست
+    return False
 
 
 # 🧱 بررسی هدف
@@ -612,24 +627,35 @@ async def handle_locks_status(update, context):
 # ======================= 👑 مدیریت مدیران =======================
 
 async def handle_addadmin(update, context):
+    # فقط مدیران مجاز
     if not await is_authorized(update, context):
         return await update.message.reply_text("🚫 فقط سودو یا مدیران ارشد می‌تونن مدیر اضافه کنن!")
 
+    # باید روی پیام کسی ریپلای زده باشه
     if not update.message.reply_to_message:
         return await update.message.reply_text("🔹 باید روی پیام کسی ریپلای بزنی تا مدیرش کنم.")
+
+    # ✋ جلوگیری از پاسخ خودکار ربات (مثلاً خوش‌آمد یا سخنگو)
+    context.user_data["skip_autoresponse"] = True
 
     target = update.message.reply_to_message.from_user
     chat_id = str(update.effective_chat.id)
     group = group_data.get(chat_id, {"admins": []})
 
+    # بررسی تکرار
     if str(target.id) in group["admins"]:
         return await update.message.reply_text("⚠️ این کاربر قبلاً مدیر شده.")
 
+    # افزودن مدیر
     group["admins"].append(str(target.id))
     group_data[chat_id] = group
     save_json_file(GROUP_CTRL_FILE, group_data)
 
-    await update.message.reply_text(f"👑 <b>{target.first_name}</b> به عنوان مدیر افزوده شد.", parse_mode="HTML")
+    # پاسخ تأیید
+    await update.message.reply_text(
+        f"👑 <b>{target.first_name}</b> به عنوان مدیر افزوده شد.",
+        parse_mode="HTML"
+    )
 
 
 async def handle_removeadmin(update, context):
@@ -639,6 +665,9 @@ async def handle_removeadmin(update, context):
     if not update.message.reply_to_message:
         return await update.message.reply_text("🔹 باید روی پیام مدیر ریپلای بزنی.")
 
+    # ✋ جلوگیری از پاسخ خودکار ربات
+    context.user_data["skip_autoresponse"] = True
+
     target = update.message.reply_to_message.from_user
     chat_id = str(update.effective_chat.id)
     group = group_data.get(chat_id, {"admins": []})
@@ -646,14 +675,21 @@ async def handle_removeadmin(update, context):
     if str(target.id) not in group["admins"]:
         return await update.message.reply_text("⚠️ این کاربر مدیر نیست!")
 
+    # حذف مدیر
     group["admins"].remove(str(target.id))
     group_data[chat_id] = group
     save_json_file(GROUP_CTRL_FILE, group_data)
 
-    await update.message.reply_text(f"❌ <b>{target.first_name}</b> از مدیران حذف شد.", parse_mode="HTML")
+    await update.message.reply_text(
+        f"❌ <b>{target.first_name}</b> از مدیران حذف شد.",
+        parse_mode="HTML"
+    )
 
 
 async def handle_admins(update, context):
+    # ✋ جلوگیری از پاسخ خودکار در این دستور هم
+    context.user_data["skip_autoresponse"] = True
+
     chat_id = str(update.effective_chat.id)
     group = group_data.get(chat_id, {"admins": []})
     admins = group.get("admins", [])
@@ -666,7 +702,6 @@ async def handle_admins(update, context):
         text += f"{idx}. <a href='tg://user?id={admin_id}'>مدیر {idx}</a>\n"
 
     await update.message.reply_text(text, parse_mode="HTML")
-
 # ======================= 💎 سیستم «اصل» پیشرفته مخصوص هر گروه =======================
 import json, os, asyncio
 from telegram import Update
