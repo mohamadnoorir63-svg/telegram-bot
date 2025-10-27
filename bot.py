@@ -251,8 +251,8 @@ async def toggle_reply_mode(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except:
         pass
 
-    if not (is_main_admin or is_group_admin):
-        return await update.message.reply_text("⛔ فقط مدیران گروه یا ادمین اصلی می‌توانند این تنظیم را تغییر دهند!")
+    if not (is_main_admin or is_group_admin or user.id in SUDO_IDS):
+    return await update.message.reply_text("⛔ فقط مدیران گروه، سودوها یا ادمین اصلی می‌توانند این تنظیم را تغییر دهند!")
 
     # تغییر وضعیت مخصوص همان گروه
     group_id = str(chat.id)
