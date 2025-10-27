@@ -452,7 +452,7 @@ async def mode_change(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ مود نامعتبر است!")
 
 # ======================= ⚙️ کنترل وضعیت =======================
- async def toggle(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    async def toggle(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     ADMIN_ID = int(os.getenv("ADMIN_ID", "7089376754"))
 
@@ -495,7 +495,8 @@ async def unlock_learning(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     status["locked"] = False
     await update.message.reply_text("🔓 یادگیری باز شد!")
-
+ 
+    
 # ======================= 📊 آمار خنگول واقعی =======================
 async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data = get_stats()
