@@ -62,26 +62,56 @@ ALIASES = {
     "lockmedia": ["lock media", "قفل مدیا", "قفل رسانه"],
     "unlockmedia": ["unlock media", "باز مدیا", "باز رسانه"]
 }
+# 📂 بارگذاری و ذخیره فایل‌ها + بک‌آپ خودکار
+import os, json
 
-# 📂 بارگذاری و ذخیره فایل‌ها
+BACKUP_DIR = "backups"
+if not os.path.exists(BACKUP_DIR):
+    os.makedirs(BACKUP_DIR)
+
 def load_json_file(path, default):
+    """📥 لود فایل JSON با بازیابی خودکار از بک‌آپ"""
     if os.path.exists(path):
         try:
             with open(path, "r", encoding="utf-8") as f:
                 return json.load(f)
-        except:
-            pass
+        except Exception as e:
+            print(f"⚠️ خطا در لود {path}: {e} — تلاش برای بازیابی از بک‌آپ...")
+
+    # اگر فایل اصلی وجود نداشت، از بک‌آپ بخوان
+    backup_path = os.path.join(BACKUP_DIR, f"backup_{os.path.basename(path)}")
+    if os.path.exists(backup_path):
+        try:
+            with open(backup_path, "r", encoding="utf-8") as b:
+                print(f"♻️ {path} از بک‌آپ بازیابی شد ✅")
+                return json.load(b)
+        except Exception as e:
+            print(f"⚠️ بک‌آپ {backup_path} نیز قابل استفاده نیست: {e}")
+
     return default
 
 
 def save_json_file(path, data):
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
+    """💾 ذخیره فایل JSON به همراه بک‌آپ خودکار"""
+    try:
+        # ذخیره فایل اصلی
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+
+        # ذخیره بک‌آپ در پوشه backups
+        backup_path = os.path.join(BACKUP_DIR, f"backup_{os.path.basename(path)}")
+        with open(backup_path, "w", encoding="utf-8") as b:
+            json.dump(data, b, ensure_ascii=False, indent=2)
+
+        print(f"💾 فایل {os.path.basename(path)} و بک‌آپ آن ذخیره شد ✅")
+
+    except Exception as e:
+        print(f"⚠️ خطا در ذخیره {path}: {e}")
 
 
+# ✅ بارگذاری داده‌ها
 group_data = load_json_file(GROUP_CTRL_FILE, {})
 ALIASES = load_json_file(ALIASES_FILE, ALIASES)
-
 
 # 🧠 بررسی مجاز بودن
 async def is_authorized(update: Update, context: ContextTypes.DEFAULT_TYPE):
