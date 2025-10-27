@@ -313,80 +313,25 @@ async def register_user(user):
         with open(USERS_FILE, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
 # ======================= ✳️ شروع و پیام فعال‌سازی =======================
-
-
-# ======================= 🚀 استارت سینمایی خفن خنگول =======================
-# ======================= 📢 اطلاع به ادمین هنگام استارت =======================
-async def notify_admin_on_startup(app):
-    """ارسال پیام فعال‌سازی به ادمین هنگام استارت"""
-    ADMIN_ID = int(os.getenv("ADMIN_ID", "7089376754"))  # اگر از قبل داری، خطش رو تکرار نکن
-    try:
-        await app.bot.send_message(
-            chat_id=ADMIN_ID,
-            text="🚀 ربات خنگول با موفقیت راه‌اندازی شد ✅"
-        )
-        print("[INFO] Startup notification sent ✅")
-    except Exception as e:
-        print(f"[ERROR] Failed to notify admin: {e}")
+# ======================= 🚀 استارت ساده خنگول (بدون افکت) =======================
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    from datetime import datetime
+    """نمایش مستقیم پنل اصلی بدون افکت بوت"""
 
     user = update.effective_user
     now = datetime.now().strftime("%Y/%m/%d - %H:%M:%S")
 
-    # مرحله اول: شروع بوت
-    msg = await update.message.reply_text(
-        f"🧠 <b>در حال راه‌اندازی سیستم خنگول...</b>\n"
-        f"👤 کاربر: <b>{user.first_name}</b>\n"
-        f"🕓 زمان اجرا: <code>{now}</code>",
+    # پیام ساده خوشامد
+    await update.message.reply_text(
+        f"✨ <b>سلام {user.first_name}!</b>\n"
+        f"🕓 زمان ورود: <code>{now}</code>\n\n"
+        "🌙 سیستم خنگول آماده‌ به خدمته 😎\n"
+        "👇 از منوی زیر استفاده کن:",
         parse_mode="HTML"
     )
 
-    # مراحل بوت خنگول با افکت نوری
-    steps = [
-        "📡 اتصال به مغز مرکزی...",
-        "🔍 بررسی سلامت حافظه و داده‌ها...",
-        "💬 بارگذاری سیستم شوخ‌طبعی...",
-        "🎭 فعال‌سازی احساسات دیجیتالی...",
-        "🤖 در حال همگام‌سازی با نسخه Cloud+ Supreme...",
-        "🚀 آماده به خدمت 😎"
-    ]
-
-    colors = ["🔵", "🟢", "🟣", "🟡", "🔴"]
-    bar_len = 14
-
-    for i, step in enumerate(steps, start=1):
-        percent = int((i / len(steps)) * 100)
-        color = colors[i % len(colors)]
-        filled = "█" * int(bar_len * (percent / 100))
-        empty = "░" * (bar_len - len(filled))
-        bar = f"{color}[{filled}{empty}] {percent}%"
-
-        await asyncio.sleep(1.1)
-        try:
-            await msg.edit_text(
-                f"🧠 <b>بوت سیستم خنگول...</b>\n\n{bar}\n\n{step}\n\n"
-                f"👤 کاربر: <b>{user.first_name}</b>\n"
-                f"🕓 <code>{now}</code>",
-                parse_mode="HTML"
-            )
-        except:
-            pass
-
-    # پایان بوت و نمایش خوشامد نهایی
-    await asyncio.sleep(1.2)
-    await msg.edit_text(
-        f"✨ <b>سیستم خنگول فارسی با موفقیت راه‌اندازی شد!</b>\n\n"
-        f"👤 کاربر: <b>{user.first_name}</b>\n"
-        f"🕓 زمان اجرا: <code>{now}</code>\n"
-        "💬 آماده‌ای برای خنده، احساس و هوش مصنوعی 😎\n\n"
-        "👇 از دکمه‌های زیر استفاده کن:",
-        parse_mode="HTML"
-    )
-
-    # نمایش پنل اصلی بعد از افکت نهایی
-    await asyncio.sleep(0.8)
+    # نمایش مستقیم پنل اصلی
     await show_main_panel(update, context)
+
 # ======================= ⚙️ خطایاب خودکار =======================
 async def handle_error(update: object, context: ContextTypes.DEFAULT_TYPE):
     error_text = f"⚠️ خطا در ربات:\n\n{context.error}"
