@@ -165,9 +165,11 @@ async def handle_unban(update, context):
     except Exception as e:
         await update.message.reply_text(f"⚠️ خطا در رفع بن:\n<code>{e}</code>", parse_mode="HTML")
 
-
 # ⚠️ اخطار (۳ اخطار = بن)
 async def handle_warn(update, context):
+    if not update or not update.message or not update.effective_chat:
+        return
+
     if not await is_authorized(update, context):
         return await update.message.reply_text("⛔ فقط مدیران یا سودوها مجازند!")
 
@@ -180,23 +182,37 @@ async def handle_warn(update, context):
     if not await can_act_on_target(update, context, target):
         return
 
-    group = group_data.get(chat_id, {"warns": {}, "admins": []})
-    warns = group["warns"]
+    # ✅ اگر گروه یا ساختار اخطار وجود نداشت، بساز
+    if chat_id not in group_data:
+        group_data[chat_id] = {}
+    if "warns" not in group_data[chat_id]:
+        group_data[chat_id]["warns"] = {}
+    if "admins" not in group_data[chat_id]:
+        group_data[chat_id]["admins"] = []
+
+    warns = group_data[chat_id]["warns"]
     warns[str(target.id)] = warns.get(str(target.id), 0) + 1
     count = warns[str(target.id)]
-    group["warns"] = warns
-    group_data[chat_id] = group
     save_json_file(GROUP_CTRL_FILE, group_data)
 
+    # 🚫 اگر سه اخطار شد → بن شود
     if count >= 3:
         try:
             await context.bot.ban_chat_member(chat_id, target.id)
-            await update.message.reply_text(f"🚫 <b>{target.first_name}</b> سه اخطار گرفت و بن شد!", parse_mode="HTML")
+            await update.message.reply_text(
+                f"🚫 <b>{target.first_name}</b> سه اخطار گرفت و بن شد!",
+                parse_mode="HTML"
+            )
             warns[str(target.id)] = 0
-        except:
-            pass
+            save_json_file(GROUP_CTRL_FILE, group_data)
+        except Exception as e:
+            await update.message.reply_text(f"⚠️ خطا در بن:\n<code>{e}</code>", parse_mode="HTML")
     else:
-        await update.message.reply_text(f"⚠️ <b>{target.first_name}</b> اخطار شماره <b>{count}</b> گرفت.", parse_mode="HTML")
+        await update.message.reply_text(
+            f"⚠️ <b>{target.first_name}</b> اخطار شماره <b>{count}</b> گرفت.",
+            parse_mode="HTML"
+    )
+
 
 
 # 🤐 سکوت / رفع سکوت
