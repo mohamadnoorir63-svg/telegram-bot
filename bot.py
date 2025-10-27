@@ -2141,11 +2141,7 @@ if __name__ == "__main__":
     application.add_handler(
         MessageHandler(filters.TEXT & filters.Regex(r"^پنل$") & filters.ChatType.GROUPS, panel_menu),
         group=-3
-    )
-    application.add_handler(
-        CallbackQueryHandler(panel_buttons, pattern="^panel_"),
-        group=-3
-    )
+    
 
     
     
