@@ -7,6 +7,15 @@ MAIN_TITLE = "🌟 <b>پنل راهنمای ربات مدیریت گروه</b>\n
 
 # 🎨 صفحه‌ی اصلی پنل
 async def panel_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat = update.effective_chat
+
+    # 🚫 بررسی: فقط در گروه‌ها مجاز باشد
+    if chat.type not in ["group", "supergroup"]:
+        return await update.message.reply_text(
+            "❌ این پنل فقط در داخل گروه‌ها قابل استفاده است!",
+            parse_mode="HTML"
+        )
+
     keyboard = [
         [
             InlineKeyboardButton("🔒 قفل‌ها", callback_data="panel_locks"),
