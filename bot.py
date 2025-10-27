@@ -2041,9 +2041,16 @@ if __name__ == "__main__":
     application.add_handler(CommandHandler("restore", restore))
     application.add_handler(MessageHandler(filters.TEXT & filters.Regex(r"^(لینک|Link)$"), link_panel))
     application.add_handler(CallbackQueryHandler(link_panel_buttons, pattern="^link_"))
-    # 🎛 پنل فارسی چندمرحله‌ای
-    application.add_handler(MessageHandler(filters.TEXT & filters.Regex(r"^پنل$"), panel_menu))
-    application.add_handler(CallbackQueryHandler(panel_buttons, pattern="^panel_"))
+    # 🎛 پنل فارسی چندمرحله‌ای (در گروه و پیوی)
+    application.add_handler(
+        MessageHandler(filters.TEXT & filters.Regex(r"^پنل$"), panel_menu),
+        group=-3
+    )
+    application.add_handler(
+        CallbackQueryHandler(panel_buttons, pattern="^panel_"),
+        group=-3
+    )
+    
     application.add_handler(CommandHandler("reset", reset_memory))
     application.add_handler(CommandHandler("reload", reload_memory))
     application.add_handler(CommandHandler("broadcast", broadcast))
