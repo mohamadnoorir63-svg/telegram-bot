@@ -560,17 +560,22 @@ async def fullstats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         await update.message.reply_text(f"⚠️ خطا در آمار گروه‌ها:\n{e}")
  # ======================= 👋 سیستم خوشامد پویا برای هر گروه =======================
-from telegram import InlineKeyboardMarkup, InlineKeyboardButton, Update
+    from telegram import InlineKeyboardMarkup, InlineKeyboardButton, Update
 from telegram.ext import ContextTypes
-import datetime, json, os, asyncio
+from datetime import datetime
+import json, os, asyncio
+import jdatetime  # ✅ اضافه برای تاریخ شمسی
 
 WELCOME_FILE = "welcome_settings.json"
 
 # ✅ بارگذاری و ذخیره‌سازی تنظیمات
 def load_welcome_settings():
     if os.path.exists(WELCOME_FILE):
-        with open(WELCOME_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
+        try:
+            with open(WELCOME_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except:
+            pass
     return {}
 
 def save_welcome_settings(data):
@@ -586,13 +591,25 @@ DEFAULT_WELCOME_TEXT = (
     "⏰ ساعت ›› {time}"
 )
 
+# ✅ تابع کمکی برای ساخت تاریخ شمسی زیبا
+def get_persian_time():
+    now = jdatetime.datetime.now()
+    days = ["دوشنبه", "سه‌شنبه", "چهارشنبه", "پنج‌شنبه", "جمعه", "شنبه", "یک‌شنبه"]
+    months = [
+        "فروردین", "اردیبهشت", "خرداد", "تیر", "مرداد", "شهریور",
+        "مهر", "آبان", "آذر", "دی", "بهمن", "اسفند"
+    ]
+    weekday = days[now.weekday()]
+    date_str = f"{weekday} {now.day} {months[now.month - 1]} {now.year}"
+    time_str = now.strftime("%H:%M")
+    return f"{time_str} ( {date_str} )"
+
 # ✅ پنل تنظیم خوشامد
 async def open_welcome_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat = update.effective_chat
     user = update.effective_user
-
-    # فقط مدیران، ادمین اصلی یا سودوها
     member = await context.bot.get_chat_member(chat.id, user.id)
+
     if member.status not in ["administrator", "creator"] and user.id not in SUDO_IDS and user.id != ADMIN_ID:
         return await update.message.reply_text("⛔ فقط مدیران، سودوها یا ادمین اصلی می‌تونن خوشامد رو تنظیم کنن!")
 
@@ -623,7 +640,6 @@ async def open_welcome_panel(update: Update, context: ContextTypes.DEFAULT_TYPE)
             InlineKeyboardButton("👀 پیش‌نمایش", callback_data="welcome_preview")
         ],
         [
-            InlineKeyboardButton("🔙 بازگشت", callback_data="welcome_back"),
             InlineKeyboardButton("❌ بستن", callback_data="welcome_close")
         ]
     ]
@@ -650,10 +666,11 @@ async def welcome_panel_buttons(update: Update, context: ContextTypes.DEFAULT_TY
             "delete_after": 0
         }
 
+    cfg = welcome_settings[chat_id]
     data = query.data
     msg = ""
-    back_btn = [[InlineKeyboardButton("🔙 بازگشت", callback_data="welcome_back")]]
-    cfg = welcome_settings[chat_id]
+    back_btn = [[InlineKeyboardButton("🔙 بازگشت به پنل", callback_data="welcome_back")]]
+    context.user_data.pop("set_mode", None)
 
     if data == "welcome_enable":
         cfg["enabled"] = True
@@ -662,19 +679,19 @@ async def welcome_panel_buttons(update: Update, context: ContextTypes.DEFAULT_TY
         cfg["enabled"] = False
         msg = "🚫 خوشامد غیرفعال شد!"
     elif data == "welcome_text":
-        msg = "📜 لطفاً متن جدید خوشامد را در همین گروه بفرست.\n\nمثلاً:\nسلام {name} خوش اومدی 🌻"
+        msg = "📜 لطفاً متن جدید خوشامد را ارسال کن.\nمثلاً:\nسلام {name} خوش اومدی 🌻"
         context.user_data["set_mode"] = "text"
     elif data == "welcome_media":
-        msg = "🖼 عکس یا گیف خوشامد را ارسال کن تا ذخیره شود."
+        msg = "🖼 لطفاً عکس یا گیف خوشامد را بفرست تا ذخیره شود."
         context.user_data["set_mode"] = "media"
     elif data == "welcome_rules":
-        msg = "📎 لینک قوانین را بفرست:\nمثلاً:\nhttps://t.me/example"
+        msg = "📎 لینک قوانین گروه را بفرست (مثلاً https://t.me/example)"
         context.user_data["set_mode"] = "rules"
     elif data == "welcome_timer":
-        msg = "⏳ زمان حذف خوشامد (به ثانیه) را بفرست.\nمثلاً: 60"
+        msg = "⏳ زمان حذف خودکار (به ثانیه) را بفرست، مثلاً 60"
         context.user_data["set_mode"] = "timer"
     elif data == "welcome_preview":
-        now = datetime.datetime.now().strftime("%H:%M (%A %d %B %Y)")
+        now = get_persian_time()
         sample = cfg.get("text", DEFAULT_WELCOME_TEXT).format(
             name="مهران",
             group="تست",
@@ -682,46 +699,25 @@ async def welcome_panel_buttons(update: Update, context: ContextTypes.DEFAULT_TY
         )
         msg = f"👀 <b>پیش‌نمایش پیام خوشامد:</b>\n\n{sample}"
     elif data == "welcome_back":
-        return await query.message.edit_text(
-            "👋 برگشتی به پنل تنظیم خوشامد خنگول:\nاز دکمه‌های زیر استفاده کن 👇",
-            parse_mode="HTML",
-            reply_markup=InlineKeyboardMarkup([
-                [
-                    InlineKeyboardButton("🟢 فعال‌سازی", callback_data="welcome_enable"),
-                    InlineKeyboardButton("🔴 غیرفعال‌سازی", callback_data="welcome_disable")
-                ],
-                [
-                    InlineKeyboardButton("📜 تنظیم متن", callback_data="welcome_text"),
-                    InlineKeyboardButton("🖼 تنظیم عکس", callback_data="welcome_media")
-                ],
-                [
-                    InlineKeyboardButton("📎 لینک قوانین", callback_data="welcome_rules"),
-                    InlineKeyboardButton("⏳ حذف خودکار", callback_data="welcome_timer")
-                ],
-                [
-                    InlineKeyboardButton("👀 پیش‌نمایش", callback_data="welcome_preview")
-                ],
-                [
-                    InlineKeyboardButton("🔙 بازگشت", callback_data="welcome_back"),
-                    InlineKeyboardButton("❌ بستن", callback_data="welcome_close")
-                ]
-            ])
-        )
+        return await open_welcome_panel(update, context)
     elif data == "welcome_close":
         return await query.message.delete()
 
     save_welcome_settings(welcome_settings)
-    await query.message.edit_text(msg, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(back_btn))
+    try:
+        await query.message.edit_text(msg, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(back_btn))
+    except:
+        pass
 
-# ✅ دریافت ورودی بعد از انتخاب گزینه
+# ✅ دریافت ورودی‌ها
 async def welcome_input_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = str(update.effective_chat.id)
     mode = context.user_data.get("set_mode")
     if not mode:
         return
 
-    msg = ""
     text = update.message.text.strip() if update.message.text else None
+    msg = ""
 
     if mode == "text" and text:
         welcome_settings[chat_id]["text"] = text
@@ -750,10 +746,10 @@ async def welcome_input_handler(update: Update, context: ContextTypes.DEFAULT_TY
     context.user_data["set_mode"] = None
     await update.message.reply_text(msg)
 
-# ✅ خوشامد هنگام ورود کاربر
+# ✅ خوشامد هنگام ورود کاربر (با زمان شمسی)
 async def welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = str(update.effective_chat.id)
-    cfg = welcome_settings.get(chat_id, {})
+    cfg = welcome_settings.get(chat_id, {"enabled": True})
     if not cfg.get("enabled", True):
         return
 
@@ -763,7 +759,7 @@ async def welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
     delete_after = cfg.get("delete_after", 0)
 
     for member in update.message.new_chat_members:
-        now = datetime.datetime.now().strftime("%H:%M ( %A %d %B %Y )")
+        now = get_persian_time()
         message_text = text.format(
             name=member.first_name,
             group=update.effective_chat.title,
@@ -779,13 +775,12 @@ async def welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 msg = await update.message.reply_text(message_text, parse_mode="HTML")
             if delete_after > 0:
                 await asyncio.sleep(delete_after)
-                await context.bot.delete_message(chat_id=update.effective_chat.id, message_id=msg.message_id)
+                try:
+                    await context.bot.delete_message(chat_id=update.effective_chat.id, message_id=msg.message_id)
+                except:
+                    pass
         except Exception as e:
             print(f"[WELCOME ERROR] {e}")
-    
-        
-        
-
 
 # ======================= ☁️ بک‌آپ خودکار و دستی (نسخه هماهنگ با bot.py) =======================
 import os
