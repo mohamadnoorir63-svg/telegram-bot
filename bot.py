@@ -560,11 +560,11 @@ async def fullstats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         await update.message.reply_text(f"⚠️ خطا در آمار گروه‌ها:\n{e}")
  # ======================= 👋 سیستم خوشامد پویا برای هر گروه =======================
-    from telegram import InlineKeyboardMarkup, InlineKeyboardButton, Update
+from telegram import InlineKeyboardMarkup, InlineKeyboardButton, Update
 from telegram.ext import ContextTypes
 from datetime import datetime
 import json, os, asyncio
-import jdatetime  # ✅ اضافه برای تاریخ شمسی
+import jdatetime  # ✅ برای تاریخ شمسی
 
 WELCOME_FILE = "welcome_settings.json"
 
@@ -594,7 +594,10 @@ DEFAULT_WELCOME_TEXT = (
 # ✅ تابع کمکی برای ساخت تاریخ شمسی زیبا
 def get_persian_time():
     now = jdatetime.datetime.now()
-    days = ["دوشنبه", "سه‌شنبه", "چهارشنبه", "پنج‌شنبه", "جمعه", "شنبه", "یک‌شنبه"]
+    days = [
+        "دوشنبه", "سه‌شنبه", "چهارشنبه", "پنج‌شنبه",
+        "جمعه", "شنبه", "یک‌شنبه"
+    ]
     months = [
         "فروردین", "اردیبهشت", "خرداد", "تیر", "مرداد", "شهریور",
         "مهر", "آبان", "آذر", "دی", "بهمن", "اسفند"
@@ -604,10 +607,13 @@ def get_persian_time():
     time_str = now.strftime("%H:%M")
     return f"{time_str} ( {date_str} )"
 
+
 # ✅ پنل تنظیم خوشامد
 async def open_welcome_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat = update.effective_chat
     user = update.effective_user
+
+    # گرفتن وضعیت کاربر
     member = await context.bot.get_chat_member(chat.id, user.id)
 
     if member.status not in ["administrator", "creator"] and user.id not in SUDO_IDS and user.id != ADMIN_ID:
@@ -649,6 +655,7 @@ async def open_welcome_panel(update: Update, context: ContextTypes.DEFAULT_TYPE)
         parse_mode="HTML",
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
+
 
 # ✅ کنترل دکمه‌های پنل خوشامد
 async def welcome_panel_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -698,8 +705,35 @@ async def welcome_panel_buttons(update: Update, context: ContextTypes.DEFAULT_TY
             time=now
         )
         msg = f"👀 <b>پیش‌نمایش پیام خوشامد:</b>\n\n{sample}"
+
     elif data == "welcome_back":
-        return await open_welcome_panel(update, context)
+        # ✅ بازگشت به پنل اصلی بدون خطا
+        keyboard = [
+            [
+                InlineKeyboardButton("🟢 فعال‌سازی", callback_data="welcome_enable"),
+                InlineKeyboardButton("🔴 غیرفعال‌سازی", callback_data="welcome_disable")
+            ],
+            [
+                InlineKeyboardButton("📜 تنظیم متن", callback_data="welcome_text"),
+                InlineKeyboardButton("🖼 تنظیم عکس", callback_data="welcome_media")
+            ],
+            [
+                InlineKeyboardButton("📎 لینک قوانین", callback_data="welcome_rules"),
+                InlineKeyboardButton("⏳ حذف خودکار", callback_data="welcome_timer")
+            ],
+            [
+                InlineKeyboardButton("👀 پیش‌نمایش", callback_data="welcome_preview")
+            ],
+            [
+                InlineKeyboardButton("❌ بستن", callback_data="welcome_close")
+            ]
+        ]
+        return await query.message.edit_text(
+            "👋 <b>پنل تنظیم خوشامد خنگول</b>\nاز دکمه‌های زیر استفاده کن 👇",
+            parse_mode="HTML",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+
     elif data == "welcome_close":
         return await query.message.delete()
 
@@ -708,6 +742,7 @@ async def welcome_panel_buttons(update: Update, context: ContextTypes.DEFAULT_TY
         await query.message.edit_text(msg, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(back_btn))
     except:
         pass
+
 
 # ✅ دریافت ورودی‌ها
 async def welcome_input_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -746,6 +781,7 @@ async def welcome_input_handler(update: Update, context: ContextTypes.DEFAULT_TY
     context.user_data["set_mode"] = None
     await update.message.reply_text(msg)
 
+
 # ✅ خوشامد هنگام ورود کاربر (با زمان شمسی)
 async def welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = str(update.effective_chat.id)
@@ -765,20 +801,36 @@ async def welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
             group=update.effective_chat.title,
             time=now
         )
+
+        # ✅ اگر قوانین تنظیم شده بود، لینک رو اضافه کن
         if rules:
             message_text += f"\n\n📜 <a href='{rules}'>مشاهده قوانین گروه</a>"
 
         try:
+            # ✅ اگر عکس تنظیم نشده بود، فقط پیام متنی ارسال کن
             if media:
-                msg = await update.message.reply_photo(media, caption=message_text, parse_mode="HTML")
+                msg = await update.message.reply_photo(
+                    media,
+                    caption=message_text,
+                    parse_mode="HTML"
+                )
             else:
-                msg = await update.message.reply_text(message_text, parse_mode="HTML")
+                msg = await update.message.reply_text(
+                    message_text,
+                    parse_mode="HTML"
+                )
+
+            # ✅ حذف خودکار در صورت نیاز
             if delete_after > 0:
                 await asyncio.sleep(delete_after)
                 try:
-                    await context.bot.delete_message(chat_id=update.effective_chat.id, message_id=msg.message_id)
+                    await context.bot.delete_message(
+                        chat_id=update.effective_chat.id,
+                        message_id=msg.message_id
+                    )
                 except:
                     pass
+
         except Exception as e:
             print(f"[WELCOME ERROR] {e}")
 
