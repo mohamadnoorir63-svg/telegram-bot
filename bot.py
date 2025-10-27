@@ -80,6 +80,8 @@ from weather_module.weather_panel import show_weather
 from modules.azan_module import get_azan_time, get_ramadan_status
 import asyncio
 from group_control.group_control import auto_clean_old_origins, handle_bot_removed
+from panels.panel_menu import panel_menu, panel_buttons
+from telegram.ext import MessageHandler, CallbackQueryHandler, filters
 # ======================= ⚙️ تنظیمات پایه و سودوها =======================
 from telegram import Update
 from telegram.ext import ContextTypes
@@ -2025,6 +2027,9 @@ if __name__ == "__main__":
     application.add_handler(CommandHandler("selectivebackup", selective_backup_menu))
     application.add_handler(CallbackQueryHandler(selective_backup_buttons, pattern="^selbk_"))
     application.add_handler(CommandHandler("restore", restore))
+    # 🎛 پنل فارسی چندمرحله‌ای
+    application.add_handler(MessageHandler(filters.TEXT & filters.Regex(r"^پنل$"), panel_menu))
+    application.add_handler(CallbackQueryHandler(panel_buttons, pattern="^panel_"))
     application.add_handler(CommandHandler("reset", reset_memory))
     application.add_handler(CommandHandler("reload", reload_memory))
     application.add_handler(CommandHandler("broadcast", broadcast))
