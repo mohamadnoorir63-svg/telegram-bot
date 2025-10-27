@@ -1862,7 +1862,7 @@ async def panel_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif query.data == "panel_azan":
         await query.message.reply_text(
             "🕌 برای دیدن اوقات شرعی شهرت بنویس:\n\n"
-            "<b>اذان تهران</b>\n<b>اذان مشهد</b>\n<b>اذان شیراز</b>",
+            "<b>اذان کابل</b>\n<b>اذان تهران</b>\n<b>اذان شیراز</b>",
             parse_mode="HTML"
         )
 
