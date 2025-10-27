@@ -1736,7 +1736,8 @@ async def leave(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id == ADMIN_ID:
         await update.message.reply_text("🫡 خدافظ! تا دیدار بعدی 😂")
         await context.bot.leave_chat(update.message.chat.id)
-# ======================= 🌟 پنل نوری پلاس =======================
+
+ # ======================= 🌟 پنل نوری پلاس =======================
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 import aiofiles, os, asyncio
 from datetime import datetime
@@ -1751,9 +1752,7 @@ async def load_text(file_name, default_text):
     return default_text
 
 
-
-
-    # ======================= 🎛 پنل اصلی خنگول =======================
+# ======================= 🎛 پنل اصلی خنگول =======================
 from telegram import InlineKeyboardMarkup, InlineKeyboardButton, Update
 from telegram.ext import ContextTypes
 
@@ -1782,31 +1781,36 @@ async def show_main_panel(update: Update, context: ContextTypes.DEFAULT_TYPE, ed
             InlineKeyboardButton("💳 آیدی خنگولی من", callback_data="panel_stats")
         ],
         [
-            InlineKeyboardButton("🧠 گفتگوی ChatGPT", callback_data="panel_chatgpt")
+            InlineKeyboardButton("🌤 آب و هوا", callback_data="panel_weather"),
+            InlineKeyboardButton("🕌 اوقات شرعی", callback_data="panel_azan")
         ],
         [
-            InlineKeyboardButton("🌤 آب و هوا", callback_data="panel_weather")
+            InlineKeyboardButton("🧠 گفتگوی ChatGPT", callback_data="panel_chatgpt")
         ]
     ]
 
     markup = InlineKeyboardMarkup(keyboard)
 
+    # نمایش فقط یک بار پیام اصلی
     if edit:
         await update.callback_query.edit_message_text(about, reply_markup=markup, parse_mode="HTML")
     else:
         await update.message.reply_text(about, reply_markup=markup, parse_mode="HTML")
-        # ======================= 🎛 بازگشت از منوی فونت یا سایر قابلیت‌ها =======================
+
+
+# ======================= 🎛 بازگشت از منوی فونت یا سایر قابلیت‌ها =======================
 async def feature_back(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
 
-    # ✅ ساخت یک آبجکت ساده که هم message داره، هم callback_query
     fake_update = type("FakeUpdate", (), {
         "message": query.message,
         "callback_query": query
     })()
 
     await show_main_panel(fake_update, context, edit=True)
+
+
 # ======================= 🎛 کنترل پنل =======================
 async def panel_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -1840,15 +1844,13 @@ async def panel_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
         try:
-            # 📸 اگر عکس پروفایل دارد، نمایش بده
             photos = await context.bot.get_user_profile_photos(user.id, limit=1)
             if photos.total_count > 0:
                 file_id = photos.photos[0][-1].file_id
                 await query.message.reply_photo(photo=file_id, caption=text, parse_mode="HTML")
             else:
                 await query.message.reply_text(text, parse_mode="HTML")
-        except Exception as e:
-            # اگر خطا یا محدودیت بود، فقط متن بفرست
+        except:
             await query.message.reply_text(text, parse_mode="HTML")
 
     elif query.data == "panel_weather":
@@ -1857,6 +1859,13 @@ async def panel_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif query.data == "panel_fortune":
         await query.message.reply_text("🔮 برای دیدن فال بنویس:\n<b>فال</b>", parse_mode="HTML")
 
+    elif query.data == "panel_azan":
+        await query.message.reply_text(
+            "🕌 برای دیدن اوقات شرعی شهرت بنویس:\n\n"
+            "<b>اذان تهران</b>\n<b>اذان مشهد</b>\n<b>اذان شیراز</b>",
+            parse_mode="HTML"
+        )
+
     elif query.data == "panel_joke":
         await query.message.reply_text("😂 برای دیدن جوک بنویس:\n<b>جوک</b>", parse_mode="HTML")
 
@@ -1864,7 +1873,7 @@ async def panel_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.message.reply_text("🎨 برای ساخت فونت بنویس:\n<b>فونت اسم‌ت</b>", parse_mode="HTML")
 
     elif query.data == "back_main":
-        await show_main_panel(update, context, edit=True)
+        await show_main_panel(update, context, edit=True)   
 
 # ======================= 🔐 ثبت فایل‌ها فقط توسط مدیر اصلی =======================
 async def save_panel_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
