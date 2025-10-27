@@ -556,10 +556,27 @@ async def handle_unlock_generic(update, context, lock_name):
     )
 
 
-# 🧹 بررسی و حذف پیام‌های خلاف قفل‌ها
 async def check_message_locks(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message:
         return
+
+    chat_id = str(update.effective_chat.id)
+    user = update.effective_user
+    message = update.message
+
+    # ✅ اگر کاربر مدیر یا سودو است، پیامش حذف نشود
+    if user.id in SUDO_IDS:
+        return
+    group = group_data.get(chat_id, {})
+    admins = group.get("admins", [])
+    if str(user.id) in admins:
+        return
+    try:
+        member = await context.bot.get_chat_member(update.effective_chat.id, user.id)
+        if member.status in ["administrator", "creator"]:
+            return
+    except:
+        pass
 
     chat_id = str(update.effective_chat.id)
     user = update.effective_user
