@@ -2051,15 +2051,7 @@ if __name__ == "__main__":
     # ==========================================================
     # 👑 مدیریت سودوها
     # ==========================================================
-    from sudo_manager import list_sudo_text, is_sudo, ADMIN_ID
-
-async def list_sudos(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user = update.effective_user
-
-    if user.id != ADMIN_ID and not is_sudo(user.id):
-        return await update.message.reply_text("⛔ فقط سودوها مجازند!")
-
-    await update.message.reply_text(list_sudo_text(), parse_mode="HTML")
+    
     # ==========================================================
     # ⚙️ سیستم مدیریت گروه (اولویت بالا)
     # ==========================================================
