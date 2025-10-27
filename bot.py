@@ -895,14 +895,20 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
         with zipfile.ZipFile(restore_zip, "r") as zip_ref:
             zip_ref.extractall(restore_dir)
 
-        important_files = ["memory.json", "group_data.json", "jokes.json", "fortunes.json"]
+    important_files = [
+            "memory.json",
+            "group_data.json",
+            "jokes.json",
+            "fortunes.json",
+            "aliases.json"          # 🧩 دستورات سفارشی
+        ]
+
         moved_any = False
         for fname in important_files:
             src = os.path.join(restore_dir, fname)
             if os.path.exists(src):
                 shutil.move(src, fname)
                 moved_any = True
-
         from memory_manager import init_files
         init_files()
 
