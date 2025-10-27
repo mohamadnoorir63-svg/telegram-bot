@@ -13,15 +13,14 @@ from telegram.ext import (
     CallbackQueryHandler,
 )
 
-# ======================= ⚙️ تنظیمات سودو =======================
 from sudo_manager import (
-    ADMIN_ID,
-    SUDO_DATA,
-    get_sudo_ids,
-    is_sudo,
     add_sudo,
     del_sudo,
-    list_sudo_text
+    list_sudo_text,
+    get_sudo_ids,
+    is_sudo,
+    ADMIN_ID,
+    SUDO_DATA
 )
 
 import aiofiles
