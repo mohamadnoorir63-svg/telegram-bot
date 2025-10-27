@@ -1740,13 +1740,136 @@ async def leave(update: Update, context: ContextTypes.DEFAULT_TYPE):
  # ======================= 🌟 پنل نوری پلاس =======================
 
 
-# ======================= 🎛 پنل اصلی خنگول =======================
+
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+import aiofiles, os, asyncio
+from datetime import datetime
+
+TEXTS_PATH = "texts"
+
+async def load_text(file_name, default_text):
+    path = os.path.join(TEXTS_PATH, file_name)
+    if os.path.exists(path):
+        async with aiofiles.open(path, "r", encoding="utf-8") as f:
+            return await f.read()
+    return default_text
 
 
-# ======================= 🔙 بازگشت به منوی اصلی پنل خنگول =======================
 
 
-# ======================= 🎛 کنترل پنل خنگول (فقط دکمه‌های main_ ) =======================
+    # ======================= 🎛 پنل اصلی خنگول =======================
+from telegram import InlineKeyboardMarkup, InlineKeyboardButton, Update
+from telegram.ext import ContextTypes
+
+async def show_main_panel(update: Update, context: ContextTypes.DEFAULT_TYPE, edit=False):
+    about = "🌙 <b>به منوی اصلی خنگول خوش آمدی!</b>\nاز دکمه‌های زیر یکی رو انتخاب کن 😎"
+
+    keyboard = [
+        [
+            InlineKeyboardButton("💬 ارتباط با سازنده", url="https://t.me/NOORI_NOOR"),
+            InlineKeyboardButton("💭 گروه پشتیبانی", url="https://t.me/Poshtibahni")
+        ],
+        [
+            InlineKeyboardButton("➕ افزودن به گروه", url="https://t.me/Khenqol_bot?startgroup=true"),
+            InlineKeyboardButton("🧩 قابلیت‌های ربات", callback_data="panel_features")
+        ],
+        [
+            InlineKeyboardButton("🤖 درباره خنگول", callback_data="panel_about"),
+            InlineKeyboardButton("👨‍💻 درباره تیم ما", callback_data="panel_team")
+        ],
+        [
+            InlineKeyboardButton("🔮 فال امروز", callback_data="panel_fortune"),
+            InlineKeyboardButton("😂 جوک خنده‌دار", callback_data="panel_joke")
+        ],
+        [
+            InlineKeyboardButton("🎨 فونت‌ساز حرفه‌ای", callback_data="panel_font"),
+            InlineKeyboardButton("💳 آیدی خنگولی من", callback_data="panel_stats")
+        ],
+        [
+            InlineKeyboardButton("🧠 گفتگوی ChatGPT", callback_data="panel_chatgpt")
+        ],
+        [
+            InlineKeyboardButton("🌤 آب و هوا", callback_data="panel_weather")
+        ]
+    ]
+
+    markup = InlineKeyboardMarkup(keyboard)
+
+    if edit:
+        await update.callback_query.edit_message_text(about, reply_markup=markup, parse_mode="HTML")
+    else:
+        await update.message.reply_text(about, reply_markup=markup, parse_mode="HTML")
+        # ======================= 🎛 بازگشت از منوی فونت یا سایر قابلیت‌ها =======================
+async def feature_back(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+
+    # ✅ ساخت یک آبجکت ساده که هم message داره، هم callback_query
+    fake_update = type("FakeUpdate", (), {
+        "message": query.message,
+        "callback_query": query
+    })()
+
+    await show_main_panel(fake_update, context, edit=True)
+# ======================= 🎛 کنترل پنل =======================
+async def panel_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+
+    user = query.from_user
+    now = datetime.now().strftime("%Y/%m/%d - %H:%M:%S")
+
+    panels = {
+        "panel_about": ("about_khengol.txt", "💫 درباره خنگول"),
+        "panel_team": ("team_noori.txt", "👨‍💻 تیم نوری"),
+        "panel_features": ("features.txt", "🧩 قابلیت‌های ربات"),
+    }
+
+    if query.data in panels:
+        file_name, title = panels[query.data]
+        text = await load_text(file_name, f"❗ هنوز {title} ثبت نشده!")
+        text += "\n\n🔙 برای بازگشت، روی دکمه زیر بزن:"
+        back_btn = [[InlineKeyboardButton("🔙 بازگشت", callback_data="back_main")]]
+        await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(back_btn), parse_mode="HTML")
+
+    elif query.data == "panel_stats":
+        user = query.from_user
+        now = datetime.now().strftime("%Y/%m/%d - %H:%M:%S")
+
+        text = (
+            f"📊 <b>اطلاعات کاربر:</b>\n\n"
+            f"👤 نام: <b>{user.first_name}</b>\n"
+            f"🆔 آیدی: <code>{user.id}</code>\n"
+            f"📅 تاریخ و ساعت فعلی: <b>{now}</b>"
+        )
+
+        try:
+            # 📸 اگر عکس پروفایل دارد، نمایش بده
+            photos = await context.bot.get_user_profile_photos(user.id, limit=1)
+            if photos.total_count > 0:
+                file_id = photos.photos[0][-1].file_id
+                await query.message.reply_photo(photo=file_id, caption=text, parse_mode="HTML")
+            else:
+                await query.message.reply_text(text, parse_mode="HTML")
+        except Exception as e:
+            # اگر خطا یا محدودیت بود، فقط متن بفرست
+            await query.message.reply_text(text, parse_mode="HTML")
+
+    elif query.data == "panel_weather":
+        await show_weather(update, context)
+
+    elif query.data == "panel_fortune":
+        await query.message.reply_text("🔮 برای دیدن فال بنویس:\n<b>فال</b>", parse_mode="HTML")
+
+    elif query.data == "panel_joke":
+        await query.message.reply_text("😂 برای دیدن جوک بنویس:\n<b>جوک</b>", parse_mode="HTML")
+
+    elif query.data == "panel_font":
+        await query.message.reply_text("🎨 برای ساخت فونت بنویس:\n<b>فونت اسم‌ت</b>", parse_mode="HTML")
+
+    elif query.data == "back_main":
+        await show_main_panel(update, context, edit=True)
+
 
 
 # ======================= 🔐 ثبت فایل‌ها فقط توسط مدیر اصلی =======================
