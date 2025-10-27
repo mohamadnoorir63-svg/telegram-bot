@@ -568,6 +568,7 @@ import jdatetime  # ✅ برای تاریخ شمسی
 
 WELCOME_FILE = "welcome_settings.json"
 
+
 # ✅ بارگذاری و ذخیره‌سازی تنظیمات
 def load_welcome_settings():
     if os.path.exists(WELCOME_FILE):
@@ -578,11 +579,14 @@ def load_welcome_settings():
             pass
     return {}
 
+
 def save_welcome_settings(data):
     with open(WELCOME_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
+
 welcome_settings = load_welcome_settings()
+
 
 # ✅ خوشامد پیش‌فرض
 DEFAULT_WELCOME_TEXT = (
@@ -590,6 +594,7 @@ DEFAULT_WELCOME_TEXT = (
     "به گروه {group} خوش آمدی!\n\n"
     "⏰ ساعت ›› {time}"
 )
+
 
 # ✅ تابع کمکی برای ساخت تاریخ شمسی زیبا
 def get_persian_time():
@@ -612,8 +617,6 @@ def get_persian_time():
 async def open_welcome_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat = update.effective_chat
     user = update.effective_user
-
-    # گرفتن وضعیت کاربر
     member = await context.bot.get_chat_member(chat.id, user.id)
 
     if member.status not in ["administrator", "creator"] and user.id not in SUDO_IDS and user.id != ADMIN_ID:
@@ -650,8 +653,15 @@ async def open_welcome_panel(update: Update, context: ContextTypes.DEFAULT_TYPE)
         ]
     ]
 
+    panel_text = (
+        "👋 <b>پنل تنظیم خوشامد خنگول</b>\n"
+        "━━━━━━━━━━━━━━━━━━━━━━\n"
+        "از گزینه‌های زیر برای تنظیم پیام خوشامد استفاده کن 👇\n\n"
+        "💡 <i>می‌تونی متن، عکس، زمان حذف یا لینک قوانین رو تغییر بدی</i>"
+    )
+
     await update.message.reply_text(
-        "👋 <b>پنل تنظیم خوشامد خنگول</b>\nاز دکمه‌های زیر استفاده کن 👇",
+        panel_text,
         parse_mode="HTML",
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
@@ -661,7 +671,6 @@ async def open_welcome_panel(update: Update, context: ContextTypes.DEFAULT_TYPE)
 async def welcome_panel_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     chat_id = str(query.message.chat.id)
-    user = update.effective_user
     await query.answer()
 
     if chat_id not in welcome_settings:
@@ -705,35 +714,8 @@ async def welcome_panel_buttons(update: Update, context: ContextTypes.DEFAULT_TY
             time=now
         )
         msg = f"👀 <b>پیش‌نمایش پیام خوشامد:</b>\n\n{sample}"
-
     elif data == "welcome_back":
-        # ✅ بازگشت به پنل اصلی بدون خطا
-        keyboard = [
-            [
-                InlineKeyboardButton("🟢 فعال‌سازی", callback_data="welcome_enable"),
-                InlineKeyboardButton("🔴 غیرفعال‌سازی", callback_data="welcome_disable")
-            ],
-            [
-                InlineKeyboardButton("📜 تنظیم متن", callback_data="welcome_text"),
-                InlineKeyboardButton("🖼 تنظیم عکس", callback_data="welcome_media")
-            ],
-            [
-                InlineKeyboardButton("📎 لینک قوانین", callback_data="welcome_rules"),
-                InlineKeyboardButton("⏳ حذف خودکار", callback_data="welcome_timer")
-            ],
-            [
-                InlineKeyboardButton("👀 پیش‌نمایش", callback_data="welcome_preview")
-            ],
-            [
-                InlineKeyboardButton("❌ بستن", callback_data="welcome_close")
-            ]
-        ]
-        return await query.message.edit_text(
-            "👋 <b>پنل تنظیم خوشامد خنگول</b>\nاز دکمه‌های زیر استفاده کن 👇",
-            parse_mode="HTML",
-            reply_markup=InlineKeyboardMarkup(keyboard)
-        )
-
+        return await open_welcome_panel(update, context)
     elif data == "welcome_close":
         return await query.message.delete()
 
@@ -802,38 +784,24 @@ async def welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
             time=now
         )
 
-        # ✅ اگر قوانین تنظیم شده بود، لینک رو اضافه کن
         if rules:
             message_text += f"\n\n📜 <a href='{rules}'>مشاهده قوانین گروه</a>"
 
         try:
-            # ✅ اگر عکس تنظیم نشده بود، فقط پیام متنی ارسال کن
             if media:
-                msg = await update.message.reply_photo(
-                    media,
-                    caption=message_text,
-                    parse_mode="HTML"
-                )
+                msg = await update.message.reply_photo(media, caption=message_text, parse_mode="HTML")
             else:
-                msg = await update.message.reply_text(
-                    message_text,
-                    parse_mode="HTML"
-                )
+                msg = await update.message.reply_text(message_text, parse_mode="HTML")
 
-            # ✅ حذف خودکار در صورت نیاز
             if delete_after > 0:
                 await asyncio.sleep(delete_after)
                 try:
-                    await context.bot.delete_message(
-                        chat_id=update.effective_chat.id,
-                        message_id=msg.message_id
-                    )
+                    await context.bot.delete_message(chat_id=update.effective_chat.id, message_id=msg.message_id)
                 except:
                     pass
-
         except Exception as e:
             print(f"[WELCOME ERROR] {e}")
-                
+  
 # ======================= ☁️ بک‌آپ خودکار و دستی (نسخه هماهنگ با bot.py) =======================
 import os
 import zipfile
