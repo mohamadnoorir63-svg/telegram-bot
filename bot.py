@@ -452,22 +452,74 @@ async def mode_change(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ مود نامعتبر است!")
 
 # ======================= ⚙️ کنترل وضعیت =======================
+import os
+from telegram import Update
+from telegram.ext import ContextTypes
+
+# 📁 وضعیت (نمونه)
+status = {"active": True, "welcome": True, "locked": False}
+
+
+# ✅ تابع کمکی برای بررسی مجاز بودن
+def is_admin_or_sudo(user_id: int):
+    ADMIN_ID = int(os.getenv("ADMIN_ID", "7089376754"))
+
+    # 📂 خواندن سودوها از پوشه sudo/
+    SUDO_IDS = []
+    if os.path.exists("sudo"):
+        for file in os.listdir("sudo"):
+            if file.endswith(".json"):
+                try:
+                    sid = int(file.replace(".json", ""))
+                    SUDO_IDS.append(sid)
+                except:
+                    pass
+
+    return user_id == ADMIN_ID or user_id in SUDO_IDS
+
+
+# ✅ فعال / غیرفعال کردن کلی
 async def toggle(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+
+    if not is_admin_or_sudo(user_id):
+        return await update.message.reply_text("⛔ فقط مدیر اصلی یا سودوها اجازه انجام این کار را دارند.")
+
     status["active"] = not status["active"]
     await update.message.reply_text("✅ فعال شد!" if status["active"] else "😴 خاموش شد!")
 
+
+# ✅ فعال / غیرفعال کردن خوشامد
 async def toggle_welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+
+    if not is_admin_or_sudo(user_id):
+        return await update.message.reply_text("⛔ فقط مدیر اصلی یا سودوها اجازه انجام این کار را دارند.")
+
     status["welcome"] = not status["welcome"]
     await update.message.reply_text("👋 خوشامد فعال شد!" if status["welcome"] else "🚫 خوشامد غیرفعال شد!")
 
+
+# ✅ قفل کردن یادگیری
 async def lock_learning(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+
+    if not is_admin_or_sudo(user_id):
+        return await update.message.reply_text("⛔ فقط مدیر اصلی یا سودوها اجازه انجام این کار را دارند.")
+
     status["locked"] = True
     await update.message.reply_text("🔒 یادگیری قفل شد!")
 
+
+# ✅ باز کردن یادگیری
 async def unlock_learning(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+
+    if not is_admin_or_sudo(user_id):
+        return await update.message.reply_text("⛔ فقط مدیر اصلی یا سودوها اجازه انجام این کار را دارند.")
+
     status["locked"] = False
     await update.message.reply_text("🔓 یادگیری باز شد!")
-
 
 # ======================= 📊 آمار خنگول واقعی =======================
 async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
