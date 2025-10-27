@@ -18,18 +18,18 @@ async def panel_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     keyboard = [
         [
-            InlineKeyboardButton("🔒 قفل‌ها", callback_data="panel_locks"),
-            InlineKeyboardButton("👮 کاربران", callback_data="panel_users")
+            InlineKeyboardButton("🔒 قفل‌ها", callback_data="tastatur_locks"),
+            InlineKeyboardButton("👮 کاربران", callback_data="tastatur_users")
         ],
         [
-            InlineKeyboardButton("⚙️ تنظیمات", callback_data="panel_settings"),
-            InlineKeyboardButton("📊 آمار و گزارش", callback_data="panel_stats")
+            InlineKeyboardButton("⚙️ تنظیمات", callback_data="tastatur_settings"),
+            InlineKeyboardButton("📊 آمار و گزارش", callback_data="tastatur_stats")
         ],
         [
-            InlineKeyboardButton("🎮 سرگرمی‌ها", callback_data="panel_fun"),
-            InlineKeyboardButton("🧩 دستورات شخصی", callback_data="panel_alias")
+            InlineKeyboardButton("🎮 سرگرمی‌ها", callback_data="tastatur_fun"),
+            InlineKeyboardButton("🧩 دستورات شخصی", callback_data="tastatur_alias")
         ],
-        [InlineKeyboardButton("❌ بستن پنل", callback_data="panel_close")]
+        [InlineKeyboardButton("❌ بستن پنل", callback_data="tastatur_close")]
     ]
 
     if update.message:
@@ -45,15 +45,15 @@ async def panel_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
 
     # ❌ بستن
-    if data == "panel_close":
+    if data == "tastatur_close":
         return await query.message.delete()
 
     # 🔙 بازگشت
-    if data == "panel_back":
+    if data == "tastatur_back":
         return await panel_menu(update, context)
 
     # ==================== 🔒 بخش قفل‌ها ====================
-    if data == "panel_locks":
+    if data == "tastatur_locks":
         text = (
             "🔐 <b>مدیریت قفل‌ها</b>\n\n"
             "🔸 <b>دستورات فارسی:</b>\n"
@@ -67,7 +67,7 @@ async def panel_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return await _panel_section(query, text)
 
     # ==================== 👮 مدیریت کاربران ====================
-    if data == "panel_users":
+    if data == "tastatur_users":
         text = (
             "👮 <b>مدیریت کاربران</b>\n\n"
             "• بن / رفع‌بن\n"
@@ -79,7 +79,7 @@ async def panel_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return await _panel_section(query, text)
 
     # ==================== ⚙️ تنظیمات ====================
-    if data == "panel_settings":
+    if data == "tastatur_settings":
         text = (
             "⚙️ <b>تنظیمات گروه</b>\n\n"
             "• قفل کل گروه یا باز کردن گروه\n"
@@ -90,7 +90,7 @@ async def panel_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return await _panel_section(query, text)
 
     # ==================== 📊 آمار ====================
-    if data == "panel_stats":
+    if data == "tastatur_stats":
         text = (
             "📊 <b>آمار و وضعیت گروه</b>\n\n"
             "• نمایش تعداد کاربران\n"
@@ -101,7 +101,7 @@ async def panel_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return await _panel_section(query, text)
 
     # ==================== 🎮 سرگرمی ====================
-    if data == "panel_fun":
+    if data == "tastatur_fun":
         text = (
             "🎮 <b>سرگرمی و ابزارها</b>\n\n"
             "• فال روزانه / جملات انگیزشی\n"
@@ -112,7 +112,7 @@ async def panel_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return await _panel_section(query, text)
 
     # ==================== 🧩 دستورات شخصی ====================
-    if data == "panel_alias":
+    if data == "tastatur_alias":
         text = (
             "🧩 <b>دستورات شخصی (Alias)</b>\n\n"
             "با این قابلیت می‌تونی برای دستورات، نام جدید بسازی 👇\n\n"
@@ -130,8 +130,8 @@ async def panel_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def _panel_section(query, text):
     keyboard = [
         [
-            InlineKeyboardButton("🔙 بازگشت", callback_data="panel_back"),
-            InlineKeyboardButton("❌ بستن", callback_data="panel_close")
+            InlineKeyboardButton("🔙 بازگشت", callback_data="tastatur_back"),
+            InlineKeyboardButton("❌ بستن", callback_data="tastatur_close")
         ]
     ]
     await query.edit_message_text(text, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(keyboard))
