@@ -1820,7 +1820,7 @@ async def panel_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     elif query.data == "panel_azan":
         await query.message.reply_text(
-            "🕌 لطفاً نام شهر خود را بنویسید تا اوقات شرعی امروز برای شما ارسال شود:",
+            "🕌 برای دیدن اوقات شرعی بنویس:\n<b>اذان هرات</b> یا <b>اذان تهران</b>"
             parse_mode="HTML"
         )
         context.user_data["awaiting_azan_city"] = True  # حالت انتظار برای نام شهر
