@@ -29,6 +29,9 @@ async def Tastatur_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
             InlineKeyboardButton("🎮 سرگرمی‌ها", callback_data="Tastatur_fun"),
             InlineKeyboardButton("🧩 دستورات شخصی", callback_data="Tastatur_alias")
         ],
+        [
+            InlineKeyboardButton("👋 خوشامدگویی", callback_data="Tastatur_welcome")
+        ],
         [InlineKeyboardButton("❌ بستن پنل", callback_data="Tastatur_close")]
     ]
 
@@ -132,6 +135,12 @@ async def Tastatur_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "<code>listsudo</code> یا دستور مخصوص نمایش"
         )
         return await _Tastatur_section(query, text)
+
+    # ==================== 👋 پنل خوشامد ====================
+    if data == "Tastatur_welcome":
+        from panels.welcome_panel import open_welcome_panel
+        fake_update = type("FakeUpdate", (), {"message": query.message, "callback_query": query})()
+        return await open_welcome_panel(fake_update, context)
 
 
 # 🔙 ساخت زیرمنو با بازگشت و بستن
