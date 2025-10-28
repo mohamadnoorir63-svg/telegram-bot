@@ -1760,7 +1760,7 @@ async def show_main_panel(update: Update, context: ContextTypes.DEFAULT_TYPE, ed
         await update.message.reply_text(text, reply_markup=markup, parse_mode="HTML")
 
 
-======================= ⚙️ کنترل دکمه‌های پنل خنگول =======================
+# ======================= ⚙️ کنترل دکمه‌های پنل خنگول =======================
 
 async def panel_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """مدیریت دکمه‌های منوی اصلی خنگول"""
