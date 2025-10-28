@@ -1719,11 +1719,13 @@ async def load_text(file_name, default_text):
     # ======================= 🎛 پنل اصلی خنگول =======================
 from telegram import InlineKeyboardMarkup, InlineKeyboardButton, Update
 from telegram.ext import ContextTypes
-from modules.azan_module import get_azan_time  # 📿 ماژول اذان موجود در پروژه‌ات
 
-# 🎛 منوی اصلی خنگول
+# 📌 نمایش منوی اصلی
 async def show_main_panel(update: Update, context: ContextTypes.DEFAULT_TYPE, edit=False):
-    about = "🌙 <b>به منوی اصلی خنگول خوش آمدی!</b>\nاز دکمه‌های زیر یکی رو انتخاب کن 😎"
+    about = (
+        "🌙 <b>به منوی اصلی خنگول خوش آمدی!</b>\n"
+        "از دکمه‌های زیر یکی رو انتخاب کن 😎"
+    )
 
     keyboard = [
         [
@@ -1747,11 +1749,11 @@ async def show_main_panel(update: Update, context: ContextTypes.DEFAULT_TYPE, ed
             InlineKeyboardButton("💳 آیدی خنگولی من", callback_data="panel_stats")
         ],
         [
-            InlineKeyboardButton("🧠 گفتگوی ChatGPT", callback_data="panel_chatgpt"),
-            InlineKeyboardButton("🌤 آب و هوا", callback_data="panel_weather")
+            InlineKeyboardButton("🧠 گفتگوی ChatGPT", callback_data="panel_chatgpt")
         ],
         [
-            InlineKeyboardButton("🕌 زمان اذان", callback_data="panel_azan")
+            InlineKeyboardButton("🌤 آب و هوا", callback_data="panel_weather"),
+            InlineKeyboardButton("🕌 اذان", callback_data="panel_azan")
         ]
     ]
 
@@ -1762,101 +1764,108 @@ async def show_main_panel(update: Update, context: ContextTypes.DEFAULT_TYPE, ed
     else:
         await update.message.reply_text(about, reply_markup=markup, parse_mode="HTML")
 
-# 📿 وقتی کاربر گزینه اذان رو زد
-async def handle_panel_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
+# ======================= 📲 هندلر دکمه‌های پنل =======================
+async def panel_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     data = query.data
     await query.answer()
 
-    if data == "panel_azan":
+    # 📦 بخش‌های مختلف پنل
+    if data == "panel_about":
         await query.edit_message_text(
-            "🕌 لطفاً نام شهر خود را بنویسید تا زمان اذان برایتان نمایش داده شود 🌙",
+            "🤖 <b>من خنگولم!</b>\nهوش مصنوعی با حس شوخ‌طبعی 😎",
             parse_mode="HTML"
         )
-        context.user_data["awaiting_city_for_azan"] = True
-        return
 
-# 📍 زمانی که کاربر شهر را می‌فرستد
-async def handle_city_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if context.user_data.get("awaiting_city_for_azan"):
-        city = update.message.text.strip()
-        await update.message.reply_text("🔍 در حال دریافت زمان اذان...")
-        try:
-            azan_text = get_azan_time(city)
-            await update.message.reply_text(azan_text, parse_mode="HTML")
-        except Exception as e:
-            await update.message.reply_text(f"⚠️ خطا در دریافت اطلاعات برای {city}:\n{e}")
-        context.user_data["awaiting_city_for_azan"] = False
-        # ======================= 🎛 بازگشت از منوی فونت یا سایر قابلیت‌ها =======================
-async def feature_back(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-
-    # ✅ ساخت یک آبجکت ساده که هم message داره، هم callback_query
-    fake_update = type("FakeUpdate", (), {
-        "message": query.message,
-        "callback_query": query
-    })()
-
-    await show_main_panel(fake_update, context, edit=True)
-# ======================= 🎛 کنترل پنل =======================
-async def panel_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-
-    user = query.from_user
-    now = datetime.now().strftime("%Y/%m/%d - %H:%M:%S")
-
-    panels = {
-        "panel_about": ("about_khengol.txt", "💫 درباره خنگول"),
-        "panel_team": ("team_noori.txt", "👨‍💻 تیم نوری"),
-        "panel_features": ("features.txt", "🧩 قابلیت‌های ربات"),
-    }
-
-    if query.data in panels:
-        file_name, title = panels[query.data]
-        text = await load_text(file_name, f"❗ هنوز {title} ثبت نشده!")
-        text += "\n\n🔙 برای بازگشت، روی دکمه زیر بزن:"
-        back_btn = [[InlineKeyboardButton("🔙 بازگشت", callback_data="back_main")]]
-        await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(back_btn), parse_mode="HTML")
-
-    elif query.data == "panel_stats":
-        user = query.from_user
-        now = datetime.now().strftime("%Y/%m/%d - %H:%M:%S")
-
-        text = (
-            f"📊 <b>اطلاعات کاربر:</b>\n\n"
-            f"👤 نام: <b>{user.first_name}</b>\n"
-            f"🆔 آیدی: <code>{user.id}</code>\n"
-            f"📅 تاریخ و ساعت فعلی: <b>{now}</b>"
+    elif data == "panel_team":
+        await query.edit_message_text(
+            "👨‍💻 <b>توسعه‌دهنده:</b> <a href='https://t.me/NOORI_NOOR'>NOORI</a>\n"
+            "🧠 ایده و طراحی: خنگول تیم",
+            parse_mode="HTML",
+            disable_web_page_preview=True
         )
 
+    elif data == "panel_fortune":
+        await query.edit_message_text("🔮 فال امروزت در حال پردازشه... ⏳")
+        await send_random_fortune(update, context)
+
+    elif data == "panel_joke":
+        from jokes_manager import list_jokes
+        import random
+        jokes = list_jokes()
+        if jokes:
+            joke = random.choice(jokes)
+            await query.edit_message_text(f"😂 <b>{joke}</b>", parse_mode="HTML")
+        else:
+            await query.edit_message_text("😅 هنوز جوکی ذخیره نشده!", parse_mode="HTML")
+
+    elif data == "panel_font":
+        await font_maker(update, context)
+
+    elif data == "panel_stats":
+        user = update.effective_user
+        await query.edit_message_text(
+            f"💳 <b>آیدی خنگولی:</b> <code>{user.id}</code>\n👤 نام: {user.first_name}",
+            parse_mode="HTML"
+        )
+
+    elif data == "panel_weather":
+        await query.edit_message_text(
+            "🌤 لطفاً نام شهر خود را بنویسید تا آب‌وهوا نمایش داده شود.\n\n"
+            "مثلاً:\n<code>کابل</code> یا <code>تهران</code>",
+            parse_mode="HTML"
+        )
+        context.user_data["expecting_weather_city"] = True
+
+    elif data == "panel_azan":
+        await query.edit_message_text(
+            "🕌 لطفاً نام شهر خود را بنویسید تا زمان دقیق اذان نمایش داده شود.\n\n"
+            "مثلاً:\n<code>کابل</code> یا <code>تهران</code>",
+            parse_mode="HTML"
+        )
+        context.user_data["expecting_azan_city"] = True
+
+    elif data == "panel_chatgpt":
+        await show_ai_panel(update, context)
+
+    elif data == "panel_features":
+        await query.edit_message_text(
+            "🧩 قابلیت‌های خنگول:\n\n"
+            "• هوش مصنوعی پاسخ‌گو\n"
+            "• مدیریت گروه و قفل‌ها\n"
+            "• فال، جوک، فونت‌ساز\n"
+            "• چت GPT و آب‌وهوا و اذان 🌍",
+            parse_mode="HTML"
+        )
+
+# ======================= ☁️ پاسخ به نام شهر (آب‌وهوا و اذان) =======================
+async def handle_city_query(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    text = update.message.text.strip()
+
+    # 🌤 آب‌وهوا
+    if context.user_data.get("expecting_weather_city"):
+        context.user_data["expecting_weather_city"] = False
+        await show_weather(update, context, city_name=text)
+        return
+
+    # 🕌 اذان
+    if context.user_data.get("expecting_azan_city"):
+        context.user_data["expecting_azan_city"] = False
         try:
-            # 📸 اگر عکس پروفایل دارد، نمایش بده
-            photos = await context.bot.get_user_profile_photos(user.id, limit=1)
-            if photos.total_count > 0:
-                file_id = photos.photos[0][-1].file_id
-                await query.message.reply_photo(photo=file_id, caption=text, parse_mode="HTML")
+            result = await get_azan_time(text)
+            if result:
+                await update.message.reply_text(
+                    f"🕌 <b>اوقات شرعی {text}:</b>\n\n"
+                    f"🌅 اذان صبح: <b>{result['fajr']}</b>\n"
+                    f"☀️ طلوع: <b>{result['sunrise']}</b>\n"
+                    f"🌇 مغرب: <b>{result['maghrib']}</b>\n"
+                    f"🌙 عشاء: <b>{result['isha']}</b>",
+                    parse_mode="HTML"
+                )
             else:
-                await query.message.reply_text(text, parse_mode="HTML")
+                await update.message.reply_text("⚠️ متأسفم، شهر یافت نشد!", parse_mode="HTML")
         except Exception as e:
-            # اگر خطا یا محدودیت بود، فقط متن بفرست
-            await query.message.reply_text(text, parse_mode="HTML")
-
-    elif query.data == "panel_weather":
-        await show_weather(update, context)
-
-    elif query.data == "panel_fortune":
-        await query.message.reply_text("🔮 برای دیدن فال بنویس:\n<b>فال</b>", parse_mode="HTML")
-
-    elif query.data == "panel_joke":
-        await query.message.reply_text("😂 برای دیدن جوک بنویس:\n<b>جوک</b>", parse_mode="HTML")
-
-    elif query.data == "panel_font":
-        await query.message.reply_text("🎨 برای ساخت فونت بنویس:\n<b>فونت اسم‌ت</b>", parse_mode="HTML")
-
-    elif query.data == "back_main":
-        await show_main_panel(update, context, edit=True)
+            await update.message.reply_text(f"⚠️ خطا در دریافت اطلاعات اذان:\n{e}")
 
 # ======================= 🔐 ثبت فایل‌ها فقط توسط مدیر اصلی =======================
 async def save_panel_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
