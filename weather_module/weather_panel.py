@@ -52,15 +52,24 @@ async def show_weather(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await process_weather(update, city)
         return
 
-    # تشخیص خودکار پیام‌هایی مثل «هوای تهران»
+    # 🌐 در گروه‌ها فقط وقتی پاسخ بده که ساختار درست باشه
+    if update.effective_chat.type in ["group", "supergroup"]:
+        text = (update.message.text or "").strip()
+        pattern = r"^(?:آب[\s‌]*و[\s‌]*هوا|هوا(?:ی)?)\s+([\u0600-\u06FF\s]+?)(?:\s*(?:چطوره|چیه|است|هست)?[؟\s]*)?$"
+        match = re.match(pattern, text)
+        if match:
+            city = match.group(1).strip()
+            if len(city) > 1:
+                await process_weather(update, city)
+        return
+
+    # ✅ در چت خصوصی هم الگوی مشابه، ولی بدون محدودیت
     text = update.message.text.strip()
-    pattern = r"(?i)(?:هوا|آب[\s‌]*و[\s‌]*هوا)\s*(?:ی)?\s*([\wآ-ی\s]+)?"
-    match = re.search(pattern, text)
+    pattern = r"^(?:آب[\s‌]*و[\s‌]*هوا|هوا(?:ی)?)\s+([\u0600-\u06FF\s]+?)(?:\s*(?:چطوره|چیه|است|هست)?[؟\s]*)?$"
+    match = re.match(pattern, text)
     if match:
-        city = match.group(1)
-        if city and len(city.strip()) > 1:
-            await process_weather(update, city.strip())
-            return
+        city = match.group(1).strip()
+        await process_weather(update, city)
     return
 
 # ======================= 🧩 پردازش نهایی =======================
