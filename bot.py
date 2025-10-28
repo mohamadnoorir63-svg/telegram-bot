@@ -299,29 +299,13 @@ async def register_user(user):
 
 # ======================= 🚀 استارت خنگول =======================
 
-from datetime import datetime
-from telegram import Update
-from telegram.ext import ContextTypes
+======================= 📢 اطلاع به ادمین هنگام استارت =======================
 
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """شروع ربات خنگول با پیام زیبا و نمایش پنل اصلی"""
-    user = update.effective_user
-    now = datetime.now().strftime("%Y/%m/%d - %H:%M:%S")
+async def notify_admin_on_startup(app): """ارسال پیام فعال‌سازی به ادمین هنگام استارت""" ADMIN_ID = int(os.getenv("ADMIN_ID", "7089376754"))  # اگر از قبل داری، خطش رو تکرار نکن try: await app.bot.send_message( chat_id=ADMIN_ID, text="🚀 ربات خنگول با موفقیت راه‌اندازی شد ✅" ) print("[INFO] Startup notification sent ✅") except Exception as e: print(f"[ERROR] Failed to notify admin: {e}")
 
-    start_text = (
-        "🤖 <b>سلام خنگول فعال شد!</b>\n\n"
-        f"👤 <b>کاربر:</b> {user.first_name}\n"
-        f"🕓 <b>زمان اجرا:</b> <code>{now}</code>\n\n"
-        "💬 آماده‌ای برای خنده، احساس و هوش مصنوعی؟ 😎\n"
-        "👇 از دکمه‌های زیر یکی رو انتخاب کن 👇"
-    )
+======================= 🧠 شروع ساده بدون افکت =======================
 
-    # ✅ ارسال پیام خوش‌آمد با استایل HTML
-    await update.message.reply_text(start_text, parse_mode="HTML")
-
-    # ✅ نمایش منوی اصلی ربات بلافاصله بعد از پیام خوشامد
-    await show_main_panel(update, context)
-
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE): """شروع ساده بدون انیمیشن یا افکت""" from datetime import datetime   user = update.effective_user   now = datetime.now().strftime("%Y/%m/%d - %H:%M:%S")    # پیام ساده خوشامد   await update.message.reply_text(       f"✨ **سیستم خنگول فعال شد!**\n\n"       f"👤 کاربر: **{user.first_name}**\n"       f"🕓 زمان اجرا: `{now}`\n"       "💬 آماده‌ای برای خنده، احساس و هوش مصنوعی 😎\n\n"       "👇 از دکمه‌های زیر استفاده کن:",       parse_mode="HTML"   )    # نمایش مستقیم پنل اصلی   await show_main_panel(update, context)
  
 # ======================= ⚙️ خطایاب خودکار =======================
 async def handle_error(update: object, context: ContextTypes.DEFAULT_TYPE):
