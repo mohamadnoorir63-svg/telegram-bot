@@ -78,10 +78,10 @@ context_memory = ContextMemory()
 from ai_chat.chatgpt_panel import show_ai_panel, chat, start_ai_chat, stop_ai_chat
 from weather_module.weather_panel import show_weather
 from modules.azan_module import get_azan_time, get_ramadan_status
-import asyncio
+import asynciofrom panels.panel_menu import panel_menu as Tastatur_menu, panel_buttons as Tastatur_buttons
 from group_control.group_control import auto_clean_old_origins, handle_bot_removed
 from panels.link_panel import link_panel, link_panel_buttons
-from panels.panel_menu import Tastatur_menu, Tastatur_buttons
+
 from telegram.ext import MessageHandler, CallbackQueryHandler, filters
 # ======================= ⚙️ تنظیمات پایه و سودوها =======================
 from telegram import Update
