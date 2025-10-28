@@ -1714,7 +1714,7 @@ async def load_text(file_name, default_text):
     return default_text
 
 
-======================= 🎛 پنل اصلی خنگول =======================
+# ======================= 🎛 پنل اصلی خنگول =======================
 
 from telegram import InlineKeyboardMarkup, InlineKeyboardButton, Update
 from telegram.ext import ContextTypes
