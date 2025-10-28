@@ -946,6 +946,46 @@ async def handle_tagadmins(update, context):
         await update.message.reply_text("✅ مدیران تگ شدند.", parse_mode="HTML")
     except Exception as e:
         await update.message.reply_text(f"⚠️ خطا:\n<code>{e}</code>", parse_mode="HTML")
+        # ======================= 🧹 پاکسازی خودکار داده‌های گروه‌های غیرفعال =======================
+
+import asyncio
+from datetime import datetime, timedelta
+
+async def auto_clean_old_origins(context):
+    """
+    🧭 بررسی خودکار گروه‌ها و حذف داده‌ی گروه‌هایی که ربات ازشون خارج شده.
+    این تابع معمولاً هفته‌ای یک‌بار توسط bot.py اجرا می‌شود.
+    """
+    print("🧭 شروع بررسی خودکار داده‌های قدیمی (origins)...")
+
+    removed_groups = []
+    to_delete = []
+
+    try:
+        for chat_id in list(origins.keys()):
+            try:
+                chat = await context.bot.get_chat(chat_id)
+                if chat.type not in ["group", "supergroup"]:
+                    to_delete.append(chat_id)
+            except:
+                # یعنی ربات از گروه رفته یا گروه وجود نداره
+                to_delete.append(chat_id)
+
+        for gid in to_delete:
+            if gid in origins:
+                del origins[gid]
+                removed_groups.append(gid)
+
+        if removed_groups:
+            save_origins(origins)
+            print(f"🧹 {len(removed_groups)} گروه حذف شدند: {', '.join(removed_groups)}")
+        else:
+            print("✅ همه‌چیز تمیز است، هیچ گروهی برای حذف وجود ندارد.")
+
+        print(f"⏰ بررسی بعدی در: {datetime.now() + timedelta(days=7)}")
+
+    except Exception as e:
+        print(f"⚠️ خطا در auto_clean_old_origins: {e}")
         # ======================= 🎮 هندلر اصلی دستورات گروه =======================
 
 async def group_command_handler(update, context):
