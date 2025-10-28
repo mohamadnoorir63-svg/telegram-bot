@@ -1,11 +1,5 @@
 # ======================= ⚙️ سیستم کنترل گروه (بخش پایه و فایل‌ها) =======================
 
-import json
-import os
-import re
-from datetime import datetime
-from telegram import Update, ChatPermissions
-from telegram.ext import ContextTypes
 
 # ======================= 🔧 فایل‌ها و تنظیمات اصلی =======================
 
