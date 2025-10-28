@@ -33,7 +33,6 @@ async def get_forecast(city: str):
                 return None
             return await response.json()
 
-
 # ======================= 🌆 هندلر اصلی =======================
 async def show_weather(update: Update, context: ContextTypes.DEFAULT_TYPE):
     message = update.message or update.callback_query.message
@@ -53,17 +52,16 @@ async def show_weather(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await process_weather(update, city)
         return
 
-    # تشخیص خودکار پیام‌هایی مثل «آب و هوای تهران» یا «آب و هوای کابل»
-    text = update.message.text.strip()
-    pattern = Wetter 
-    match = re.search(pattern, text)
+    # 🌤 فقط وقتی پیام با «آب و هوای» شروع شود
+    text = (update.message.text or "").strip()
+    pattern = r"^آب[\s‌]*و[\s‌]*هوا(?:ی)?\s+([\u0600-\u06FF\s]+)$"
+    match = re.match(pattern, text)
     if match:
-        city = match.group(1)
-        if city and len(city.strip()) > 1:
-            await process_weather(update, city.strip())
-            return
+        city = match.group(1).strip()
+        if len(city) > 1:
+            await process_weather(update, city)
+    # بقیه پیام‌ها به مسیر خودشون (مثل پاسخ هوش مصنوعی) می‌رن
     return
-
 
 # ======================= 🧩 پردازش نهایی =======================
 async def process_weather(update: Update, city: str):
@@ -141,7 +139,6 @@ async def process_weather(update: Update, city: str):
 
     await update.message.reply_text(text, parse_mode="HTML")
 
-
 # ======================= 🎨 تابع‌های کمکی =======================
 def get_weather_emoji(icon):
     mapping = {
@@ -156,7 +153,6 @@ def get_weather_emoji(icon):
         "50d": "🌫", "50n": "🌫",
     }
     return mapping.get(icon, "🌍")
-
 
 def flag_emoji(country_code):
     if not country_code:
