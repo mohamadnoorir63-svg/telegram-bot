@@ -2086,11 +2086,7 @@ async def list_sudos(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     clean_pattern = r"^(پاکسازی|پاک کن|پاک|حذف پیام|نظافت|delete|clear|clean)(.*)$"
     application.add_handler(MessageHandler(filters.Regex(clean_pattern) & filters.TEXT, clean_handler), group=-7)
-    # --- Sudo admin commands (no invisible chars) ---
-    application.add_handler(CommandHandler("addsudo", cmd_addsudo))
-    application.add_handler(CommandHandler("delsudo", cmd_delsudo))
-    application.add_handler(CommandHandler("listsudo", cmd_listsudo))
-
+   
     # ==========================================================
     # 💾 دستورات شخصی (ذخیره، حذف، اجرای دستورها)
     # ==========================================================
