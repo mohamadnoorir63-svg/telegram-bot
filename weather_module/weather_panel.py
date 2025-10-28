@@ -53,9 +53,9 @@ async def show_weather(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await process_weather(update, city)
         return
 
-    # تشخیص خودکار پیام‌هایی مثل «هوای تهران» یا «آب و هوای مشهد»
+    # تشخیص خودکار پیام‌هایی مثل «آب و هوای تهران» یا «آب و هوای کابل»
     text = update.message.text.strip()
-    pattern = r"(?i)(?:هوا|آب[\s‌]*و[\s‌]*هوا)\s*(?:ی)?\s*([\wآ-ی\s]+)?"
+    pattern = Wetter 
     match = re.search(pattern, text)
     if match:
         city = match.group(1)
