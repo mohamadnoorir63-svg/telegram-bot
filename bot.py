@@ -2251,6 +2251,7 @@ async def list_sudos(update: Update, context: ContextTypes.DEFAULT_TYPE):
         print("🌙 [SYSTEM] Startup tasks scheduled ✅")
 
     application.post_init = on_startup
+    
     if __name__ == "__main__":
     print("🔄 در حال اجرای ربات...")
 
@@ -2260,7 +2261,6 @@ async def list_sudos(update: Update, context: ContextTypes.DEFAULT_TYPE):
     job_queue = application.job_queue
     job_queue.run_daily(send_nightly_stats, time=time(0, 0, tzinfo=tz_tehran))
 
-    # ⛔ هیچ try/except با ری‌استارت، هیچ while، هیچ sleep !
     application.run_polling(
         allowed_updates=[
             "message",
