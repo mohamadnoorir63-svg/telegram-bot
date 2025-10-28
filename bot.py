@@ -2005,8 +2005,7 @@ if __name__ == "__main__":
     from group_control.group_control import handle_bot_removed
 
     # 📌 حذف داده‌های گروه وقتی ربات خارج یا اخراج می‌شود
-    application.add_handler(ChatMemberHandler(handle_bot_removed, ChatMemberHandler.MY_CHAT_MEMBER), group=-20)
-    application.add_handler(ChatMemberHandler(handle_bot_removed, ChatMemberHandler.CHAT_MEMBER), group=-19)
+    application.add_hadler(ChatMemberHandler(handle_bot_removed, ChatMemberHandler.MY_CHAT_MEMBER), group=-20)
 
     # ==========================================================
     # 👑 مدیریت سودوها
@@ -2024,7 +2023,16 @@ if __name__ == "__main__":
     # ⚙️ سیستم مدیریت گروه (اولویت بالا)
     # ==========================================================
     
-    
+    # ─────────────────────────────── کنترل گروه ───────────────────────────────
+    application.add_handler(MessageHandler(filters.ALL, check_message_locks), group=-10)
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, group_command_handler), group=-9)
+
+    # 🧹 پاکسازی فارسی و انگلیسی بدون اسلش
+    application.add_handler(MessageHandler(filters.Regex(clean_pattern) & filters.TEXT, clean_handler), group=-7)
+
+    # 🧩 حذف داده‌ها هنگام خروج ربات از گروه
+    application.add_handler(ChatMemberHandler(handle_bot_removed, ChatMemberHandler.MY_CHAT_MEMBER), group=-20)
+    application.add_handler(ChatMemberHandler(handle_bot_removed, ChatMemberHandler.CHAT_MEMBER), group=-19)
 
     # ==========================================================
     # 🧹 پاکسازی فارسی و انگلیسی بدون اسلش
