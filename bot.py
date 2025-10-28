@@ -1861,6 +1861,15 @@ async def handle_city_query(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await update.message.reply_text("⚠️ شهر یافت نشد یا خطایی رخ داد!")
         except Exception as e:
             await update.message.reply_text(f"⚠️ خطا در دریافت اطلاعات اذان:\n{e}")
+            # ======================= کنترل دکمه بازگشت در پنل قابلیت‌ها =======================
+from telegram import Update
+from telegram.ext import ContextTypes
+
+async def feature_back(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """بازگشت از پنل قابلیت‌ها به منوی اصلی خنگول"""
+    query = update.callback_query
+    await query.answer()
+    await show_main_panel(update, context, edit=True)
 
 # ======================= 🔐 ثبت فایل‌ها فقط توسط مدیر اصلی =======================
 async def save_panel_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
