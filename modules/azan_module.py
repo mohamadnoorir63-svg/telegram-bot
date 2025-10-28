@@ -2,158 +2,51 @@ import requests
 import asyncio
 from datetime import datetime, timedelta
 import jdatetime
-from telegram import Update
+from hijri_converter import convert
+from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import ContextTypes
 
-# ===================== ⚙️ تنظیمات پایه =====================
 AZAN_API = "https://api.aladhan.com/v1/timingsByCity"
 G_TO_H_API = "https://api.aladhan.com/v1/gToH"
 
-CITIES = {
-    "هرات": {"city": "Herat", "country": "Afghanistan"},
-    "کابل": {"city": "Kabul", "country": "Afghanistan"},
-    "قندهار": {"city": "Kandahar", "country": "Afghanistan"},
-    "مزار": {"city": "Mazar-e-Sharif", "country": "Afghanistan"},
-    "تهران": {"city": "Tehran", "country": "Iran"},
-    "مشهد": {"city": "Mashhad", "country": "Iran"},
-    "اصفهان": {"city": "Isfahan", "country": "Iran"},
-}
-
-# ===================== 🕌 دریافت زمان اذان =====================
-async def get_azan_time(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    text = update.message.text.strip()
-
-    for name, info in CITIES.items():
-        if name in text:
-            return await send_azan_info(update, info["city"], info["country"], name)
-
-    await update.message.reply_text(
-        "❗ لطفاً نام شهر را بنویس مثل:\n"
-        "<code>اذان هرات</code> یا <code>اذان تهران</code>",
-        parse_mode="HTML"
-    )
-
-
-async def send_azan_info(update, city, country, city_fa):
-    try:
-        sunni = requests.get(f"{AZAN_API}?city={city}&country={country}&method=2").json()
-        shia = requests.get(f"{AZAN_API}?city={city}&country={country}&method=12").json()
-
-        sunni_data = sunni["data"]["timings"]
-        shia_data = shia["data"]["timings"]
-
-        today_gregorian = sunni["data"]["date"]["gregorian"]["date"]
-        today_hijri = sunni["data"]["date"]["hijri"]["date"]
-        today_jalali = jdatetime.date.today().strftime("%Y/%m/%d")
-
-        msg = (
-            f"📍 <b>شهر:</b> {city_fa}\n"
-            f"🏳️ <b>کشور:</b> {country}\n\n"
-            f"📅 <b>میلادی:</b> {today_gregorian}\n"
-            f"🗓 <b>شمسی:</b> {today_jalali}\n"
-            f"🕌 <b>هجری قمری:</b> {today_hijri}\n\n"
-            f"🕌 <b>اهل تسنن (سنی)</b>\n"
-            f"🌅 اذان صبح: {sunni_data['Fajr']}\n"
-            f"🏙 اذان ظهر: {sunni_data['Dhuhr']}\n"
-            f"🌇 اذان مغرب: {sunni_data['Maghrib']}\n"
-            f"🌙 نیمه شب: {sunni_data['Midnight']}\n\n"
-            f"🕋 <b>اهل تشیع (شیعه)</b>\n"
-            f"🌅 اذان صبح: {shia_data['Fajr']}\n"
-            f"🏙 اذان ظهر: {shia_data['Dhuhr']}\n"
-            f"🌇 اذان مغرب: {shia_data['Maghrib']}\n"
-            f"🌙 نیمه شب: {shia_data['Midnight']}\n"
-        )
-
-        hijri_month = sunni["data"]["date"]["hijri"]["month"]["en"]
-        if hijri_month == "Ramadan":
-            msg += "\n🌙 <b>ماه مبارک رمضان است!</b>\n"
-            maghrib_time = datetime.strptime(sunni_data["Maghrib"], "%H:%M")
-            now = datetime.utcnow() + timedelta(hours=4.5)
-
-            delta = (maghrib_time - now.replace(second=0, microsecond=0)).total_seconds()
-            if 0 < delta <= 600:
-                minutes = int(delta // 60)
-                msg += f"\n⏰ <b>{minutes} دقیقه تا اذان مغرب باقی مانده...</b> 🌇"
-            elif delta > 600:
-                msg += "\n🕔 هنوز تا اذان مغرب زمان زیادی مانده."
-            else:
-                msg += "\n🌇 اذان مغرب گذشته است."
-
-        await update.message.reply_text(msg, parse_mode="HTML")
-
-    except Exception as e:
-        await update.message.reply_text(f"⚠️ خطا در دریافت اوقات شرعی: {e}")
-
-
 # ===================== 🌙 بررسی وضعیت رمضان و مناسبت‌ها =====================
 async def get_ramadan_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    import json
     try:
-        today = datetime.utcnow().strftime("%Y-%m-%d")
-        response = requests.get(f"{G_TO_H_API}/{today}")
+        # اگر از دکمه‌ی پنل فراخوانی شد
+        if update.callback_query:
+            query = update.callback_query
+            await query.answer()
+            message = query.message
+        else:
+            message = update.message
 
-        # ✅ تلاش برای تبدیل پاسخ به JSON امن
-        try:
-            data = response.json()
-        except Exception:
-            try:
-                data = json.loads(response.text)
-            except Exception:
-                data = {}
-
-        # ✅ اطمینان از اینکه data دیکشنری است نه رشته
-        if isinstance(data, str):
-            try:
-                data = json.loads(data)
-            except Exception:
-                data = {}
-
-        # استخراج امن داده‌ها
-        hijri_data = {}
-        gregorian_data = {}
-
-        if "data" in data:
-            d = data["data"]
-            if isinstance(d, dict):
-                hijri_data = d.get("hijri", {})
-                gregorian_data = d.get("gregorian", {})
-
-        # اگر باز هم رشته بودن → تبدیل
-        if isinstance(hijri_data, str):
-            try:
-                hijri_data = json.loads(hijri_data)
-            except Exception:
-                hijri_data = {}
-        if isinstance(gregorian_data, str):
-            try:
-                gregorian_data = json.loads(gregorian_data)
-            except Exception:
-                gregorian_data = {}
-
-        hijri_date = hijri_data.get("date", "نامشخص")
-        hijri_day = int(hijri_data.get("day", "0"))
-        hijri_month = hijri_data.get("month", {}) or {}
-        month_name_en = hijri_month.get("en", "Unknown")
-        month_name_fa = hijri_month.get("ar", "نامشخص")
-        year = hijri_data.get("year", "----")
-
-        gregorian_date = gregorian_data.get("date", "نامشخص")
+        # تاریخ‌های محلی فعلی
+        now = datetime.utcnow() + timedelta(hours=4.5)  # ساعت کابل
+        gregorian_date = now.strftime("%Y-%m-%d")
         jalali_date = jdatetime.date.today().strftime("%Y/%m/%d")
 
+        # تبدیل میلادی به قمری با کتابخانه دقیق‌تر
+        hijri = convert.Gregorian(now.year, now.month, now.day).to_hijri()
+        hijri_date = f"{hijri.day} {hijri.month_name('ar')} {hijri.year}"
+        hijri_day = hijri.day
+        month_name_en = hijri.month_name('en')
+        month_name_fa = hijri.month_name('ar')
+
+        # 📅 ساخت پیام
         msg = (
             f"📅 <b>تاریخ میلادی:</b> {gregorian_date}\n"
             f"🗓 <b>تاریخ شمسی:</b> {jalali_date}\n"
             f"🕌 <b>تاریخ هجری قمری:</b> {hijri_date} ({month_name_fa})\n\n"
         )
 
-        # ✅ بررسی مناسبت‌ها
+        # ✅ مناسبت‌های مذهبی
         special_days = []
 
         if month_name_en == "Ramadan":
             msg += "🌙 اکنون در ماه مبارک <b>رمضان</b> هستیم 🤲\n\n"
             if hijri_day in [1, 2]:
-                special_days.append("🌅 آغاز ماه رمضان")
-            elif hijri_day in [17]:
+                special_days.append("🌅 آغاز ماه مبارک رمضان")
+            elif hijri_day == 17:
                 special_days.append("⚔️ غزوه بدر و میلاد امام حسن (ع)")
             elif hijri_day in [19, 21, 23]:
                 special_days.append("🌌 شب‌های قدر")
@@ -170,8 +63,11 @@ async def get_ramadan_status(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
         msg += "\n".join(special_days) if special_days else "📿 امروز مناسبت مذهبی خاصی ندارد."
 
-        await update.message.reply_text(msg, parse_mode="HTML")
+        # دکمه‌ی بازگشت به منوی اصلی
+        keyboard = [[InlineKeyboardButton("🔙 بازگشت به منو", callback_data="back_main")]]
+        markup = InlineKeyboardMarkup(keyboard)
+
+        await message.reply_text(msg, parse_mode="HTML", reply_markup=markup)
 
     except Exception as e:
         await update.message.reply_text(f"⚠️ خطا در بررسی ماه رمضان: {e}")
-        
