@@ -2031,7 +2031,6 @@ if __name__ == "__main__":
     # 🧩 حذف داده‌ها هنگام خروج ربات از گروه
     application.add_handler(ChatMemberHandler(handle_bot_removed, ChatMemberHandler.MY_CHAT_MEMBER), group=-20)
     application.add_handler(ChatMemberHandler(handle_bot_removed, ChatMemberHandler.CHAT_MEMBER), group=-19)
-
     # ==========================================================
     # 🧹 پاکسازی فارسی و انگلیسی بدون اسلش
     # ==========================================================
