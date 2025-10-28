@@ -1831,7 +1831,7 @@ async def panel_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await show_main_panel(update, context, edit=True)
 
 
-======================= ☁️ پاسخ به نام شهر برای آب‌وهوا یا اذان =======================
+# ======================= ☁️ پاسخ به نام شهر برای آب‌وهوا یا اذان =======================
 
 async def handle_city_query(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """دریافت نام شهر برای ماژول آب‌وهوا یا اذان"""
