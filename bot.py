@@ -2002,24 +2002,9 @@ if __name__ == "__main__":
     # 🧹 پاکسازی داده‌های گروه وقتی ربات حذف یا بیرون انداخته می‌شود
     # ==========================================================
     from telegram.ext import ChatMemberHandler
-    from group_control.group_control import origins, save_origins
+    from group_control.group_control import handle_bot_removed
 
-    async def handle_bot_removed(update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """وقتی ربات از گروه حذف یا بیرون انداخته می‌شود، داده‌های اون گروه پاک می‌شود."""
-        member = update.my_chat_member or update.chat_member
-        if not member:
-            return
-
-        status = member.new_chat_member.status
-        chat_id = str(update.effective_chat.id)
-
-        if status in ("kicked", "left"):
-            if chat_id in origins:
-                del origins[chat_id]
-                save_origins(origins)
-                print(f"🧹 داده‌های گروه {chat_id} حذف شدند (ربات از گروه خارج شد).")
-
-    # 📌 افزودن هندلر برای هر دو حالت (my_chat_member و chat_member)
+    # 📌 حذف داده‌های گروه وقتی ربات خارج یا اخراج می‌شود
     application.add_handler(ChatMemberHandler(handle_bot_removed, ChatMemberHandler.MY_CHAT_MEMBER), group=-20)
     application.add_handler(ChatMemberHandler(handle_bot_removed, ChatMemberHandler.CHAT_MEMBER), group=-19)
 
