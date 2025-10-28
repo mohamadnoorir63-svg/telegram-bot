@@ -2032,26 +2032,7 @@ if __name__ == "__main__":
     application.add_handler(ChatMemberHandler(handle_bot_removed, ChatMemberHandler.MY_CHAT_MEMBER), group=-20)
     application.add_handler(ChatMemberHandler(handle_bot_removed, ChatMemberHandler.CHAT_MEMBER), group=-19)
     # ==========================================================
-    # 🧹 پاکسازی فارسی و انگلیسی بدون اسلش
-    # ==========================================================
-    import re
-
-    async def clean_handler(update, context):
-        """پاکسازی فارسی و انگلیسی بدون اسلش"""
-        if not await is_authorized(update, context):
-            return await update.message.reply_text("🚫 فقط مدیران یا سودوها مجازند!")
-
-        text = update.message.text.strip().lower()
-        match = re.search(r"(\d+)", text)
-        context.args = [match.group(1)] if match else []
-
-        if any(word in text for word in ["all", "همه", "full", "کامل"]):
-            context.args = ["all"]
-
-        await handle_clean(update, context)
-
-    clean_pattern = r"^(پاکسازی|پاک کن|پاک|حذف پیام|نظافت|delete|clear|clean)(.*)$"
-    application.add_handler(MessageHandler(filters.Regex(clean_pattern) & filters.TEXT, clean_handler), group=-7)
+    
 
     # ==========================================================
     application.add_handler(CommandHandler("addsudo", add_sudo))
