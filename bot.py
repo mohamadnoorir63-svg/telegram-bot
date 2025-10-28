@@ -1714,16 +1714,15 @@ async def load_text(file_name, default_text):
     return default_text
 
 
+======================= 🎛 پنل اصلی خنگول =======================
 
-
-    # ======================= 🎛 پنل اصلی خنگول =======================
 from telegram import InlineKeyboardMarkup, InlineKeyboardButton, Update
 from telegram.ext import ContextTypes
 
-# 📌 نمایش منوی اصلی
 async def show_main_panel(update: Update, context: ContextTypes.DEFAULT_TYPE, edit=False):
-    about = (
-        "🌙 <b>به منوی اصلی خنگول خوش آمدی!</b>\n"
+    """نمایش منوی اصلی خنگول 😎"""
+    text = (
+        "🌙 <b>به منوی اصلی خنگول خوش اومدی!</b>\n"
         "از دکمه‌های زیر یکی رو انتخاب کن 😎"
     )
 
@@ -1734,70 +1733,53 @@ async def show_main_panel(update: Update, context: ContextTypes.DEFAULT_TYPE, ed
         ],
         [
             InlineKeyboardButton("➕ افزودن به گروه", url="https://t.me/Khenqol_bot?startgroup=true"),
-            InlineKeyboardButton("🧩 قابلیت‌های ربات", callback_data="panel_features")
-        ],
-        [
-            InlineKeyboardButton("🤖 درباره خنگول", callback_data="panel_about"),
-            InlineKeyboardButton("👨‍💻 درباره تیم ما", callback_data="panel_team")
+            InlineKeyboardButton("🧩 قابلیت‌ها", callback_data="panel_features")
         ],
         [
             InlineKeyboardButton("🔮 فال امروز", callback_data="panel_fortune"),
             InlineKeyboardButton("😂 جوک خنده‌دار", callback_data="panel_joke")
         ],
         [
-            InlineKeyboardButton("🎨 فونت‌ساز حرفه‌ای", callback_data="panel_font"),
-            InlineKeyboardButton("💳 آیدی خنگولی من", callback_data="panel_stats")
+            InlineKeyboardButton("🎨 فونت‌ساز", callback_data="panel_font"),
+            InlineKeyboardButton("💳 آیدی من", callback_data="panel_stats")
         ],
         [
-            InlineKeyboardButton("🧠 گفتگوی ChatGPT", callback_data="panel_chatgpt")
-        ],
-        [
-            InlineKeyboardButton("🌤 آب و هوا", callback_data="panel_weather"),
+            InlineKeyboardButton("🌤 آب‌وهوا", callback_data="panel_weather"),
             InlineKeyboardButton("🕌 اذان", callback_data="panel_azan")
+        ],
+        [
+            InlineKeyboardButton("🧠 چت ChatGPT", callback_data="panel_chatgpt")
         ]
     ]
 
     markup = InlineKeyboardMarkup(keyboard)
 
     if edit:
-        await update.callback_query.edit_message_text(about, reply_markup=markup, parse_mode="HTML")
+        await update.callback_query.edit_message_text(text, reply_markup=markup, parse_mode="HTML")
     else:
-        await update.message.reply_text(about, reply_markup=markup, parse_mode="HTML")
+        await update.message.reply_text(text, reply_markup=markup, parse_mode="HTML")
 
-# ======================= 📲 هندلر دکمه‌های پنل =======================
+
+======================= ⚙️ کنترل دکمه‌های پنل خنگول =======================
+
 async def panel_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """مدیریت دکمه‌های منوی اصلی خنگول"""
     query = update.callback_query
     data = query.data
     await query.answer()
 
-    # 📦 بخش‌های مختلف پنل
-    if data == "panel_about":
-        await query.edit_message_text(
-            "🤖 <b>من خنگولم!</b>\nهوش مصنوعی با حس شوخ‌طبعی 😎",
-            parse_mode="HTML"
-        )
-
-    elif data == "panel_team":
-        await query.edit_message_text(
-            "👨‍💻 <b>توسعه‌دهنده:</b> <a href='https://t.me/NOORI_NOOR'>NOORI</a>\n"
-            "🧠 ایده و طراحی: خنگول تیم",
-            parse_mode="HTML",
-            disable_web_page_preview=True
-        )
-
-    elif data == "panel_fortune":
-        await query.edit_message_text("🔮 فال امروزت در حال پردازشه... ⏳")
+    if data == "panel_fortune":
+        await query.edit_message_text("🔮 فال امروز در حال آماده‌سازی است...")
         await send_random_fortune(update, context)
 
     elif data == "panel_joke":
         from jokes_manager import list_jokes
-        import random
         jokes = list_jokes()
         if jokes:
             joke = random.choice(jokes)
-            await query.edit_message_text(f"😂 <b>{joke}</b>", parse_mode="HTML")
+            await query.edit_message_text(f"😂 {joke}")
         else:
-            await query.edit_message_text("😅 هنوز جوکی ذخیره نشده!", parse_mode="HTML")
+            await query.edit_message_text("😅 هنوز جوکی ذخیره نشده!")
 
     elif data == "panel_font":
         await font_maker(update, context)
@@ -1805,22 +1787,24 @@ async def panel_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif data == "panel_stats":
         user = update.effective_user
         await query.edit_message_text(
-            f"💳 <b>آیدی خنگولی:</b> <code>{user.id}</code>\n👤 نام: {user.first_name}",
+            f"💳 آیدی خنگولی شما:\n\n"
+            f"👤 نام: <b>{user.first_name}</b>\n"
+            f"🆔 آیدی: <code>{user.id}</code>",
             parse_mode="HTML"
         )
 
     elif data == "panel_weather":
         await query.edit_message_text(
-            "🌤 لطفاً نام شهر خود را بنویسید تا آب‌وهوا نمایش داده شود.\n\n"
-            "مثلاً:\n<code>کابل</code> یا <code>تهران</code>",
+            "🌤 لطفاً نام شهرت رو بنویس تا آب‌وهواش رو بگم 😎\n\n"
+            "مثلاً بنویس: <code>تهران</code> یا <code>مشهد</code>",
             parse_mode="HTML"
         )
         context.user_data["expecting_weather_city"] = True
 
     elif data == "panel_azan":
         await query.edit_message_text(
-            "🕌 لطفاً نام شهر خود را بنویسید تا زمان دقیق اذان نمایش داده شود.\n\n"
-            "مثلاً:\n<code>کابل</code> یا <code>تهران</code>",
+            "🕌 لطفاً نام شهرت رو بنویس تا زمان اذان رو بگم 🕋\n\n"
+            "مثلاً بنویس: <code>قم</code> یا <code>کابل</code>",
             parse_mode="HTML"
         )
         context.user_data["expecting_azan_city"] = True
@@ -1829,41 +1813,52 @@ async def panel_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await show_ai_panel(update, context)
 
     elif data == "panel_features":
-        await query.edit_message_text(
-            "🧩 قابلیت‌های خنگول:\n\n"
-            "• هوش مصنوعی پاسخ‌گو\n"
-            "• مدیریت گروه و قفل‌ها\n"
-            "• فال، جوک، فونت‌ساز\n"
-            "• چت GPT و آب‌وهوا و اذان 🌍",
-            parse_mode="HTML"
+        text = (
+            "🧩 <b>قابلیت‌های خنگول:</b>\n\n"
+            "🤖 پاسخ هوشمندانه و احساسی\n"
+            "🧠 یادگیری خودکار از چت‌ها\n"
+            "💬 مدیریت گروه‌ها و خوشامدگویی\n"
+            "😂 ارسال جوک و فال روزانه\n"
+            "🌤 آب‌وهوا و 🕌 اذان شهرها\n"
+            "🎨 فونت‌ساز و 💳 آیدی‌نمای هوشمند\n"
+            "🧠 چت ChatGPT در تلگرام!\n\n"
+            "برای بازگشت از دکمه زیر استفاده کن 👇"
         )
+        keyboard = [[InlineKeyboardButton("🔙 بازگشت", callback_data="feature_back")]]
+        await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
 
-# ======================= ☁️ پاسخ به نام شهر (آب‌وهوا و اذان) =======================
+    elif data == "feature_back":
+        await show_main_panel(update, context, edit=True)
+
+
+======================= ☁️ پاسخ به نام شهر برای آب‌وهوا یا اذان =======================
+
 async def handle_city_query(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """دریافت نام شهر برای ماژول آب‌وهوا یا اذان"""
     text = update.message.text.strip()
 
-    # 🌤 آب‌وهوا
+    # 🌤 اگر کاربر انتظار پاسخ آب‌وهوا دارد
     if context.user_data.get("expecting_weather_city"):
         context.user_data["expecting_weather_city"] = False
         await show_weather(update, context, city_name=text)
         return
 
-    # 🕌 اذان
+    # 🕌 اگر کاربر انتظار پاسخ اذان دارد
     if context.user_data.get("expecting_azan_city"):
         context.user_data["expecting_azan_city"] = False
         try:
-            result = await get_azan_time(text)
-            if result:
+            data = await get_azan_time(text)
+            if data:
                 await update.message.reply_text(
                     f"🕌 <b>اوقات شرعی {text}:</b>\n\n"
-                    f"🌅 اذان صبح: <b>{result['fajr']}</b>\n"
-                    f"☀️ طلوع: <b>{result['sunrise']}</b>\n"
-                    f"🌇 مغرب: <b>{result['maghrib']}</b>\n"
-                    f"🌙 عشاء: <b>{result['isha']}</b>",
+                    f"🌅 اذان صبح: <b>{data['fajr']}</b>\n"
+                    f"☀️ طلوع: <b>{data['sunrise']}</b>\n"
+                    f"🌇 مغرب: <b>{data['maghrib']}</b>\n"
+                    f"🌙 عشاء: <b>{data['isha']}</b>",
                     parse_mode="HTML"
                 )
             else:
-                await update.message.reply_text("⚠️ متأسفم، شهر یافت نشد!", parse_mode="HTML")
+                await update.message.reply_text("⚠️ شهر یافت نشد یا خطایی رخ داد!")
         except Exception as e:
             await update.message.reply_text(f"⚠️ خطا در دریافت اطلاعات اذان:\n{e}")
 
