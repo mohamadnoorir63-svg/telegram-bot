@@ -2014,6 +2014,15 @@ if __name__ == "__main__":
     application.add_handler(MessageHandler(filters.Regex("(?i)^ربات$"), sudo_bot_call))
 
     # ==========================================================
+
+    # 🔹 دستورات اصلی سیستم
+    # ==========================================================
+    application.add_handler(CommandHandler("start", start))
+    application.add_handler(CommandHandler("toggle", toggle))
+    application.add_handler(CommandHandler("welcome", toggle_welcome))
+    application.add_handler(CommandHandler("lock", lock_learning))
+    application.add_handler(CommandHandler("unlock", unlock_learning))
+    application.add_handler(CommandHandler("mode", mode_change))
     # 🎛 فعال‌سازی Tastatur راهنمای فارسی (فقط در گروه‌ها)
     application.add_handler(
         MessageHandler(filters.TEXT & filters.Regex(r"^پنل$"), Tastatur_menu),
@@ -2025,14 +2034,6 @@ if __name__ == "__main__":
         CallbackQueryHandler(Tastatur_buttons, pattern="^Tastatur_"),
         group=-3
     )
-    # 🔹 دستورات اصلی سیستم
-    # ==========================================================
-    application.add_handler(CommandHandler("start", start))
-    application.add_handler(CommandHandler("toggle", toggle))
-    application.add_handler(CommandHandler("welcome", toggle_welcome))
-    application.add_handler(CommandHandler("lock", lock_learning))
-    application.add_handler(CommandHandler("unlock", unlock_learning))
-    application.add_handler(CommandHandler("mode", mode_change))
     application.add_handler(CommandHandler("stats", stats))
     application.add_handler(CommandHandler("fullstats", fullstats))
     application.add_handler(CommandHandler("backup", backup))
