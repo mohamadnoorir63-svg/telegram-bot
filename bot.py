@@ -2004,8 +2004,6 @@ if __name__ == "__main__":
     from telegram.ext import ChatMemberHandler
     from group_control.group_control import handle_bot_removed
 
-    # 📌 حذف داده‌های گروه وقتی ربات خارج یا اخراج می‌شود
-    application.add_hadler(ChatMemberHandler(handle_bot_removed, ChatMemberHandler.MY_CHAT_MEMBER), group=-20)
 
     # ==========================================================
     # 👑 مدیریت سودوها
