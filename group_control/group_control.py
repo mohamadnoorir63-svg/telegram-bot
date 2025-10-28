@@ -1034,3 +1034,21 @@ async def group_command_handler(update, context):
 
     # اگر چیزی تشخیص داده نشد:
     return
+    # ======================= ⚙️ گروه هندلر پیشرفته سازگار با ساختار اصلی =======================
+
+async def group_text_handler_adv(update, context):
+    """
+    🎯 هندلر عمومی پیام‌های متنی گروه‌ها
+    این تابع فقط نقش رابط را دارد تا با سیستم اصلی در bot.py هماهنگ باشد.
+    """
+    if not update.message or not update.message.text:
+        return
+
+    # اگر پیام شامل دستور مدیریتی یا تگ/فیلتر است
+    text = update.message.text.strip().lower()
+
+    # اول بررسی قفل‌ها و فیلترها
+    await check_message_locks(update, context)
+
+    # بعد بررسی دستورات اصلی گروه
+    await group_command_handler(update, context)
