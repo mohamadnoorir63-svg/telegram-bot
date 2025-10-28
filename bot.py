@@ -297,16 +297,40 @@ async def register_user(user):
         with open(USERS_FILE, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
 
-# ======================= 🚀 استارت خنگول =======================
 
-======================= 📢 اطلاع به ادمین هنگام استارت =======================
+# ======================= 📢 اطلاع به ادمین هنگام استارت =======================
+async def notify_admin_on_startup(app):
+    """ارسال پیام فعال‌سازی به ادمین هنگام استارت"""
+    ADMIN_ID = int(os.getenv("ADMIN_ID", "7089376754"))  # اگر از قبل داری، خطش رو تکرار نکن
+    try:
+        await app.bot.send_message(
+            chat_id=ADMIN_ID,
+            text="🚀 ربات خنگول با موفقیت راه‌اندازی شد ✅"
+        )
+        print("[INFO] Startup notification sent ✅")
+    except Exception as e:
+        print(f"[ERROR] Failed to notify admin: {e}")
 
-async def notify_admin_on_startup(app): """ارسال پیام فعال‌سازی به ادمین هنگام استارت""" ADMIN_ID = int(os.getenv("ADMIN_ID", "7089376754"))  # اگر از قبل داری، خطش رو تکرار نکن try: await app.bot.send_message( chat_id=ADMIN_ID, text="🚀 ربات خنگول با موفقیت راه‌اندازی شد ✅" ) print("[INFO] Startup notification sent ✅") except Exception as e: print(f"[ERROR] Failed to notify admin: {e}")
 
-======================= 🧠 شروع ساده بدون افکت =======================
+# ======================= 🧠 شروع ساده بدون افکت =======================
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """شروع ساده بدون انیمیشن یا افکت"""
+    from datetime import datetime
+    user = update.effective_user
+    now = datetime.now().strftime("%Y/%m/%d - %H:%M:%S")
 
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE): """شروع ساده بدون انیمیشن یا افکت""" from datetime import datetime   user = update.effective_user   now = datetime.now().strftime("%Y/%m/%d - %H:%M:%S")    # پیام ساده خوشامد   await update.message.reply_text(       f"✨ **سیستم خنگول فعال شد!**\n\n"       f"👤 کاربر: **{user.first_name}**\n"       f"🕓 زمان اجرا: `{now}`\n"       "💬 آماده‌ای برای خنده، احساس و هوش مصنوعی 😎\n\n"       "👇 از دکمه‌های زیر استفاده کن:",       parse_mode="HTML"   )    # نمایش مستقیم پنل اصلی   await show_main_panel(update, context)
- 
+    # پیام ساده خوشامد
+    await update.message.reply_text(
+        f"✨ **سیستم خنگول فعال شد!**\n\n"
+        f"👤 کاربر: **{user.first_name}**\n"
+        f"🕓 زمان اجرا: `{now}`\n"
+        "💬 آماده‌ای برای خنده، احساس و هوش مصنوعی 😎\n\n"
+        "👇 از دکمه‌های زیر استفاده کن:",
+        parse_mode="HTML"
+    )
+
+    # نمایش مستقیم پنل اصلی
+    await show_main_panel(update, context)
 # ======================= ⚙️ خطایاب خودکار =======================
 async def handle_error(update: object, context: ContextTypes.DEFAULT_TYPE):
     error_text = f"⚠️ خطا در ربات:\n\n{context.error}"
@@ -315,7 +339,6 @@ async def handle_error(update: object, context: ContextTypes.DEFAULT_TYPE):
         await context.bot.send_message(chat_id=ADMIN_ID, text=error_text)
     except:
         pass
-
 
 
 # ======================= 👑 شناسایی ورود، خروج و صدا زدن سازنده =======================
