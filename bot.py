@@ -52,7 +52,7 @@ from auto_brain.command_manager import (
 from group_control.group_control import (
     group_command_handler,
     check_message_locks,
-    group_text_handler_adv,
+
     handle_clean,
     handle_pin,
     handle_unpin,
