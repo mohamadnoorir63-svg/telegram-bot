@@ -1773,6 +1773,7 @@ async def feature_back(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 # ======================= 🎛 کنترل پنل =======================
+
 async def panel_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -1824,6 +1825,10 @@ async def panel_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         context.user_data["awaiting_azan_city"] = True  # حالت انتظار برای نام شهر
 
+    elif query.data == "panel_ramadan":
+        # ✅ نمایش وضعیت رمضان و تاریخ‌های قمری/شمسی/میلادی
+        await get_ramadan_status(update, context)
+
     elif query.data == "panel_fortune":
         await query.message.reply_text("🔮 برای دیدن فال بنویس:\n<b>فال</b>", parse_mode="HTML")
 
@@ -1835,7 +1840,6 @@ async def panel_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     elif query.data == "back_main":
         await show_main_panel(update, context, edit=True)
-
 
 # ======================= ☁️ پاسخ به نام شهر برای اذان =======================
 async def handle_azan_city(update: Update, context: ContextTypes.DEFAULT_TYPE):
