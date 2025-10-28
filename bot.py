@@ -2024,9 +2024,7 @@ if __name__ == "__main__":
     # ⚙️ سیستم مدیریت گروه (اولویت بالا)
     # ==========================================================
     
-    application.add_handler(MessageHandler(filters.ALL, check_message_locks), group=-10)
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, group_command_handler), group=-9)
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, group_text_handler_adv), group=-8)
+    
 
     # ==========================================================
     # 🧹 پاکسازی فارسی و انگلیسی بدون اسلش
