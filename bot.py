@@ -1819,10 +1819,10 @@ async def panel_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await show_weather(update, context)
 
     elif query.data == "panel_azan":
-        await query.message.reply_text(
-            "🕌 برای دیدن اوقات شرعی بنویس:\n<b>اذان هرات</b> یا <b>اذان تهران</b>"
-            parse_mode="HTML"
-        )
+    await query.message.reply_text(
+        "🕌 برای دیدن اوقات شرعی بنویس:\n<b>اذان هرات</b> یا <b>اذان تهران</b>",
+        parse_mode="HTML"
+    )
         context.user_data["awaiting_azan_city"] = True  # حالت انتظار برای نام شهر
 
     elif query.data == "panel_ramadan":
