@@ -6,7 +6,7 @@ from telegram.ext import ContextTypes
 MAIN_TITLE = "🌟 <b>پنل راهنمای ربات مدیریت گروه</b>\n\n🧭 از منوی زیر یکی از بخش‌ها را انتخاب کنید 👇"
 
 # 🎨 صفحه‌ی اصلی پنل
-async def panel_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def Tastatur_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat = update.effective_chat
 
     # 🚫 بررسی: فقط در گروه‌ها مجاز باشد
@@ -18,42 +18,50 @@ async def panel_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     keyboard = [
         [
-            InlineKeyboardButton("🔒 قفل‌ها", callback_data="tastatur_locks"),
-            InlineKeyboardButton("👮 کاربران", callback_data="tastatur_users")
+            InlineKeyboardButton("🔒 قفل‌ها", callback_data="Tastatur_locks"),
+            InlineKeyboardButton("👮 کاربران", callback_data="Tastatur_users")
         ],
         [
-            InlineKeyboardButton("⚙️ تنظیمات", callback_data="tastatur_settings"),
-            InlineKeyboardButton("📊 آمار و گزارش", callback_data="tastatur_stats")
+            InlineKeyboardButton("⚙️ تنظیمات", callback_data="Tastatur_settings"),
+            InlineKeyboardButton("📊 آمار و گزارش", callback_data="Tastatur_stats")
         ],
         [
-            InlineKeyboardButton("🎮 سرگرمی‌ها", callback_data="tastatur_fun"),
-            InlineKeyboardButton("🧩 دستورات شخصی", callback_data="tastatur_alias")
+            InlineKeyboardButton("🎮 سرگرمی‌ها", callback_data="Tastatur_fun"),
+            InlineKeyboardButton("🧩 دستورات شخصی", callback_data="Tastatur_alias")
         ],
-        [InlineKeyboardButton("❌ بستن پنل", callback_data="tastatur_close")]
+        [InlineKeyboardButton("❌ بستن پنل", callback_data="Tastatur_close")]
     ]
 
     if update.message:
-        await update.message.reply_text(MAIN_TITLE, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(keyboard))
+        await update.message.reply_text(
+            MAIN_TITLE,
+            parse_mode="HTML",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
     else:
-        await update.callback_query.edit_message_text(MAIN_TITLE, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(keyboard))
+        await update.callback_query.edit_message_text(
+            MAIN_TITLE,
+            parse_mode="HTML",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
 
 
 # 🎛 هندلر دکمه‌ها
-async def panel_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def Tastatur_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     data = query.data
     await query.answer()
 
     # ❌ بستن
-    if data == "tastatur_close":
+    if data == "Tastatur_close":
         return await query.message.delete()
 
     # 🔙 بازگشت
-    if data == "tastatur_back":
-        return await panel_menu(update, context)
+    if data == "Tastatur_back":
+        return await Tastatur_menu(update, context)
 
     # ==================== 🔒 بخش قفل‌ها ====================
-    if data == "tastatur_locks":
+    if data == "Tastatur_locks":
         text = (
             "🔐 <b>مدیریت قفل‌ها</b>\n\n"
             "🔸 <b>دستورات فارسی:</b>\n"
@@ -64,10 +72,10 @@ async def panel_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "<code>lock links</code> / <code>unlock links</code>\n"
             "<code>lock media</code> / <code>unlock media</code>"
         )
-        return await _panel_section(query, text)
+        return await _Tastatur_section(query, text)
 
     # ==================== 👮 مدیریت کاربران ====================
-    if data == "tastatur_users":
+    if data == "Tastatur_users":
         text = (
             "👮 <b>مدیریت کاربران</b>\n\n"
             "• بن / رفع‌بن\n"
@@ -76,10 +84,10 @@ async def panel_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "• افزودن یا حذف مدیر\n"
             "• مشاهده لیست مدیران"
         )
-        return await _panel_section(query, text)
+        return await _Tastatur_section(query, text)
 
     # ==================== ⚙️ تنظیمات ====================
-    if data == "tastatur_settings":
+    if data == "Tastatur_settings":
         text = (
             "⚙️ <b>تنظیمات گروه</b>\n\n"
             "• قفل کل گروه یا باز کردن گروه\n"
@@ -87,10 +95,10 @@ async def panel_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "• پاکسازی گروه با دستور پاکسازی عددی\n"
             "• تغییر حالت یادگیری ربات"
         )
-        return await _panel_section(query, text)
+        return await _Tastatur_section(query, text)
 
     # ==================== 📊 آمار ====================
-    if data == "tastatur_stats":
+    if data == "Tastatur_stats":
         text = (
             "📊 <b>آمار و وضعیت گروه</b>\n\n"
             "• نمایش تعداد کاربران\n"
@@ -98,10 +106,10 @@ async def panel_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "• اعضای فعال و غیرفعال\n"
             "• مدیران برتر بر اساس فعالیت"
         )
-        return await _panel_section(query, text)
+        return await _Tastatur_section(query, text)
 
     # ==================== 🎮 سرگرمی ====================
-    if data == "tastatur_fun":
+    if data == "Tastatur_fun":
         text = (
             "🎮 <b>سرگرمی و ابزارها</b>\n\n"
             "• فال روزانه / جملات انگیزشی\n"
@@ -109,10 +117,10 @@ async def panel_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "• منشن کاربران (تگ‌همه / تگ‌فعال)\n"
             "• ابزارهای کوچک و جالب دیگر 😄"
         )
-        return await _panel_section(query, text)
+        return await _Tastatur_section(query, text)
 
     # ==================== 🧩 دستورات شخصی ====================
-    if data == "tastatur_alias":
+    if data == "Tastatur_alias":
         text = (
             "🧩 <b>دستورات شخصی (Alias)</b>\n\n"
             "با این قابلیت می‌تونی برای دستورات، نام جدید بسازی 👇\n\n"
@@ -123,15 +131,19 @@ async def panel_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "🔹 <b>لیست aliasها:</b>\n"
             "<code>listsudo</code> یا دستور مخصوص نمایش"
         )
-        return await _panel_section(query, text)
+        return await _Tastatur_section(query, text)
 
 
 # 🔙 ساخت زیرمنو با بازگشت و بستن
-async def _panel_section(query, text):
+async def _Tastatur_section(query, text):
     keyboard = [
         [
-            InlineKeyboardButton("🔙 بازگشت", callback_data="tastatur_back"),
-            InlineKeyboardButton("❌ بستن", callback_data="tastatur_close")
+            InlineKeyboardButton("🔙 بازگشت", callback_data="Tastatur_back"),
+            InlineKeyboardButton("❌ بستن", callback_data="Tastatur_close")
         ]
     ]
-    await query.edit_message_text(text, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(keyboard))
+    await query.edit_message_text(
+        text,
+        parse_mode="HTML",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
