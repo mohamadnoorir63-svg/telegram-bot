@@ -2019,14 +2019,13 @@ if __name__ == "__main__":
     application.add_handler(CommandHandler("lock", lock_learning))
     application.add_handler(CommandHandler("unlock", unlock_learning))
     application.add_handler(CommandHandler("mode", mode_change))
-    # 🎛 فعال‌سازی Tastatur راهنمای فارسی (فقط در گروه‌ها)
     application.add_handler(
         MessageHandler(filters.TEXT & filters.Regex(r"^پنل$"), Tastatur_menu),
         group=-3
     )
     application.add_handler(
-    CallbackQueryHandler(Tastatur_buttons, pattern="^Tastatur_"),
-    group=-3
+        CallbackQueryHandler(Tastatur_buttons, pattern="^Tastatur_"),
+        group=-3
     )
     application.add_handler(CommandHandler("stats", stats))
     application.add_handler(CommandHandler("fullstats", fullstats))
