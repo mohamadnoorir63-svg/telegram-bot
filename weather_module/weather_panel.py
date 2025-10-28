@@ -52,7 +52,7 @@ async def show_weather(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await process_weather(update, city)
         return
 
-    # 🌐 در گروه‌ها و خصوصی فقط وقتی جواب بده که با «آب و هوای» شروع بشه
+    # 🌤 فقط وقتی پیام با «آب و هوای» شروع شود
     text = (update.message.text or "").strip()
     pattern = r"^آب[\s‌]*و[\s‌]*هوا(?:ی)?\s+([\u0600-\u06FF\s]+)$"
     match = re.match(pattern, text)
@@ -60,6 +60,7 @@ async def show_weather(update: Update, context: ContextTypes.DEFAULT_TYPE):
         city = match.group(1).strip()
         if len(city) > 1:
             await process_weather(update, city)
+    # بقیه پیام‌ها به مسیر خودشون (مثل پاسخ هوش مصنوعی) می‌رن
     return
 
 # ======================= 🧩 پردازش نهایی =======================
