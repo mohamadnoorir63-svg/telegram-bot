@@ -296,81 +296,33 @@ async def register_user(user):
         data.append({"id": user.id, "name": user.first_name})
         with open(USERS_FILE, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
-# ======================= ✳️ شروع و پیام فعال‌سازی =======================
 
+# ======================= 🚀 استارت خنگول =======================
 
-# ======================= 🚀 استارت سینمایی خفن خنگول =======================
-# ======================= 📢 اطلاع به ادمین هنگام استارت =======================
-async def notify_admin_on_startup(app):
-    """ارسال پیام فعال‌سازی به ادمین هنگام استارت"""
-    ADMIN_ID = int(os.getenv("ADMIN_ID", "7089376754"))  # اگر از قبل داری، خطش رو تکرار نکن
-    try:
-        await app.bot.send_message(
-            chat_id=ADMIN_ID,
-            text="🚀 ربات خنگول با موفقیت راه‌اندازی شد ✅"
-        )
-        print("[INFO] Startup notification sent ✅")
-    except Exception as e:
-        print(f"[ERROR] Failed to notify admin: {e}")
+from datetime import datetime
+from telegram import Update
+from telegram.ext import ContextTypes
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    from datetime import datetime
-
+    """شروع ربات خنگول با پیام زیبا و نمایش پنل اصلی"""
     user = update.effective_user
     now = datetime.now().strftime("%Y/%m/%d - %H:%M:%S")
 
-    # مرحله اول: شروع بوت
-    msg = await update.message.reply_text(
-        f"🧠 <b>در حال راه‌اندازی سیستم خنگول...</b>\n"
-        f"👤 کاربر: <b>{user.first_name}</b>\n"
-        f"🕓 زمان اجرا: <code>{now}</code>",
-        parse_mode="HTML"
+    start_text = (
+        "🤖 <b>سلام خنگول فعال شد!</b>\n\n"
+        f"👤 <b>کاربر:</b> {user.first_name}\n"
+        f"🕓 <b>زمان اجرا:</b> <code>{now}</code>\n\n"
+        "💬 آماده‌ای برای خنده، احساس و هوش مصنوعی؟ 😎\n"
+        "👇 از دکمه‌های زیر یکی رو انتخاب کن 👇"
     )
 
-    # مراحل بوت خنگول با افکت نوری
-    steps = [
-        "📡 اتصال به مغز مرکزی...",
-        "🔍 بررسی سلامت حافظه و داده‌ها...",
-        "💬 بارگذاری سیستم شوخ‌طبعی...",
-        "🎭 فعال‌سازی احساسات دیجیتالی...",
-        "🤖 در حال همگام‌سازی با نسخه Cloud+ Supreme...",
-        "🚀 آماده به خدمت 😎"
-    ]
+    # ✅ ارسال پیام خوش‌آمد با استایل HTML
+    await update.message.reply_text(start_text, parse_mode="HTML")
 
-    colors = ["🔵", "🟢", "🟣", "🟡", "🔴"]
-    bar_len = 14
-
-    for i, step in enumerate(steps, start=1):
-        percent = int((i / len(steps)) * 100)
-        color = colors[i % len(colors)]
-        filled = "█" * int(bar_len * (percent / 100))
-        empty = "░" * (bar_len - len(filled))
-        bar = f"{color}[{filled}{empty}] {percent}%"
-
-        await asyncio.sleep(1.1)
-        try:
-            await msg.edit_text(
-                f"🧠 <b>بوت سیستم خنگول...</b>\n\n{bar}\n\n{step}\n\n"
-                f"👤 کاربر: <b>{user.first_name}</b>\n"
-                f"🕓 <code>{now}</code>",
-                parse_mode="HTML"
-            )
-        except:
-            pass
-
-    # پایان بوت و نمایش خوشامد نهایی
-    await asyncio.sleep(1.2)
-    await msg.edit_text(
-        f"✨ <b>سیستم خنگول فارسی با موفقیت راه‌اندازی شد!</b>\n\n"
-        f"👤 کاربر: <b>{user.first_name}</b>\n"
-        f"🕓 زمان اجرا: <code>{now}</code>\n"
-        "💬 آماده‌ای برای خنده، احساس و هوش مصنوعی 😎\n\n"
-        "👇 از دکمه‌های زیر استفاده کن:",
-        parse_mode="HTML"
-    )
-
-    # نمایش پنل اصلی بعد از افکت نهایی
-    await asyncio.sleep(0.8)
+    # ✅ نمایش منوی اصلی ربات بلافاصله بعد از پیام خوشامد
     await show_main_panel(update, context)
+
+ 
 # ======================= ⚙️ خطایاب خودکار =======================
 async def handle_error(update: object, context: ContextTypes.DEFAULT_TYPE):
     error_text = f"⚠️ خطا در ربات:\n\n{context.error}"
@@ -439,14 +391,22 @@ async def detect_admin_movement(update: Update, context: ContextTypes.DEFAULT_TY
         )
         await message.reply_text(text, parse_mode="HTML")
 
-# ======================= 🤖 پاسخ اختصاصی به کلمه "ربات" برای سودو =======================
+# ==========================================================
+# 🤖 پاسخ ویژه برای سازنده (سودو اصلی)
+# ==========================================================
+import os
+import random
+from telegram import Update
+from telegram.ext import ContextTypes
+
 async def sudo_bot_call(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """وقتی سازنده بگه 'ربات' — پاسخ‌های ویژه فقط برای سودو"""
+    """وقتی سازنده پیام «ربات» بفرسته — پاسخ‌های مخصوص فقط برای سودو اصلی"""
     ADMIN_ID = int(os.getenv("ADMIN_ID", "7089376754"))
     user_id = update.effective_user.id
 
+    # 🚫 فقط برای ادمین اصلی (سودو)
     if user_id != ADMIN_ID:
-        return  # فقط برای سازنده فعاله
+        return
 
     replies = [
         "👑 جانم سودو؟ 😎",
@@ -458,6 +418,7 @@ async def sudo_bot_call(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "🔥 بگو رئیس، منتظرم!"
     ]
 
+    # 🎲 انتخاب تصادفی پاسخ
     reply = random.choice(replies)
     await update.message.reply_text(reply)
 # ======================= 🎭 تغییر مود =======================
@@ -492,14 +453,21 @@ async def unlock_learning(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ======================= 📊 آمار خنگول واقعی =======================
 async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """نمایش آمار کلی — فقط برای مدیر اصلی یا سودوها"""
+    ADMIN_ID = int(os.getenv("ADMIN_ID", "7089376754"))
+    user = update.effective_user
+    user_id = user.id
+
+    # ✅ فقط مدیر اصلی یا سودوها مجازند
+    if user_id != ADMIN_ID and user_id not in SUDO_IDS:
+        return await update.message.reply_text("⛔ فقط مدیر اصلی یا سودوها اجازه مشاهده آمار را دارند.")
+
+    # 🧠 دریافت اطلاعات از حافظه و فایل گروه‌ها
     data = get_stats()
     groups_data = load_data("group_data.json").get("groups", [])
 
     # ✅ شمارش گروه‌ها (سازگار با دیکشنری یا لیست)
-    if isinstance(groups_data, dict):
-        groups = len(groups_data)
-    else:
-        groups = len(groups_data)
+    groups = len(groups_data) if isinstance(groups_data, (dict, list)) else 0
 
     # ✅ شمارش کاربران از users.json
     users_list = []
@@ -510,6 +478,7 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 users_list = json.load(f)
         except:
             users_list = []
+
     users = len(users_list)
 
     # ✅ ساخت پیام نهایی
@@ -519,25 +488,36 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"👥 گروه‌های فعال: <b>{groups}</b>\n"
         f"🧩 جملات ذخیره‌شده: <b>{data['phrases']}</b>\n"
         f"💬 پاسخ‌های یادگرفته: <b>{data['responses']}</b>\n"
-        f"🎭 مود فعلی: <b>{data['mode']}</b>"
+        f"🎭 مود فعلی: <b>{data['mode']}</b>\n"
+        f"━━━━━━━━━━━━━━━\n"
+        f"📨 <i>درخواست توسط:</i> <b>{user.first_name}</b> (<code>{user_id}</code>)"
     )
 
     await update.message.reply_text(msg, parse_mode="HTML")
 
-# ======================= 📊 آمار کامل گروه‌ها (اصلاح‌شده) =======================
+
+# ======================= 📊 آمار کامل گروه‌ها (فقط برای مدیر اصلی و سودوها) =======================
 async def fullstats(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """نمایش آمار فقط برای گروه‌ها (فیلتر کاربران از group_data.json)"""
+    """نمایش آمار فقط برای گروه‌ها — فقط مدیر اصلی و سودوها"""
+    ADMIN_ID = int(os.getenv("ADMIN_ID", "7089376754"))
+    user = update.effective_user
+    user_id = user.id
+
+    # ✅ فقط مدیر اصلی یا سودوها مجازند
+    if user_id != ADMIN_ID and user_id not in SUDO_IDS:
+        return await update.message.reply_text("⛔ فقط مدیر اصلی یا سودوها اجازه مشاهده آمار کامل گروه‌ها را دارند.")
+
     try:
         data = load_data("group_data.json")
         groups = data.get("groups", {})
 
-        text = "📈 آمار کامل گروه‌ها:\n\n"
+        text = "📈 <b>آمار کامل گروه‌ها:</b>\n\n"
 
-        # حالت 1: اگر groups لیست باشه
+        # ✅ حالت 1: اگر groups لیست باشه
         if isinstance(groups, list):
             valid_groups = [g for g in groups if str(g.get("id", "")).startswith("-")]
             if not valid_groups:
-                return await update.message.reply_text("ℹ️ هنوز هیچ گروهی ثبت نشده.")
+                return await update.message.reply_text("ℹ️ هنوز هیچ گروهی ثبت نشده.", parse_mode="HTML")
             for g in valid_groups:
                 group_id = g.get("id")
                 title = g.get("title", f"Group_{group_id}")
@@ -550,13 +530,17 @@ async def fullstats(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 except:
                     pass
 
-                text += f"🏠 گروه: {title}\n👥 اعضا: {members}\n🕓 آخرین فعالیت: {last_active}\n\n"
+                text += (
+                    f"🏠 <b>گروه:</b> {title}\n"
+                    f"👥 <b>اعضا:</b> {members}\n"
+                    f"🕓 <b>آخرین فعالیت:</b> {last_active}\n\n"
+                )
 
-        # حالت 2: اگر groups دیکشنری باشه
+        # ✅ حالت 2: اگر groups دیکشنری باشه
         elif isinstance(groups, dict):
             valid_items = {gid: info for gid, info in groups.items() if str(gid).startswith("-")}
             if not valid_items:
-                return await update.message.reply_text("ℹ️ هنوز هیچ گروهی ثبت نشده.")
+                return await update.message.reply_text("ℹ️ هنوز هیچ گروهی ثبت نشده.", parse_mode="HTML")
             for gid, info in valid_items.items():
                 title = info.get("title", f"Group_{gid}")
                 members = len(info.get("members", []))
@@ -568,19 +552,23 @@ async def fullstats(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 except:
                     pass
 
-                text += f"🏠 گروه: {title}\n👥 اعضا: {members}\n🕓 آخرین فعالیت: {last_active}\n\n"
+                text += (
+                    f"🏠 <b>گروه:</b> {title}\n"
+                    f"👥 <b>اعضا:</b> {members}\n"
+                    f"🕓 <b>آخرین فعالیت:</b> {last_active}\n\n"
+                )
 
         else:
-            return await update.message.reply_text("⚠️ ساختار فایل group_data.json نامعتبر است!")
+            return await update.message.reply_text("⚠️ ساختار فایل group_data.json نامعتبر است!", parse_mode="HTML")
 
+        # جلوگیری از پیام بیش از حد طولانی
         if len(text) > 4000:
             text = text[:3990] + "..."
 
-        await update.message.reply_text(text)
+        await update.message.reply_text(text, parse_mode="HTML")
 
     except Exception as e:
         await update.message.reply_text(f"⚠️ خطا در آمار گروه‌ها:\n{e}")
- 
 # ======================= 👋 سیستم خوشامد پویا برای هر گروه =======================
 
 from telegram import InlineKeyboardMarkup, InlineKeyboardButton, Update
@@ -1724,7 +1712,9 @@ async def load_text(file_name, default_text):
     # ======================= 🎛 پنل اصلی خنگول =======================
 from telegram import InlineKeyboardMarkup, InlineKeyboardButton, Update
 from telegram.ext import ContextTypes
+from modules.azan_module import get_azan_time  # 📿 ماژول اذان موجود در پروژه‌ات
 
+# 🎛 منوی اصلی خنگول
 async def show_main_panel(update: Update, context: ContextTypes.DEFAULT_TYPE, edit=False):
     about = "🌙 <b>به منوی اصلی خنگول خوش آمدی!</b>\nاز دکمه‌های زیر یکی رو انتخاب کن 😎"
 
@@ -1750,10 +1740,11 @@ async def show_main_panel(update: Update, context: ContextTypes.DEFAULT_TYPE, ed
             InlineKeyboardButton("💳 آیدی خنگولی من", callback_data="panel_stats")
         ],
         [
-            InlineKeyboardButton("🧠 گفتگوی ChatGPT", callback_data="panel_chatgpt")
+            InlineKeyboardButton("🧠 گفتگوی ChatGPT", callback_data="panel_chatgpt"),
+            InlineKeyboardButton("🌤 آب و هوا", callback_data="panel_weather")
         ],
         [
-            InlineKeyboardButton("🌤 آب و هوا", callback_data="panel_weather")
+            InlineKeyboardButton("🕌 زمان اذان", callback_data="panel_azan")
         ]
     ]
 
@@ -1763,6 +1754,32 @@ async def show_main_panel(update: Update, context: ContextTypes.DEFAULT_TYPE, ed
         await update.callback_query.edit_message_text(about, reply_markup=markup, parse_mode="HTML")
     else:
         await update.message.reply_text(about, reply_markup=markup, parse_mode="HTML")
+
+# 📿 وقتی کاربر گزینه اذان رو زد
+async def handle_panel_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    data = query.data
+    await query.answer()
+
+    if data == "panel_azan":
+        await query.edit_message_text(
+            "🕌 لطفاً نام شهر خود را بنویسید تا زمان اذان برایتان نمایش داده شود 🌙",
+            parse_mode="HTML"
+        )
+        context.user_data["awaiting_city_for_azan"] = True
+        return
+
+# 📍 زمانی که کاربر شهر را می‌فرستد
+async def handle_city_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if context.user_data.get("awaiting_city_for_azan"):
+        city = update.message.text.strip()
+        await update.message.reply_text("🔍 در حال دریافت زمان اذان...")
+        try:
+            azan_text = get_azan_time(city)
+            await update.message.reply_text(azan_text, parse_mode="HTML")
+        except Exception as e:
+            await update.message.reply_text(f"⚠️ خطا در دریافت اطلاعات برای {city}:\n{e}")
+        context.user_data["awaiting_city_for_azan"] = False
         # ======================= 🎛 بازگشت از منوی فونت یا سایر قابلیت‌ها =======================
 async def feature_back(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
