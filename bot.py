@@ -2051,7 +2051,15 @@ if __name__ == "__main__":
     # ==========================================================
     # 👑 مدیریت سودوها
     # ==========================================================
-    
+    async def list_sudos(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id not in SUDO_IDS:
+        return await update.message.reply_text("⛔ فقط سودوها مجازند!")
+
+    text = "👑 <b>لیست سودوهای فعلی:</b>\n\n"
+    for i, sid in enumerate(SUDO_IDS, start=1):
+        text += f"{i}. <code>{sid}</code>\n"
+
+    await update.message.reply_text(text, parse_mode="HTML")
     # ==========================================================
     # ⚙️ سیستم مدیریت گروه (اولویت بالا)
     # ==========================================================
