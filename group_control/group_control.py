@@ -968,8 +968,8 @@ async def execute_command(cmd, update, context):
     else:
         return await update.message.reply_text("⚠️ دستور ناشناخته.", parse_mode="HTML")
 
-async def group_command_handler(update: Update
-                                async def group_command_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+# ─────────────────────────────── Command Core ───────────────────────────────
+async def group_command_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """📡 هسته‌ی مرکزی تشخیص و اجرای دستورات فارسی/انگلیسی"""
     if not update.message or not update.message.text:
         return
