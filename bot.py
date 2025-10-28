@@ -2047,11 +2047,8 @@ if __name__ == "__main__":
     # 📌 افزودن هندلر برای هر دو حالت (my_chat_member و chat_member)
     application.add_handler(ChatMemberHandler(handle_bot_removed, ChatMemberHandler.MY_CHAT_MEMBER), group=-20)
     application.add_handler(ChatMemberHandler(handle_bot_removed, ChatMemberHandler.CHAT_MEMBER), group=-19)
-
-    # ==========================================================
-    # 👑 مدیریت سودوها
-    # ==========================================================
-    async def list_sudos(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    
+async def list_sudos(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id not in SUDO_IDS:
         return await update.message.reply_text("⛔ فقط سودوها مجازند!")
 
@@ -2061,6 +2058,7 @@ if __name__ == "__main__":
 
     await update.message.reply_text(text, parse_mode="HTML")
     # ==========================================================
+ 
     # ⚙️ سیستم مدیریت گروه (اولویت بالا)
     # ==========================================================
     application.add_handler(MessageHandler(filters.ALL, check_message_locks), group=-10)
