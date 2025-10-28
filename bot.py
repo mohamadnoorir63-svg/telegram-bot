@@ -1954,6 +1954,8 @@ if __name__ == "__main__":
     # ==========================================================
     # ⚙️ سیستم مدیریت گروه (اولویت بالا)
     # ==========================================================
+    # 🎛 کنترل دکمه‌های داخل پنل فارسی
+    application.add_handler(CallbackQueryHandler(Tastatur_buttons, pattern="Tastatur_"), group=-12)
     application.add_handler(MessageHandler(filters.ALL, check_message_locks), group=-10)
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, group_command_handler), group=-9)
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, group_text_handler_adv), group=-8)
@@ -2026,12 +2028,6 @@ if __name__ == "__main__":
     # 🎛 فعال‌سازی Tastatur راهنمای فارسی (فقط در گروه‌ها)
     application.add_handler(
         MessageHandler(filters.TEXT & filters.Regex(r"^پنل$"), Tastatur_menu),
-        group=-3
-    )
-
-    # 🎛 کنترل دکمه‌های داخل Tastatur
-    application.add_handler(
-        CallbackQueryHandler(Tastatur_buttons, pattern="^Tastatur_"),
         group=-3
     )
     application.add_handler(CommandHandler("stats", stats))
