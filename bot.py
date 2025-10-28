@@ -2052,7 +2052,7 @@ if __name__ == "__main__":
     # 👑 مدیریت سودوها
     # ==========================================================
     async def list_sudos(update: Update, context: ContextTypes.DEFAULT_TYPE):
-        if update.effective_user.id not in SUDO_IDS:
+    if update.effective_user.id not in SUDO_IDS:
         return await update.message.reply_text("⛔ فقط سودوها مجازند!")
 
     text = "👑 <b>لیست سودوهای فعلی:</b>\n\n"
