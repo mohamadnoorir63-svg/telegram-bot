@@ -74,7 +74,8 @@ from panels.panel_menu import (
     Tastatur_buttons,
     toggle_lock_button,
     handle_lock_page_switch,
-    handle_fun_buttons   # 👈 این خط خیلی مهمه
+    handle_fun_buttons,
+    handle_admin_buttons,   # 👈 اینو اضافه کن
 )
 from context_memory import ContextMemory
 from brain_bridge_group import process_group_message
