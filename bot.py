@@ -2091,29 +2091,35 @@ if __name__ == "__main__":
     application.add_handler(CommandHandler("lock", lock_learning))
     application.add_handler(CommandHandler("unlock", unlock_learning))
     application.add_handler(CommandHandler("mode", mode_change))
+    # 🎮 پنل اصلی و دکمه‌ها
     application.add_handler(
-    MessageHandler(filters.TEXT & filters.Regex(r"^پنل$"), Tastatur_menu),
-    group=-3
+        MessageHandler(filters.TEXT & filters.Regex(r"^پنل$"), Tastatur_menu),
+        group=-3
     )
-
     application.add_handler(
         CallbackQueryHandler(Tastatur_buttons, pattern="^Tastatur_"),
         group=-3
     )
 
+    # 🔐 قفل‌ها
     application.add_handler(
         CallbackQueryHandler(toggle_lock_button, pattern=r"^toggle_lock:"),
         group=-3
     )
-
     application.add_handler(
         CallbackQueryHandler(handle_lock_page_switch, pattern=r"^lock_page:"),
         group=-3
     )
 
-    # 🎮 مدیریت دکمه‌های بخش سرگرمی‌ها
+    # 🎮 سرگرمی‌ها
     application.add_handler(
         CallbackQueryHandler(handle_fun_buttons, pattern=r"^fun_"),
+        group=-3
+    )
+
+    # 👮 مدیریت گروه
+    application.add_handler(
+        CallbackQueryHandler(handle_admin_buttons, pattern=r"^admin_"),
         group=-3
     )
     application.add_handler(CommandHandler("stats", stats))
