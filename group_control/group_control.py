@@ -55,26 +55,28 @@ origins_db  = _load_json(ORIGINS_FILE, {})     # {"chat_id": {"origins": {uid: t
 nicks_db    = _load_json(NICKS_FILE, {})       # {"chat_id": {uid: nick}}
 
 # ─────────────────────────────── Access Control ───────────────────────────────
-SUDO_IDS = [1777319036, 7089376754]
-
+# ✅ بررسی دسترسی: سودو / مدیر واقعی / مدیر ثبت‌شده با ربات
 async def is_authorized(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
     user = update.effective_user
     chat = update.effective_chat
     if not user or not chat:
         return False
+
+    uid = str(user.id)
+    cid = str(chat.id)
+
+    # سودو همیشه مجازه
     if user.id in SUDO_IDS:
         return True
+
+    # مدیر ثبت‌شده با ربات (دستور افزودن مدیر)
+    admins = group_data.get(cid, {}).get("admins", [])
+    if uid in admins:
+        return True
+
+    # مدیر واقعی تلگرام
     try:
         member = await context.bot.get_chat_member(chat.id, user.id)
-        return member.status in ("administrator", "creator")
-    except:
-        return False
-
-async def _is_admin_or_sudo_uid(context, chat_id: int, user_id: int) -> bool:
-    if user_id in SUDO_IDS:
-        return True
-    try:
-        member = await context.bot.get_chat_member(chat_id, user_id)
         return member.status in ("administrator", "creator")
     except:
         return False
