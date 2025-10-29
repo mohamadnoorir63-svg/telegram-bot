@@ -1173,7 +1173,7 @@ async def execute_command(cmd, update, context):
         "filters": handle_filters,
         # ───── مدیریت مدیران ─────
         "addadmin": ["افزودن مدیر", "مدیر کن", "add admin"],
-   b    "removeadmin": ["حذف مدیر", "بردار مدیر", "remove admin"],
+        "removeadmin": ["حذف مدیر", "بردار مدیر", "remove admin"],
         "admins": ["لیست مدیران", "مدیران", "admins"],
         "clearadmins": ["پاکسازی مدیران", "پاک مدیران", "clear admins"],
         # بن / سکوت / اخطار
