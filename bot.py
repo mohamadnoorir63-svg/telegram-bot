@@ -197,7 +197,7 @@ def is_valid_message(update):
             "لقب", "اصل", "تگ", "پاکسازی", "گروه", "مدیر", "سودو"
         ]
         if any(text.startswith(word) for word in command_keywords):
-            return  # ⛔ این پیام یه دستوره، نباید سخنگو جواب بده
+            return False  # ⛔ این پیام یه دستوره، نباید سخنگو جواب بده
 
     text = msg.text or msg.caption or ""
     if not text.strip():
