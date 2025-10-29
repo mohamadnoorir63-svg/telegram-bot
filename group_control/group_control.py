@@ -1268,27 +1268,7 @@ async def execute_command(cmd, update, context):
     else:
         return await update.message.reply_text("⚠️ دستور ناشناخته.", parse_mode="HTML")
 # ─────────────────────────────── Command Core ───────────────────────────────
-# ─────────────────────────────── Alias + Command Mapping ───────────────────────────────
-DEFAULT_ALIASES = {
-    # ...
-}
 
-if not ALIASES:
-    ALIASES = DEFAULT_ALIASES
-    _save_json(ALIASES_FILE, ALIASES)
-
-
-async def execute_command(cmd, update, context):
-    mapping = {
-        # اینجا همه‌ی handleها (از جمله handle_addadmin و handle_lockgroup و غیره)
-    }
-    if cmd in mapping:
-        return await mapping[cmd](update, context)
-    else:
-        return await update.message.reply_text("⚠️ دستور ناشناخته.", parse_mode="HTML")
-
-
-# ─────────────────────────────── Command Core ───────────────────────────────
 async def group_command_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """📡 هسته‌ی مرکزی تشخیص و اجرای دستورات فارسی/انگلیسی"""
     if not update.message or not update.message.text:
