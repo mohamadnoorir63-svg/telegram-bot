@@ -55,6 +55,26 @@ origins_db  = _load_json(ORIGINS_FILE, {})     # {"chat_id": {"origins": {uid: t
 nicks_db    = _load_json(NICKS_FILE, {})       # {"chat_id": {uid: nick}}
 
 # ─────────────────────────────── Access Control ───────────────────────────────
+# ✅ بررسی با شناسه (بدون نیاز به Update)
+async def _is_admin_or_sudo_uid(context, chat_id: int, user_id: int) -> bool:
+    uid = str(user_id)
+    cid = str(chat_id)
+
+    # سودو همیشه مجازه
+    if user_id in SUDO_IDS:
+        return True
+
+    # مدیر ثبت‌شده با ربات
+    admins = group_data.get(cid, {}).get("admins", [])
+    if uid in admins:
+        return True
+
+    # مدیر واقعی تلگرام
+    try:
+        member = await context.bot.get_chat_member(chat_id, user_id)
+        return member.status in ("administrator", "creator")
+    except:
+        return False
 # ✅ بررسی دسترسی: سودو / مدیر واقعی / مدیر ثبت‌شده با ربات
 async def is_authorized(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
     user = update.effective_user
@@ -580,24 +600,36 @@ def _ensure_user_system(chat_id: str):
     g.setdefault("warns", {})
     group_data[chat_id] = g
 
-
-# 🔒 کمکی برای بررسی نقش کاربر
+# ✅ بررسی اینکه هدف، سودو / مدیر واقعی / مدیر ثبت‌شده با ربات نباشد
 async def _check_protected_target(update, context, target):
-    """بررسی اینکه آیا هدف، خود ربات یا مدیر/سودو است"""
     bot_id = context.bot.id
+    chat_id = str(update.effective_chat.id)
+
+    # ⛔ روی خود ربات
     if target.id == bot_id:
         await update.message.reply_text("😅 من نمی‌تونم روی خودم کاری انجام بدم!")
         return True
+
+    # ⛔ روی سودو
     if target.id in SUDO_IDS:
         await update.message.reply_text("😎 من نمی‌تونم سازنده‌ام رو محدود کنم!")
         return True
+
+    # ⛔ روی مدیر ثبت‌شده با ربات
+    admins = group_data.get(chat_id, {}).get("admins", [])
+    if str(target.id) in admins:
+        await update.message.reply_text("👑 من نمی‌تونم مدیر ثبت‌شده با ربات رو محدود کنم!")
+        return True
+
+    # ⛔ روی مدیر یا صاحب واقعی گروه
     try:
         member = await context.bot.get_chat_member(update.effective_chat.id, target.id)
         if member.status in ("administrator", "creator"):
-            await update.message.reply_text("👮‍♂️ من نمی‌تونم مدیر گروه رو محدود کنم!")
+            await update.message.reply_text("👮‍♂️ من نمی‌تونم مدیر واقعی گروه رو محدود کنم!")
             return True
     except:
         pass
+
     return False
 
 
