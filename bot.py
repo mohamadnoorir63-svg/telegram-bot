@@ -69,7 +69,8 @@ from group_control.daily_stats import (
     send_nightly_stats
 )
 
-
+from panels.panel_menu import toggle_lock_button
+application.add_handler(CallbackQueryHandler(toggle_lock_button, pattern=r"^toggle_lock:"))
 from context_memory import ContextMemory
 from brain_bridge_group import process_group_message
 
