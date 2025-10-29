@@ -1346,3 +1346,57 @@ async def group_command_handler(update: Update, context: ContextTypes.DEFAULT_TY
 
 # ─────────────────────────────── پایان فایل ───────────────────────────────
 print("✅ [Group Control System] با موفقیت بارگذاری شد.")
+# ─────────────────────────────── Bot Join / Leave ───────────────────────────────
+async def handle_bot_added(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """وقتی ربات به گروه اضافه می‌شود (my_chat_member). ساختار گروه را می‌سازد و پیام خوش‌آمد می‌دهد."""
+    member = update.my_chat_member or update.chat_member
+    if not member:
+        return
+
+    # بررسی اینکه خود ربات تازه عضو شده
+    new_status = member.new_chat_member.status
+    if new_status not in ("member", "administrator", "creator"):
+        return
+
+    chat = update.effective_chat
+    if not chat:
+        return
+    chat_id = str(chat.id)
+
+    # اگر گروه هنوز در دیتابیس ثبت نشده، ساختار پایه بساز
+    if chat_id not in group_data:
+        group_data[chat_id] = {
+            "locks": {},
+            "admins": [],
+            "auto_lock": {},
+            "bans": [],
+            "mutes": {},
+            "warns": {},
+        }
+        _save_json(GROUP_CTRL_FILE, group_data)
+
+    try:
+        await context.bot.send_message(
+            chat.id,
+            f"🤖 سلام! من به گروه <b>{chat.title or chat.id}</b> اضافه شدم.\n\n"
+            "برای شروع، دستور «افزودن مدیر» یا «قفل لینک» رو امتحان کن 😎",
+            parse_mode="HTML"
+        )
+    except:
+        pass
+
+
+async def handle_bot_removed(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """وقتی ربات از گروه حذف می‌شود، داده‌های گروه حذف می‌گردد."""
+    member = update.my_chat_member or update.chat_member
+    if not member:
+        return
+
+    status = member.new_chat_member.status
+    chat_id = str(update.effective_chat.id)
+
+    if status in ("kicked", "left"):
+        if chat_id in group_data:
+            del group_data[chat_id]
+            _save_json(GROUP_CTRL_FILE, group_data)
+            print(f"🧹 داده‌های گروه {chat_id} حذف شدند (ربات از گروه خارج شد).")
