@@ -226,32 +226,34 @@ _emoji_pat = re.compile(
     r"[\U0001F300-\U0001F6FF\U0001F900-\U0001FAFF\U0001F1E6-\U0001F1FF"
     r"\U00002700-\U000027BF\U00002600-\U000026FF]"
 )
-
 def _emoji_only(s: str) -> bool:
     s = s.strip()
     if not s:
         return False
     non = re.sub(_emoji_pat, "", s)
     return non.strip() == ""
-    
-    
-    async def check_message_locks(update: Update, context: ContextTypes.DEFAULT_TYPE):
-        msg = update.effective_message
-        chat = update.effective_chat
-        user = update.effective_user
+
+
+async def check_message_locks(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    msg = update.effective_message
+    chat = update.effective_chat
+    user = update.effective_user
     if not msg or not chat or not user:
         return
+
     # معاف: مدیر یا سودو
     if await _is_admin_or_sudo_uid(context, chat.id, user.id):
         return
+
     locks = _locks_get(chat.id)
     if not locks:
         # اگر فیلتر کلمات داریم، پایین‌تر چک می‌شود
         pass
+
     # 🟢 متن پیام (شامل کپشن)
     text = (msg.text or msg.caption or "")
-    text_l = text.lower(
-    )
+    text_l = text.lower()
+
     async def _del(reason: str, filtered_word: str = None):
         """حذف پیام + نمایش پیام هشدار زیبا (با نام کاربر و کلمه فیلترشده)"""
         try:
@@ -286,6 +288,7 @@ def _emoji_only(s: str) -> bool:
             if w and w in tl:
                 await _del("کلمه فیلتر شده", filtered_word=w)
                 return
+
                 
     # 🔍 بررسی فیلتر کلمات (ادغام‌شده)
     chat_id = str(chat.id)
