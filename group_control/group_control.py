@@ -249,6 +249,16 @@ async def check_message_locks(update: Update, context: ContextTypes.DEFAULT_TYPE
         # اگر فیلتر کلمات داریم، پایین‌تر چک می‌شود (ادغام شده)
         pass
         
+        # ── فیلتر کلمات (ادغام شده)
+chat_id = str(chat.id)
+chat_filters = filters_db.get(chat_id, [])
+if msg.text and chat_filters:
+    tl = msg.text.lower()
+    for w in chat_filters:
+        if w and w in tl:
+            await _del("کلمه فیلتر شده", filtered_word=w)
+            return
+            
         # 🟢 متن پیام (شامل کپشن)
     text = (msg.text or msg.caption or "")
     text_l = text.lower()
