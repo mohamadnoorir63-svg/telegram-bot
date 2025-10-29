@@ -2104,6 +2104,9 @@ if __name__ == "__main__":
     )
     application.add_handler(
         CallbackQueryHandler(handle_lock_page_switch, pattern=r"^lock_page:"),
+    # 🎮 مدیریت دکمه‌های بخش سرگرمی‌ها
+    application.add_handler(
+        CallbackQueryHandler(handle_fun_buttons, pattern=r"^fun_"),
         group=-3
     )
     application.add_handler(CommandHandler("stats", stats))
