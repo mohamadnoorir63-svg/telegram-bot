@@ -1,13 +1,12 @@
-# ====================== 🧭 پنل راهنمای فارسی پیشرفته و رنگی (چندمرحله‌ای دو ستونه + کنترل قفل‌ها) ======================
+# ====================== 🧭 پنل مدیریت گروه — نسخه پیشرفته با کنترل زنده قفل‌ها ======================
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 from group_control.group_control import _locks_get, _locks_set, _save_json, group_data, GROUP_CTRL_FILE, LOCK_TYPES
 
-# 🌈 عنوان و طراحی اصلی
-MAIN_TITLE = "🌟 <b>پنل راهنمای ربات مدیریت گروه</b>\n\n🧭 از منوی زیر یکی از بخش‌ها را انتخاب کنید 👇"
+# 🌟 عنوان اصلی
+MAIN_TITLE = "🌟 <b>پنل راهنمای ربات مدیریت گروه</b>\n\n🧭 یکی از بخش‌های زیر را انتخاب کنید 👇"
 
-
-# 🎨 صفحه‌ی اصلی پنل
+# 🎨 منوی اصلی
 async def Tastatur_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat = update.effective_chat
     if chat.type not in ["group", "supergroup"]:
@@ -26,9 +25,7 @@ async def Tastatur_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
             InlineKeyboardButton("🎮 سرگرمی‌ها", callback_data="Tastatur_fun"),
             InlineKeyboardButton("🧩 دستورات شخصی", callback_data="Tastatur_alias")
         ],
-        [
-            InlineKeyboardButton("👋 خوشامدگویی", callback_data="Tastatur_welcome")
-        ],
+        [InlineKeyboardButton("👋 خوشامدگویی", callback_data="Tastatur_welcome")],
         [InlineKeyboardButton("❌ بستن پنل", callback_data="Tastatur_close")]
     ]
 
@@ -48,15 +45,15 @@ async def Tastatur_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if data == "Tastatur_close":
         return await query.message.delete()
 
-    # 🔙 بازگشت
+    # 🔙 بازگشت به منوی اصلی
     if data == "Tastatur_back":
         return await Tastatur_menu(update, context)
 
-    # ==================== 🔒 بخش قفل‌ها ====================
+    # 🔒 بخش قفل‌ها
     if data == "Tastatur_locks":
         return await show_lock_menu(query, context)
 
-    # دسته‌بندی قفل‌ها
+    # 🧩 دسته‌بندی قفل‌ها
     if data == "lock_cat_media":
         locks_map = {k: LOCK_TYPES[k] for k in ["photos", "videos", "gifs", "files", "voices", "vmsgs"]}
         return await show_lock_category(query, context, "🖼 رسانه‌ها", locks_map)
@@ -73,66 +70,17 @@ async def Tastatur_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
         locks_map = {k: LOCK_TYPES[k] for k in ["links", "ads", "usernames", "mention"]}
         return await show_lock_category(query, context, "🌐 لینک‌ها و تبلیغ", locks_map)
 
-    # ==================== 👮 مدیریت کاربران ====================
-    if data == "Tastatur_users":
-        text = (
-            "👮 <b>مدیریت کاربران</b>\n\n"
-            "• بن / رفع‌بن\n"
-            "• اخطار / حذف‌اخطار\n"
-            "• سکوت / رفع‌سکوت\n"
-            "• افزودن یا حذف مدیر\n"
-            "• مشاهده لیست مدیران"
-        )
-        return await _Tastatur_section(query, text)
-
-    # ==================== ⚙️ تنظیمات ====================
-    if data == "Tastatur_settings":
-        text = (
-            "⚙️ <b>تنظیمات گروه</b>\n\n"
-            "• قفل کل گروه یا باز کردن گروه\n"
-            "• فعال یا غیرفعال کردن خوش‌آمدگویی\n"
-            "• پاکسازی گروه با دستور پاکسازی عددی\n"
-            "• تغییر حالت یادگیری ربات"
-        )
-        return await _Tastatur_section(query, text)
-
-    # ==================== 📊 آمار ====================
-    if data == "Tastatur_stats":
-        text = (
-            "📊 <b>آمار و وضعیت گروه</b>\n\n"
-            "• نمایش تعداد کاربران\n"
-            "• تعداد پیام‌های امروز و هفته\n"
-            "• اعضای فعال و غیرفعال\n"
-            "• مدیران برتر بر اساس فعالیت"
-        )
-        return await _Tastatur_section(query, text)
-
-    # ==================== 🎮 سرگرمی ====================
-    if data == "Tastatur_fun":
-        text = (
-            "🎮 <b>سرگرمی‌ها و ابزارها</b>\n\n"
-            "🌤 آب‌وهوا | 🔮 فال روزانه | 😂 جوک و لطیفه\n"
-            "🪪 ابزارهای مفید مثل آیدی، بیو، فونت و..."
-        )
-        return await _Tastatur_section(query, text)
-
-    # ==================== 🧩 Alias ====================
-    if data == "Tastatur_alias":
-        text = (
-            "🧩 <b>دستورات شخصی (Alias)</b>\n\n"
-            "با این قابلیت می‌تونی برای دستورات نام جدید بسازی 👇\n\n"
-            "🔹 مثال:\n"
-            "<code>افزودن دستور \"گمشو\" → ban</code>"
-        )
-        return await _Tastatur_section(query, text)
-
-    # ==================== 👋 خوشامدگویی ====================
-    if data == "Tastatur_welcome":
-        text = (
-            "👋 <b>سیستم خوشامدگویی پیشرفته</b>\n\n"
-            "با فعال بودن، ربات به تازه‌واردها پیام خوش‌آمد می‌فرسته 💬"
-        )
-        return await _Tastatur_section(query, text)
+    # ==================== سایر بخش‌ها ====================
+    sections = {
+        "Tastatur_users": "👮 <b>مدیریت کاربران</b>\n\n• بن / رفع‌بن\n• اخطار / حذف‌اخطار\n• سکوت / رفع‌سکوت\n• افزودن یا حذف مدیر\n• لیست مدیران",
+        "Tastatur_settings": "⚙️ <b>تنظیمات گروه</b>\n\n• قفل یا بازکردن کل گروه\n• فعال‌سازی خوش‌آمدگویی\n• پاکسازی گروه\n• تنظیم حالت یادگیری",
+        "Tastatur_stats": "📊 <b>آمار و گزارش</b>\n\n• آمار کاربران و پیام‌ها\n• فعالیت مدیران\n• اعضای فعال و غیرفعال",
+        "Tastatur_fun": "🎮 <b>سرگرمی‌ها و ابزارها</b>\n\n🌤 آب‌وهوا | 🔮 فال | 😂 جوک | 🪪 ابزارها و فونت",
+        "Tastatur_alias": "🧩 <b>دستورات شخصی (Alias)</b>\n\nمثلاً:\n<code>افزودن دستور \"گمشو\" → ban</code>",
+        "Tastatur_welcome": "👋 <b>سیستم خوشامدگویی</b>\n\nارسال پیام خوش‌آمد خودکار به تازه‌واردها 💬"
+    }
+    if data in sections:
+        return await _Tastatur_section(query, sections[data])
 
 
 # ========================= 🔙 زیرمنوها و قفل‌ها =========================
@@ -147,10 +95,14 @@ async def _Tastatur_section(query, text):
     await query.edit_message_text(text, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(keyboard))
 
 
-# ====================== 🔒 سیستم کنترل قفل‌ها ======================
+# ====================== 🔒 کنترل و نمایش قفل‌ها ======================
+
 async def show_lock_menu(query, context):
     """صفحه‌ی دسته‌بندی قفل‌ها"""
-    text = "🔐 <b>دسته‌بندی قفل‌های گروه</b>\n\nنوع قفلی که می‌خوای تنظیم کنی رو انتخاب کن 👇"
+    text = (
+        "🔐 <b>مدیریت قفل‌های گروه</b>\n\n"
+        "نوع قفلی که می‌خواهی تنظیم کنی را انتخاب کن 👇"
+    )
     keyboard = [
         [InlineKeyboardButton("🖼 رسانه‌ها", callback_data="lock_cat_media")],
         [InlineKeyboardButton("💬 پیام‌ها و متون", callback_data="lock_cat_text")],
@@ -162,29 +114,27 @@ async def show_lock_menu(query, context):
 
 
 async def show_lock_category(query, context, category, locks_map):
-    """نمایش لیست قفل‌های هر دسته"""
-    chat_id = str(query.message.chat.id)
+    """نمایش وضعیت هر قفل در دسته مربوطه"""
+    chat_id = query.message.chat.id
     locks = _locks_get(chat_id)
-    keyboard = []
-    # دکمه‌ها دو‌ستونه
-    row = []
+    keyboard, row = [], []
+
     for key, label in locks_map.items():
-        state = "🔒" if locks.get(key) else "🔓"
-        btn = InlineKeyboardButton(f"{state} {label}", callback_data=f"toggle_lock:{key}")
+        state = locks.get(key, False)
+        icon = "🔒 فعال" if state else "🔓 غیرفعال"
+        btn = InlineKeyboardButton(f"{label} | {icon}", callback_data=f"toggle_lock:{key}")
         row.append(btn)
-        if len(row) == 2:
+        if len(row) == 1:  # یک‌ستونه زیباتر دیده می‌شود
             keyboard.append(row)
             row = []
-    if row:
-        keyboard.append(row)
 
     keyboard.append([InlineKeyboardButton("🔙 بازگشت", callback_data="Tastatur_locks")])
-    text = f"⚙️ <b>تنظیمات قفل‌های {category}</b>\n\nروی هر مورد بزن تا فعال یا غیرفعال شود 👇"
+    text = f"⚙️ <b>تنظیمات قفل‌های {category}</b>\n\nروی هر مورد بزن تا روشن یا خاموش شود 👇"
     await query.edit_message_text(text, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(keyboard))
 
 
 async def toggle_lock_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """روشن/خاموش کردن هر قفل"""
+    """روشن / خاموش کردن قفل با دکمه"""
     query = update.callback_query
     await query.answer()
     data = query.data
@@ -193,20 +143,29 @@ async def toggle_lock_button(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
     chat_id = query.message.chat.id
     lock_key = data.split(":", 1)[1]
+
+    # وضعیت فعلی را برعکس کن
     locks = _locks_get(chat_id)
     current_state = locks.get(lock_key, False)
     _locks_set(chat_id, lock_key, not current_state)
     _save_json(GROUP_CTRL_FILE, group_data)
 
-    # بازسازی دسته مرتبط
+    # بازسازی صفحه فعلی
     categories = {
         "media": ["photos", "videos", "gifs", "files", "voices", "vmsgs"],
         "text": ["text", "caption", "emoji", "english", "arabic"],
         "members": ["bots", "join", "joinmsg"],
         "links": ["links", "ads", "usernames", "mention"]
     }
+
     for cat, keys in categories.items():
         if lock_key in keys:
             locks_map = {k: LOCK_TYPES[k] for k in keys}
-            await show_lock_category(query, context, cat, locks_map)
+            category_name = {
+                "media": "🖼 رسانه‌ها",
+                "text": "💬 پیام‌ها و متون",
+                "members": "👥 اعضا و ربات‌ها",
+                "links": "🌐 لینک‌ها و تبلیغ"
+            }[cat]
+            await show_lock_category(query, context, category_name, locks_map)
             return
