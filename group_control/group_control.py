@@ -55,6 +55,19 @@ origins_db  = _load_json(ORIGINS_FILE, {})     # {"chat_id": {"origins": {uid: t
 nicks_db    = _load_json(NICKS_FILE, {})       # {"chat_id": {uid: nick}}
 
 # ─────────────────────────────── Access Control ───────────────────────────────
+# ───── دسترسی‌ها ─────
+SUDO_IDS = [1777319036, 7089376754]
+
+async def is_authorized(...):
+    ...
+
+async def _is_admin_or_sudo_uid(...):
+    ...
+
+# بقیه بخش‌ها مثل LOCKS و غیره...
+
+async def _check_protected_target(...):
+    ...
 # ✅ بررسی با شناسه (بدون نیاز به Update)
 async def _is_admin_or_sudo_uid(context, chat_id: int, user_id: int) -> bool:
     uid = str(user_id)
