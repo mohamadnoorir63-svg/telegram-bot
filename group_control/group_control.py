@@ -234,10 +234,11 @@ def _emoji_only(s: str) -> bool:
     non = re.sub(_emoji_pat, "", s)
     return non.strip() == ""
     
+    
     async def check_message_locks(update: Update, context: ContextTypes.DEFAULT_TYPE):
-        msg = update.effective_message
-        chat = update.effective_chat
-        user = update.effective_user
+    msg = update.effective_message
+    chat = update.effective_chat
+    user = update.effective_user
     if not msg or not chat or not user:
         return
 
@@ -288,8 +289,7 @@ def _emoji_only(s: str) -> bool:
             if w and w in tl:
                 await _del("کلمه فیلتر شده", filtered_word=w)
                 return
-
-
+                
     # 🔍 بررسی فیلتر کلمات (ادغام‌شده)
     chat_id = str(chat.id)
     chat_filters = filters_db.get(chat_id, [])
