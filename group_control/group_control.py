@@ -250,16 +250,24 @@ async def check_message_locks(update: Update, context: ContextTypes.DEFAULT_TYPE
         # اگر فیلتر کلمات داریم، پایین‌تر چک می‌شود (ادغام شده)
         pass
 
-    text = (msg.text or msg.caption or "")  # کپشن هم
+text = (msg.text or msg.caption or "")  # کپشن هم
     text_l = text.lower()
 
     async def _del(reason: str):
+        """حذف پیام + نمایش پیام خطای زیبا"""
         try:
             await msg.delete()
         except:
             return
         try:
-            await context.bot.send_message(chat.id, f"🚫 پیام <b>{user.first_name}</b> حذف شد.\n🎯 دلیل: <b>{reason}</b>", parse_mode="HTML")
+            await context.bot.send_message(
+                chat.id,
+                f"🚫 <b>پیام حذف شد</b>\n\n"
+                f"⫸ <b>کاربر:</b> <a href='tg://user?id={user.id}'>{user.first_name}</a>\n"
+                f"💬 <b>دلیل:</b> {reason}\n"
+                f"🕒 <code>{datetime.now().strftime('%H:%M:%S')}</code>",
+                parse_mode="HTML"
+            )
         except:
             pass
 
@@ -1368,16 +1376,17 @@ async def group_command_handler(update: Update, context: ContextTypes.DEFAULT_TY
     return
 
 
-# ─────────────────────────────── پایان فایل ───────────────────────────────
-print("✅ [Group Control System] با موفقیت بارگذاری شد.")
+
 # ─────────────────────────────── Bot Join / Leave ───────────────────────────────
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+
 async def handle_bot_added(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """وقتی ربات به گروه اضافه می‌شود (my_chat_member). ساختار گروه را می‌سازد و پیام خوش‌آمد می‌دهد."""
+    """📦 وقتی ربات به گروه اضافه می‌شود — ساختار اولیه و پیام نصب."""
     member = update.my_chat_member or update.chat_member
     if not member:
         return
 
-    # بررسی اینکه خود ربات تازه عضو شده
+    # بررسی اینکه خود ربات تازه اضافه شده
     new_status = member.new_chat_member.status
     if new_status not in ("member", "administrator", "creator"):
         return
@@ -1387,7 +1396,7 @@ async def handle_bot_added(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     chat_id = str(chat.id)
 
-    # اگر گروه هنوز در دیتابیس ثبت نشده، ساختار پایه بساز
+    # اگر گروه در دیتابیس وجود ندارد، ایجاد ساختار پایه
     if chat_id not in group_data:
         group_data[chat_id] = {
             "locks": {},
@@ -1399,19 +1408,55 @@ async def handle_bot_added(update: Update, context: ContextTypes.DEFAULT_TYPE):
         }
         _save_json(GROUP_CTRL_FILE, group_data)
 
+    # 🔹 دریافت مالک گروه (creator)
+    owner_name = "نامشخص"
     try:
-        await context.bot.send_message(
-            chat.id,
-            f"🤖 سلام! من به گروه <b>{chat.title or chat.id}</b> اضافه شدم.\n\n"
-            "برای شروع، دستور «افزودن مدیر» یا «قفل لینک» رو امتحان کن 😎",
-            parse_mode="HTML"
-        )
+        admins = await context.bot.get_chat_administrators(chat.id)
+        creator = next((a.user for a in admins if a.status == "creator"), None)
+        if creator:
+            owner_name = f"@{creator.username}" if creator.username else creator.first_name
     except:
         pass
 
+    # 🔰 پیام خوش‌آمد جدید
+    text = (
+        f"🔰 <b>ربات با موفقیت در گروه نصب شد</b>\n\n"
+        f"✚ <b>مالک گروه:</b>\n▸ {owner_name}\n\n"
+        f"⚠️ ادمینی در گروه یافت نشد!\n\n"
+        f"🛠 <b>بطور پیشفرض قفل‌های زیر در گروه شما فعال شد:</b>\n\n"
+        f"✅ قفل لینک فعال\n"
+        f"✅ قفل فایل فعال\n"
+        f"✅ قفل سرویس تلگرام فعال\n"
+        f"✅ قفل ورود ربات فعال\n"
+        f"✅ قفل اد کننده ربات فعال\n"
+        f"✅ قفل تبچی فعال\n"
+        f"✅ قفل دستورات عمومی فعال\n"
+        f"✅ خوش‌آمدگویی فعال\n\n"
+        f"📚 برای مشاهده راهنما از دستور <b>راهنما</b> استفاده نمایید.\n"
+        f"⚙️ برای دریافت پنل تنظیمات دستور <b>پنل</b> را ارسال نمایید.\n\n"
+        f"⛑ درصورت وجود هرگونه مشکل به گروه پشتیبانی مراجعه کنید 👇"
+    )
+
+    # 🎛 فقط دکمه پشتیبانی
+    buttons = [
+        [InlineKeyboardButton("🆘 پشتیبانی", url="https://t.me/Poshtibahni")]
+    ]
+    markup = InlineKeyboardMarkup(buttons)
+
+    try:
+        await context.bot.send_message(chat.id, text, parse_mode="HTML", reply_markup=markup)
+
+        # 🧩 فعال‌سازی قفل‌های پیش‌فرض
+        defaults = ["links", "files", "tgservices", "bots", "ads"]
+        for key in defaults:
+            _locks_set(chat.id, key, True)
+
+    except Exception as e:
+        print(f"⚠️ خطا در ارسال پیام خوش‌آمد: {e}")
+
 
 async def handle_bot_removed(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """وقتی ربات از گروه حذف می‌شود، داده‌های گروه حذف می‌گردد."""
+    """🧹 وقتی ربات از گروه حذف شود، داده‌های گروه پاک می‌شوند."""
     member = update.my_chat_member or update.chat_member
     if not member:
         return
