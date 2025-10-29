@@ -1492,92 +1492,81 @@ async def group_command_handler(update: Update, context: ContextTypes.DEFAULT_TY
 
 # ─────────────────────────────── Bot Join / Leave ───────────────────────────────
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import ContextTypes
+from telegram import Update
 
 async def handle_bot_added(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """📦 وقتی ربات به گروه اضافه می‌شود — ساختار اولیه و پیام نصب."""
-    member = update.my_chat_member or update.chat_member
-    if not member:
+    """📦 وقتی ربات به گروه اضافه می‌شود — فقط یکبار اجرا می‌شود."""
+    member = update.my_chat_member
+    if not member or member.chat.type not in ("group", "supergroup"):
         return
 
-    # بررسی اینکه خود ربات تازه اضافه شده
-    new_status = member.new_chat_member.status
-    if new_status not in ("member", "administrator", "creator"):
-        return
+    # فقط اگر ربات تازه اضافه شده (نه تغییر ادمینی)
+    if member.old_chat_member.status in ("left", "kicked") and member.new_chat_member.status in ("member", "administrator"):
+        chat = update.effective_chat
+        chat_id = str(chat.id)
 
-    chat = update.effective_chat
-    if not chat:
-        return
-    chat_id = str(chat.id)
+        # ایجاد ساختار اولیه در صورت نبود گروه
+        if chat_id not in group_data:
+            group_data[chat_id] = {
+                "locks": {},
+                "admins": [],
+                "auto_lock": {},
+                "bans": [],
+                "mutes": {},
+                "warns": {},
+            }
+            _save_json(GROUP_CTRL_FILE, group_data)
 
-    # اگر گروه در دیتابیس وجود ندارد، ایجاد ساختار پایه
-    if chat_id not in group_data:
-        group_data[chat_id] = {
-            "locks": {},
-            "admins": [],
-            "auto_lock": {},
-            "bans": [],
-            "mutes": {},
-            "warns": {},
-        }
-        _save_json(GROUP_CTRL_FILE, group_data)
+        # 🔹 دریافت مالک گروه
+        owner_name = "نامشخص"
+        try:
+            admins = await context.bot.get_chat_administrators(chat.id)
+            creator = next((a.user for a in admins if a.status == "creator"), None)
+            if creator:
+                owner_name = f"@{creator.username}" if creator.username else creator.first_name
+        except:
+            pass
 
-    # 🔹 دریافت مالک گروه (creator)
-    owner_name = "نامشخص"
-    try:
-        admins = await context.bot.get_chat_administrators(chat.id)
-        creator = next((a.user for a in admins if a.status == "creator"), None)
-        if creator:
-            owner_name = f"@{creator.username}" if creator.username else creator.first_name
-    except:
-        pass
+        # 🔰 پیام خوش‌آمد
+        text = (
+            f"🔰 <b>ربات با موفقیت در گروه نصب شد</b>\n\n"
+            f"✚ <b>مالک گروه:</b>\n▸ {owner_name}\n\n"
+            f"🛠 <b>بطور پیش‌فرض قفل‌های زیر در گروه شما فعال شدند:</b>\n\n"
+            f"✅ قفل لینک فعال\n"
+            f"✅ قفل فایل فعال\n"
+            f"✅ قفل سرویس تلگرام فعال\n"
+            f"✅ قفل ورود ربات فعال\n"
+            f"✅ قفل تبلیغ (تبچی) فعال\n\n"
+            f"📚 برای مشاهده راهنما بنویس: <b>راهنما</b>\n"
+            f"⚙️ برای پنل تنظیمات بنویس: <b>پنل</b>\n\n"
+            f"⛑ درصورت بروز مشکل به پشتیبانی مراجعه کن 👇"
+        )
 
-    # 🔰 پیام خوش‌آمد جدید
-    text = (
-        f"🔰 <b>ربات با موفقیت در گروه نصب شد</b>\n\n"
-        f"✚ <b>مالک گروه:</b>\n▸ {owner_name}\n\n"
-        f"⚠️ ادمینی در گروه یافت نشد!\n\n"
-        f"🛠 <b>بطور پیشفرض قفل‌های زیر در گروه شما فعال شد:</b>\n\n"
-        f"✅ قفل لینک فعال\n"
-        f"✅ قفل فایل فعال\n"
-        f"✅ قفل سرویس تلگرام فعال\n"
-        f"✅ قفل ورود ربات فعال\n"
-        f"✅ قفل اد کننده ربات فعال\n"
-        f"✅ قفل تبچی فعال\n"
-        f"✅ قفل دستورات عمومی فعال\n"
-        f"✅ خوش‌آمدگویی فعال\n\n"
-        f"📚 برای مشاهده راهنما از دستور <b>راهنما</b> استفاده نمایید.\n"
-        f"⚙️ برای دریافت پنل تنظیمات دستور <b>پنل</b> را ارسال نمایید.\n\n"
-        f"⛑ درصورت وجود هرگونه مشکل به گروه پشتیبانی مراجعه کنید 👇"
-    )
+        # 🎛 دکمه پشتیبانی
+        buttons = [[InlineKeyboardButton("🆘 پشتیبانی", url="https://t.me/Poshtibahni")]]
+        markup = InlineKeyboardMarkup(buttons)
 
-    # 🎛 فقط دکمه پشتیبانی
-    buttons = [
-        [InlineKeyboardButton("🆘 پشتیبانی", url="https://t.me/Poshtibahni")]
-    ]
-    markup = InlineKeyboardMarkup(buttons)
+        try:
+            await context.bot.send_message(chat.id, text, parse_mode="HTML", reply_markup=markup)
 
-    try:
-        await context.bot.send_message(chat.id, text, parse_mode="HTML", reply_markup=markup)
+            # 🧩 فعال‌سازی قفل‌های پیش‌فرض
+            for key in ["links", "files", "tgservices", "bots", "ads"]:
+                _locks_set(chat.id, key, True)
 
-        # 🧩 فعال‌سازی قفل‌های پیش‌فرض
-        defaults = ["links", "files", "tgservices", "bots", "ads"]
-        for key in defaults:
-            _locks_set(chat.id, key, True)
-
-    except Exception as e:
-        print(f"⚠️ خطا در ارسال پیام خوش‌آمد: {e}")
+        except Exception as e:
+            print(f"⚠️ خطا در ارسال پیام خوش‌آمد: {e}")
 
 
 async def handle_bot_removed(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """🧹 وقتی ربات از گروه حذف شود، داده‌های گروه پاک می‌شوند."""
-    member = update.my_chat_member or update.chat_member
-    if not member:
+    member = update.my_chat_member
+    if not member or member.chat.type not in ("group", "supergroup"):
         return
 
-    status = member.new_chat_member.status
-    chat_id = str(update.effective_chat.id)
-
-    if status in ("kicked", "left"):
+    # فقط وقتی واقعا حذف شده
+    if member.new_chat_member.status in ("left", "kicked"):
+        chat_id = str(update.effective_chat.id)
         if chat_id in group_data:
             del group_data[chat_id]
             _save_json(GROUP_CTRL_FILE, group_data)
