@@ -356,3 +356,22 @@ async def toggle_lock_button(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
     # بروزرسانی صفحه جاری
     await show_lock_page(query, page_to_show)
+    # ====================== 🧭 کنترل تغییر صفحه قفل‌ها ======================
+async def handle_lock_page_switch(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """مدیریت جابه‌جایی بین صفحات قفل‌ها (رزرو برای گسترش آینده)"""
+    query = update.callback_query
+    data = query.data
+    await query.answer()
+
+    # بررسی اینکه کاربر روی دکمه صفحه زده
+    if not data.startswith("lock_page:"):
+        return
+
+    # استخراج شماره صفحه
+    try:
+        page = int(data.split(":")[1])
+    except (IndexError, ValueError):
+        return await query.answer("صفحه نامعتبر است ⚠️", show_alert=True)
+
+    # نمایش صفحه مورد نظر
+    await show_lock_page(query, page)
