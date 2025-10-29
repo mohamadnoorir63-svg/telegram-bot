@@ -73,7 +73,8 @@ from panels.panel_menu import (
     Tastatur_menu,
     Tastatur_buttons,
     toggle_lock_button,
-    handle_lock_page_switch,   # ← این خطو اضافه کن!
+    handle_lock_page_switch,
+    handle_fun_buttons   # 👈 این خط خیلی مهمه
 )
 from context_memory import ContextMemory
 from brain_bridge_group import process_group_message
