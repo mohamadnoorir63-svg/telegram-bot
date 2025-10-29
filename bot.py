@@ -75,7 +75,7 @@ from panels.panel_menu import (
     toggle_lock_button,
     handle_lock_page_switch,
     handle_fun_buttons,
-    handle_admin_buttons,   # 👈 اینو اضافه کن
+    
 )
 from context_memory import ContextMemory
 from brain_bridge_group import process_group_message
@@ -2118,11 +2118,7 @@ if __name__ == "__main__":
         group=-3
     )
 
-    # 👮 مدیریت گروه
-    application.add_handler(
-        CallbackQueryHandler(handle_admin_buttons, pattern=r"^admin_"),
-        group=-3
-    )
+    
     application.add_handler(CommandHandler("stats", stats))
     application.add_handler(CommandHandler("fullstats", fullstats))
     application.add_handler(CommandHandler("backup", backup))
