@@ -1265,65 +1265,53 @@ async def execute_command(cmd, update, context):
         return await update.message.reply_text("⚠️ دستور ناشناخته.", parse_mode="HTML")
 
 # ─────────────────────────────── Command Core ───────────────────────────────
-async def handle_locks_with_alias(update, context):
-    """مدیریت قفل‌ها با پشتیبانی alias (فارسی و انگلیسی)"""
+# ─────────────────────────────── Alias + Command Mapping ───────────────────────────────
+DEFAULT_ALIASES = {
+    # ...
+}
 
-    if not await is_authorized(update, context):
-        return await update.message.reply_text("🚫 فقط مدیران یا سودوها مجازند!")
+if not ALIASES:
+    ALIASES = DEFAULT_ALIASES
+    _save_json(ALIASES_FILE, ALIASES)
+
+
+async def execute_command(cmd, update, context):
+    mapping = {
+        # اینجا همه‌ی handleها (از جمله handle_addadmin و handle_lockgroup و غیره)
+    }
+    if cmd in mapping:
+        return await mapping[cmd](update, context)
+    else:
+        return await update.message.reply_text("⚠️ دستور ناشناخته.", parse_mode="HTML")
+
+
+# ─────────────────────────────── Command Core ───────────────────────────────
+async def group_command_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """📡 هسته‌ی مرکزی تشخیص و اجرای دستورات فارسی/انگلیسی"""
+    if not update.message or not update.message.text:
+        return
 
     lower_text = update.message.text.strip().lower()
 
-    # ✅ بررسی ویژه: قفل کامل گروه / بازکردن گروه
+    # ✅ دستورات خاص قفل یا بازکردن گروه
     if "قفل گروه" in lower_text or "ببند گروه" in lower_text or "lock group" in lower_text:
         return await handle_lockgroup(update, context)
-
     if "باز گروه" in lower_text or "بازکردن گروه" in lower_text or "unlock group" in lower_text:
         return await handle_unlockgroup(update, context)
 
-    # ✅ بررسی ویژه: قفل خودکار گروه (زمان‌بندی شبانه یا ساعتی)
-    if "قفل خودکار" in lower_text or "auto lock group" in lower_text:
-        return await handle_auto_lockgroup(update, context)
+    # ✅ قفل‌های محتوایی (مثل قفل لینک / باز عکس)
+    if lower_text.startswith("قفل") or lower_text.startswith("باز"):
+        return await handle_locks_with_alias(update, context)
 
-    if "غیرفعال قفل خودکار" in lower_text or "لغو قفل خودکار" in lower_text or "disable auto lock" in lower_text:
-        return await handle_disable_auto_lock(update, context)
+    # ✅ سایر دستورات بر اساس aliasها
+    for cmd, aliases in ALIASES.items():
+        for alias in aliases:
+            if lower_text.startswith(alias):
+                context.args = lower_text.replace(alias, "", 1).strip().split()
+                return await execute_command(cmd, update, context)
 
-    # ✅ از اینجا به بعد بقیه‌ی قفل‌های معمولی (لینک، عکس، استیکر و...) بررسی می‌شن
-    text = update.message.text.strip().lower()
-    parts = text.split()
-
-    if len(parts) < 2:
-        return await update.message.reply_text("⚠️ نام قفل نامعتبر است.")
-
-    action, lock_name = parts[0], parts[1]
-    chat_id = str(update.effective_chat.id)
-    _ensure_locks(chat_id)
-
-    # جستجو بین قفل‌ها
-    found_lock = None
-    for key, names in LOCK_ALIASES.items():
-        if lock_name in names:
-            found_lock = key
-            break
-
-    if not found_lock:
-        return await update.message.reply_text("⚠️ نام قفل نامعتبر است.")
-
-    locks = group_data[chat_id]["locks"]
-
-    if action == "قفل" or action == "lock":
-        if locks.get(found_lock):
-            return await update.message.reply_text(f"🔒 قفل <b>{LOCK_ALIASES[found_lock][0]}</b> از قبل فعال است.", parse_mode="HTML")
-        locks[found_lock] = True
-        await update.message.reply_text(f"🔒 قفل <b>{LOCK_ALIASES[found_lock][0]}</b> فعال شد.", parse_mode="HTML")
-
-    elif action == "باز" or action == "unlock" or action == "بازکردن":
-        if not locks.get(found_lock):
-            return await update.message.reply_text(f"🔓 قفل <b>{LOCK_ALIASES[found_lock][0]}</b> از قبل باز است.", parse_mode="HTML")
-        locks[found_lock] = False
-        await update.message.reply_text(f"🔓 قفل <b>{LOCK_ALIASES[found_lock][0]}</b> باز شد.", parse_mode="HTML")
-
-    group_data[chat_id]["locks"] = locks
-    _save_json(GROUP_CTRL_FILE, group_data)
+    # اگر هیچ دستوری نبود
+    return
 
 
 # ─────────────────────────────── پایان فایل ───────────────────────────────
