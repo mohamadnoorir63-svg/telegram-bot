@@ -943,6 +943,39 @@ async def handle_list_warns(update, context):
     for i, (uid, c) in enumerate(warns.items(), 1):
         txt += f"{i}. <a href='tg://user?id={uid}'>کاربر</a> → {c}/3 اخطار\n"
     await update.message.reply_text(txt, parse_mode="HTML")
+    # ───── مدیریت Alias (دستورات سفارشی) ─────
+async def handle_addalias(update, context):
+    """افزودن دستور (Alias) جدید توسط مدیر"""
+    if not await is_authorized(update, context):
+        return await update.message.reply_text("🚫 فقط مدیران یا سودو مجازند!")
+
+    text = update.message.text
+    if "→" not in text:
+        return await update.message.reply_text(
+            "❌ فرمت اشتباه است!\nمثال:\n<code>افزودن دستور \"قفل شبانه\" → autolockgroup</code>",
+            parse_mode="HTML"
+        )
+
+    try:
+        parts = text.split("→")
+        new_alias = parts[0].replace("افزودن دستور", "").strip().replace('"', '')
+        target_cmd = parts[1].strip()
+
+        if not new_alias or not target_cmd:
+            return await update.message.reply_text("⚠️ دستور نامعتبر است.", parse_mode="HTML")
+
+        # اضافه به ALIASES
+        if target_cmd not in ALIASES:
+            ALIASES[target_cmd] = []
+        if new_alias not in ALIASES[target_cmd]:
+            ALIASES[target_cmd].append(new_alias)
+            _save_json(ALIASES_FILE, ALIASES)
+            return await update.message.reply_text(f"✅ دستور جدید افزوده شد!\n📘 {new_alias} ⇢ {target_cmd}", parse_mode="HTML")
+        else:
+            return await update.message.reply_text("⚠️ این دستور قبلاً وجود دارد.", parse_mode="HTML")
+
+    except Exception as e:
+        return await update.message.reply_text(f"⚠️ خطا:\n<code>{e}</code>", parse_mode="HTML")
 # ─────────────────────────────── Admins Management ───────────────────────────────
 async def handle_addadmin(update, context):
     if not await is_authorized(update, context):
@@ -1384,6 +1417,8 @@ DEFAULT_ALIASES = {
 
     # وضعیت قفل‌ها
     "locks": ["وضعیت قفل", "وضعیت قفل‌ها", "locks", "lock status"]
+    
+    "addalias": ["افزودن دستور", "ساخت دستور", "add alias"],
 }
 
 if not ALIASES:
@@ -1453,6 +1488,7 @@ async def execute_command(cmd, update, context):
         "addsudo": handle_addsudo,
         "delsudo": handle_delsudo,
         "listsudos": handle_listsudos,
+        "addalias": handle_addalias,
     }
 
     if cmd in mapping:
