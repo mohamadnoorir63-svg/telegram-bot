@@ -398,12 +398,44 @@ async def handle_edited_message(update: Update, context: ContextTypes.DEFAULT_TY
 async def handle_lockgroup(update, context):
     if not await is_authorized(update, context):
         return await update.message.reply_text("🚫 فقط مدیران یا سودوها می‌توانند گروه را قفل کنند!")
+
     chat = update.effective_chat
     try:
+        # 🔒 قفل کل گروه برای اعضای عادی
         await context.bot.set_chat_permissions(chat.id, ChatPermissions(can_send_messages=False))
+
+        # ✅ مدیران واقعی، ثبت‌شده و سودوها آزاد می‌مانند
+        try:
+            # مدیران واقعی تلگرام
+            admins_real = await context.bot.get_chat_administrators(chat.id)
+            # مدیران ثبت‌شده در ربات
+            admins_registered = group_data.get(str(chat.id), {}).get("admins", [])
+            # سودوها
+            allowed_ids = set([a.user.id for a in admins_real]) | set(map(int, admins_registered)) | set(SUDO_IDS)
+
+            for uid in allowed_ids:
+                try:
+                    await context.bot.restrict_chat_member(
+                        chat.id,
+                        uid,
+                        ChatPermissions(
+                            can_send_messages=True,
+                            can_send_media_messages=True,
+                            can_send_other_messages=True,
+                            can_add_web_page_previews=True,
+                        )
+                    )
+                except Exception as e:
+                    print(f"⚠️ خطا در آزاد کردن {uid}: {e}")
+        except Exception as e:
+            print(f"⚠️ خطا در بررسی مدیران: {e}")
+
+        # پیام تأیید
         await update.message.reply_text(
             f"🔒 <b>گروه قفل شد!</b>\n📅 {datetime.now().strftime('%H:%M - %d/%m/%Y')}\n👑 {update.effective_user.first_name}",
-            parse_mode="HTML")
+            parse_mode="HTML"
+        )
+
     except Exception as e:
         await update.message.reply_text(f"⚠️ خطا:\n<code>{e}</code>", parse_mode="HTML")
 
