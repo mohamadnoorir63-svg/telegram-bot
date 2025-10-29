@@ -944,38 +944,48 @@ async def handle_list_warns(update, context):
         txt += f"{i}. <a href='tg://user?id={uid}'>کاربر</a> → {c}/3 اخطار\n"
     await update.message.reply_text(txt, parse_mode="HTML")
     # ───── مدیریت Alias (دستورات سفارشی) ─────
+import re
+
 async def handle_addalias(update, context):
-    """افزودن دستور (Alias) جدید توسط مدیر"""
+    """افزودن دستور (Alias) جدید توسط مدیر — از → یا -> یا => یا = پشتیبانی می‌کند"""
     if not await is_authorized(update, context):
         return await update.message.reply_text("🚫 فقط مدیران یا سودو مجازند!")
 
-    text = update.message.text
-    if "→" not in text:
+    txt = (update.message.text or "").strip()
+
+    # الگو برای همه‌ی حالت‌ها: → | -> | => | =
+    m = re.search(
+        r'(?:افزودن\s+دستور|add\s+alias)\s*[\"“](.+?)[\"”]\s*(?:→|->|=>|=)\s*([A-Za-z_][\w]*)',
+        txt, flags=re.IGNORECASE
+    )
+    if not m:
         return await update.message.reply_text(
-            "❌ فرمت اشتباه است!\nمثال:\n<code>افزودن دستور \"قفل شبانه\" → autolockgroup</code>",
+            "❌ فرمت اشتباه است!\n"
+            "مثال‌ها:\n"
+            "• افزودن دستور \"اخراج\" → ban\n"
+            "• افزودن دستور \"اخراج\" -> ban\n"
+            "• افزودن دستور \"اخراج\" = ban",
             parse_mode="HTML"
         )
 
-    try:
-        parts = text.split("→")
-        new_alias = parts[0].replace("افزودن دستور", "").strip().replace('"', '')
-        target_cmd = parts[1].strip()
+    new_alias = m.group(1).strip()
+    target_cmd = m.group(2).strip()
 
-        if not new_alias or not target_cmd:
-            return await update.message.reply_text("⚠️ دستور نامعتبر است.", parse_mode="HTML")
+    if not new_alias or not target_cmd:
+        return await update.message.reply_text("⚠️ دستور نامعتبر است.", parse_mode="HTML")
 
-        # اضافه به ALIASES
-        if target_cmd not in ALIASES:
-            ALIASES[target_cmd] = []
-        if new_alias not in ALIASES[target_cmd]:
-            ALIASES[target_cmd].append(new_alias)
-            _save_json(ALIASES_FILE, ALIASES)
-            return await update.message.reply_text(f"✅ دستور جدید افزوده شد!\n📘 {new_alias} ⇢ {target_cmd}", parse_mode="HTML")
-        else:
-            return await update.message.reply_text("⚠️ این دستور قبلاً وجود دارد.", parse_mode="HTML")
+    # ثبت در ALIASES
+    if target_cmd not in ALIASES:
+        ALIASES[target_cmd] = []
+    if new_alias in ALIASES[target_cmd]:
+        return await update.message.reply_text("⚠️ این دستور قبلاً وجود دارد.", parse_mode="HTML")
 
-    except Exception as e:
-        return await update.message.reply_text(f"⚠️ خطا:\n<code>{e}</code>", parse_mode="HTML")
+    ALIASES[target_cmd].append(new_alias)
+    _save_json(ALIASES_FILE, ALIASES)
+    return await update.message.reply_text(
+        f"✅ دستور جدید افزوده شد!\n📘 {new_alias} ⇢ {target_cmd}",
+        parse_mode="HTML"
+    )
 # ─────────────────────────────── Admins Management ───────────────────────────────
 async def handle_addadmin(update, context):
     if not await is_authorized(update, context):
