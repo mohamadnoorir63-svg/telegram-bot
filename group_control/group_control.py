@@ -1,3 +1,4 @@
+
 # ======================= Group Control System — Full Single File =======================
 # python-telegram-bot v20+
 # همه‌ی سیستم‌ها: قفل‌ها (+Alias)، قفل/بازگروه+زمان‌بندی، پاکسازی، پین زمانی،
@@ -1150,6 +1151,11 @@ DEFAULT_ALIASES = {
     "addfilter": ["افزودن فیلتر", "فیلترکن", "addfilter"],
     "delfilter": ["حذف فیلتر", "پاک فیلتر", "delfilter"],
     "filters": ["لیست فیلترها", "فیلترها", "filters"],
+    # ───── مدیریت مدیران ─────
+    "addadmin": ["افزودن مدیر", "مدیر کن", "add admin"],
+    "removeadmin": ["حذف مدیر", "بردار مدیر", "remove admin"],
+    "admins": ["لیست مدیران", "مدیران", "admins"],
+    "clearadmins": ["پاکسازی مدیران", "پاک مدیران", "clear admins"],
 
     # تگ‌ها
     "tagall": ["تگ همه", "منشن همگانی", "tagall"],
@@ -1208,12 +1214,14 @@ async def execute_command(cmd, update, context):
         "addfilter": handle_addfilter,
         "delfilter": handle_delfilter,
         "filters": handle_filters,
+
         # ───── مدیریت مدیران ─────
-        "addadmin": ["افزودن مدیر", "مدیر کن", "add admin"],
-        "removeadmin": ["حذف مدیر", "بردار مدیر", "remove admin"],
-        "admins": ["لیست مدیران", "مدیران", "admins"],
-        "clearadmins": ["پاکسازی مدیران", "پاک مدیران", "clear admins"],
-        # بن / سکوت / اخطار
+        "addadmin": handle_addadmin,
+        "removeadmin": handle_removeadmin,
+        "admins": handle_admins,
+        "clearadmins": handle_clearadmins,
+
+        # ───── مدیریت کاربران (بن / سکوت / اخطار) ─────
         "ban": handle_ban,
         "unban": handle_unban,
         "listbans": handle_list_bans,
@@ -1225,45 +1233,40 @@ async def execute_command(cmd, update, context):
         "warn": handle_warn,
         "unwarn": handle_unwarn,
         "listwarns": handle_list_warns,
-        # مدیریت مدیران
-        "addadmin": handle_addadmin,
-        "removeadmin": handle_removeadmin,
-        "admins": handle_admins,
-        "clearadmins": handle_clearadmins,
 
-        # تگ
+        # ───── تگ ─────
         "tagall": handle_tag,
         "tagactive": handle_tag,
         "taginactive": handle_tag,
         "tagadmins": handle_tag,
 
-        # لقب
+        # ───── لقب ─────
         "setnick": handle_set_nick,
         "shownick": handle_show_nick,
         "delnick": handle_del_nick,
         "listnicks": handle_list_nicks,
 
-        # اصل
+        # ───── اصل ─────
         "setorigin": handle_set_origin,
         "showorigin": handle_show_origin,
         "delorigin": handle_del_origin,
         "listorigins": handle_list_origins,
 
-        # پین
+        # ───── پین ─────
         "pin": handle_pin,
         "unpin": handle_unpin,
 
-        # پاکسازی
+        # ───── پاکسازی ─────
         "clean": handle_clean,
 
-        # وضعیت قفل‌ها
+        # ───── وضعیت قفل‌ها ─────
         "locks": handle_locks_status,
     }
+
     if cmd in mapping:
         return await mapping[cmd](update, context)
     else:
         return await update.message.reply_text("⚠️ دستور ناشناخته.", parse_mode="HTML")
-
 # ─────────────────────────────── Command Core ───────────────────────────────
 # ─────────────────────────────── Alias + Command Mapping ───────────────────────────────
 DEFAULT_ALIASES = {
