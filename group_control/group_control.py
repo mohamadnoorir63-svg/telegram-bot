@@ -995,7 +995,73 @@ async def handle_clearadmins(update, context):
     group_data[cid]["admins"] = []
     _save_json(GROUP_CTRL_FILE, group_data)
     await update.message.reply_text("🧹 لیست مدیران پاک شد.", parse_mode="HTML")
+    
+# ─────────────────────────────── SUDO MANAGEMENT ───────────────────────────────
+SUDO_FILE = "sudos.json"
 
+# بارگذاری و ذخیره لیست سودوها
+def _load_sudos():
+    if os.path.exists(SUDO_FILE):
+        try:
+            with open(SUDO_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except:
+            pass
+    return []
+
+def _save_sudos():
+    try:
+        with open(SUDO_FILE, "w", encoding="utf-8") as f:
+            json.dump(SUDO_IDS, f, ensure_ascii=False, indent=2)
+    except:
+        pass
+
+# بارگذاری اولیه
+SUDO_IDS = _load_sudos() or SUDO_IDS
+
+async def handle_addsudo(update, context):
+    """➕ افزودن سودو جدید"""
+    user = update.effective_user
+    if user.id not in SUDO_IDS:
+        return await update.message.reply_text("🚫 فقط سودو اصلی مجاز به افزودن سودو جدید است!")
+
+    if not update.message.reply_to_message:
+        return await update.message.reply_text("🔹 روی پیام فرد موردنظر ریپلای بزن تا سودو شود.")
+
+    target = update.message.reply_to_message.from_user
+    if target.id in SUDO_IDS:
+        return await update.message.reply_text("⚠️ این کاربر از قبل سودو است!")
+
+    SUDO_IDS.append(target.id)
+    _save_sudos()
+    await update.message.reply_text(f"👑 {target.first_name} به سودوها اضافه شد.", parse_mode="HTML")
+
+async def handle_delsudo(update, context):
+    """❌ حذف سودو"""
+    user = update.effective_user
+    if user.id not in SUDO_IDS:
+        return await update.message.reply_text("🚫 فقط سودو مجاز به حذف سودو است!")
+
+    if not update.message.reply_to_message:
+        return await update.message.reply_text("🔹 روی پیام سودو ریپلای بزن تا حذف شود.")
+
+    target = update.message.reply_to_message.from_user
+    if target.id not in SUDO_IDS:
+        return await update.message.reply_text("⚠️ این کاربر سودو نیست!")
+
+    SUDO_IDS.remove(target.id)
+    _save_sudos()
+    await update.message.reply_text(f"🗑️ {target.first_name} از سودوها حذف شد.", parse_mode="HTML")
+
+async def handle_listsudos(update, context):
+    """📜 نمایش لیست سودوها"""
+    if not SUDO_IDS:
+        return await update.message.reply_text("ℹ️ هیچ سودویی ثبت نشده.", parse_mode="HTML")
+
+    txt = "👑 <b>لیست سودوها:</b>\n\n"
+    for i, uid in enumerate(SUDO_IDS, 1):
+        txt += f"{i}. <a href='tg://user?id={uid}'>کاربر</a>\n"
+    await update.message.reply_text(txt, parse_mode="HTML")
 # ─────────────────────────────── Filters (words) ───────────────────────────────
 async def _can_manage(update, context):
     return await is_authorized(update, context)
@@ -1304,6 +1370,10 @@ DEFAULT_ALIASES = {
     "warn": ["اخطار", "warn"],
     "unwarn": ["حذف اخطار", "پاک اخطار", "unwarn"],
     "listwarns": ["لیست اخطار", "اخطارها", "warns"],
+    # ───── مدیریت سودو ─────
+    "addsudo": ["افزودن سودو", "سودو کن", "add sudo"],
+    "delsudo": ["حذف سودو", "بردار سودو", "del sudo"],
+    "listsudos": ["لیست سودو", "سودوها", "listsudos"],
 
     # پین
     "pin": ["پن", "پین", "سنجاق", "pin"],
@@ -1379,6 +1449,10 @@ async def execute_command(cmd, update, context):
 
         # ───── وضعیت قفل‌ها ─────
         "locks": handle_locks_status,
+        
+        "addsudo": handle_addsudo,
+        "delsudo": handle_delsudo,
+        "listsudos": handle_listsudos,
     }
 
     if cmd in mapping:
