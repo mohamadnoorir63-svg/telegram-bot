@@ -562,7 +562,10 @@ async def handle_unpin(update, context):
     except Exception as e:
         await update.message.reply_text(f"⚠️ خطا:\n<code>{e}</code>", parse_mode="HTML")
         # ─────────────────────────────── User Management (Ban / Mute / Warn) ───────────────────────────────
- from datetime import timedelta
+ # سایر importها بالا
+from datetime import datetime, timedelta
+import asyncio
+from telegram import ChatPermissions
 
 def _ensure_user_system(chat_id: str):
     """اطمینان از وجود ساختار بن / سکوت / اخطار برای گروه"""
