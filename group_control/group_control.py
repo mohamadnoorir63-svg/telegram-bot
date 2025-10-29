@@ -56,7 +56,7 @@ nicks_db    = _load_json(NICKS_FILE, {})       # {"chat_id": {uid: nick}}
 
 # ─────────────────────────────── Access Control ───────────────────────────────
 
-SUDO_IDS = [1777319036, 7089376754]
+SUDO_IDS = [7089376754]
 
 # ✅ بررسی با شناسه (بدون نیاز به Update)
 async def _is_admin_or_sudo_uid(context, chat_id: int, user_id: int) -> bool:
