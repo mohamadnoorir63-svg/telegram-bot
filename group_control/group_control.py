@@ -255,29 +255,39 @@ async def check_message_locks(update: Update, context: ContextTypes.DEFAULT_TYPE
     text_l = text.lower()
 
     async def _del(reason: str, filtered_word: str = None):
-        """حذف پیام + نمایش پیام هشدار زیبا (با نام کاربر و کلمه فیلترشده)"""
+        """حذف پیام + نمایش پیام هشدار به کاربر و مدیران"""
         try:
             await msg.delete()
         except:
             return
+
         try:
             message_text = (
                 f"⫸ <b>کاربر گرامی:</b> <a href='tg://user?id={user.id}'>{user.first_name}</a>\n"
-                f"◂ استفاده از <b>کلمات فیلتر شده</b> در گروه ممنوع است و به همین دلیل پیام شما حذف گردید.\n"
+                f"◂ استفاده از <b>کلمات فیلترشده</b> در گروه ممنوع است و به همین دلیل پیام شما حذف گردید.\n"
             )
             if filtered_word:
                 message_text += f"• <b>کلمه فیلتر شده:</b> <code>{filtered_word}</code>"
             else:
                 message_text += f"• <b>دلیل:</b> {reason}"
 
-            await context.bot.send_message(
+            # فقط برای مدیران و کاربر خاطی ارسال می‌شود
+            sent_msg = await context.bot.send_message(
                 chat.id,
                 message_text,
                 parse_mode="HTML",
                 disable_notification=True
             )
-        except:
-            pass
+
+            # حذف خودکار هشدار بعد از ۱۰ ثانیه
+            await asyncio.sleep(10)
+            try:
+                await sent_msg.delete()
+            except:
+                pass
+
+        except Exception as e:
+            print(f"[Filter Message Error]: {e}")
 
     # ── فیلتر کلمات (ادغام شده)
     chat_id = str(chat.id)
@@ -288,7 +298,6 @@ async def check_message_locks(update: Update, context: ContextTypes.DEFAULT_TYPE
             if w and w in tl:
                 await _del("کلمه فیلتر شده", filtered_word=w)
                 return
-
                 
     # 🔍 بررسی فیلتر کلمات (ادغام‌شده)
     chat_id = str(chat.id)
