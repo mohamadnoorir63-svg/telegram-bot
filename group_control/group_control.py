@@ -233,6 +233,7 @@ def _emoji_only(s: str) -> bool:
         return False
     non = re.sub(_emoji_pat, "", s)
     return non.strip() == ""
+    
     async def check_message_locks(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = update.effective_message
     chat = update.effective_chat
