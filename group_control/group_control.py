@@ -1512,28 +1512,9 @@ async def group_command_handler(update: Update, context: ContextTypes.DEFAULT_TY
     """📡 هسته‌ی مرکزی تشخیص و اجرای دستورات فارسی/انگلیسی"""
     if not update.message or not update.message.text:
         return
-        # ✅ دستور ویژه: پنل
+        # ⛔ اگر پیام فقط "پنل" بود، هیچ واکنشی نشان نده
     if update.message.text.strip() == "پنل":
-        from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-
-        text = (
-            "🌟 <b>پنل راهنمای ربات مدیریت گروه</b>\n"
-            "🎯 از منوی زیر یکی از بخش‌ها را انتخاب کنید 👇"
-        )
-
-        buttons = [
-            [InlineKeyboardButton("🔒 قفل‌ها", callback_data="locks"),
-             InlineKeyboardButton("👮‍♂️ کاربران", callback_data="users")],
-            [InlineKeyboardButton("⚙️ تنظیمات", callback_data="settings"),
-             InlineKeyboardButton("📊 آمار و گزارش", callback_data="stats")],
-            [InlineKeyboardButton("🎮 سرگرمی‌ها", callback_data="fun"),
-             InlineKeyboardButton("🧩 دستورات شخصی", callback_data="custom")]
-        ]
-        markup = InlineKeyboardMarkup(buttons)
-
-        return await update.message.reply_text(
-            text, parse_mode="HTML", reply_markup=markup
-        )
+        return
 
     lower_text = update.message.text.strip().lower()
 
