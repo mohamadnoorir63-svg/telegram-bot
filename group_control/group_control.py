@@ -249,27 +249,28 @@ async def check_message_locks(update: Update, context: ContextTypes.DEFAULT_TYPE
     if not locks:
         # اگر فیلتر کلمات داریم، پایین‌تر چک می‌شود (ادغام شده)
         pass
-        text = (msg.text or msg.caption or "")  # کپشن هم
-text_l = text.lower()
 
-async def _del(reason: str):
-    """حذف پیام + نمایش پیام خطای زیبا"""
-    try:
-        await msg.delete()
-    except:
-        return
-    try:
-        await context.bot.send_message(
-            chat.id,
-            f"🚫 <b>پیام حذف شد</b>\n\n"
-            f"⫸ <b>کاربر:</b> <a href='tg://user?id={user.id}'>{user.first_name}</a>\n"
-            f"💬 <b>دلیل:</b> {reason}\n"
-            f"🕒 <code>{datetime.now().strftime('%H:%M:%S')}</code>",
-            parse_mode="HTML"
-        )
-    except:
-        pass
+    # 🟢 این دو خط حتماً باید داخل تابع و با همین تورفتگی باشند
+    text = (msg.text or msg.caption or "")  # کپشن هم
+    text_l = text.lower()
 
+    async def _del(reason: str):
+        """حذف پیام + نمایش پیام خطای زیبا"""
+        try:
+            await msg.delete()
+        except:
+            return
+        try:
+            await context.bot.send_message(
+                chat.id,
+                f"🚫 <b>پیام حذف شد</b>\n\n"
+                f"⫸ <b>کاربر:</b> <a href='tg://user?id={user.id}'>{user.first_name}</a>\n"
+                f"💬 <b>دلیل:</b> {reason}\n"
+                f"🕒 <code>{datetime.now().strftime('%H:%M:%S')}</code>",
+                parse_mode="HTML"
+            )
+        except:
+            pass
 
     # قفل کلی
     if locks.get("all"):
