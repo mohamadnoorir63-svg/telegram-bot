@@ -2095,16 +2095,22 @@ if __name__ == "__main__":
     MessageHandler(filters.TEXT & filters.Regex(r"^پنل$"), Tastatur_menu),
     group=-3
     )
+
     application.add_handler(
         CallbackQueryHandler(Tastatur_buttons, pattern="^Tastatur_"),
         group=-3
     )
+
     application.add_handler(
         CallbackQueryHandler(toggle_lock_button, pattern=r"^toggle_lock:"),
         group=-3
     )
+
     application.add_handler(
         CallbackQueryHandler(handle_lock_page_switch, pattern=r"^lock_page:"),
+        group=-3
+    )
+
     # 🎮 مدیریت دکمه‌های بخش سرگرمی‌ها
     application.add_handler(
         CallbackQueryHandler(handle_fun_buttons, pattern=r"^fun_"),
