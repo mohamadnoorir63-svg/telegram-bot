@@ -1415,8 +1415,11 @@ DEFAULT_ALIASES = {
     # پاکسازی
     "clean": ["پاکسازی", "پاک کن", "پاک", "clear", "delete", "clean"],
 
-    "locks": ["وضعیت قفل", "وضعیت قفل‌ها", "locks", "lock status"]
-    "addalias": ["افزودن دستور", "ساخت دستور", "add alias"],
+    # وضعیت قفل‌ها
+    "locks": ["وضعیت قفل", "وضعیت قفل‌ها", "locks", "lock status"],
+
+    # افزودن دستور جدید (Alias)
+    "addalias": ["افزودن دستور", "ساخت دستور", "add alias"]
 }
 
 if not ALIASES:
