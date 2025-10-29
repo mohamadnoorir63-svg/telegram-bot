@@ -241,20 +241,17 @@ def _emoji_only(s: str) -> bool:
         user = update.effective_user
     if not msg or not chat or not user:
         return
-
     # معاف: مدیر یا سودو
     if await _is_admin_or_sudo_uid(context, chat.id, user.id):
         return
-
     locks = _locks_get(chat.id)
     if not locks:
         # اگر فیلتر کلمات داریم، پایین‌تر چک می‌شود
         pass
-
     # 🟢 متن پیام (شامل کپشن)
     text = (msg.text or msg.caption or "")
-    text_l = text.lower()
-
+    text_l = text.lower(
+    )
     async def _del(reason: str, filtered_word: str = None):
         """حذف پیام + نمایش پیام هشدار زیبا (با نام کاربر و کلمه فیلترشده)"""
         try:
