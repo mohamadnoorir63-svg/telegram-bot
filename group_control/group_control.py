@@ -562,7 +562,7 @@ async def handle_unpin(update, context):
     except Exception as e:
         await update.message.reply_text(f"⚠️ خطا:\n<code>{e}</code>", parse_mode="HTML")
         # ─────────────────────────────── User Management (Ban / Mute / Warn) ───────────────────────────────
-from datetime import timedelta
+ from datetime import timedelta
 
 def _ensure_user_system(chat_id: str):
     """اطمینان از وجود ساختار بن / سکوت / اخطار برای گروه"""
@@ -574,6 +574,27 @@ def _ensure_user_system(chat_id: str):
     g.setdefault("warns", {})
     group_data[chat_id] = g
 
+
+# 🔒 کمکی برای بررسی نقش کاربر
+async def _check_protected_target(update, context, target):
+    """بررسی اینکه آیا هدف، خود ربات یا مدیر/سودو است"""
+    bot_id = context.bot.id
+    if target.id == bot_id:
+        await update.message.reply_text("😅 من نمی‌تونم روی خودم کاری انجام بدم!")
+        return True
+    if target.id in SUDO_IDS:
+        await update.message.reply_text("😎 من نمی‌تونم سازنده‌ام رو محدود کنم!")
+        return True
+    try:
+        member = await context.bot.get_chat_member(update.effective_chat.id, target.id)
+        if member.status in ("administrator", "creator"):
+            await update.message.reply_text("👮‍♂️ من نمی‌تونم مدیر گروه رو محدود کنم!")
+            return True
+    except:
+        pass
+    return False
+
+
 # 📛 بن کاربر
 async def handle_ban(update, context):
     if not await is_authorized(update, context):
@@ -581,6 +602,8 @@ async def handle_ban(update, context):
     if not update.message.reply_to_message:
         return await update.message.reply_text("🔹 روی پیام کاربر ریپلای بزن.")
     target = update.message.reply_to_message.from_user
+    if await _check_protected_target(update, context, target):
+        return
     cid = str(update.effective_chat.id)
     _ensure_user_system(cid)
     bans = group_data[cid]["bans"]
@@ -594,6 +617,7 @@ async def handle_ban(update, context):
         await update.message.reply_text(f"⛔ {target.first_name} بن شد!", parse_mode="HTML")
     except Exception as e:
         await update.message.reply_text(f"⚠️ خطا:\n<code>{e}</code>", parse_mode="HTML")
+
 
 # 🟢 حذف بن
 async def handle_unban(update, context):
@@ -616,6 +640,7 @@ async def handle_unban(update, context):
     except Exception as e:
         await update.message.reply_text(f"⚠️ خطا:\n<code>{e}</code>", parse_mode="HTML")
 
+
 # 📋 لیست بن‌ها
 async def handle_list_bans(update, context):
     cid = str(update.effective_chat.id)
@@ -628,6 +653,7 @@ async def handle_list_bans(update, context):
         txt += f"{i}. <a href='tg://user?id={uid}'>کاربر</a>\n"
     await update.message.reply_text(txt, parse_mode="HTML")
 
+
 # 🤐 سکوت کاربر (اختیاری با زمان)
 async def handle_mute(update, context):
     if not await is_authorized(update, context):
@@ -635,11 +661,13 @@ async def handle_mute(update, context):
     if not update.message.reply_to_message:
         return await update.message.reply_text("🔹 روی پیام کاربر ریپلای بزن.")
     target = update.message.reply_to_message.from_user
+    if await _check_protected_target(update, context, target):
+        return
+
     cid = str(update.effective_chat.id)
     _ensure_user_system(cid)
     mutes = group_data[cid]["mutes"]
 
-    # استخراج زمان از متن (مثلاً سکوت 20 دقیقه)
     duration = 0
     text = update.message.text.lower()
     if "ثانیه" in text:
@@ -672,7 +700,6 @@ async def handle_mute(update, context):
         else:
             await update.message.reply_text(f"🤐 {target.first_name} ساکت شد (بدون زمان).", parse_mode="HTML")
 
-        # حذف خودکار پس از زمان
         if until:
             async def _auto_unmute():
                 await asyncio.sleep(delta.total_seconds())
@@ -691,6 +718,7 @@ async def handle_mute(update, context):
             asyncio.create_task(_auto_unmute())
     except Exception as e:
         await update.message.reply_text(f"⚠️ خطا:\n<code>{e}</code>", parse_mode="HTML")
+
 
 # 🔊 حذف سکوت
 async def handle_unmute(update, context):
@@ -715,6 +743,7 @@ async def handle_unmute(update, context):
     except Exception as e:
         await update.message.reply_text(f"⚠️ خطا:\n<code>{e}</code>", parse_mode="HTML")
 
+
 # 📋 لیست سکوت‌ها
 async def handle_list_mutes(update, context):
     cid = str(update.effective_chat.id)
@@ -731,6 +760,7 @@ async def handle_list_mutes(update, context):
             txt += f"{i}. <a href='tg://user?id={uid}'>کاربر</a> → تا {t}\n"
     await update.message.reply_text(txt, parse_mode="HTML")
 
+
 # ⚠️ اخطار کاربر
 async def handle_warn(update, context):
     if not await is_authorized(update, context):
@@ -738,6 +768,9 @@ async def handle_warn(update, context):
     if not update.message.reply_to_message:
         return await update.message.reply_text("🔹 روی پیام کاربر ریپلای بزن.")
     target = update.message.reply_to_message.from_user
+    if await _check_protected_target(update, context, target):
+        return
+
     cid = str(update.effective_chat.id)
     _ensure_user_system(cid)
     warns = group_data[cid]["warns"]
@@ -759,6 +792,7 @@ async def handle_warn(update, context):
     else:
         await update.message.reply_text(f"⚠️ اخطار {count}/3 برای {target.first_name}", parse_mode="HTML")
 
+
 # 🧹 حذف اخطار کاربر
 async def handle_unwarn(update, context):
     if not await is_authorized(update, context):
@@ -775,6 +809,7 @@ async def handle_unwarn(update, context):
     _save_json(GROUP_CTRL_FILE, group_data)
     await update.message.reply_text(f"✅ اخطار {target.first_name} حذف شد.", parse_mode="HTML")
 
+
 # 📋 لیست اخطارها
 async def handle_list_warns(update, context):
     cid = str(update.effective_chat.id)
@@ -786,7 +821,6 @@ async def handle_list_warns(update, context):
     for i, (uid, c) in enumerate(warns.items(), 1):
         txt += f"{i}. <a href='tg://user?id={uid}'>کاربر</a> → {c}/3 اخطار\n"
     await update.message.reply_text(txt, parse_mode="HTML")
-
 # ─────────────────────────────── Admins Management ───────────────────────────────
 async def handle_addadmin(update, context):
     if not await is_authorized(update, context):
