@@ -233,7 +233,6 @@ def _emoji_only(s: str) -> bool:
         return False
     non = re.sub(_emoji_pat, "", s)
     return non.strip() == ""
-
 async def check_message_locks(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = update.effective_message
     chat = update.effective_chat
@@ -250,27 +249,46 @@ async def check_message_locks(update: Update, context: ContextTypes.DEFAULT_TYPE
         # اگر فیلتر کلمات داریم، پایین‌تر چک می‌شود (ادغام شده)
         pass
 
-    # 🟢 این دو خط حتماً باید داخل تابع و با همین تورفتگی باشند
-    text = (msg.text or msg.caption or "")  # کپشن هم
+    # 🟢 متن پیام (شامل کپشن)
+    text = (msg.text or msg.caption or "")
     text_l = text.lower()
 
-    async def _del(reason: str):
-        """حذف پیام + نمایش پیام خطای زیبا"""
+    async def _del(reason: str, filtered_word: str = None):
+        """حذف پیام + نمایش پیام هشدار زیبا (با نام کاربر و کلمه فیلترشده)"""
         try:
             await msg.delete()
         except:
             return
         try:
+            message_text = (
+                f"⫸ <b>کاربر گرامی:</b> <a href='tg://user?id={user.id}'>{user.first_name}</a>\n"
+                f"◂ استفاده از <b>کلمات فیلتر شده</b> در گروه ممنوع است و به همین دلیل پیام شما حذف گردید.\n"
+            )
+            if filtered_word:
+                message_text += f"• <b>کلمه فیلتر شده:</b> <code>{filtered_word}</code>"
+            else:
+                message_text += f"• <b>دلیل:</b> {reason}"
+
             await context.bot.send_message(
                 chat.id,
-                f"🚫 <b>پیام حذف شد</b>\n\n"
-                f"⫸ <b>کاربر:</b> <a href='tg://user?id={user.id}'>{user.first_name}</a>\n"
-                f"💬 <b>دلیل:</b> {reason}\n"
-                f"🕒 <code>{datetime.now().strftime('%H:%M:%S')}</code>",
-                parse_mode="HTML"
+                message_text,
+                parse_mode="HTML",
+                reply_to_message_id=msg.message_id,
+                disable_notification=True
             )
         except:
             pass
+
+    # 🔍 بررسی فیلتر کلمات (ادغام‌شده)
+    chat_id = str(chat.id)
+    chat_filters = filters_db.get(chat_id, [])
+    if msg.text and chat_filters:
+        for w in chat_filters:
+            if w and w in text_l:
+                await _del("کلمه فیلترشده", filtered_word=w)
+                return
+
+    # (ادامه‌ی بررسی سایر قفل‌ها در پایین تابع می‌ماند)
 
     # قفل کلی
     if locks.get("all"):
