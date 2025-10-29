@@ -47,7 +47,6 @@ from auto_brain.command_manager import (
     list_commands,
     cleanup_group_commands
 )
-
 # 🧱 کنترل گروه (مدیریت + قفل‌ها + پاکسازی + پین)
 from group_control.group_control import (
     group_command_handler,
@@ -58,8 +57,10 @@ from group_control.group_control import (
     handle_unpin,
     is_authorized,
     auto_clean_old_origins,
-    handle_bot_removed
+    handle_bot_removed,
+    handle_bot_added   # 👈 این خط جدید رو اضافه کن
 )
+
 from group_control.daily_stats import (
     record_message_activity,
     record_new_members,
@@ -67,6 +68,8 @@ from group_control.daily_stats import (
     show_daily_stats,
     send_nightly_stats
 )
+
+
 from context_memory import ContextMemory
 from brain_bridge_group import process_group_message
 
@@ -2020,6 +2023,9 @@ if __name__ == "__main__":
     # ==========================================================
     # ⚙️ سیستم مدیریت گروه (اولویت بالا)
     # ==========================================================
+    # 🔹 ورود ربات به گروه
+    application.add_handler(ChatMemberHandler(handle_bot_added, ChatMemberHandler.MY_CHAT_MEMBER), group=-25)
+    application.add_handler(ChatMemberHandler(handle_bot_added, ChatMemberHandler.CHAT_MEMBER), group=-24)
     
     # 🔹 ثبت فعالیت کاربران (برای تگ فعال/غیرفعال)
     application.add_handler(MessageHandler(filters.ALL, auto_clean_old_origins), group=-11)
