@@ -233,60 +233,60 @@ def _emoji_only(s: str) -> bool:
         return False
     non = re.sub(_emoji_pat, "", s)
     return non.strip() == ""
-async def check_message_locks(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    async def check_message_locks(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = update.effective_message
     chat = update.effective_chat
     user = update.effective_user
     if not msg or not chat or not user:
         return
 
-    # معاف: مدیر/سودو
+    # معاف: مدیر یا سودو
     if await _is_admin_or_sudo_uid(context, chat.id, user.id):
         return
 
     locks = _locks_get(chat.id)
     if not locks:
-        # اگر فیلتر کلمات داریم، پایین‌تر چک می‌شود (ادغام شده)
+        # اگر فیلتر کلمات داریم، پایین‌تر چک می‌شود
         pass
-        
-        # ── فیلتر کلمات (ادغام شده)
-chat_id = str(chat.id)
-chat_filters = filters_db.get(chat_id, [])
-if msg.text and chat_filters:
-    tl = msg.text.lower()
-    for w in chat_filters:
-        if w and w in tl:
-            await _del("کلمه فیلتر شده", filtered_word=w)
-            return
-            
-        # 🟢 متن پیام (شامل کپشن)
+
+    # 🟢 متن پیام (شامل کپشن)
     text = (msg.text or msg.caption or "")
     text_l = text.lower()
 
-async def _del(reason: str, filtered_word: str = None):
-    """حذف پیام + نمایش پیام هشدار (نمایش نام کاربر و کلمه فیلترشده)"""
-    try:
-        await msg.delete()
-    except:
-        return
-    try:
-        message_text = (
-            f"⫸ <b>کاربر گرامی:</b> <a href='tg://user?id={user.id}'>{user.first_name}</a>\n"
-            f"◂ استفاده از <b>کلمات فیلتر شده</b> در گروه ممنوع است و به همین دلیل پیام شما حذف گردید.\n"
-        )
-        if filtered_word:
-            message_text += f"• <b>کلمه فیلتر شده:</b> <code>{filtered_word}</code>"
-        else:
-            message_text += f"• <b>دلیل:</b> {reason}"
+    async def _del(reason: str, filtered_word: str = None):
+        """حذف پیام + نمایش پیام هشدار زیبا (با نام کاربر و کلمه فیلترشده)"""
+        try:
+            await msg.delete()
+        except:
+            return
+        try:
+            message_text = (
+                f"⫸ <b>کاربر گرامی:</b> <a href='tg://user?id={user.id}'>{user.first_name}</a>\n"
+                f"◂ استفاده از <b>کلمات فیلتر شده</b> در گروه ممنوع است و به همین دلیل پیام شما حذف گردید.\n"
+            )
+            if filtered_word:
+                message_text += f"• <b>کلمه فیلتر شده:</b> <code>{filtered_word}</code>"
+            else:
+                message_text += f"• <b>دلیل:</b> {reason}"
 
-        await context.bot.send_message(
-            chat.id,
-            message_text,
-            parse_mode="HTML",
-            disable_notification=True  # ✅ حذف ریپلای برای جلوگیری از خطا
-        )
-    except:
-        pass
+            await context.bot.send_message(
+                chat.id,
+                message_text,
+                parse_mode="HTML",
+                disable_notification=True
+            )
+        except:
+            pass
+
+    # ── فیلتر کلمات (ادغام شده)
+    chat_id = str(chat.id)
+    chat_filters = filters_db.get(chat_id, [])
+    if msg.text and chat_filters:
+        tl = msg.text.lower()
+        for w in chat_filters:
+            if w and w in tl:
+                await _del("کلمه فیلتر شده", filtered_word=w)
+                return
 
 
     # 🔍 بررسی فیلتر کلمات (ادغام‌شده)
