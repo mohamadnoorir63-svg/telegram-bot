@@ -248,6 +248,7 @@ async def check_message_locks(update: Update, context: ContextTypes.DEFAULT_TYPE
     if not locks:
         # اگر فیلتر کلمات داریم، پایین‌تر چک می‌شود (ادغام شده)
         pass
+        
         # 🟢 متن پیام (شامل کپشن)
 text = (msg.text or msg.caption or "")
 text_l = text.lower()
