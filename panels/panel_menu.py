@@ -1,10 +1,12 @@
-# ====================== 🧭 پنل مدیریت گروه — نسخه پیشرفته با کنترل زنده قفل‌ها ======================
+# ====================== 🧭 پنل مدیریت گروه — نسخه پیشرفته با کنترل زنده و زیرمنوی تنظیمات ======================
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 from group_control.group_control import _locks_get, _locks_set, _save_json, group_data, GROUP_CTRL_FILE, LOCK_TYPES
 
+
 # 🌟 عنوان اصلی
 MAIN_TITLE = "🌟 <b>پنل راهنمای ربات مدیریت گروه</b>\n\n🧭 یکی از بخش‌های زیر را انتخاب کنید 👇"
+
 
 # 🎨 منوی اصلی
 async def Tastatur_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -49,123 +51,136 @@ async def Tastatur_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if data == "Tastatur_back":
         return await Tastatur_menu(update, context)
 
-    # 🔒 بخش قفل‌ها
+    # ================= 🔒 بخش قفل‌ها =================
     if data == "Tastatur_locks":
         return await show_lock_menu(query, context)
 
-    # 🧩 دسته‌بندی قفل‌ها
-    if data == "lock_cat_media":
-        locks_map = {k: LOCK_TYPES[k] for k in ["photos", "videos", "gifs", "files", "voices", "vmsgs"]}
-        return await show_lock_category(query, context, "🖼 رسانه‌ها", locks_map)
+    # ================= ⚙️ زیرمنوی تنظیمات =================
+    if data == "Tastatur_settings":
+        return await show_settings_menu(query)
 
-    if data == "lock_cat_text":
-        locks_map = {k: LOCK_TYPES[k] for k in ["text", "caption", "emoji", "english", "arabic"]}
-        return await show_lock_category(query, context, "💬 پیام‌ها و متون", locks_map)
+    # 🔧 زیرمنوی قفل‌ها در بخش تنظیمات
+    if data == "settings_locks":
+        return await show_settings_locks(query)
 
-    if data == "lock_cat_members":
-        locks_map = {k: LOCK_TYPES[k] for k in ["bots", "join", "joinmsg"]}
-        return await show_lock_category(query, context, "👥 اعضا و ربات‌ها", locks_map)
+    # 📋 سایر زیرمنوهای تنظیمات
+    if data == "settings_lists":
+        return await show_text_section(query, "📜 لیست‌ها", "لیست فیلترها، اخطارها و مدیران فعال در گروه.")
+    if data == "settings_help":
+        return await show_text_section(query, "❓ راهنما", "در این بخش می‌تونی با نحوه‌ی کار دستورات آشنا بشی.")
+    if data == "settings_advanced":
+        return await show_text_section(query, "⚙️ تنظیمات پیشرفته", "تنظیمات خودکار، زمان‌بندی قفل‌ها و تنظیم خوشامد خودکار.")
 
-    if data == "lock_cat_links":
-        locks_map = {k: LOCK_TYPES[k] for k in ["links", "ads", "usernames", "mention"]}
-        return await show_lock_category(query, context, "🌐 لینک‌ها و تبلیغ", locks_map)
-
-    # ==================== سایر بخش‌ها ====================
-    sections = {
-        "Tastatur_users": "👮 <b>مدیریت کاربران</b>\n\n• بن / رفع‌بن\n• اخطار / حذف‌اخطار\n• سکوت / رفع‌سکوت\n• افزودن یا حذف مدیر\n• لیست مدیران",
-        "Tastatur_settings": "⚙️ <b>تنظیمات گروه</b>\n\n• قفل یا بازکردن کل گروه\n• فعال‌سازی خوش‌آمدگویی\n• پاکسازی گروه\n• تنظیم حالت یادگیری",
-        "Tastatur_stats": "📊 <b>آمار و گزارش</b>\n\n• آمار کاربران و پیام‌ها\n• فعالیت مدیران\n• اعضای فعال و غیرفعال",
-        "Tastatur_fun": "🎮 <b>سرگرمی‌ها و ابزارها</b>\n\n🌤 آب‌وهوا | 🔮 فال | 😂 جوک | 🪪 ابزارها و فونت",
+    # 🎯 سایر بخش‌های اطلاعاتی (کاربران، آمار، سرگرمی و...)
+    simple_sections = {
+        "Tastatur_users": "👮 <b>مدیریت کاربران</b>\n\n• بن / رفع‌بن\n• سکوت / رفع‌سکوت\n• افزودن مدیر\n• لیست مدیران",
+        "Tastatur_stats": "📊 <b>آمار گروه</b>\n\n• تعداد کاربران\n• تعداد پیام‌ها\n• اعضای فعال",
+        "Tastatur_fun": "🎮 <b>سرگرمی‌ها</b>\n\nفال، جوک، آب‌وهوا، بیو، فونت و ابزارهای روزانه 😄",
         "Tastatur_alias": "🧩 <b>دستورات شخصی (Alias)</b>\n\nمثلاً:\n<code>افزودن دستور \"گمشو\" → ban</code>",
         "Tastatur_welcome": "👋 <b>سیستم خوشامدگویی</b>\n\nارسال پیام خوش‌آمد خودکار به تازه‌واردها 💬"
     }
-    if data in sections:
-        return await _Tastatur_section(query, sections[data])
+    if data in simple_sections:
+        return await show_text_section(query, "ℹ️ اطلاعات", simple_sections[data])
+        # ====================== 🔧 زیرمنوهای تنظیمات و قفل‌ها ======================
 
-
-# ========================= 🔙 زیرمنوها و قفل‌ها =========================
-
-async def _Tastatur_section(query, text):
+async def show_settings_menu(query):
+    """منوی اصلی تنظیمات"""
+    text = "⚙️ <b>تنظیمات گروه</b>\n\nیکی از بخش‌های زیر را انتخاب کنید 👇"
     keyboard = [
-        [
-            InlineKeyboardButton("🔙 بازگشت", callback_data="Tastatur_back"),
-            InlineKeyboardButton("❌ بستن", callback_data="Tastatur_close")
-        ]
-    ]
-    await query.edit_message_text(text, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(keyboard))
-
-
-# ====================== 🔒 کنترل و نمایش قفل‌ها ======================
-
-async def show_lock_menu(query, context):
-    """صفحه‌ی دسته‌بندی قفل‌ها"""
-    text = (
-        "🔐 <b>مدیریت قفل‌های گروه</b>\n\n"
-        "نوع قفلی که می‌خواهی تنظیم کنی را انتخاب کن 👇"
-    )
-    keyboard = [
-        [InlineKeyboardButton("🖼 رسانه‌ها", callback_data="lock_cat_media")],
-        [InlineKeyboardButton("💬 پیام‌ها و متون", callback_data="lock_cat_text")],
-        [InlineKeyboardButton("👥 اعضا و ربات‌ها", callback_data="lock_cat_members")],
-        [InlineKeyboardButton("🌐 لینک‌ها و تبلیغ", callback_data="lock_cat_links")],
+        [InlineKeyboardButton("🔒 قفل‌ها", callback_data="settings_locks")],
+        [InlineKeyboardButton("📜 لیست‌ها", callback_data="settings_lists")],
+        [InlineKeyboardButton("❓ راهنما", callback_data="settings_help")],
+        [InlineKeyboardButton("⚙️ تنظیمات پیشرفته", callback_data="settings_advanced")],
         [InlineKeyboardButton("🔙 بازگشت", callback_data="Tastatur_back")]
     ]
     await query.edit_message_text(text, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(keyboard))
 
 
-async def show_lock_category(query, context, category, locks_map):
-    """نمایش وضعیت هر قفل در دسته مربوطه"""
+async def show_text_section(query, title, text):
+    """نمایش متن‌های ساده تنظیمات"""
+    keyboard = [[InlineKeyboardButton("🔙 بازگشت", callback_data="Tastatur_settings")]]
+    await query.edit_message_text(f"<b>{title}</b>\n\n{text}", parse_mode="HTML", reply_markup=InlineKeyboardMarkup(keyboard))
+
+
+# ====================== 🔐 کنترل و صفحه‌بندی قفل‌ها ======================
+
+async def show_settings_locks(query):
+    """اولین صفحه‌ی قفل‌ها"""
+    await show_lock_page(query, page=1)
+
+
+async def show_lock_page(query, page=1):
+    """صفحه‌بندی قفل‌ها (۳ صفحه شامل ۲۵ قفل)"""
     chat_id = query.message.chat.id
     locks = _locks_get(chat_id)
-    keyboard, row = [], []
 
-    for key, label in locks_map.items():
-        state = locks.get(key, False)
-        icon = "🔒 فعال" if state else "🔓 غیرفعال"
-        btn = InlineKeyboardButton(f"{label} | {icon}", callback_data=f"toggle_lock:{key}")
+    # دیکشنری همه قفل‌ها
+    all_locks = {
+        1: ["links", "hyperlinks", "hashtags", "usernames", "english", "persian", "text", "telegramservice", "emoji", "badwords",
+            "forward", "inlinebtn", "games", "hidden", "addbots", "bots", "editmsg", "editmedia"],
+        2: ["photos", "videos", "files", "stickers", "audios", "gifs", "location", "contact", "animations", "voice", "commands", "selfie"],
+        3: ["pin", "commands2", "mention", "newmember", "story", "reply", "foreignreply", "poll"]
+    }
+
+    current = all_locks.get(page, [])
+    keyboard = []
+    row = []
+
+    for lock_key in current:
+        state = locks.get(lock_key, False)
+        icon = "✅" if state else "❌"
+        label = LOCK_TYPES.get(lock_key, lock_key)
+        btn = InlineKeyboardButton(f"{icon} {label}", callback_data=f"toggle_lock:{lock_key}")
         row.append(btn)
-        if len(row) == 1:  # یک‌ستونه زیباتر دیده می‌شود
+        if len(row) == 2:
             keyboard.append(row)
             row = []
+    if row:
+        keyboard.append(row)
 
-    keyboard.append([InlineKeyboardButton("🔙 بازگشت", callback_data="Tastatur_locks")])
-    text = f"⚙️ <b>تنظیمات قفل‌های {category}</b>\n\nروی هر مورد بزن تا روشن یا خاموش شود 👇"
-    await query.edit_message_text(text, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(keyboard))
+    # دکمه‌های صفحه‌بندی
+    nav_buttons = []
+    if page > 1:
+        nav_buttons.append(InlineKeyboardButton("⬅️ صفحه قبل", callback_data=f"lock_page:{page-1}"))
+    if page < 3:
+        nav_buttons.append(InlineKeyboardButton("صفحه بعد ➡️", callback_data=f"lock_page:{page+1}"))
+    if nav_buttons:
+        keyboard.append(nav_buttons)
+
+    keyboard.append([InlineKeyboardButton("🔙 بازگشت", callback_data="Tastatur_settings")])
+
+    await query.edit_message_text(
+        f"🔐 <b>پنل تنظیمات قفل‌ها — بخش {page}</b>\n\nبا لمس هر مورد می‌تونی فعال یا غیرفعال کنی 👇",
+        parse_mode="HTML",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
 
 
+# 📌 هندلر تغییر صفحه
+async def handle_lock_page_switch(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    data = query.data
+    await query.answer()
+
+    if data.startswith("lock_page:"):
+        page = int(data.split(":")[1])
+        await show_lock_page(query, page)
+        return
+
+# ⚙️ تغییر وضعیت هر قفل
 async def toggle_lock_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """روشن / خاموش کردن قفل با دکمه"""
     query = update.callback_query
     await query.answer()
     data = query.data
+
     if not data.startswith("toggle_lock:"):
         return
 
     chat_id = query.message.chat.id
     lock_key = data.split(":", 1)[1]
-
-    # وضعیت فعلی را برعکس کن
     locks = _locks_get(chat_id)
-    current_state = locks.get(lock_key, False)
-    _locks_set(chat_id, lock_key, not current_state)
+    new_state = not locks.get(lock_key, False)
+    _locks_set(chat_id, lock_key, new_state)
     _save_json(GROUP_CTRL_FILE, group_data)
 
-    # بازسازی صفحه فعلی
-    categories = {
-        "media": ["photos", "videos", "gifs", "files", "voices", "vmsgs"],
-        "text": ["text", "caption", "emoji", "english", "arabic"],
-        "members": ["bots", "join", "joinmsg"],
-        "links": ["links", "ads", "usernames", "mention"]
-    }
-
-    for cat, keys in categories.items():
-        if lock_key in keys:
-            locks_map = {k: LOCK_TYPES[k] for k in keys}
-            category_name = {
-                "media": "🖼 رسانه‌ها",
-                "text": "💬 پیام‌ها و متون",
-                "members": "👥 اعضا و ربات‌ها",
-                "links": "🌐 لینک‌ها و تبلیغ"
-            }[cat]
-            await show_lock_category(query, context, category_name, locks_map)
-            return
+    await show_lock_page(query, 1)  # به همان صفحه برگردد
