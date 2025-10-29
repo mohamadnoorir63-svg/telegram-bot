@@ -69,8 +69,7 @@ from group_control.daily_stats import (
     send_nightly_stats
 )
 
-from panels.panel_menu import toggle_lock_button
-application.add_handler(CallbackQueryHandler(toggle_lock_button, pattern=r"^toggle_lock:"))
+from panels.panel_menu import Tastatur_menu, Tastatur_buttons, toggle_lock_button
 from context_memory import ContextMemory
 from brain_bridge_group import process_group_message
 
@@ -2092,6 +2091,10 @@ if __name__ == "__main__":
     )
     application.add_handler(
         CallbackQueryHandler(Tastatur_buttons, pattern="^Tastatur_"),
+        group=-3
+    )
+    application.add_handler(
+        CallbackQueryHandler(toggle_lock_button, pattern=r"^toggle_lock:"),
         group=-3
     )
     application.add_handler(CommandHandler("stats", stats))
