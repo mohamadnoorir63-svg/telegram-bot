@@ -248,36 +248,35 @@ async def check_message_locks(update: Update, context: ContextTypes.DEFAULT_TYPE
     if not locks:
         # اگر فیلتر کلمات داریم، پایین‌تر چک می‌شود (ادغام شده)
         pass
+        # 🟢 متن پیام (شامل کپشن)
+text = (msg.text or msg.caption or "")
+text_l = text.lower()
 
-    # 🟢 متن پیام (شامل کپشن)
-    text = (msg.text or msg.caption or "")
-    text_l = text.lower()
+async def _del(reason: str, filtered_word: str = None):
+    """حذف پیام + نمایش پیام هشدار (نمایش نام کاربر و کلمه فیلترشده)"""
+    try:
+        await msg.delete()
+    except:
+        return
+    try:
+        message_text = (
+            f"⫸ <b>کاربر گرامی:</b> <a href='tg://user?id={user.id}'>{user.first_name}</a>\n"
+            f"◂ استفاده از <b>کلمات فیلتر شده</b> در گروه ممنوع است و به همین دلیل پیام شما حذف گردید.\n"
+        )
+        if filtered_word:
+            message_text += f"• <b>کلمه فیلتر شده:</b> <code>{filtered_word}</code>"
+        else:
+            message_text += f"• <b>دلیل:</b> {reason}"
 
-    async def _del(reason: str, filtered_word: str = None):
-        """حذف پیام + نمایش پیام هشدار زیبا (با نام کاربر و کلمه فیلترشده)"""
-        try:
-            await msg.delete()
-        except:
-            return
-        try:
-            message_text = (
-                f"⫸ <b>کاربر گرامی:</b> <a href='tg://user?id={user.id}'>{user.first_name}</a>\n"
-                f"◂ استفاده از <b>کلمات فیلتر شده</b> در گروه ممنوع است و به همین دلیل پیام شما حذف گردید.\n"
-            )
-            if filtered_word:
-                message_text += f"• <b>کلمه فیلتر شده:</b> <code>{filtered_word}</code>"
-            else:
-                message_text += f"• <b>دلیل:</b> {reason}"
+        await context.bot.send_message(
+            chat.id,
+            message_text,
+            parse_mode="HTML",
+            disable_notification=True  # ✅ حذف ریپلای برای جلوگیری از خطا
+        )
+    except:
+        pass
 
-            await context.bot.send_message(
-                chat.id,
-                message_text,
-                parse_mode="HTML",
-                reply_to_message_id=msg.message_id,
-                disable_notification=True
-            )
-        except:
-            pass
 
     # 🔍 بررسی فیلتر کلمات (ادغام‌شده)
     chat_id = str(chat.id)
