@@ -69,7 +69,12 @@ from group_control.daily_stats import (
     send_nightly_stats
 )
 
-from panels.panel_menu import Tastatur_menu, Tastatur_buttons, toggle_lock_button
+from panels.panel_menu import (
+    Tastatur_menu,
+    Tastatur_buttons,
+    toggle_lock_button,
+    handle_lock_page_switch,   # ← این خطو اضافه کن!
+)
 from context_memory import ContextMemory
 from brain_bridge_group import process_group_message
 
