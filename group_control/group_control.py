@@ -250,8 +250,8 @@ async def check_message_locks(update: Update, context: ContextTypes.DEFAULT_TYPE
         pass
         
         # 🟢 متن پیام (شامل کپشن)
-text = (msg.text or msg.caption or "")
-text_l = text.lower()
+    text = (msg.text or msg.caption or "")
+    text_l = text.lower()
 
 async def _del(reason: str, filtered_word: str = None):
     """حذف پیام + نمایش پیام هشدار (نمایش نام کاربر و کلمه فیلترشده)"""
