@@ -2245,11 +2245,27 @@ if __name__ == "__main__":
     # ==========================================================
 # 🔗 اتصال سیستم کنترل گروه
 # ==========================================================
-from group_system import register_group_handlers, schedule_group_jobs
+from group_control.group_control import (
+    group_command_handler,
+    handle_new_members,
+    handle_service_messages,
+    handle_edited_message,
+    auto_group_lock_scheduler
+)
 
-register_group_handlers(application)
-schedule_group_jobs(application.job_queue)
-    # ==========================================================
+from telegram.ext import MessageHandler, filters
+
+# ثبت هندلرهای کنترل گروه
+application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, group_command_handler))
+application.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, handle_new_members))
+application.add_handler(MessageHandler(filters.StatusUpdate.LEFT_CHAT_MEMBER, handle_service_messages))
+application.add_handler(MessageHandler(filters.UpdateType.EDITED_MESSAGE, handle_edited_message))
+
+# زمان‌بندی قفل خودکار گروه
+application.job_queue.run_repeating(auto_group_lock_scheduler, interval=60)
+
+
+# ==========================================================
 # 🤖 اجرای همزمان یوزربات (Telethon) در کنار ربات اصلی
 # ==========================================================
 from telethon import TelegramClient, events
@@ -2283,6 +2299,7 @@ async def start_userbot():
         me = await client.get_me()
         print(f"✅ Userbot آنلاین شد ({me.first_name}) [ID: {me.id}]")
 
+        # تست ساده
         @client.on(events.NewMessage(pattern=r"\.ping"))
         async def _(event):
             await event.reply("🏓 Userbot فعاله ✅")
@@ -2291,6 +2308,7 @@ async def start_userbot():
 
     except Exception as e:
         print(f"❌ خطا در userbot: {e}")
+
 
 # ==========================================================
 # 🚀 اجرای نهایی ربات اصلی + یوزربات
@@ -2308,11 +2326,12 @@ application.post_init = on_startup
 try:
     print("🔄 در حال اجرای ربات...")
 
+    # 🌙 زمان‌بندی آمار شبانه
     tz_tehran = timezone(timedelta(hours=3, minutes=30))
     job_queue = application.job_queue
     job_queue.run_daily(send_nightly_stats, time=time(0, 0, tzinfo=tz_tehran))
 
-    # ⚙️ اجرای همزمان userbot
+    # ⚙️ اجرای همزمان userbot در پس‌زمینه
     loop = asyncio.get_event_loop()
     loop.create_task(start_userbot())
 
