@@ -2245,18 +2245,67 @@ if __name__ == "__main__":
     # ==========================================================
 # 🤖 اجرای همزمان یوزربات (Telethon) در کنار ربات اصلی
 # ==========================================================
-import asyncio
+from telethon import TelegramClient, events
+from telethon.sessions import StringSession
+import os, asyncio
+
+async def start_userbot():
+    """🧠 اجرای خودکار یوزربات در کنار ربات اصلی"""
+    print("🔌 در حال اتصال userbot ...")
+
+    api_id = int(os.getenv("API_ID", "0"))
+    api_hash = os.getenv("API_HASH", "")
+    session_string = os.getenv("SESSION_STRING", "")
+
+    if not api_id or not api_hash:
+        print("🚫 API_ID یا API_HASH تنظیم نشده — یوزربات غیرفعال ماند.")
+        return
+
+    try:
+        if not session_string:
+            if os.path.exists("userbot.session"):
+                print("📂 SESSION_STRING پیدا نشد — در حال خواندن از فایل userbot.session ...")
+                client = TelegramClient("userbot.session", api_id, api_hash)
+            else:
+                print("⚠️ نه SESSION_STRING هست، نه userbot.session — یوزربات اجرا نمی‌شود.")
+                return
+        else:
+            client = TelegramClient(StringSession(session_string), api_id, api_hash)
+
+        await client.start()
+        me = await client.get_me()
+        print(f"✅ Userbot آنلاین شد ({me.first_name}) [ID: {me.id}]")
+
+        @client.on(events.NewMessage(pattern=r"\.ping"))
+        async def _(event):
+            await event.reply("🏓 Userbot فعاله ✅")
+
+        await client.run_until_disconnected()
+
+    except Exception as e:
+        print(f"❌ خطا در userbot: {e}")
+
+# ==========================================================
+# 🚀 اجرای نهایی ربات اصلی + یوزربات
+# ==========================================================
 from datetime import time, timezone, timedelta
+
+async def on_startup(app):
+    await notify_admin_on_startup(app)
+    app.create_task(auto_backup(app.bot))
+    app.create_task(start_auto_brain_loop(app.bot))
+    print("🌙 [SYSTEM] Startup tasks scheduled ✅")
+
+application.post_init = on_startup
 
 try:
     print("🔄 در حال اجرای ربات...")
 
-    # 🌙 آمار خودکار شبانه (هر شب ساعت 00:00 به وقت تهران)
     tz_tehran = timezone(timedelta(hours=3, minutes=30))
     job_queue = application.job_queue
     job_queue.run_daily(send_nightly_stats, time=time(0, 0, tzinfo=tz_tehran))
 
-    # ✅ اجرای userbot در پس‌زمینه
+    # ⚙️ اجرای همزمان userbot
     loop = asyncio.get_event_loop()
     loop.create_task(start_userbot())
 
@@ -2271,58 +2320,8 @@ try:
         ]
     )
 
-    # ✅ جلوگیری از بسته شدن برنامه
     loop.run_forever()
 
 except Exception as e:
     print(f"⚠️ خطا در اجرای ربات:\n{e}")
-    print("♻️ ربات به‌صورت خودکار توسط هاست ری‌استارت خواهد شد ✅") 
-    # ==========================================================
-# 🤖 اجرای همزمان یوزربات (Telethon) در کنار ربات اصلی
-# نسخه به‌روز مخصوص هاست Heroku — 2025
-# ==========================================================
-from telethon import TelegramClient, events
-from telethon.sessions import StringSession
-import os, asyncio
-
-async def start_userbot():
-    """🧠 اجرای خودکار یوزربات در کنار ربات اصلی"""
-    print("🔌 در حال اتصال userbot ...")
-
-    # 📡 دریافت اطلاعات از محیط هاست
-    api_id = int(os.getenv("API_ID", "0"))
-    api_hash = os.getenv("API_HASH", "")
-    session_string = os.getenv("SESSION_STRING", "")
-
-    # ⚠️ بررسی ورودی‌ها
-    if not api_id or not api_hash:
-        print("🚫 API_ID یا API_HASH تنظیم نشده — یوزربات غیرفعال می‌ماند.")
-        return
-
-    try:
-        # 📂 اگر SESSION_STRING نبود → از فایل local بخوان
-        if not session_string:
-            if os.path.exists("userbot.session"):
-                print("📂 SESSION_STRING پیدا نشد — دارم از فایل userbot.session می‌خونم ...")
-                client = TelegramClient("userbot.session", api_id, api_hash)
-            else:
-                print("⚠️ نه SESSION_STRING هست، نه فایل userbot.session — یوزربات اجرا نمی‌شود.")
-                return
-        else:
-            client = TelegramClient(StringSession(session_string), api_id, api_hash)
-
-        # ✅ شروع یوزربات
-        await client.start()
-        me = await client.get_me()
-        print(f"✅ Userbot آنلاین شد ({me.first_name}) [ID: {me.id}]")
-
-        # 💬 تست ساده با دستور `.ping`
-        @client.on(events.NewMessage(pattern=r"\.ping"))
-        async def _(event):
-            await event.reply("🏓 Userbot فعاله ✅")
-
-        # 🧩 اجرای پایدار تا قطع اتصال
-        await client.run_until_disconnected()
-
-    except Exception as e:
-        print(f"❌ خطا در userbot: {e}")
+    print("♻️ ربات به‌صورت خودکار توسط هاست ری‌استارت خواهد شد ✅")
