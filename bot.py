@@ -2244,110 +2244,22 @@ if __name__ == "__main__":
     # ==========================================================
     # 🧠 وظایف استارتاپ
     # ==========================================================
-    async def on_startup(app):
-        await notify_admin_on_startup(app)
-        app.create_task(auto_backup(app.bot))
-        app.create_task(start_auto_brain_loop(app.bot))
-        print("🌙 [SYSTEM] Startup tasks scheduled ✅")
-
-    application.post_init = on_startup
     # ==========================================================
-# 🤖 اجرای همزمان یوزربات (Telethon) در کنار ربات اصلی
+# 🚀 اجرای ربات اصلی + انرژی دادن به یوزربات
 # ==========================================================
-from telethon import TelegramClient, events, errors
-from telethon.sessions import StringSession
-import os, asyncio
-
-async def start_userbot():
-    """🧠 اجرای خودکار یوزربات در کنار ربات اصلی"""
-    print("🔌 در حال اتصال userbot ...")
-
-    api_id = int(os.getenv("API_ID", "0"))
-    api_hash = os.getenv("API_HASH", "")
-    session_string = os.getenv("SESSION_STRING", "")
-
-    if not api_id or not api_hash:
-        print("🚫 API_ID یا API_HASH تنظیم نشده — یوزربات غیرفعال ماند.")
-        return
-
-    try:
-        # 🧠 ساخت کلاینت
-        if not session_string:
-            if os.path.exists("userbot.session"):
-                print("📂 SESSION_STRING پیدا نشد — در حال خواندن از فایل userbot.session ...")
-                client = TelegramClient("userbot.session", api_id, api_hash)
-            else:
-                print("⚠️ نه SESSION_STRING هست، نه userbot.session — یوزربات اجرا نمی‌شود.")
-                return
-        else:
-            client = TelegramClient(StringSession(session_string), api_id, api_hash)
-
-        await client.start()
-        me = await client.get_me()
-        print(f"✅ Userbot آنلاین شد ({me.first_name}) [ID: {me.id}]")
-
-        # ────────────────────────────── دستورات یوزربات ──────────────────────────────
-
-        @client.on(events.NewMessage(pattern=r"^\.ping$"))
-        async def _(event):
-            await event.reply("🏓 Userbot فعاله ✅")
-
-        # 🧹 پاکسازی فوق‌العاده سریع — دستور .nuke
-        @client.on(events.NewMessage(pattern=r"^\.nuke(?:\s+(\d+))?$"))
-        async def nuke_handler(event):
-            """پاکسازی سریع — فقط برای ادمین دارای Delete Messages"""
-            chat = await event.get_chat()
-            chat_id = event.chat_id
-            m = event.pattern_match.group(1)
-            limit = int(m) if m else 5000  # پیش‌فرض ۵۰۰۰ پیام
-            msg = await event.reply("🧹 شروع پاکسازی...")
-
-            try:
-                messages = await client.get_messages(chat_id, limit=limit)
-                ids = [m.id for m in messages]
-                total = len(ids)
-                deleted = 0
-                failed = 0
-
-                for i in range(0, total, 100):
-                    batch = ids[i:i + 100]
-                    try:
-                        await client.delete_messages(chat_id, batch, revoke=True)
-                        deleted += len(batch)
-                    except errors.FloodWait as fw:
-                        await msg.edit(f"⚠️ FloodWait {fw.seconds}s — در حال صبر...")
-                        await asyncio.sleep(fw.seconds + 1)
-                    except Exception as e:
-                        print(f"[NUKE ERROR] {e}")
-                        failed += len(batch)
-
-                    await msg.edit(f"🧹 حذف شد: {deleted}/{total} (ناموفق: {failed})")
-                    await asyncio.sleep(0.3)
-
-                await msg.edit(f"✅ پاکسازی کامل شد.\n✔️ حذف شده: {deleted}\n❌ ناموفق: {failed}")
-            except Exception as e:
-                await msg.edit(f"❌ خطا: {e}")
-
-        # ────────────────────────────── پایان دستورات ──────────────────────────────
-
-        await client.run_until_disconnected()
-
-    except Exception as e:
-        print(f"❌ خطا در userbot: {e}")
-
-# ==========================================================
-# 🚀 اجرای نهایی ربات اصلی + یوزربات
-# ==========================================================
+import asyncio
 from datetime import time, timezone, timedelta
 
+# 🧩 تابع استارتاپ ربات
 async def on_startup(app):
-    """✅ وظایف استارتاپ ربات"""
+    """✅ وظایف استارتاپ ربات اصلی"""
     await notify_admin_on_startup(app)
     app.create_task(auto_backup(app.bot))
     app.create_task(start_auto_brain_loop(app.bot))
     print("🌙 [SYSTEM] Startup tasks scheduled ✅")
 
 application.post_init = on_startup
+
 
 try:
     print("🔄 در حال اجرای ربات...")
@@ -2357,7 +2269,11 @@ try:
     job_queue = application.job_queue
     job_queue.run_daily(send_nightly_stats, time=time(0, 0, tzinfo=tz_tehran))
 
-    # ⚙️ اجرای همزمان userbot در پس‌زمینه
+    # ==========================================================
+    # ⚙️ بارگذاری و اجرای userbot از پوشه مستقل
+    # ==========================================================
+    from userbot.userbot import start_userbot
+
     loop = asyncio.get_event_loop()
     loop.create_task(start_userbot())
 
@@ -2372,6 +2288,7 @@ try:
         ]
     )
 
+    # جلوگیری از بسته شدن برنامه
     loop.run_forever()
 
 except Exception as e:
