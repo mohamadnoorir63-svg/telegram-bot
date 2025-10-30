@@ -2243,7 +2243,7 @@ if __name__ == "__main__":
 
     application.post_init = on_startup
     # ==========================================================
-# 🔗 اتصال سیستم کنترل گروه
+# 🔗 اتصال سیستم کنترل گروه (یکپارچه و بدون تکرار)
 # ==========================================================
 from group_control.group_control import (
     group_command_handler,
@@ -2252,19 +2252,18 @@ from group_control.group_control import (
     handle_edited_message,
     auto_group_lock_scheduler
 )
-
 from telegram.ext import MessageHandler, filters
 
-# ثبت هندلرهای کنترل گروه
-application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, group_command_handler))
-application.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, handle_new_members))
-application.add_handler(MessageHandler(filters.StatusUpdate.LEFT_CHAT_MEMBER, handle_service_messages))
-application.add_handler(MessageHandler(filters.UpdateType.EDITED_MESSAGE, handle_edited_message))
+def setup_group_system(application):
+    """تنها تابع ثبت هندلرها — جلوگیری از دوبارسازی"""
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, group_command_handler))
+    application.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, handle_new_members))
+    application.add_handler(MessageHandler(filters.StatusUpdate.LEFT_CHAT_MEMBER, handle_service_messages))
+    application.add_handler(MessageHandler(filters.UpdateType.EDITED_MESSAGE, handle_edited_message))
+    application.job_queue.run_repeating(auto_group_lock_scheduler, interval=60)
 
-# زمان‌بندی قفل خودکار گروه
-application.job_queue.run_repeating(auto_group_lock_scheduler, interval=60)
-
-
+# اجرا
+setup_group_system(application)
 # ==========================================================
 # 🤖 اجرای همزمان یوزربات (Telethon) در کنار ربات اصلی
 # ==========================================================
