@@ -88,6 +88,10 @@ from weather_module.weather_panel import show_weather
 from modules.azan_module import get_azan_time, get_ramadan_status
 from panels.link_panel import link_panel, link_panel_buttons
 from panels.panel_menu import Tastatur_menu, Tastatur_buttons
+from userbot.userbot import start_userbot
+
+loop = asyncio.get_event_loop()
+loop.create_task(start_userbot())
 
 # ======================= ⚙️ تنظیمات پایه و سودوها =======================
 from telegram import Update
