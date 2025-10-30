@@ -2262,15 +2262,20 @@ if __name__ == "__main__":
             ]
         )
         
-        except Exception as e:
-        print(f"⚠️ خطا در اجرای ربات:\n{e}")
-        print("♻️ ربات به‌صورت خودکار توسط هاست ری‌استارت خواهد شد ✅")
+    try:
+    # 👇 تمام کد اصلی ربات داخل try باشه
+    application.run_polling()
+
+except Exception as e:
+    print(f"⚠️ خطا در اجرای ربات:\n{e}")
+    print("♻️ ربات به‌صورت خودکار توسط هاست ری‌استارت خواهد شد ✅")
 
 # ==========================================================
 # 🤖 اجرای همزمان یوزربات (Telethon) در کنار ربات اصلی
 # ==========================================================
 from telethon import TelegramClient
 from telethon.sessions import StringSession
+import asyncio
 
 async def start_userbot():
     api_id = int(os.getenv("API_ID", "0"))
@@ -2287,7 +2292,5 @@ async def start_userbot():
     print(f"✅ Userbot آنلاین شد ({me.first_name}) [ID: {me.id}]")
     await client.run_until_disconnected()
 
-# اجرای یوزربات در پس‌زمینه
-import asyncio
+# 🚀 اجرای userbot در پس‌زمینه
 asyncio.get_event_loop().create_task(start_userbot())
-
