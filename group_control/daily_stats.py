@@ -137,6 +137,21 @@ async def show_daily_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
         today = datetime.now().strftime("%Y-%m-%d")
         text_input = update.message.text.strip().lower()
 
+        # 🔒 بررسی مجوز دسترسی (فقط ادمین‌ها یا سودو)
+        if user.id != SUDO_ID:
+            try:
+                member = await context.bot.get_chat_member(chat_id, user.id)
+                if member.status not in ["creator", "administrator"]:
+                    msg = await update.message.reply_text("🚫 فقط مدیران یا سودو مجاز به مشاهده آمار و آیدی هستند.")
+                    await asyncio.sleep(10)
+                    try:
+                        await context.bot.delete_message(chat_id, msg.message_id)
+                    except:
+                        pass
+                    return
+            except:
+                return
+
         # 📌 حالت "آیدی"
         if text_input in ["آیدی", "id"]:
             # اگر روی پیام کسی ریپلای شده → آیدی همون فرد
@@ -160,7 +175,6 @@ async def show_daily_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
 
             try:
-                # 📸 دریافت عکس پروفایل هدف
                 photos = await context.bot.get_user_profile_photos(target.id, limit=1)
                 if photos.total_count > 0:
                     photo = photos.photos[0][-1].file_id
@@ -173,7 +187,6 @@ async def show_daily_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 else:
                     msg = await update.message.reply_text(text, parse_mode="HTML")
 
-                # 🕒 حذف خودکار پیام بعد از 15 ثانیه
                 await asyncio.sleep(15)
                 try:
                     await context.bot.delete_message(chat_id, msg.message_id)
@@ -246,7 +259,6 @@ async def show_daily_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         msg = await update.message.reply_text(text, parse_mode="HTML")
 
-        # 🕒 حذف خودکار پیام آمار بعد از 15 ثانیه
         await asyncio.sleep(15)
         try:
             await context.bot.delete_message(chat_id, msg.message_id)
