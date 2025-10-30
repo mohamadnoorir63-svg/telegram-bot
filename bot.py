@@ -88,7 +88,7 @@ from weather_module.weather_panel import show_weather
 from modules.azan_module import get_azan_time, get_ramadan_status
 from panels.link_panel import link_panel, link_panel_buttons
 from panels.panel_menu import Tastatur_menu, Tastatur_buttons
-from userbot import start_userbot, message_queue
+
 # ======================= ⚙️ تنظیمات پایه و سودوها =======================
 from telegram import Update
 from telegram.ext import ContextTypes
@@ -2251,28 +2251,7 @@ if __name__ == "__main__":
         print("🌙 [SYSTEM] Startup tasks scheduled ✅")
 
     application.post_init = on_startup
-    # ==========================================================
-# 🔗 اتصال سیستم کنترل گروه (یکپارچه و بدون تکرار)
-# ==========================================================
-from group_control.group_control import (
-    group_command_handler,
-    handle_new_members,
-    handle_service_messages,
-    handle_edited_message,
-    auto_group_lock_scheduler
-)
-from telegram.ext import MessageHandler, filters
-
-def setup_group_system(application):
-    """تنها تابع ثبت هندلرها — جلوگیری از دوبارسازی"""
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, group_command_handler))
-    application.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, handle_new_members))
-    application.add_handler(MessageHandler(filters.StatusUpdate.LEFT_CHAT_MEMBER, handle_service_messages))
-    application.add_handler(MessageHandler(filters.UpdateType.EDITED_MESSAGE, handle_edited_message))
-    application.job_queue.run_repeating(auto_group_lock_scheduler, interval=60)
-
-# اجرا
-setup_group_system(application)
+    
 # ==========================================================
 # 🤖 اجرای همزمان یوزربات (Telethon) در کنار ربات اصلی
 # ==========================================================
