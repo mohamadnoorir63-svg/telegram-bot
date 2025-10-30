@@ -88,10 +88,6 @@ from weather_module.weather_panel import show_weather
 from modules.azan_module import get_azan_time, get_ramadan_status
 from panels.link_panel import link_panel, link_panel_buttons
 from panels.panel_menu import Tastatur_menu, Tastatur_buttons
-from userbot.userbot import start_userbot
-
-loop = asyncio.get_event_loop()
-loop.create_task(start_userbot())
 
 # ======================= ⚙️ تنظیمات پایه و سودوها =======================
 from telegram import Update
@@ -2243,16 +2239,9 @@ if __name__ == "__main__":
     # 🧠 هندلر ورودی هوشمند برای تنظیمات خوشامد
     application.add_handler(MessageHandler(filters.TEXT | filters.PHOTO | filters.ANIMATION, welcome_input_handler), group=-1)
     # ==========================================================
-    # 🧠 وظایف استارتاپ
-    # ==========================================================
-    # ==========================================================
-    # 🧠 وظایف استارتاپ
-    # ==========================================================
-    # ==========================================================
-# 🚀 اجرای نهایی ربات اصلی + بارگذاری یوزربات از پوشه مستقل
+# 🚀 اجرای نهایی ربات اصلی (خنگول فارسی)
 # ==========================================================
 from datetime import time, timezone, timedelta
-import importlib
 import asyncio
 
 async def on_startup(app):
@@ -2267,22 +2256,15 @@ application.post_init = on_startup
 try:
     print("🔄 در حال اجرای ربات اصلی...")
 
-    # 🌙 زمان‌بندی آمار شبانه
+    # 🌙 زمان‌بندی آمار شبانه (ساعت ۰۰:۰۰ به وقت تهران)
     tz_tehran = timezone(timedelta(hours=3, minutes=30))
     job_queue = application.job_queue
     job_queue.run_daily(send_nightly_stats, time=time(0, 0, tzinfo=tz_tehran))
 
-    # ⚙️ بارگذاری یوزربات از پوشه مستقل
-    try:
-        importlib.import_module("userbot.userbot")
-        print("✅ یوزربات با موفقیت بارگذاری و فعال شد (از پوشه‌ی مستقل).")
-    except Exception as e:
-        print(f"⚠️ خطا در بارگذاری userbot: {e}")
-
-    # 🧩 تست پایدار بودن خنگول (اختیاری)
+    # 🧩 تست سلامت (اختیاری، فقط برای لاگ زنده)
     async def test_main_bot():
         while True:
-            print("🤖 [BOT] خنگول فعاله و منتظره...")
+            print("🤖 [BOT] خنگول فعاله و در حال اجراست...")
             await asyncio.sleep(10)
 
     asyncio.get_event_loop().create_task(test_main_bot())
