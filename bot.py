@@ -2279,20 +2279,15 @@ try:
     except Exception as e:
         print(f"⚠️ خطا در بارگذاری userbot: {e}")
 
-try:
-    print("🔄 در حال اجرای ربات اصلی...")
+    # 🧩 تست پایدار بودن خنگول (اختیاری)
+    async def test_main_bot():
+        while True:
+            print("🤖 [BOT] خنگول فعاله و منتظره...")
+            await asyncio.sleep(10)
 
-    tz_tehran = timezone(timedelta(hours=3, minutes=30))
-    job_queue = application.job_queue
-    job_queue.run_daily(send_nightly_stats, time=time(0, 0, tzinfo=tz_tehran))
+    asyncio.get_event_loop().create_task(test_main_bot())
 
-    try:
-        importlib.import_module("userbot.userbot")
-        print("✅ یوزربات با موفقیت بارگذاری و فعال شد (از پوشه‌ی مستقل).")
-    except Exception as e:
-        print(f"⚠️ خطا در بارگذاری userbot: {e}")
-
-    # 👇👇 این بخش باید درون همین try اصلی باشه، نه بیرونش 👇👇
+    # ✅ اجرای polling ربات اصلی
     application.run_polling(
         allowed_updates=[
             "message",
@@ -2303,6 +2298,7 @@ try:
         ]
     )
 
+    # جلوگیری از بسته شدن برنامه
     asyncio.get_event_loop().run_forever()
 
 except Exception as e:
