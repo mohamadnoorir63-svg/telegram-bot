@@ -2261,6 +2261,30 @@ if __name__ == "__main__":
             "my_chat_member",
             ]
         )
+        # ==========================================================
+# 🤖 اجرای همزمان یوزربات (Telethon) در کنار ربات اصلی
+# ==========================================================
+from telethon import TelegramClient
+from telethon.sessions import StringSession
+
+async def start_userbot():
+    api_id = int(os.getenv("API_ID", "0"))
+    api_hash = os.getenv("API_HASH", "")
+    session_string = os.getenv("SESSION_STRING", "")
+
+    if not all([api_id, api_hash, session_string]):
+        print("⚠️ اطلاعات userbot کامل نیست (API_ID, API_HASH, SESSION_STRING)")
+        return
+
+    client = TelegramClient(StringSession(session_string), api_id, api_hash)
+    await client.start()
+    me = await client.get_me()
+    print(f"✅ Userbot آنلاین شد ({me.first_name}) [ID: {me.id}]")
+    await client.run_until_disconnected()
+
+# اجرای یوزربات در پس‌زمینه
+import asyncio
+asyncio.get_event_loop().create_task(start_userbot())
 
     except Exception as e:
         print(f"⚠️ خطا در اجرای ربات:\n{e}")
