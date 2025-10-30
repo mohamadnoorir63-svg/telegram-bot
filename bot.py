@@ -2243,6 +2243,13 @@ if __name__ == "__main__":
 
     application.post_init = on_startup
     # ==========================================================
+# 🔗 اتصال سیستم کنترل گروه
+# ==========================================================
+from group_system import register_group_handlers, schedule_group_jobs
+
+register_group_handlers(application)
+schedule_group_jobs(application.job_queue)
+    # ==========================================================
 # 🤖 اجرای همزمان یوزربات (Telethon) در کنار ربات اصلی
 # ==========================================================
 from telethon import TelegramClient, events
