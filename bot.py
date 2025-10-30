@@ -88,6 +88,7 @@ from weather_module.weather_panel import show_weather
 from modules.azan_module import get_azan_time, get_ramadan_status
 from panels.link_panel import link_panel, link_panel_buttons
 from panels.panel_menu import Tastatur_menu, Tastatur_buttons
+from userbot import start_userbot, message_queue
 # ======================= ⚙️ تنظیمات پایه و سودوها =======================
 from telegram import Update
 from telegram.ext import ContextTypes
@@ -1022,6 +1023,12 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if context.user_data.get("custom_handled"):
         context.user_data["custom_handled"] = False
         return
+        # هر وقت پیام جدیدی از کاربر رسید
+await message_queue.put({
+    "chat_id": update.effective_chat.id,
+    "text": update.message.text
+})
+        
     
 
     # 🧩 اطمینان از اینکه پیام معتبره
