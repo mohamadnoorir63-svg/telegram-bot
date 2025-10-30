@@ -1017,18 +1017,20 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ======================= 💬 پاسخ و هوش مصنوعی =======================
 async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """پاسخ‌دهی اصلی هوش مصنوعی و سیستم یادگیری"""
-    
 
     # 🚫 جلوگیری از پاسخ هوشمند در صورت اجرای دستور سفارشی
     if context.user_data.get("custom_handled"):
         context.user_data["custom_handled"] = False
         return
-        # هر وقت پیام جدیدی از کاربر رسید
-await message_queue.put({
-    "chat_id": update.effective_chat.id,
-    "text": update.message.text
-})
-        
+
+    # 🧠 هر وقت پیام جدیدی از کاربر رسید → بفرست برای userbot
+    try:
+        await message_queue.put({
+            "chat_id": update.effective_chat.id,
+            "text": update.message.text
+        })
+    except Exception as e:
+        print(f"⚠️ خطا در ارسال پیام به userbot queue: {e}")
     
 
     # 🧩 اطمینان از اینکه پیام معتبره
