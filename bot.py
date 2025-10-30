@@ -2261,6 +2261,7 @@ if __name__ == "__main__":
             "my_chat_member",
             ]
         )
+        
         except Exception as e:
         print(f"⚠️ خطا در اجرای ربات:\n{e}")
         print("♻️ ربات به‌صورت خودکار توسط هاست ری‌استارت خواهد شد ✅")
