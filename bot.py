@@ -2272,10 +2272,13 @@ try:
     # ==========================================================
     # ⚙️ بارگذاری و اجرای userbot از پوشه مستقل
     # ==========================================================
-    from userbot.userbot import start_userbot
+    import importlib
 
-    loop = asyncio.get_event_loop()
-    loop.create_task(start_userbot())
+    try:
+        importlib.import_module("userbot.userbot")
+        print("✅ یوزربات با موفقیت بارگذاری و فعال شد (از پوشه‌ی مستقل).")
+    except Exception as e:
+        print(f"⚠️ خطا در بارگذاری userbot: {e}")
 
     # ✅ اجرای polling ربات اصلی
     application.run_polling(
@@ -2289,7 +2292,8 @@ try:
     )
 
     # جلوگیری از بسته شدن برنامه
-    loop.run_forever()
+    import asyncio
+    asyncio.get_event_loop().run_forever()
 
 except Exception as e:
     print(f"⚠️ خطا در اجرای ربات:\n{e}")
