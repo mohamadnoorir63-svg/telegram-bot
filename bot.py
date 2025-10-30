@@ -2249,14 +2249,14 @@ if __name__ == "__main__":
     # 🧠 وظایف استارتاپ
     # ==========================================================
     # ==========================================================
-# 🚀 اجرای ربات اصلی + انرژی دادن به یوزربات
+# 🚀 اجرای نهایی ربات اصلی + بارگذاری یوزربات از پوشه مستقل
 # ==========================================================
-import asyncio
 from datetime import time, timezone, timedelta
+import importlib
+import asyncio
 
-# 🧩 تابع استارتاپ ربات
 async def on_startup(app):
-    """✅ وظایف استارتاپ ربات اصلی"""
+    """✅ وظایف استارتاپ ربات"""
     await notify_admin_on_startup(app)
     app.create_task(auto_backup(app.bot))
     app.create_task(start_auto_brain_loop(app.bot))
@@ -2264,25 +2264,28 @@ async def on_startup(app):
 
 application.post_init = on_startup
 
-
 try:
-    print("🔄 در حال اجرای ربات...")
+    print("🔄 در حال اجرای ربات اصلی...")
 
     # 🌙 زمان‌بندی آمار شبانه
     tz_tehran = timezone(timedelta(hours=3, minutes=30))
     job_queue = application.job_queue
     job_queue.run_daily(send_nightly_stats, time=time(0, 0, tzinfo=tz_tehran))
 
-    # ==========================================================
-    # ⚙️ بارگذاری و اجرای userbot از پوشه مستقل
-    # ==========================================================
-    import importlib
-
+    # ⚙️ بارگذاری یوزربات از پوشه مستقل
     try:
         importlib.import_module("userbot.userbot")
         print("✅ یوزربات با موفقیت بارگذاری و فعال شد (از پوشه‌ی مستقل).")
     except Exception as e:
         print(f"⚠️ خطا در بارگذاری userbot: {e}")
+
+    # 🧩 تست پایدار بودن خنگول
+    async def test_main_bot():
+        while True:
+            print("🤖 [BOT] خنگول فعاله و منتظره...")
+            await asyncio.sleep(10)
+
+    asyncio.get_event_loop().create_task(test_main_bot())
 
     # ✅ اجرای polling ربات اصلی
     application.run_polling(
@@ -2296,7 +2299,6 @@ try:
     )
 
     # جلوگیری از بسته شدن برنامه
-    import asyncio
     asyncio.get_event_loop().run_forever()
 
 except Exception as e:
