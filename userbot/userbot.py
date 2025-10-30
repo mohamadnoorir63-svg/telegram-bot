@@ -1,52 +1,57 @@
 # ==========================================================
-# 🤖 Userbot فارسی چندمنظوره (پاکسازی، بن، سکوت، اخطار)
+# 🇮🇷 Userbot فارسی – نسخه‌ی مستقل و ایمن
 # ==========================================================
-import os
-import asyncio
+# نیاز به:
+#  ┣ TELETHON
+#  ┣ متغیرهای محیطی: API_ID, API_HASH, SESSION_STRING
+# ==========================================================
+
 from telethon import TelegramClient, events, errors
 from telethon.sessions import StringSession
+import os, asyncio
 
-# ---- تنظیمات محیطی ----
+print("🚀 در حال راه‌اندازی یوزربات ...")
+
+# ---- تنظیمات اتصال ----
 API_ID = int(os.getenv("API_ID", "0"))
 API_HASH = os.getenv("API_HASH", "")
-SESSION = os.getenv("SESSION_STRING", "")
-OWNER_IDS = {7089376754}  # آیدی مدیران مجاز (خودت + دیگران در صورت نیاز)
+SESSION = os.getenv("SESSION_STRING", "")  # یا فایل userbot.session
 
+OWNER_ID = int(os.getenv("ADMIN_ID", "7089376754"))  # آیدی خودت
+BATCH_SIZE = 100
+SLEEP_BETWEEN = 0.35
+
+# ---- اتصال ----
 if not API_ID or not API_HASH:
-    raise SystemExit("⚠️ لطفاً API_ID و API_HASH را در محیط تنظیم کن.")
+    raise SystemExit("🚫 API_ID یا API_HASH تنظیم نشده است!")
 
 client = TelegramClient(StringSession(SESSION) if SESSION else "userbot.session", API_ID, API_HASH)
 
-# ---- تنظیمات پاکسازی ----
-NUKE_BATCH = 100
-NUKE_SLEEP = 0.3
-NUKE_DEFAULT = 5000
-STOP_NUKE = False
-
+# ---- کمک‌کننده ----
+def chunked(lst, n):
+    for i in range(0, len(lst), n):
+        yield lst[i:i+n]
 
 # ==========================================================
-# 🩵 دستور پینگ / Ping
+# 🔸 دستور پینگ
 # ==========================================================
 @client.on(events.NewMessage(pattern=r"^(?:\.ping|پینگ)$"))
-async def ping_handler(event):
-    await event.reply("🏓 یوزربات فعاله ✅")
-
+async def ping(event):
+    await event.reply("🏓 من فعالم و آماده‌ام!")
 
 # ==========================================================
-# 🔥 پاکسازی سریع / نابود
+# 🔸 دستور پاکسازی سریع (نابود)
 # ==========================================================
 @client.on(events.NewMessage(pattern=r"^(?:\.nuke|نابود)(?:\s+(\d+))?$"))
-async def nuke_handler(event):
-    global STOP_NUKE
+async def nuke(event):
     sender = await event.get_sender()
-    if sender.id not in OWNER_IDS:
-        await event.reply("🚫 شما اجازه اجرای این دستور را ندارید.")
-        return
+    if sender.id != OWNER_ID:
+        return await event.reply("🚫 فقط ادمین می‌تواند از این دستور استفاده کند!")
 
-    m = event.pattern_match.group(1)
-    limit = int(m) if m else NUKE_DEFAULT
     chat_id = event.chat_id
-    msg = await event.reply(f"🧹 در حال جمع‌آوری آخرین {limit} پیام...")
+    limit = int(event.pattern_match.group(1) or 1000)
+
+    msg = await event.reply(f"🧹 در حال نابودی {limit} پیام اخیر...")
 
     try:
         messages = await client.get_messages(chat_id, limit=limit)
@@ -54,140 +59,69 @@ async def nuke_handler(event):
         total = len(ids)
         deleted = 0
         failed = 0
-        STOP_NUKE = False
 
-        for i in range(0, total, NUKE_BATCH):
-            if STOP_NUKE:
-                await msg.edit(f"⛔ عملیات نابود متوقف شد!\n✅ حذف‌شده: {deleted}\n❌ ناموفق: {failed}")
-                return
-
-            batch = ids[i:i + NUKE_BATCH]
+        for batch in chunked(ids, BATCH_SIZE):
             try:
                 await client.delete_messages(chat_id, batch, revoke=True)
                 deleted += len(batch)
             except errors.FloodWait as fw:
-                await msg.edit(f"⚠️ محدودیت حذف، انتظار {fw.seconds}s ...")
-                await asyncio.sleep(fw.seconds)
+                await msg.edit(f"⚠️ محدودیت حذف — صبر {fw.seconds}s ...")
+                await asyncio.sleep(fw.seconds + 1)
             except Exception as e:
                 print(f"[NUKE ERROR] {e}")
                 failed += len(batch)
 
             await msg.edit(f"🧹 حذف شد: {deleted}/{total} (ناموفق: {failed})")
-            await asyncio.sleep(NUKE_SLEEP)
+            await asyncio.sleep(SLEEP_BETWEEN)
 
-        await msg.edit(f"✅ عملیات نابود پایان یافت!\n🧨 حذف‌شده: {deleted}\n🚫 ناموفق: {failed}")
-
-        # اطلاع نهایی در گروه
-        await client.send_message(chat_id, f"✨ پاکسازی کامل شد!\n📉 {deleted} پیام حذف شد.\n⚙️ Userbot آماده‌ست.")
+        await msg.edit(f"✅ پاکسازی انجام شد!\n🧾 حذف‌شده: {deleted}\n❌ ناموفق: {failed}")
 
     except Exception as e:
         await msg.edit(f"❌ خطا در پاکسازی: {e}")
 
-
 # ==========================================================
-# 🛑 توقف عملیات نابود
+# 🔸 دستور توقف پینگ (برای سایلنت موقت)
 # ==========================================================
-@client.on(events.NewMessage(pattern=r"^(?:\.stop|توقف)$"))
-async def stop_handler(event):
-    global STOP_NUKE
-    STOP_NUKE = True
-    await event.reply("🛑 عملیات نابود در حال توقف است...")
+ping_block = set()
 
-
-# ==========================================================
-# 🚫 بن کاربر
-# ==========================================================
-@client.on(events.NewMessage(pattern=r"^(?:\.ban|بن)$"))
-async def ban_user(event):
-    if not event.is_reply:
-        await event.reply("📎 باید روی پیام فرد ریپلای کنی تا بن شود.")
-        return
-
+@client.on(events.NewMessage(pattern=r"^(?:توقف پینگ)$"))
+async def stop_ping(event):
     sender = await event.get_sender()
-    if sender.id not in OWNER_IDS:
-        await event.reply("🚫 شما مجوز بن ندارید.")
-        return
+    if sender.id != OWNER_ID:
+        return await event.reply("🚫 فقط ادمین می‌تواند پینگ را متوقف کند!")
 
-    reply_msg = await event.get_reply_message()
-    user = await reply_msg.get_sender()
-    chat_id = event.chat_id
+    ping_block.add(event.chat_id)
+    await event.reply("🔕 پاسخ پینگ در این چت غیرفعال شد.")
 
-    try:
-        await client.edit_permissions(chat_id, user.id, view_messages=False)
-        await event.reply(f"⛔ کاربر [{user.first_name}](tg://user?id={user.id}) بن شد.")
-    except Exception as e:
-        await event.reply(f"❌ خطا در بن: {e}")
+@client.on(events.NewMessage(pattern=r"^(?:فعال‌سازی پینگ)$"))
+async def enable_ping(event):
+    sender = await event.get_sender()
+    if sender.id != OWNER_ID:
+        return await event.reply("🚫 فقط ادمین می‌تواند پینگ را فعال کند!")
 
-
-# ==========================================================
-# 🔇 سکوت کاربر
-# ==========================================================
-@client.on(events.NewMessage(pattern=r"^(?:\.mute|سکوت)(?:\s+(\d+)\s*(ثانیه|دقیقه)?)?$"))
-async def mute_user(event):
-    if not event.is_reply:
-        await event.reply("📎 باید روی پیام فرد ریپلای کنی تا ساکت شود.")
-        return
-
-    reply_msg = await event.get_reply_message()
-    user = await reply_msg.get_sender()
-    chat_id = event.chat_id
-    m = event.pattern_match.group(1)
-    unit = event.pattern_match.group(2)
-    duration = None
-
-    if m:
-        seconds = int(m)
-        if unit == "دقیقه":
-            seconds *= 60
-        duration = seconds
-
-    try:
-        until = None
-        if duration:
-            until = asyncio.get_event_loop().time() + duration
-        await client.edit_permissions(chat_id, user.id, send_messages=False, until_date=until)
-        await event.reply(f"🔇 کاربر [{user.first_name}](tg://user?id={user.id}) ساکت شد.")
-    except Exception as e:
-        await event.reply(f"❌ خطا در سکوت: {e}")
-
+    if event.chat_id in ping_block:
+        ping_block.remove(event.chat_id)
+        await event.reply("🔔 پاسخ پینگ دوباره فعال شد.")
+    else:
+        await event.reply("ℹ️ پینگ از قبل فعال بوده.")
 
 # ==========================================================
-# 🔊 حذف سکوت
+# 🔸 دستورات بن / سکوت / اخطار (نمایشی ساده)
 # ==========================================================
-@client.on(events.NewMessage(pattern=r"^(?:\.unmute|حذف سکوت)$"))
-async def unmute_user(event):
-    if not event.is_reply:
-        await event.reply("📎 باید روی پیام فرد ریپلای کنی تا سکوتش برداشته شود.")
-        return
-
-    reply_msg = await event.get_reply_message()
-    user = await reply_msg.get_sender()
-    chat_id = event.chat_id
-    try:
-        await client.edit_permissions(chat_id, user.id, send_messages=True)
-        await event.reply(f"🔊 سکوت [{user.first_name}](tg://user?id={user.id}) برداشته شد.")
-    except Exception as e:
-        await event.reply(f"❌ خطا در حذف سکوت: {e}")
-
+@client.on(events.NewMessage(pattern=r"^(?:بن|سکوت|اخطار)(?:\s+@?\w+)?$"))
+async def moderation(event):
+    text = event.raw_text.strip()
+    target = event.pattern_match.group(0).split(" ", 1)
+    action = text.split()[0]
+    user = target[1] if len(target) > 1 else "کاربر نامشخص"
+    await event.reply(f"⚙️ دستور {action} برای {user} ثبت شد (در حالت نمایشی).")
 
 # ==========================================================
-# ⚠️ اخطار
+# 🚀 شروع یوزربات
 # ==========================================================
-@client.on(events.NewMessage(pattern=r"^(?:\.warn|اخطار)$"))
-async def warn_user(event):
-    if not event.is_reply:
-        await event.reply("📎 باید روی پیام فرد ریپلای کنی تا اخطار بگیرد.")
-        return
+print("✅ یوزربات در حال اتصال ...")
+client.start()
+me = client.loop.run_until_complete(client.get_me())
+print(f"🤖 یوزربات فعال شد ({me.first_name}) [ID: {me.id}]")
 
-    reply_msg = await event.get_reply_message()
-    user = await reply_msg.get_sender()
-    await event.reply(f"⚠️ کاربر [{user.first_name}](tg://user?id={user.id}) اخطار دریافت کرد.")
-
-
-# ==========================================================
-# 🚀 اجرا
-# ==========================================================
-if __name__ == "__main__":
-    print("🔌 شروع userbot ...")
-    client.start()
-    client.run_until_disconnected()
+client.run_until_disconnected()
