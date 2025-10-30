@@ -2260,10 +2260,7 @@ if __name__ == "__main__":
             "chat_member",
             "my_chat_member",
             ]
-        )
-        
-    try:
-    # 👇 تمام کد اصلی ربات داخل try باشه
+        )try:
     application.run_polling()
 
 except Exception as e:
@@ -2294,3 +2291,5 @@ async def start_userbot():
 
 # 🚀 اجرای userbot در پس‌زمینه
 asyncio.get_event_loop().create_task(start_userbot())
+        
+    
