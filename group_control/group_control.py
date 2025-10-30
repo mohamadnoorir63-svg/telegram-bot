@@ -549,9 +549,7 @@ async def auto_group_lock_scheduler(context):
             print(f"auto lock err {chat_id}: {ex}")
 
 # ─────────────────────────────── Clean System ───────────────────────────────
-
-
-    async def handle_clean(update, context):
+async def handle_clean(update, context):
     """پاکسازی هوشمند: عددی، کامل، کاربر خاص یا پیام‌های ربات‌ها"""
     user = update.effective_user
     chat = update.effective_chat
@@ -672,7 +670,6 @@ async def auto_group_lock_scheduler(context):
         await context.bot.send_message(user.id, report, parse_mode="HTML")
     except:
         await message.reply_text(report, parse_mode="HTML")
-
 # ─────────────────────────────── Pin / Unpin (Timed) ───────────────────────────────
 async def handle_pin(update, context):
     if not await is_authorized(update, context):
