@@ -2232,6 +2232,9 @@ if __name__ == "__main__":
     # ==========================================================
     # 🧠 وظایف استارتاپ
     # ==========================================================
+    # ==========================================================
+    # 🧠 وظایف استارتاپ
+    # ==========================================================
     async def on_startup(app):
         await notify_admin_on_startup(app)
         app.create_task(auto_backup(app.bot))
@@ -2241,8 +2244,28 @@ if __name__ == "__main__":
     application.post_init = on_startup
 
     # ==========================================================
-    # 🚀 اجرای نهایی ربات
+    # 🚀 اجرای نهایی ربات + یوزربات Telethon
     # ==========================================================
+    from telethon import TelegramClient
+    from telethon.sessions import StringSession
+    import asyncio
+
+    async def start_userbot():
+        api_id = int(os.getenv("API_ID", "0"))
+        api_hash = os.getenv("API_HASH", "")
+        session_string = os.getenv("SESSION_STRING", "")
+
+        if not all([api_id, api_hash, session_string]):
+            print("⚠️ اطلاعات userbot کامل نیست (API_ID, API_HASH, SESSION_STRING)")
+            return
+
+        client = TelegramClient(StringSession(session_string), api_id, api_hash)
+        await client.start()
+        me = await client.get_me()
+        print(f"✅ Userbot آنلاین شد ({me.first_name}) [ID: {me.id}]")
+        await client.run_until_disconnected()
+
+    # 🚀 اجرای نهایی ربات
     try:
         print("🔄 در حال اجرای ربات...")
 
@@ -2252,45 +2275,21 @@ if __name__ == "__main__":
         job_queue = application.job_queue
         job_queue.run_daily(send_nightly_stats, time=time(0, 0, tzinfo=tz_tehran))
 
+        # ✅ اجرای userbot در پس‌زمینه
+        asyncio.get_event_loop().create_task(start_userbot())
+
+        # ✅ اجرای polling
         application.run_polling(
-        allowed_updates=[
-            "message",
-            "edited_message",
-            "callback_query",
-            "chat_member",
-            "my_chat_member",
+            allowed_updates=[
+                "message",
+                "edited_message",
+                "callback_query",
+                "chat_member",
+                "my_chat_member",
             ]
         )
-try:
-    application.run_polling()
 
-except Exception as e:
-    print(f"⚠️ خطا در اجرای ربات:\n{e}")
-    print("♻️ ربات به‌صورت خودکار توسط هاست ری‌استارت خواهد شد ✅")
-
-# ==========================================================
-# 🤖 اجرای همزمان یوزربات (Telethon) در کنار ربات اصلی
-# ==========================================================
-from telethon import TelegramClient
-from telethon.sessions import StringSession
-import asyncio
-
-async def start_userbot():
-    api_id = int(os.getenv("API_ID", "0"))
-    api_hash = os.getenv("API_HASH", "")
-    session_string = os.getenv("SESSION_STRING", "")
-
-    if not all([api_id, api_hash, session_string]):
-        print("⚠️ اطلاعات userbot کامل نیست (API_ID, API_HASH, SESSION_STRING)")
-        return
-
-    client = TelegramClient(StringSession(session_string), api_id, api_hash)
-    await client.start()
-    me = await client.get_me()
-    print(f"✅ Userbot آنلاین شد ({me.first_name}) [ID: {me.id}]")
-    await client.run_until_disconnected()
-
-# 🚀 اجرای userbot در پس‌زمینه
-asyncio.get_event_loop().create_task(start_userbot())
-        
+    except Exception as e:
+        print(f"⚠️ خطا در اجرای ربات:\n{e}")
+        print("♻️ ربات به‌صورت خودکار توسط هاست ری‌استارت خواهد شد ✅")
     
