@@ -1545,43 +1545,72 @@ async def execute_command(cmd, update, context):
     else:
         return await update.message.reply_text("⚠️ دستور ناشناخته.", parse_mode="HTML")
 # ─────────────────────────────── Command Core ───────────────────────────────
-
 async def group_command_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """📡 هسته‌ی مرکزی تشخیص و اجرای دستورات فارسی/انگلیسی"""
+    """📡 نسخه‌ی تستی برای بررسی تشخیص دستورات و alias‌ها"""
     if not update.message or not update.message.text:
         return
-        # ⛔ اگر پیام فقط "پنل" بود، هیچ واکنشی نشان نده
-    if update.message.text.strip() == "پنل":
+
+    text = update.message.text.strip()
+    lower_text = text.lower()
+
+    # 🧠 بررسی اولیه
+    print(f"[ورودی] پیام دریافت شد: {text}")
+
+    # جلوگیری از پاسخ به پیام‌های ساده مثل "پنل"
+    if text in ["پنل", "panel"]:
+        print("⚙️ پیام فقط 'پنل' بود — هیچ واکنشی انجام نمی‌شود.")
         return
-        
-        text = update.message.text.strip()
 
+    words = lower_text.split()
+    if not words:
+        return
 
+    # ✅ پاکسازی‌ها
+    valid_clean_cmds = [
+        "پاکسازی",
+        "پاکسازی کامل",
+        "پاکسازی همه",
+        "پاکسازی پیام ربات"
+    ]
+    if words[0] == "پاکسازی":
+        if lower_text in valid_clean_cmds or \
+           len(words) == 1 or \
+           (len(words) == 2 and words[1].isdigit()):
+            print("🧹 دستور تشخیص داده شد: پاکسازی")
+            return await handle_clean(update, context)
+        else:
+            print("ℹ️ جمله شامل 'پاکسازی' بود اما دستور معتبر نیست.")
+            return
 
-    lower_text = update.message.text.strip().lower()
-
-    # ✅ دستورات خاص قفل یا بازکردن گروه
-    if "قفل گروه" in lower_text or "ببند گروه" in lower_text or "lock group" in lower_text:
+    # ✅ دستورات گروه
+    if lower_text in ["قفل گروه", "ببند گروه", "lock group"]:
+        print("🔒 دستور تشخیص داده شد: قفل گروه")
         return await handle_lockgroup(update, context)
-    if "باز گروه" in lower_text or "بازکردن گروه" in lower_text or "unlock group" in lower_text:
+
+    if lower_text in ["باز گروه", "بازکردن گروه", "unlock group"]:
+        print("🔓 دستور تشخیص داده شد: باز کردن گروه")
         return await handle_unlockgroup(update, context)
 
-    # ✅ قفل‌های محتوایی (مثل قفل لینک / باز عکس)
-    if lower_text.startswith("قفل") or lower_text.startswith("باز"):
-        return await handle_locks_with_alias(update, context)
+    # ✅ قفل‌های محتوایی (قفل لینک، باز عکس، ...)
+    if any(lower_text.startswith(prefix + " ") for prefix in ["قفل", "باز"]):
+        if len(words) <= 3:
+            print(f"🔐 دستور قفل/باز محتوایی: {text}")
+            return await handle_locks_with_alias(update, context)
+        else:
+            print(f"ℹ️ جمله شامل '{words[0]}' بود ولی دستور نیست: {text}")
+            return
 
-    # ✅ سایر دستورات بر اساس aliasها
+    # ✅ سایر دستورات alias
     for cmd, aliases in ALIASES.items():
         for alias in aliases:
             if lower_text.startswith(alias):
                 context.args = lower_text.replace(alias, "", 1).strip().split()
+                print(f"✅ alias تشخیص داده شد → فرمان اصلی: {cmd} | alias: {alias}")
                 return await execute_command(cmd, update, context)
 
-    # اگر هیچ دستوری نبود
+    # 💤 هیچ دستوری پیدا نشد
+    print("😴 هیچ دستور معتبری پیدا نشد.")
     return
-
-
-
 # ─────────────────────────────── Bot Join / Leave ───────────────────────────────
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
