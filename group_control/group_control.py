@@ -1556,10 +1556,6 @@ async def group_command_handler(update: Update, context: ContextTypes.DEFAULT_TY
         
         text = update.message.text.strip()
 
-    # فقط وقتی پیام دقیقاً با دستور شروع میشه، اجرا کن
-    if not text.startswith("پاکسازی"):
-        return
-
 
 
     lower_text = update.message.text.strip().lower()
