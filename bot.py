@@ -2260,7 +2260,8 @@ if __name__ == "__main__":
             "chat_member",
             "my_chat_member",
             ]
-        )try:
+        )
+        try:
     application.run_polling()
 
 except Exception as e:
