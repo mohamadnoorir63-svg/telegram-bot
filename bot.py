@@ -2245,36 +2245,35 @@ if __name__ == "__main__":
     # ==========================================================
 # 🤖 اجرای همزمان یوزربات (Telethon) در کنار ربات اصلی
 # ==========================================================
-from telethon import TelegramClient, events
-from telethon.sessions import StringSession
 import asyncio
-import os
+from datetime import time, timezone, timedelta
 
-async def start_userbot():
-    api_id = int(os.getenv("API_ID", "0"))
-    api_hash = os.getenv("API_HASH", "")
-    session_string = os.getenv("SESSION_STRING", "")
+try:
+    print("🔄 در حال اجرای ربات...")
 
-    # 👇 اگه SESSION_STRING نبود، از فایل بخون
-    if not session_string:
-        if os.path.exists("userbot.session"):
-            print("📂 SESSION_STRING پیدا نشد، دارم از فایل userbot.session می‌خونم ...")
-            # اینجا به‌جای StringSession از همون نام فایل استفاده می‌کنیم
-            client = TelegramClient("userbot.session", api_id, api_hash)
-        else:
-            print("⚠️ نه SESSION_STRING هست، نه userbot.session — یوزربات روشن نمی‌شه.")
-            return
-    else:
-        # اگه SESSION_STRING بود → از همون استفاده کن
-        client = TelegramClient(StringSession(session_string), api_id, api_hash)
+    # 🌙 آمار خودکار شبانه (هر شب ساعت 00:00 به وقت تهران)
+    tz_tehran = timezone(timedelta(hours=3, minutes=30))
+    job_queue = application.job_queue
+    job_queue.run_daily(send_nightly_stats, time=time(0, 0, tzinfo=tz_tehran))
 
-    await client.start()
-    me = await client.get_me()
-    print(f"✅ Userbot آنلاین شد ({me.first_name}) [ID: {me.id}]")
+    # ✅ اجرای userbot در پس‌زمینه
+    loop = asyncio.get_event_loop()
+    loop.create_task(start_userbot())
 
-    # تست سریع
-    @client.on(events.NewMessage(pattern=r"\.ping"))
-    async def _(event):
-        await event.reply("🏓 Userbot فعاله ✅")
+    # ✅ اجرای polling ربات اصلی
+    application.run_polling(
+        allowed_updates=[
+            "message",
+            "edited_message",
+            "callback_query",
+            "chat_member",
+            "my_chat_member",
+        ]
+    )
 
-    await client.run_until_disconnected()
+    # ✅ جلوگیری از بسته شدن برنامه
+    loop.run_forever()
+
+except Exception as e:
+    print(f"⚠️ خطا در اجرای ربات:\n{e}")
+    print("♻️ ربات به‌صورت خودکار توسط هاست ری‌استارت خواهد شد ✅")
