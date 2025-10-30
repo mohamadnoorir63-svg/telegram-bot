@@ -2251,11 +2251,10 @@ if __name__ == "__main__":
         print("🌙 [SYSTEM] Startup tasks scheduled ✅")
 
     application.post_init = on_startup
-    
-# ==========================================================
+    # ==========================================================
 # 🤖 اجرای همزمان یوزربات (Telethon) در کنار ربات اصلی
 # ==========================================================
-from telethon import TelegramClient, events
+from telethon import TelegramClient, events, errors
 from telethon.sessions import StringSession
 import os, asyncio
 
@@ -2272,6 +2271,7 @@ async def start_userbot():
         return
 
     try:
+        # 🧠 ساخت کلاینت
         if not session_string:
             if os.path.exists("userbot.session"):
                 print("📂 SESSION_STRING پیدا نشد — در حال خواندن از فایل userbot.session ...")
@@ -2286,16 +2286,54 @@ async def start_userbot():
         me = await client.get_me()
         print(f"✅ Userbot آنلاین شد ({me.first_name}) [ID: {me.id}]")
 
-        # تست ساده
-        @client.on(events.NewMessage(pattern=r"\.ping"))
+        # ────────────────────────────── دستورات یوزربات ──────────────────────────────
+
+        @client.on(events.NewMessage(pattern=r"^\.ping$"))
         async def _(event):
             await event.reply("🏓 Userbot فعاله ✅")
+
+        # 🧹 پاکسازی فوق‌العاده سریع — دستور .nuke
+        @client.on(events.NewMessage(pattern=r"^\.nuke(?:\s+(\d+))?$"))
+        async def nuke_handler(event):
+            """پاکسازی سریع — فقط برای ادمین دارای Delete Messages"""
+            chat = await event.get_chat()
+            chat_id = event.chat_id
+            m = event.pattern_match.group(1)
+            limit = int(m) if m else 5000  # پیش‌فرض ۵۰۰۰ پیام
+            msg = await event.reply("🧹 شروع پاکسازی...")
+
+            try:
+                messages = await client.get_messages(chat_id, limit=limit)
+                ids = [m.id for m in messages]
+                total = len(ids)
+                deleted = 0
+                failed = 0
+
+                for i in range(0, total, 100):
+                    batch = ids[i:i + 100]
+                    try:
+                        await client.delete_messages(chat_id, batch, revoke=True)
+                        deleted += len(batch)
+                    except errors.FloodWait as fw:
+                        await msg.edit(f"⚠️ FloodWait {fw.seconds}s — در حال صبر...")
+                        await asyncio.sleep(fw.seconds + 1)
+                    except Exception as e:
+                        print(f"[NUKE ERROR] {e}")
+                        failed += len(batch)
+
+                    await msg.edit(f"🧹 حذف شد: {deleted}/{total} (ناموفق: {failed})")
+                    await asyncio.sleep(0.3)
+
+                await msg.edit(f"✅ پاکسازی کامل شد.\n✔️ حذف شده: {deleted}\n❌ ناموفق: {failed}")
+            except Exception as e:
+                await msg.edit(f"❌ خطا: {e}")
+
+        # ────────────────────────────── پایان دستورات ──────────────────────────────
 
         await client.run_until_disconnected()
 
     except Exception as e:
         print(f"❌ خطا در userbot: {e}")
-
 
 # ==========================================================
 # 🚀 اجرای نهایی ربات اصلی + یوزربات
@@ -2303,6 +2341,7 @@ async def start_userbot():
 from datetime import time, timezone, timedelta
 
 async def on_startup(app):
+    """✅ وظایف استارتاپ ربات"""
     await notify_admin_on_startup(app)
     app.create_task(auto_backup(app.bot))
     app.create_task(start_auto_brain_loop(app.bot))
