@@ -1621,3 +1621,19 @@ async def handle_bot_removed(update: Update, context: ContextTypes.DEFAULT_TYPE)
             del group_data[chat_id]
             _save_json(GROUP_CTRL_FILE, group_data)
             print(f"🧹 داده‌های گروه {chat_id} حذف شدند (ربات از گروه خارج شد).")
+            # ─────────────────────────────── Shared Interface for Userbot ───────────────────────────────
+# ⚙️ این بخش برای Telethon (Userbot) طراحی شده تا از همین سیستم قفل و مدیریت گروه استفاده کند.
+
+def lock_via_userbot(chat_id: int, lock_key: str):
+    """قفل کردن از طریق یوزربات"""
+    _locks_set(chat_id, lock_key, True)
+    print(f"[Userbot] 🔒 قفل {lock_key} در {chat_id} فعال شد.")
+
+def unlock_via_userbot(chat_id: int, lock_key: str):
+    """باز کردن قفل از طریق یوزربات"""
+    _locks_set(chat_id, lock_key, False)
+    print(f"[Userbot] 🔓 قفل {lock_key} در {chat_id} باز شد.")
+
+def get_group_status(chat_id: int):
+    """دریافت وضعیت قفل‌ها (برای استفاده در Userbot)"""
+    return _locks_get(chat_id)
