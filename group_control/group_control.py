@@ -549,28 +549,41 @@ async def auto_group_lock_scheduler(context):
             print(f"auto lock err {chat_id}: {ex}")
 
 # ─────────────────────────────── Clean System ───────────────────────────────
-async def handle_clean(update, context):
-    """پاکسازی: عدد/کامل/کاربر خاص (ریپلای)"""
+
+
+    async def handle_clean(update, context):
+    """پاکسازی هوشمند: عددی، کامل، کاربر خاص یا پیام‌های ربات‌ها"""
     user = update.effective_user
     chat = update.effective_chat
     message = update.message
-    args = context.args if context.args else []
+    args = context.args or []
 
+    # 🔒 فقط برای مدیران یا سودوها
     if not await is_authorized(update, context):
-        return await message.reply_text("🚫 فقط مدیران یا سودوها مجازند!")
+        return await message.reply_text("🚫 فقط مدیران یا سودوها مجاز به اجرای این دستور هستند!")
+
+    text = message.text.strip()
+    if not text.startswith("پاکسازی"):
+        return
 
     limit = 100
-    mode = "range"
+    mode = "count"
     target_id = None
+    bot_mode = False
 
-    if message.reply_to_message:
+    # 🧠 حالت‌های مختلف
+    if text.strip() == "پاکسازی پیام ربات":
+        mode = "bot"
+        limit = 10000
+        bot_mode = True
+    elif message.reply_to_message:
         target_id = message.reply_to_message.from_user.id
         mode = "user"
     elif args and args[0].isdigit():
-        limit = min(int(args[0]), 1000)
+        limit = min(int(args[0]), 100000)
         mode = "count"
-    elif any(w in " ".join(args).lower() for w in ["all", "همه", "کامل", "full"]):
-        limit = 1000
+    elif any(w in text for w in ["همه", "کامل", "full"]):
+        limit = 100000
         mode = "full"
 
     deleted = 0
@@ -581,11 +594,10 @@ async def handle_clean(update, context):
         try:
             await context.bot.delete_message(chat.id, mid)
             return 1
-        except (BadRequest, RetryAfter):
-            return 0
         except:
             return 0
 
+    # 🔁 حلقه‌ی حذف پیام‌ها
     for _ in range(limit):
         last_id -= 1
         if last_id <= 0:
@@ -593,15 +605,26 @@ async def handle_clean(update, context):
         try:
             fwd = await context.bot.forward_message(chat.id, chat.id, last_id)
             sender = fwd.forward_from.id if fwd.forward_from else None
+            is_bot = bool(fwd.forward_from and fwd.forward_from.is_bot)
             await context.bot.delete_message(chat.id, fwd.message_id)
+
             if mode == "user" and sender != target_id:
                 continue
+            if bot_mode and not is_bot:
+                continue
+
             batch.append(asyncio.create_task(safe_delete(last_id)))
-            if len(batch) >= 50:
+
+            if len(batch) >= 100:
                 res = await asyncio.gather(*batch)
                 deleted += sum(res)
                 batch = []
-                await asyncio.sleep(0.4)
+                await asyncio.sleep(0.2)
+
+            # ⚙️ توقف کوتاه برای جلوگیری از Flood محدودیت تلگرام
+            if deleted % 1000 == 0 and deleted > 0:
+                await asyncio.sleep(1)
+
         except Exception:
             continue
 
@@ -609,24 +632,42 @@ async def handle_clean(update, context):
         res = await asyncio.gather(*batch)
         deleted += sum(res)
 
+    # 🗑 حذف پیام دستور
     try:
         await context.bot.delete_message(chat.id, message.message_id)
     except:
         pass
 
+    # ✅ پیام موقت در گروه
+    try:
+        if bot_mode:
+            done_text = f"🤖 {deleted} پیام ربات با موفقیت پاک شد!"
+        elif mode == "user":
+            done_text = f"✅ تمام پیام‌های کاربر انتخابی حذف شد ({deleted})"
+        else:
+            done_text = f"✅ {deleted} پیام پاک شد!"
+        done_msg = await message.reply_text(done_text, quote=False)
+        await asyncio.sleep(5)
+        await context.bot.delete_message(chat.id, done_msg.message_id)
+    except:
+        pass
+
+    # 📩 گزارش پایانی
     labels = {
+        "bot": "پاکسازی پیام‌های ربات‌ها",
         "user": "پاکسازی پیام‌های کاربر خاص",
         "count": f"پاکسازی عددی ({limit} پیام)",
-        "full": "پاکسازی کامل",
-        "range": "پاکسازی عمومی"
+        "full": "پاکسازی کامل"
     }
+
     report = (
         f"🧹 <b>گزارش پاکسازی</b>\n\n"
         f"🏷 حالت: {labels[mode]}\n"
-        f"👤 توسط: {user.first_name}\n"
+        f"👤 اجراکننده: {user.first_name}\n"
         f"🗑 حذف‌شده: {deleted}\n"
-        f"🕒 {datetime.now().strftime('%H:%M:%S - %Y/%m/%d')}"
+        f"🕒 زمان: {datetime.now().strftime('%H:%M:%S - %Y/%m/%d')}"
     )
+
     try:
         await context.bot.send_message(user.id, report, parse_mode="HTML")
     except:
