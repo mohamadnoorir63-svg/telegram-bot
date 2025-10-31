@@ -41,7 +41,6 @@ def _load_json(path: str, default):
         with open(path, "r", encoding="utf-8") as f:
             return json.load(f)
     except Exception:
-        # خراب بود → بازنویسی امن
         with open(path, "w", encoding="utf-8") as f:
             json.dump(default, f, ensure_ascii=False, indent=2)
         return default
@@ -55,16 +54,15 @@ def save_fortunes(data):
 
 # ========================= ثبت فال (ریپلای) =========================
 async def save_fortune(update: Update):
-    """با ریپلای روی پیام: متن/عکس/ویدیو/استیکر را به‌صورت امن ذخیره می‌کند."""
+    """با ریپلای روی پیام: متن/عکس/ویدیو/استیکر را ذخیره می‌کند."""
     reply = update.message.reply_to_message
     if not reply:
-        return await update.message.reply_text("❗ لطفاً روی پیام فال (متن/عکس/ویدیو/استیکر) ریپلای کن.")
+        return await update.message.reply_text("❗ لطفاً روی پیام فال ریپلای کن.")
 
     data = load_fortunes()
     entry = {"type": "text", "value": ""}
 
     try:
-        # متن یا کپشن
         if reply.text or reply.caption:
             val = (reply.text or reply.caption).strip()
             if not val:
@@ -72,7 +70,6 @@ async def save_fortune(update: Update):
             entry["type"] = "text"
             entry["value"] = val
 
-        # عکس
         elif reply.photo:
             file = await reply.photo[-1].get_file()
             filename = f"photo_{int(datetime.now().timestamp())}.jpg"
@@ -81,7 +78,6 @@ async def save_fortune(update: Update):
             entry["type"] = "photo"
             entry["value"] = os.path.relpath(path, BASE_DIR)
 
-        # ویدیو
         elif reply.video:
             file = await reply.video.get_file()
             filename = f"video_{int(datetime.now().timestamp())}.mp4"
@@ -90,7 +86,6 @@ async def save_fortune(update: Update):
             entry["type"] = "video"
             entry["value"] = os.path.relpath(path, BASE_DIR)
 
-        # استیکر
         elif reply.sticker:
             file = await reply.sticker.get_file()
             filename = f"sticker_{int(datetime.now().timestamp())}.webp"
@@ -102,7 +97,6 @@ async def save_fortune(update: Update):
         else:
             return await update.message.reply_text("⚠️ فقط متن، عکس، ویدیو یا استیکر پشتیبانی می‌شود.")
 
-        # جلوگیری از تکراری
         for v in data.values():
             if v.get("type") == entry["type"] and v.get("value") == entry["value"]:
                 return await update.message.reply_text("😅 این فال قبلاً ذخیره شده بود!")
@@ -116,10 +110,10 @@ async def save_fortune(update: Update):
 
 # ========================= حذف فال (ریپلای) =========================
 async def delete_fortune(update: Update):
-    """با ریپلای روی فال موردنظر، آن را از فایل حذف می‌کند (متن و مدیا)."""
+    """با ریپلای روی فال، آن را از فایل حذف می‌کند (پشتیبانی از متن و مدیا)."""
     reply = update.message.reply_to_message
     if not reply:
-        return await update.message.reply_text("❗ لطفاً روی پیام فال ریپلای بزن تا حذف شود.")
+        return await update.message.reply_text("❗ لطفاً روی پیام فال ریپلای کن.")
 
     data = load_fortunes()
     if not data:
@@ -128,19 +122,22 @@ async def delete_fortune(update: Update):
     delete_type = None
     delete_value = None
 
-    # تشخیص نوع و مقدار فال ریپلای‌شده
+    # تشخیص نوع و مقدار
     if reply.text or reply.caption:
         delete_type = "text"
         delete_value = (reply.text or reply.caption).strip()
     elif reply.photo:
         delete_type = "photo"
-        delete_value = os.path.basename(await reply.photo[-1].get_file().file_path)
+        file = await reply.photo[-1].get_file()
+        delete_value = os.path.basename(file.file_path)
     elif reply.video:
         delete_type = "video"
-        delete_value = os.path.basename(await reply.video.get_file().file_path)
+        file = await reply.video.get_file()
+        delete_value = os.path.basename(file.file_path)
     elif reply.sticker:
         delete_type = "sticker"
-        delete_value = os.path.basename(await reply.sticker.get_file().file_path)
+        file = await reply.sticker.get_file()
+        delete_value = os.path.basename(file.file_path)
 
     if not delete_type or not delete_value:
         return await update.message.reply_text("⚠️ نوع فال قابل شناسایی نیست.")
@@ -159,7 +156,6 @@ async def delete_fortune(update: Update):
     if key_to_delete:
         deleted = data.pop(key_to_delete)
         save_fortunes(data)
-
         val = _abs_media_path(deleted.get("value", ""))
         if os.path.exists(val) and not _is_valid_url(val):
             try:
@@ -173,7 +169,7 @@ async def delete_fortune(update: Update):
 
 # ========================= ارسال فال تصادفی =========================
 async def send_random_fortune(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """ارسال فال تصادفی با بررسی مسیرهای واقعی و حذف فال‌های خراب از فایل."""
+    """ارسال فال تصادفی با بررسی مسیرهای واقعی و حذف موارد خراب."""
     data = load_fortunes()
     if not data:
         return await update.message.reply_text("📭 هنوز فالی ذخیره نشده 😔")
@@ -201,13 +197,13 @@ async def send_random_fortune(update: Update, context: ContextTypes.DEFAULT_TYPE
                 await update.message.reply_text(f"🔮 {raw}")
                 break
             elif t == "photo":
-                await update.message.reply_photo(photo=_abs_media_path(raw), caption="🔮 فال تصویری!")
+                await update.message.reply_photo(photo=val, caption="🔮 فال تصویری!")
                 break
             elif t == "video":
-                await update.message.reply_video(video=_abs_media_path(raw), caption="🎥 فال ویدیویی!")
+                await update.message.reply_video(video=val, caption="🎥 فال ویدیویی!")
                 break
             elif t == "sticker":
-                await update.message.reply_sticker(sticker=_abs_media_path(raw))
+                await update.message.reply_sticker(sticker=val)
                 break
         except Exception as e:
             print(f"[Fortune Error] id={k} type={t} err={e}")
@@ -220,11 +216,11 @@ async def send_random_fortune(update: Update, context: ContextTypes.DEFAULT_TYPE
     if not cleaned_data:
         await update.message.reply_text("⚠️ هیچ فالی سالم برای ارسال پیدا نشد 😔")
 
-# ========================= لیست فال‌ ها (آخرین ۱۰ تا) =========================
+# ========================= لیست فال‌ها (آخرین ۱۰ مورد) =========================
 async def list_fortunes(update: Update):
     """نمایش ۱۰ فال آخر با نوع و محتوا"""
     data = load_fortunes()
-    if not data: 
+    if not data:
         return await update.message.reply_text("هنوز هیچ فالی ثبت نشده 😔")
 
     await update.message.reply_text(f"📜 تعداد کل فال‌ها: {len(data)}")
@@ -233,12 +229,11 @@ async def list_fortunes(update: Update):
     for k in sorted(data.keys(), key=lambda x: int(x))[-10:]:
         v = data[k]
         t = v.get("type", "text")
-        raw = v.get("value", "")
-        val = _abs_media_path(raw)
+        val = _abs_media_path(v.get("value", ""))
 
         try:
             if t == "text":
-                await update.message.reply_text(f"🔮 {raw}")
+                await update.message.reply_text(f"🔮 {v.get('value')}")
             elif t == "photo":
                 await update.message.reply_photo(photo=val, caption=f"🔮 فال {k}")
             elif t == "video":
@@ -251,4 +246,4 @@ async def list_fortunes(update: Update):
             continue
 
     if shown == 0:
-        await update.message.reply_text("⚠️ چیزی برای نمایش پیدا نشد (ممکنه فایل‌ها جابه‌جا شده باشن).")
+        await update.message.reply_text("⚠️ هیچ فالی برای نمایش پیدا نشد (ممکنه فایل‌ها حذف یا جابه‌جا شده باشن).")
