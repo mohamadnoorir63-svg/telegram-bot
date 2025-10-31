@@ -12,7 +12,7 @@ def init_emotion_memory():
     if not os.path.exists(EMOTION_FILE):
         with open(EMOTION_FILE, "w", encoding="utf-8") as f:
             json.dump({}, f, ensure_ascii=False, indent=2)
-        print("✅ فایل emotion_memory.json ساخته شد.")
+        print("فایل emotion_memory.json ساخته شد.")
 
 
 # ========================= 💾 خواندن و ذخیره =========================
@@ -21,11 +21,11 @@ def load_emotions():
         with open(EMOTION_FILE, "r", encoding="utf-8") as f:
             return json.load(f)
     except json.JSONDecodeError:
-        print("⚠️ فایل احساسات خراب بود — بازنشانی شد.")
+        print("فایل احساسات خراب بود — بازنشانی شد.")
         save_emotions({})
         return {}
     except Exception as e:
-        print(f"❌ خطا در بارگذاری emotion_memory.json: {e}")
+        print(f"خطا در بارگذاری emotion_memory.json: {e}")
         return {}
 
 
@@ -34,7 +34,7 @@ def save_emotions(data):
         with open(EMOTION_FILE, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
     except Exception as e:
-        print(f"❌ خطا در ذخیره احساسات: {e}")
+        print(f"خطا در ذخیره احساسات: {e}")
 
 
 # ========================= 💖 ثبت احساس جدید =========================
@@ -76,13 +76,13 @@ def get_last_emotion(user_id: int) -> str:
 def emotion_context_reply(current_emotion: str, last_emotion: str) -> str:
     """ایجاد پاسخ بر اساس تغییر احساس کاربر"""
     if last_emotion == "sad" and current_emotion == "happy":
-        return "😄 دیدی گفتم حالِت خوب میشه!"
+        return "دیدی گفتم حالت خوب میشه!"
     if last_emotion == "angry" and current_emotion == "neutral":
-        return "😌 آروم شدی؟ خیلی خوبه!"
+        return "آروم شدی؟ خیلی خوبه!"
     if last_emotion == "happy" and current_emotion == "sad":
-        return "😢 چی شد یهو ناراحت شدی؟"
+        return "چی شد یهو ناراحت شدی؟"
     if last_emotion == "neutral" and current_emotion == "love":
-        return "😍 اوه! یه حسی خاص پیدا کردی انگار!"
+        return "یه حسی خاص پیدا کردی انگار!"
     if last_emotion == current_emotion:
         return None  # احساس تغییری نکرده
 
