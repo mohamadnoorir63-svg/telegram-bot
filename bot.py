@@ -1035,6 +1035,10 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     ]
     if any(lower_text.startswith(word) for word in command_keywords):
         return
+        
+        def process_group_message(uid, chat_id, text):
+    # منطق پاسخ‌دهی
+    return "پاسخ نهایی"
 
     # 🧠 فعال‌سازی حافظهٔ کوتاه‌مدت گفتگو
     context_memory.add_message(uid, text)
