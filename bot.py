@@ -1009,7 +1009,6 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data["await_restore"] = False
         
 # ======================= 💬 پاسخ و هوش مصنوعی =======================
-
 async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """پاسخ‌دهی اصلی هوش مصنوعی و سیستم یادگیری"""
 
@@ -1018,26 +1017,19 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data["custom_handled"] = False
         return
 
-    # 🧠 هر وقت پیام جدیدی از کاربر رسید → بفرست برای userbot
-    try:
-        await message_queue.put({
-            "chat_id": update.effective_chat.id,
-            "text": update.message.text
-        })
-    except Exception as e:
-        print(f"⚠️ خطا در ارسال پیام به userbot queue: {e}")
-
     # 🧩 اطمینان از اینکه پیام معتبره
     if not update.message or not update.message.text:
         return
 
+    # 🧠 تعریف اولیه متغیرها (برای جلوگیری از خطای متغیر ناشناخته)
+    uid = update.effective_user.id
+    chat_id = update.effective_chat.id
+    text = update.message.text.strip()
+
+    # 🧩 پردازش پیام گروهی (الان دیگه متغیرها مقدار دارند)
     reply_text = process_group_message(uid, chat_id, text)
 
     # 🧠 فعال‌سازی حافظهٔ کوتاه‌مدت گفتگو
-    uid = update.effective_user.id
-    text = update.message.text.strip()
-
-    # 🧠 ثبت پیام در حافظه کوتاه‌مدت
     context_memory.add_message(uid, text)
 
     # 🧠 گرفتن کل تاریخچه اخیر کاربر
@@ -1046,10 +1038,7 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # 🧩 ترکیب سه پیام آخر برای درک بهتر ادامه گفتگو
     full_context = " ".join(recent_context[-3:]) if recent_context else text
 
-    text = update.message.text.strip()
     lower_text = text.lower()
-    uid = update.effective_user.id
-    chat_id = update.effective_chat.id
 
     # 🚫 جلوگیری از پاسخ در پیوی (فقط جوک و فال مجازند)
     if update.effective_chat.type == "private" and lower_text not in ["جوک", "فال"]:
@@ -1066,6 +1055,7 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # 🧠 بررسی حالت ریپلی مود گروهی
     if await handle_group_reply_mode(update, context):
         return
+
 
     # ثبت کاربر و گروه
     await register_user(update.effective_user)
