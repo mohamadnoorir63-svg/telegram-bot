@@ -1012,45 +1012,36 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """پاسخ‌دهی اصلی هوش مصنوعی و سیستم یادگیری"""
     
-
     # 🚫 جلوگیری از پاسخ هوشمند در صورت اجرای دستور سفارشی
     if context.user_data.get("custom_handled"):
         context.user_data["custom_handled"] = False
         return
 
-
-    # 🚫 جلوگیری از پاسخ سخنگو به پیام‌های دستوری
-    if update.message and update.message.text:
-        command_keywords = [
-            "قفل", "باز", "بازکردن", "پنل", "خوشامد",
-            "عکس خوشامد", "فیلتر", "سکوت", "بن", "اخطار",
-            "لقب", "اصل", "تگ", "پاکسازی", "گروه", "مدیر", "سودو"
-        ]
-        if any(lower_text.startswith(word) for word in command_keywords):
-            return
-
-    
     # 🧩 اطمینان از اینکه پیام معتبره
     if not update.message or not update.message.text:
         return
-        reply_text = process_group_message(uid, chat_id, text)
-        # 🧠 فعال‌سازی حافظهٔ کوتاه‌مدت گفتگو
-    uid = update.effective_user.id
-    text = update.message.text.strip()
 
-    # 🧠 ثبت پیام در حافظه کوتاه‌مدت
+    # 🧠 آماده‌سازی متغیرهای پایه
+    uid = update.effective_user.id
+    chat_id = update.effective_chat.id
+    text = update.message.text.strip()
+    lower_text = text.lower()
+
+    # 🚫 جلوگیری از پاسخ سخنگو به پیام‌های دستوری
+    command_keywords = [
+        "قفل", "باز", "بازکردن", "پنل", "خوشامد",
+        "عکس خوشامد", "فیلتر", "سکوت", "بن", "اخطار",
+        "لقب", "اصل", "تگ", "پاکسازی", "گروه", "مدیر", "سودو"
+    ]
+    if any(lower_text.startswith(word) for word in command_keywords):
+        return
+
+    # 🧠 فعال‌سازی حافظهٔ کوتاه‌مدت گفتگو
     context_memory.add_message(uid, text)
 
     # 🧠 گرفتن کل تاریخچه اخیر کاربر
     recent_context = context_memory.get_context(uid)
-
-    # 🧩 ترکیب سه پیام آخر برای درک بهتر ادامه گفتگو
     full_context = " ".join(recent_context[-3:]) if recent_context else text
-
-    text = update.message.text.strip()
-    lower_text = text.lower()
-    uid = update.effective_user.id
-    chat_id = update.effective_chat.id
 
     # 🚫 جلوگیری از پاسخ در پیوی (فقط جوک و فال مجازند)
     if update.effective_chat.type == "private" and lower_text not in ["جوک", "فال"]:
@@ -1058,7 +1049,7 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if re.search(r"(هوای|آب[\s‌]*و[\s‌]*هوا)", text):
         return
 
-    # ✅ جلوگیری از پاسخ به دستورات خاص (مثل راهنما، خوشامد، ربات و غیره)
+    # ✅ جلوگیری از پاسخ به دستورات خاص
     protected_words = [
         "راهنما", "ثبت راهنما", "خوشامد", "ثبت خوشامد",
         "ربات", "save", "del", "panel", "backup", "cloudsync", "leave"
@@ -1079,18 +1070,9 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await register_user(update.effective_user)
     register_group_activity(chat_id, uid)
 
+    # 🧩 یادگیری خودکار
     if not status["locked"]:
         auto_learn_from_text(text)
-
-    if not status["active"]:
-        shadow_learn(text, "")
-        return
-
-    # 🧩 یادگیری خودکار متن‌ها
-    if not status["locked"]:
-        auto_learn_from_text(text)
-
-
 
     # 🧠 پردازش و پاسخ نهایی از ماژول گروه
     try:
@@ -1099,7 +1081,7 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text(reply_text)
     except Exception as e:
         print(f"⚠️ خطا در تولید پاسخ: {e}")
-
+        
     # ✅ درصد هوش منطقی
     if text.lower() == "درصد هوش":
         score = 0
