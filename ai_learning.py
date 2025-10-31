@@ -3,7 +3,7 @@ import random
 from memory_manager import learn, load_data, save_data, shadow_learn
 
 # ===============================================================
-# 🤖 یادگیری خودکار خنگول Cloud+ — نسخه‌ی هوشمند و احساسی
+# 🤖 یادگیری خودکار خنگول Cloud+ — نسخه‌ی بدون ایموجی
 # ===============================================================
 def auto_learn_from_text(text: str):
     """یادگیری خودکار از گفت‌وگوهای طبیعی کاربران با درک احساس و منطق ساده"""
@@ -17,20 +17,20 @@ def auto_learn_from_text(text: str):
         return
 
     text = text.strip().replace("؟", "?")
-    emotion = detect_emotion(text)  # 😄 تشخیص احساس جمله (شاد، غمگین، عصبی، خنثی)
+    emotion = detect_emotion(text)  # تشخیص احساس جمله (شاد، غمگین، عصبی، خنثی)
 
     # ==============================
     # 🎯 الگوهای آماده یادگیری سریع
     # ==============================
     patterns = {
-        r"اسم(ت)? چیه": ["اسمم خنگوله 😅", "من خنگولم 🤖"],
-        r"چطوری": ["خوبم، تو چطوری؟ 😎", "عالیم 🤖", "رو فرمم!"],
-        r"کجایی": ["اینجام پیش خودت 😅", "همین دور و برم 🤖"],
-        r"چیکار میکنی": ["دارم یاد می‌گیرم 😁", "در حال رشد مغزمم 🤖"],
-        r"دوست(م)? داری": ["خیلی زیاد 💙", "آره معلومه 😅"],
-        r"کی ساختت": ["یه آدم مهربون 😎", "خودت چی فکر می‌کنی؟ 🤔"],
-        r"ربات(ی)?": ["آره ولی با احساس 🤖💫", "آره ولی شبیه آدمم 😄"],
-        r"خنگ(ی)?": ["آره ولی باحال 🤪", "آره ولی باهوشم 😎"],
+        r"اسم(ت)? چیه": ["اسمم خنگوله", "من خنگولم"],
+        r"چطوری": ["خوبم، تو چطوری؟", "عالیم", "رو فرمم"],
+        r"کجایی": ["اینجام پیش خودت", "همین دور و برم"],
+        r"چیکار میکنی": ["دارم یاد می‌گیرم", "در حال رشد مغزمم"],
+        r"دوست(م)? داری": ["خیلی زیاد", "آره معلومه"],
+        r"کی ساختت": ["یه آدم مهربون", "خودت چی فکر می‌کنی؟"],
+        r"ربات(ی)?": ["آره ولی با احساس", "آره ولی شبیه آدمم"],
+        r"خنگ(ی)?": ["آره ولی باحال", "آره ولی باهوشم"],
     }
 
     # 🧩 بررسی و یادگیری سریع بر اساس الگوها
@@ -50,13 +50,13 @@ def auto_learn_from_text(text: str):
         base_reply = random.choice(["آره", "درسته", "جالبه", "باشه", "اوه"])
         tail = random.choice(words[-2:])
 
-        # بر اساس احساس، لحن پاسخ رو تغییر بده
+        # بر اساس احساس، لحن پاسخ رو تغییر بده (بدون ایموجی)
         if emotion == "شاد":
-            resp = f"{base_reply} {tail} 😄"
+            resp = f"{base_reply} {tail}"
         elif emotion == "غمگین":
-            resp = f"{base_reply} {tail} 😔"
+            resp = f"{base_reply} {tail}"
         elif emotion == "عصبی":
-            resp = f"{base_reply.upper()} 😤"
+            resp = f"{base_reply.upper()}"
         else:
             resp = f"{base_reply} {tail}"
 
@@ -98,7 +98,7 @@ def clean_duplicates():
         elif "phrases" in mem:
             mem["phrases"] = data
         save_data("memory.json", mem)
-        print("🧽 حافظه تمیز و بهینه شد ✅")
+        print("حافظه تمیز و بهینه شد.")
 
 
 # ===============================================================
@@ -121,12 +121,12 @@ def reinforce_learning():
             continue
         count = len(responses)
         old_weight = weights.get(phrase, 1)
-        new_weight = min(old_weight + count / 5, 20)  # افزایش وزن تا سقف ۲۰
+        new_weight = min(old_weight + count / 5, 20)
         if new_weight != old_weight:
             strengthened += 1
         weights[phrase] = new_weight
 
-    # حذف داده‌های بی‌استفاده (در صورت حافظه‌ی خیلی ضعیف)
+    # حذف داده‌های بی‌استفاده
     for phrase in list(weights.keys()):
         if weights[phrase] <= 0.5:
             removed += 1
@@ -134,7 +134,6 @@ def reinforce_learning():
 
     mem["weights"] = weights
     save_data("memory.json", mem)
-    print(f"💪 تقویت حافظه انجام شد ✅ ({strengthened} تقویت، {removed} حذف)")
+    print(f"تقویت حافظه انجام شد ({strengthened} تقویت، {removed} حذف).")
 
-    # خروجی برای auto_brain
     return {"strengthened": strengthened, "removed": removed}
