@@ -578,10 +578,11 @@ async def handle_clean(update, context):
         target_id = message.reply_to_message.from_user.id
         mode = "user"
     elif args and args[0].isdigit():
-        limit = min(int(args[0]), 100000)
+        # ✅ فقط همون تعداد درخواستی حذف بشه (نه همه)
+        limit = max(1, min(int(args[0]), 10000))
         mode = "count"
     elif any(w in text for w in ["همه", "کامل", "full"]):
-        limit = 100000
+        limit = 10000
         mode = "full"
 
     deleted = 0
@@ -595,11 +596,9 @@ async def handle_clean(update, context):
         except:
             return 0
 
-    # 🔁 حلقه‌ی حذف پیام‌ها
-    for _ in range(limit):
+    # 🔁 حلقه‌ی حذف پیام‌ها — دقیق و کنترل‌شده
+    while deleted < limit and last_id > 1:
         last_id -= 1
-        if last_id <= 0:
-            break
         try:
             fwd = await context.bot.forward_message(chat.id, chat.id, last_id)
             sender = fwd.forward_from.id if fwd.forward_from else None
@@ -613,15 +612,12 @@ async def handle_clean(update, context):
 
             batch.append(asyncio.create_task(safe_delete(last_id)))
 
-            if len(batch) >= 100:
+            # انجام حذف‌های دسته‌ای برای کاهش فشار API
+            if len(batch) >= 20:
                 res = await asyncio.gather(*batch)
                 deleted += sum(res)
                 batch = []
                 await asyncio.sleep(0.2)
-
-            # ⚙️ توقف کوتاه برای جلوگیری از Flood محدودیت تلگرام
-            if deleted % 1000 == 0 and deleted > 0:
-                await asyncio.sleep(1)
 
         except Exception:
             continue
@@ -670,6 +666,7 @@ async def handle_clean(update, context):
         await context.bot.send_message(user.id, report, parse_mode="HTML")
     except:
         await message.reply_text(report, parse_mode="HTML")
+    
 # ─────────────────────────────── Pin / Unpin (Timed) ───────────────────────────────
 async def handle_pin(update, context):
     if not await is_authorized(update, context):
