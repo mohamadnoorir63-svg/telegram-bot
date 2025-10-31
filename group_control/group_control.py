@@ -1373,9 +1373,8 @@ async def handle_list_nicks(update, context):
     await update.message.reply_text(txt, parse_mode="HTML")
 
 # ─────────────────────────────── Tag System ───────────────────────────────
-
 async def handle_tag(update, context):
-    """📢 تگ کردن کاربران با فیلتر نوع (همه / فعال / غیرفعال / مدیران)"""
+    """📢 تگ کاربران با فیلتر هوشمند (همه / فعال / غیرفعال / مدیران / کاربر خاص)"""
     if not await is_authorized(update, context):
         return await update.message.reply_text("🚫 فقط مدیران یا سودوها!")
 
@@ -1384,6 +1383,7 @@ async def handle_tag(update, context):
     cid = str(chat.id)
     now = datetime.now()
 
+    # 📦 گرفتن دیتای فعالیت کاربران
     data = origins_db.get(cid, {})
     users = data.get("users", {})
     if not users and "همه" in text:
@@ -1392,51 +1392,63 @@ async def handle_tag(update, context):
     targets = []
     title = "کاربران"
 
-    # 🎯 انتخاب هدف تگ
-    if "همه" in text:
-        targets = list(users.keys())
-        title = "همه کاربران"
-
+    # ✅ دقت بالا در تشخیص — اول غیرفعال بعد فعال (چون غیرفعال شامل 'فعال' هست)
+    if "غیرفعال" in text:
+        th = now - timedelta(days=3)
+        targets = [u for u, t in users.items() if datetime.fromisoformat(t) < th]
+        title = "کاربران غیرفعال (۳ روز گذشته)"
     elif "فعال" in text:
         th = now - timedelta(days=3)
         targets = [u for u, t in users.items() if datetime.fromisoformat(t) >= th]
         title = "کاربران فعال (۳ روز اخیر)"
-
-    elif "غیرفعال" in text:
-        th = now - timedelta(days=3)
-        targets = [u for u, t in users.items() if datetime.fromisoformat(t) < th]
-        title = "کاربران غیرفعال"
-
     elif "مدیر" in text:
         try:
-            admins = await context.bot.get_chat_administrators(chat.id)  # ✅ اینجا اصلاح شد
+            admins = await context.bot.get_chat_administrators(chat.id)
             targets = [str(a.user.id) for a in admins]
             title = "مدیران گروه"
         except Exception as e:
-            print(f"⚠️ خطا در گرفتن مدیران: {e}")
-            return await update.message.reply_text("⚠️ خطا در دریافت مدیران")
-
+            print(f"⚠️ خطا در دریافت مدیران: {e}")
+            return await update.message.reply_text("⚠️ خطا در دریافت مدیران.")
+    elif "همه" in text:
+        targets = list(users.keys())
+        title = "همه کاربران"
     elif "تگ " in text and ("@" in text or any(ch.isdigit() for ch in text.split())):
         raw = text.replace("تگ", "").strip()
         targets = [raw.replace("@", "")]
         title = f"کاربر {raw}"
-
     else:
         return await update.message.reply_text(
-            "📌 نمونه: «تگ همه» | «تگ فعال» | «تگ غیرفعال» | «تگ مدیران» | «تگ @123»",
+            "📌 نمونه‌ها:\n"
+            "• تگ همه\n"
+            "• تگ فعال\n"
+            "• تگ غیرفعال\n"
+            "• تگ مدیران\n"
+            "• تگ @username یا تگ [id]\n",
             parse_mode="HTML"
         )
+
+    # حذف خود ارسال‌کننده از لیست
+    sender_id = str(update.effective_user.id)
+    if sender_id in targets:
+        targets.remove(sender_id)
 
     if not targets:
         return await update.message.reply_text("⚠️ کاربری برای تگ یافت نشد.")
 
     await update.message.reply_text(f"📢 شروع تگ {title} ...", parse_mode="HTML")
 
-    # 🔄 ارسال در دسته‌های ۵تایی
+    # 🔄 ارسال در دسته‌های ۵تایی با mention واقعی
     batch, cnt = [], 0
     for i, uid in enumerate(targets, 1):
-        # اینجا لینک آیدی عددی می‌فرسته (نه اون دکمه آبی)
-        batch.append(f"{uid}")
+        try:
+            member = await context.bot.get_chat_member(chat.id, int(uid))
+            user = member.user
+            name = user.first_name or "کاربر"
+            mention = f"<a href='tg://user?id={user.id}'>{name}</a>"
+            batch.append(mention)
+        except:
+            continue
+
         if len(batch) >= 5 or i == len(targets):
             try:
                 await context.bot.send_message(chat.id, " ".join(batch), parse_mode="HTML")
