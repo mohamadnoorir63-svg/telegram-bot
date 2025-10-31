@@ -1009,8 +1009,8 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data["await_restore"] = False
         
 # ======================= 💬 پاسخ و هوش مصنوعی =======================
- async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
-     """پاسخ‌دهی اصلی هوش مصنوعی و سیستم یادگیری"""
+  async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
+       """پاسخ‌دهی اصلی هوش مصنوعی و سیستم یادگیری"""
 
     # 🧱 جلوگیری از پاسخ دوباره در صورت اجرای هم‌زمان یا تکراری
     if context.chat_data.get("reply_in_progress"):
@@ -1095,7 +1095,6 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
     finally:
         # 🔓 در هر صورت قفل پاسخ رو باز کن
         context.chat_data["reply_in_progress"] = False
-    
     # ✅ درصد هوش منطقی
     if text.lower() == "درصد هوش":
         score = 0
