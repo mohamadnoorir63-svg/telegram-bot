@@ -1373,92 +1373,133 @@ async def handle_list_nicks(update, context):
     await update.message.reply_text(txt, parse_mode="HTML")
 
 # ─────────────────────────────── Tag System ───────────────────────────────
+TAG_CACHE = {}
+
 async def handle_tag(update, context):
-    """📢 تگ کاربران با فیلتر هوشمند (همه / فعال / غیرفعال / مدیران / کاربر خاص)"""
+    """📢 تگ مرحله‌ای + پاک‌سازی خودکار پیام‌ها"""
     if not await is_authorized(update, context):
         return await update.message.reply_text("🚫 فقط مدیران یا سودوها!")
 
-    text = update.message.text.lower().strip()
     chat = update.effective_chat
-    cid = str(chat.id)
-    now = datetime.now()
+    bot = context.bot
+    text = update.message.text.lower().strip()
+    key = str(chat.id)
+    sender = update.effective_user
 
-    # 📦 گرفتن دیتای فعالیت کاربران
-    data = origins_db.get(cid, {})
-    users = data.get("users", {})
-    if not users and "همه" in text:
-        return await update.message.reply_text("⚠️ هنوز فعالیتی ثبت نشده.")
+    # 🔁 ادامه تگ
+    if "ادامه" in text and key in TAG_CACHE:
+        data = TAG_CACHE[key]
+        members = data["members"]
+        index = data["index"]
+        title = data["title"]
 
-    targets = []
-    title = "کاربران"
+        if index >= len(members):
+            del TAG_CACHE[key]
+            return await update.message.reply_text("✅ همه اعضا تگ شدند.", parse_mode="HTML")
 
-    # ✅ دقت بالا در تشخیص — اول غیرفعال بعد فعال (چون غیرفعال شامل 'فعال' هست)
-    if "غیرفعال" in text:
-        th = now - timedelta(days=3)
-        targets = [u for u, t in users.items() if datetime.fromisoformat(t) < th]
-        title = "کاربران غیرفعال (۳ روز گذشته)"
-    elif "فعال" in text:
-        th = now - timedelta(days=3)
-        targets = [u for u, t in users.items() if datetime.fromisoformat(t) >= th]
-        title = "کاربران فعال (۳ روز اخیر)"
+        msg = await update.message.reply_text(f"📢 ادامه تگ {title} از عضو {index+1} ...", parse_mode="HTML")
+        await asyncio.sleep(2)
+        await msg.delete()
+        return await _send_tag_batch(bot, chat.id, members, index, key, title)
+
+    # 🎯 نوع تگ
+    if "همه" in text:
+        title = "همه اعضای گروه"
+        target_type = "all"
     elif "مدیر" in text:
-        try:
-            admins = await context.bot.get_chat_administrators(chat.id)
-            targets = [str(a.user.id) for a in admins]
-            title = "مدیران گروه"
-        except Exception as e:
-            print(f"⚠️ خطا در دریافت مدیران: {e}")
-            return await update.message.reply_text("⚠️ خطا در دریافت مدیران.")
-    elif "همه" in text:
-        targets = list(users.keys())
-        title = "همه کاربران"
+        title = "مدیران گروه"
+        target_type = "admins"
     elif "تگ " in text and ("@" in text or any(ch.isdigit() for ch in text.split())):
         raw = text.replace("تگ", "").strip()
-        targets = [raw.replace("@", "")]
-        title = f"کاربر {raw}"
+        if raw.startswith("@"):
+            msg = await bot.send_message(chat.id, f"📢 {raw}")
+            await asyncio.sleep(5)
+            await msg.delete()
+            return
+        elif raw.isdigit():
+            mention = f"<a href='tg://user?id={raw}'>کاربر</a>"
+            msg = await bot.send_message(chat.id, f"📢 {mention}", parse_mode="HTML")
+            await asyncio.sleep(5)
+            await msg.delete()
+            return
     else:
         return await update.message.reply_text(
             "📌 نمونه‌ها:\n"
             "• تگ همه\n"
-            "• تگ فعال\n"
-            "• تگ غیرفعال\n"
             "• تگ مدیران\n"
-            "• تگ @username یا تگ [id]\n",
+            "• تگ ادامه\n"
+            "• تگ @username یا تگ [id]",
             parse_mode="HTML"
         )
 
-    # حذف خود ارسال‌کننده از لیست
-    sender_id = str(update.effective_user.id)
-    if sender_id in targets:
-        targets.remove(sender_id)
+    note = await update.message.reply_text(f"📢 جمع‌آوری اعضا برای {title} ...", parse_mode="HTML")
 
-    if not targets:
-        return await update.message.reply_text("⚠️ کاربری برای تگ یافت نشد.")
+    # 👥 گرفتن اعضا
+    try:
+        members = []
+        if target_type == "admins":
+            admins = await bot.get_chat_administrators(chat.id)
+            members = [a.user for a in admins if not a.user.is_bot]
+        else:
+            async for member in bot.get_chat_members(chat.id, limit=2000):
+                if not member.user.is_bot:
+                    members.append(member.user)
+    except Exception as e:
+        print(f"[Tag Error] {e}")
+        await note.delete()
+        return await update.message.reply_text("⚠️ خطا در دریافت اعضای گروه. مطمئن شو ربات ادمینه!")
 
-    await update.message.reply_text(f"📢 شروع تگ {title} ...", parse_mode="HTML")
+    # حذف خود کاربر
+    members = [m for m in members if m.id != sender.id]
+    if not members:
+        await note.delete()
+        return await update.message.reply_text("⚠️ هیچ عضوی برای تگ وجود ندارد.")
 
-    # 🔄 ارسال در دسته‌های ۵تایی با mention واقعی
-    batch, cnt = [], 0
-    for i, uid in enumerate(targets, 1):
-        try:
-            member = await context.bot.get_chat_member(chat.id, int(uid))
-            user = member.user
-            name = user.first_name or "کاربر"
-            mention = f"<a href='tg://user?id={user.id}'>{name}</a>"
-            batch.append(mention)
-        except:
-            continue
+    TAG_CACHE[key] = {"members": members, "index": 0, "title": title}
 
-        if len(batch) >= 5 or i == len(targets):
-            try:
-                await context.bot.send_message(chat.id, " ".join(batch), parse_mode="HTML")
-                cnt += len(batch)
-                batch = []
-                await asyncio.sleep(1)
-            except Exception as e:
-                print(f"⚠️ خطا در ارسال دسته تگ: {e}")
+    await note.edit_text(f"📢 شروع تگ {title} در دسته‌های ۵۰تایی...", parse_mode="HTML")
+    await asyncio.sleep(2)
+    await note.delete()
+    return await _send_tag_batch(bot, chat.id, members, 0, key, title)
 
-    await update.message.reply_text(f"✅ {cnt} کاربر {title} تگ شدند.", parse_mode="HTML")
+
+async def _send_tag_batch(bot, chat_id, members, start_index, key, title):
+    """📦 ارسال دسته‌ای و پاک خودکار"""
+    batch_size = 50
+    total = len(members)
+    end_index = min(start_index + batch_size, total)
+    part = members[start_index:end_index]
+
+    mentions = []
+    for user in part:
+        name = (user.first_name or "کاربر").replace("<", "").replace(">", "")
+        mentions.append(f"<a href='tg://user?id={user.id}'>{name}</a>")
+
+    try:
+        msg = await bot.send_message(chat_id, " ".join(mentions), parse_mode="HTML")
+        await asyncio.sleep(5)  # 🕒 زمان نمایش پیام تگ (قابل تغییر)
+        await msg.delete()
+    except Exception as e:
+        print(f"[Send Error] {e}")
+
+    TAG_CACHE[key]["index"] = end_index
+
+    if end_index < total:
+        left = total - end_index
+        notice = await bot.send_message(
+            chat_id,
+            f"📄 {end_index}/{total} ارسال شد.\n"
+            f"برای ادامه بنویس: <b>تگ ادامه</b>\n"
+            f"📍 {left} نفر باقی‌مانده...",
+            parse_mode="HTML"
+        )
+        await asyncio.sleep(7)
+        await notice.delete()
+    else:
+        del TAG_CACHE[key]
+        done = await bot.send_message(chat_id, f"✅ تمام {total} نفر {title} تگ شدند.", parse_mode="HTML")
+        await asyncio.sleep(5)
+        await done.delete()
 # ─────────────────────────────── Alias + Command Core ───────────────────────────────
 DEFAULT_ALIASES = {
     # قفل گروه
@@ -1477,12 +1518,12 @@ DEFAULT_ALIASES = {
     "admins": ["لیست مدیران", "مدیران", "admins"],
     "clearadmins": ["پاکسازی مدیران", "پاک مدیران", "clear admins"],
 
-    # تگ‌ها
-    "tagall": ["تگ همه", "منشن همگانی", "tagall"],
-    "tagactive": ["تگ فعال", "tagactive"],
-    "taginactive": ["تگ غیرفعال", "taginactive"],
-    "tagadmins": ["تگ مدیران", "tagadmins"],
-
+    # ───── تگ‌ها (Tagging) ─────
+    "tagall": ["تگ همه", "منشن همگانی", "تگ گروه", "tag all", "tagall"],
+    "tagactive": ["تگ فعال", "تگ کاربران فعال", "tag active", "tagactive"],
+    "taginactive": ["تگ غیرفعال", "تگ کاربران غیرفعال", "tag inactive", "taginactive"],
+    "tagadmins": ["تگ مدیران", "تگ ادمین‌ها", "tag admins", "tagadmins"],
+    
     # لقب‌ها
     "setnick": ["ثبت لقب", "set nick", "setnickname", "setnick"],
     "shownick": ["لقب", "لقب من", "mynick"],
@@ -1562,11 +1603,11 @@ async def execute_command(cmd, update, context):
         "listwarns": handle_list_warns,
 
         # ───── تگ ─────
-        "tagall": handle_tag,
-        "tagactive": handle_tag,
-        "taginactive": handle_tag,
-        "tagadmins": handle_tag,
-
+        
+        "tagall": lambda update, context: handle_tag(update, context, mode="all"),
+        "tagactive": lambda update, context: handle_tag(update, context, mode="active"),
+        "taginactive": lambda update, context: handle_tag(update, context, mode="inactive"),
+        "tagadmins": lambda update, context: handle_tag(update, context, mode="admins"),
         # ───── لقب ─────
         "setnick": handle_set_nick,
         "shownick": handle_show_nick,
