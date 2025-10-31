@@ -1037,7 +1037,6 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # 🧩 ترکیب سه پیام آخر برای درک بهتر ادامه گفتگو
     full_context = " ".join(recent_context[-3:]) if recent_context else text
-
     lower_text = text.lower()
 
 # 🚫 جلوگیری از پاسخ در پیوی (فقط جوک و فال مجازند)
@@ -1064,7 +1063,6 @@ if any(lower_text.startswith(word) for word in command_keywords):
 # 🧠 بررسی حالت ریپلی مود گروهی
 if await handle_group_reply_mode(update, context):
     return
-
 
     # ثبت کاربر و گروه
     await register_user(update.effective_user)
