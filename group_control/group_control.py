@@ -1375,121 +1375,78 @@ async def handle_list_nicks(update, context):
 # ─────────────────────────────── Tag System ───────────────────────────────
 
 async def handle_tag(update, context):
-    # 🔒 بررسی مجوز
+    """📢 تگ کردن کاربران با فیلتر نوع (همه / فعال / غیرفعال / مدیران)"""
     if not await is_authorized(update, context):
         return await update.message.reply_text("🚫 فقط مدیران یا سودوها!")
 
     text = update.message.text.lower().strip()
     chat = update.effective_chat
+    cid = str(chat.id)
     now = datetime.now()
 
-    # 🔹 تشخیص حالت تگ
-    if "تگ همه" in text or text.endswith("tag all"):
-        mode = "all"
+    data = origins_db.get(cid, {})
+    users = data.get("users", {})
+    if not users and "همه" in text:
+        return await update.message.reply_text("⚠️ هنوز فعالیتی ثبت نشده.")
+
+    targets = []
+    title = "کاربران"
+
+    # 🎯 انتخاب هدف تگ
+    if "همه" in text:
+        targets = list(users.keys())
         title = "همه کاربران"
-    elif "تگ فعال" in text or text.endswith("tag active"):
-        mode = "active"
+
+    elif "فعال" in text:
+        th = now - timedelta(days=3)
+        targets = [u for u, t in users.items() if datetime.fromisoformat(t) >= th]
         title = "کاربران فعال (۳ روز اخیر)"
-    elif "تگ غیرفعال" in text or text.endswith("tag inactive"):
-        mode = "inactive"
-        title = "کاربران غیرفعال (۳ روز اخیر)"
-    elif "تگ مدیر" in text or text.endswith("tag admin"):
-        mode = "admins"
-        title = "مدیران گروه"
+
+    elif "غیرفعال" in text:
+        th = now - timedelta(days=3)
+        targets = [u for u, t in users.items() if datetime.fromisoformat(t) < th]
+        title = "کاربران غیرفعال"
+
+    elif "مدیر" in text:
+        try:
+            admins = await context.bot.get_chat_administrators(chat.id)  # ✅ اینجا اصلاح شد
+            targets = [str(a.user.id) for a in admins]
+            title = "مدیران گروه"
+        except Exception as e:
+            print(f"⚠️ خطا در گرفتن مدیران: {e}")
+            return await update.message.reply_text("⚠️ خطا در دریافت مدیران")
+
     elif "تگ " in text and ("@" in text or any(ch.isdigit() for ch in text.split())):
-        mode = "single"
         raw = text.replace("تگ", "").strip()
-        title = f"کاربر {raw}"
         targets = [raw.replace("@", "")]
+        title = f"کاربر {raw}"
+
     else:
         return await update.message.reply_text(
-            "📌 نمونه‌ها:\n"
-            "• تگ همه\n"
-            "• تگ فعال\n"
-            "• تگ غیرفعال\n"
-            "• تگ مدیران\n"
-            "• تگ @123456789",
+            "📌 نمونه: «تگ همه» | «تگ فعال» | «تگ غیرفعال» | «تگ مدیران» | «تگ @123»",
             parse_mode="HTML"
         )
 
+    if not targets:
+        return await update.message.reply_text("⚠️ کاربری برای تگ یافت نشد.")
+
     await update.message.reply_text(f"📢 شروع تگ {title} ...", parse_mode="HTML")
 
-    targets = []
-
-    # 🔹 حالت تگ مدیران
-    if mode == "admins":
-        try:
-            admins = await context.bot.get_chat_administrators(chat.id)
-            targets = [a.user for a in admins if not a.user.is_bot]
-        except:
-            return await update.message.reply_text("⚠️ خطا در دریافت مدیران")
-
-    # 🔹 حالت تگ همه اعضا
-    elif mode == "all":
-        async for member in context.bot.get_chat_administrators(chat.id):
-            pass  # فقط برای تأخیر مجازسازی
-        async for m in context.bot.get_chat_members(chat.id):
-            if not m.user.is_bot:
-                targets.append(m.user)
-
-    # 🔹 حالت تگ فعال / غیرفعال (بر اساس آخرین پیام)
-    elif mode in ["active", "inactive"]:
-        # آخرین زمان فعالیت (۳ روز اخیر)
-        threshold = now - timedelta(days=3)
-        seen_users = {}
-        async for msg in context.bot.get_chat_history(chat.id, limit=500):
-            if msg.from_user and not msg.from_user.is_bot:
-                seen_users[msg.from_user.id] = msg.date
-
-        async for m in context.bot.get_chat_members(chat.id):
-            if m.user.is_bot:
-                continue
-            last_seen = seen_users.get(m.user.id)
-            if not last_seen:
-                if mode == "inactive":
-                    targets.append(m.user)
-            else:
-                if mode == "active" and last_seen >= threshold:
-                    targets.append(m.user)
-                elif mode == "inactive" and last_seen < threshold:
-                    targets.append(m.user)
-
-    # 🔹 حالت تگ خاص (آیدی یا یوزرنیم)
-    elif mode == "single":
-        for u in targets:
-            try:
-                user = await context.bot.get_chat_member(chat.id, int(u))
-                targets = [user.user]
-            except:
-                try:
-                    user = await context.bot.get_chat(u)
-                    targets = [user]
-                except:
-                    return await update.message.reply_text("❌ کاربر یافت نشد.")
-        # حذف تکرار
-        if isinstance(targets[0], str):
-            targets = [targets[0]]
-
-    if not targets:
-        return await update.message.reply_text("⚠️ هیچ کاربری برای تگ یافت نشد.")
-
-    # 🔹 ارسال تگ‌ها (بدون لینک آبی)
-    batch, count = [], 0
-    for i, user in enumerate(targets, 1):
-        tag = f"@{user.username}" if user.username else f"ID:{user.id}"
-        batch.append(tag)
-
-        # ارسال هر ۵ تگ در یک پیام
+    # 🔄 ارسال در دسته‌های ۵تایی
+    batch, cnt = [], 0
+    for i, uid in enumerate(targets, 1):
+        # اینجا لینک آیدی عددی می‌فرسته (نه اون دکمه آبی)
+        batch.append(f"{uid}")
         if len(batch) >= 5 or i == len(targets):
             try:
-                await context.bot.send_message(chat.id, " ".join(batch))
-                count += len(batch)
+                await context.bot.send_message(chat.id, " ".join(batch), parse_mode="HTML")
+                cnt += len(batch)
                 batch = []
                 await asyncio.sleep(1)
-            except:
-                pass
+            except Exception as e:
+                print(f"⚠️ خطا در ارسال دسته تگ: {e}")
 
-    await update.message.reply_text(f"✅ {count} {title} تگ شدند.", parse_mode="HTML")
+    await update.message.reply_text(f"✅ {cnt} کاربر {title} تگ شدند.", parse_mode="HTML")
 # ─────────────────────────────── Alias + Command Core ───────────────────────────────
 DEFAULT_ALIASES = {
     # قفل گروه
