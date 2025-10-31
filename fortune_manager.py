@@ -116,7 +116,7 @@ async def save_fortune(update: Update):
 
 # ========================= حذف فال (ریپلای) =========================
 async def delete_fortune(update: Update):
-    """با ریپلای روی فال موردنظر، آن را از فایل حذف می‌کند."""
+    """با ریپلای روی فال موردنظر، آن را از فایل حذف می‌کند (متن و مدیا)."""
     reply = update.message.reply_to_message
     if not reply:
         return await update.message.reply_text("❗ لطفاً روی پیام فال ریپلای بزن تا حذف شود.")
@@ -125,21 +125,41 @@ async def delete_fortune(update: Update):
     if not data:
         return await update.message.reply_text("📂 هیچ فالی برای حذف وجود ندارد.")
 
-    text = (reply.text or reply.caption or "").strip()
-    if not text:
-        return await update.message.reply_text("⚠️ متن فال برای شناسایی پیدا نشد.")
+    delete_type = None
+    delete_value = None
+
+    # تشخیص نوع و مقدار فال ریپلای‌شده
+    if reply.text or reply.caption:
+        delete_type = "text"
+        delete_value = (reply.text or reply.caption).strip()
+    elif reply.photo:
+        delete_type = "photo"
+        delete_value = os.path.basename(await reply.photo[-1].get_file().file_path)
+    elif reply.video:
+        delete_type = "video"
+        delete_value = os.path.basename(await reply.video.get_file().file_path)
+    elif reply.sticker:
+        delete_type = "sticker"
+        delete_value = os.path.basename(await reply.sticker.get_file().file_path)
+
+    if not delete_type or not delete_value:
+        return await update.message.reply_text("⚠️ نوع فال قابل شناسایی نیست.")
 
     key_to_delete = None
     for k, v in data.items():
-        if v.get("value") == text:
-            key_to_delete = k
-            break
+        if v.get("type") == delete_type:
+            val_path = _abs_media_path(v.get("value", ""))
+            if delete_type == "text" and v.get("value") == delete_value:
+                key_to_delete = k
+                break
+            elif delete_type != "text" and os.path.basename(val_path) == delete_value:
+                key_to_delete = k
+                break
 
     if key_to_delete:
         deleted = data.pop(key_to_delete)
         save_fortunes(data)
 
-        # حذف فایل از سیستم اگر لوکال بود
         val = _abs_media_path(deleted.get("value", ""))
         if os.path.exists(val) and not _is_valid_url(val):
             try:
@@ -160,60 +180,39 @@ async def send_random_fortune(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     keys = list(data.keys())
     random.shuffle(keys)
-
-    cleaned_data = {}  # برای ذخیره فقط فال‌های سالم
+    cleaned_data = {}
 
     for k in keys:
         v = data.get(k, {})
         t = v.get("type", "text").strip()
         raw = (v.get("value") or "").strip()
 
-        # 🧹 حذف فال‌های بی‌مقدار
         if not raw:
-            print(f"[Cleaned] فال {k} حذف شد (value خالی)")
             continue
 
         val = _abs_media_path(raw)
-
-        # 🧹 حذف مسیرهای اشتباه یا فایل‌های پاک‌شده
         if not _is_valid_url(val) and not os.path.exists(val) and t != "text":
-            print(f"[Cleaned] فال {k} حذف شد (فایل پیدا نشد: {val})")
             continue
 
-        # فال سالم نگه داشته میشه
         cleaned_data[k] = v
 
         try:
             if t == "text":
                 await update.message.reply_text(f"🔮 {raw}")
                 break
-
             elif t == "photo":
-                if _is_valid_url(val):
-                    await update.message.reply_photo(photo=val, caption=f"🔮 فال {k}")
-                else:
-                    await update.message.reply_photo(photo=open(val, "rb"), caption=f"🔮 فال {k}")
+                await update.message.reply_photo(photo=_abs_media_path(raw), caption="🔮 فال تصویری!")
                 break
-
             elif t == "video":
-                if _is_valid_url(val):
-                    await update.message.reply_video(video=val, caption=f"🎥 فال {k}")
-                else:
-                    await update.message.reply_video(video=open(val, "rb"), caption=f"🎥 فال {k}")
+                await update.message.reply_video(video=_abs_media_path(raw), caption="🎥 فال ویدیویی!")
                 break
-
             elif t == "sticker":
-                if _is_valid_url(val):
-                    await update.message.reply_sticker(sticker=val)
-                else:
-                    await update.message.reply_sticker(sticker=open(val, "rb"))
+                await update.message.reply_sticker(sticker=_abs_media_path(raw))
                 break
-
         except Exception as e:
             print(f"[Fortune Error] id={k} type={t} err={e}")
             continue
 
-    # ✅ بازنویسی فال‌ها بدون موارد خراب
     if len(cleaned_data) != len(data):
         save_fortunes(cleaned_data)
         print(f"🧹 فال‌های خراب حذف شدند ({len(data) - len(cleaned_data)} مورد).")
@@ -235,31 +234,21 @@ async def list_fortunes(update: Update):
         v = data[k]
         t = v.get("type", "text")
         raw = v.get("value", "")
+        val = _abs_media_path(raw)
 
         try:
             if t == "text":
                 await update.message.reply_text(f"🔮 {raw}")
             elif t == "photo":
-                val = _abs_media_path(raw)
-                if _is_valid_url(val):
-                    await update.message.reply_photo(photo=val, caption=f"🔮 فال {k}")
-                elif os.path.exists(val):
-                    await update.message.reply_photo(photo=InputFile(val), caption=f"🔮 فال {k}")
+                await update.message.reply_photo(photo=val, caption=f"🔮 فال {k}")
             elif t == "video":
-                val = _abs_media_path(raw)
-                if _is_valid_url(val):
-                    await update.message.reply_video(video=val, caption=f"🎥 فال {k}")
-                elif os.path.exists(val):
-                    await update.message.reply_video(video=InputFile(val), caption=f"🎥 فال {k}")
+                await update.message.reply_video(video=val, caption=f"🎥 فال {k}")
             elif t == "sticker":
-                val = _abs_media_path(raw)
-                if _is_valid_url(val):
-                    await update.message.reply_sticker(sticker=val)
-                elif os.path.exists(val):
-                    await update.message.reply_sticker(sticker=InputFile(val))
+                await update.message.reply_sticker(sticker=val)
             shown += 1
         except Exception as e:
             print(f"[Fortune List Error] id={k} err={e}")
+            continue
 
     if shown == 0:
         await update.message.reply_text("⚠️ چیزی برای نمایش پیدا نشد (ممکنه فایل‌ها جابه‌جا شده باشن).")
