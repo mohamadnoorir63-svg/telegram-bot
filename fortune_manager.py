@@ -108,54 +108,64 @@ async def save_fortune(update: Update):
     except Exception as e:
         await update.message.reply_text(f"⚠️ خطا در ذخیره فال: {e}")
 
+
 # ========================= حذف فال (ریپلای) =========================
 async def delete_fortune(update: Update):
-    """با ریپلای روی فال، آن را از فایل حذف می‌کند (پشتیبانی از متن و مدیا)."""
+    """با ریپلای روی فال موردنظر، آن را از فایل حذف می‌کند (پشتیبانی از متن، عکس، ویدیو، استیکر)."""
     reply = update.message.reply_to_message
     if not reply:
-        return await update.message.reply_text("❗ لطفاً روی پیام فال ریپلای کن.")
+        return await update.message.reply_text("❗ لطفاً روی پیام فال ریپلای کن تا حذف شود.")
 
     data = load_fortunes()
     if not data:
         return await update.message.reply_text("📂 هیچ فالی برای حذف وجود ندارد.")
 
     delete_type = None
-    delete_value = None
+    delete_match_values = []  # چند مقدار ممکن برای تطبیق (برای اطمینان بیشتر)
 
-    # تشخیص نوع و مقدار
+    # 🎯 تشخیص نوع پیام و مقدار احتمالی
     if reply.text or reply.caption:
         delete_type = "text"
-        delete_value = (reply.text or reply.caption).strip()
+        delete_match_values.append((reply.text or reply.caption).strip())
+
     elif reply.photo:
         delete_type = "photo"
         file = await reply.photo[-1].get_file()
-        delete_value = os.path.basename(file.file_path)
+        delete_match_values.append(os.path.basename(file.file_path))
+        delete_match_values.append("photo")  # برای تطبیق کلی‌تر
+
     elif reply.video:
         delete_type = "video"
         file = await reply.video.get_file()
-        delete_value = os.path.basename(file.file_path)
+        delete_match_values.append(os.path.basename(file.file_path))
+        delete_match_values.append("video")
+
     elif reply.sticker:
         delete_type = "sticker"
         file = await reply.sticker.get_file()
-        delete_value = os.path.basename(file.file_path)
+        delete_match_values.append(os.path.basename(file.file_path))
+        delete_match_values.append("sticker")
 
-    if not delete_type or not delete_value:
+    else:
         return await update.message.reply_text("⚠️ نوع فال قابل شناسایی نیست.")
 
+    # 🧩 جستجو در فایل JSON
     key_to_delete = None
     for k, v in data.items():
         if v.get("type") == delete_type:
             val_path = _abs_media_path(v.get("value", ""))
-            if delete_type == "text" and v.get("value") == delete_value:
-                key_to_delete = k
-                break
-            elif delete_type != "text" and os.path.basename(val_path) == delete_value:
+            base_name = os.path.basename(val_path)
+
+            # بررسی تطابق جزئی (اگر فایل اصلی و فایل فعلی فرق داشت)
+            if any(match in base_name or match == v.get("value") for match in delete_match_values):
                 key_to_delete = k
                 break
 
+    # ⚙️ حذف از فایل و دیسک
     if key_to_delete:
         deleted = data.pop(key_to_delete)
         save_fortunes(data)
+
         val = _abs_media_path(deleted.get("value", ""))
         if os.path.exists(val) and not _is_valid_url(val):
             try:
@@ -166,7 +176,7 @@ async def delete_fortune(update: Update):
         await update.message.reply_text("🗑️ فال با موفقیت حذف شد ✅")
     else:
         await update.message.reply_text("⚠️ فال موردنظر در فایل پیدا نشد.")
-
+        
 # ========================= ارسال فال تصادفی =========================
 async def send_random_fortune(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """ارسال فال تصادفی با بررسی مسیرهای واقعی و حذف موارد خراب."""
@@ -216,7 +226,7 @@ async def send_random_fortune(update: Update, context: ContextTypes.DEFAULT_TYPE
     if not cleaned_data:
         await update.message.reply_text("⚠️ هیچ فالی سالم برای ارسال پیدا نشد 😔")
 
-# ========================= لیست فال‌ها (آخرین ۱۰ مورد) =========================
+# ========================= لیست فال‌ ها (آخرین ۱۰ مورد) =========================
 async def list_fortunes(update: Update):
     """نمایش ۱۰ فال آخر با نوع و محتوا"""
     data = load_fortunes()
