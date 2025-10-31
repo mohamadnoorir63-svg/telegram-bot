@@ -1401,7 +1401,7 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await list_jokes(update)
         return
 
-    if text == "لیست فال‌ها" or text == "لیست فال‌":
+    if text == "لیست فال‌" or text == "لیست فال‌":
         await list_fortunes(update)
         return
 
