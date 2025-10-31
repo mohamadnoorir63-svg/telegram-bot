@@ -1065,6 +1065,11 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # 🧠 بررسی حالت ریپلی مود گروهی
     if await handle_group_reply_mode(update, context):
         return
+        
+        # 🧱 جلوگیری از پاسخ دوباره در صورت اجرای هم‌زمان یا تکراری
+   if context.chat_data.get("reply_in_progress"):
+       return
+   context.chat_data["reply_in_progress"] = True
 
     # 🔕 در صورت غیرفعال بودن هوش، فقط یادگیری پنهان انجام می‌شود
     if not status["active"]:
@@ -1086,6 +1091,7 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text(reply_text)
     except Exception as e:
         print(f"⚠️ خطا در تولید پاسخ: {e}")
+        context.chat_data["reply_in_progress"] = False
 
     
     # ✅ درصد هوش منطقی
