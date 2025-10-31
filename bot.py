@@ -190,13 +190,7 @@ def is_valid_message(update):
     if msg.from_user and msg.from_user.is_bot:
         return False
         # 🚫 جلوگیری از پاسخ سخنگو به پیام‌های دستوری
-    if update.message and update.message.text:
-        text = update.message.text.strip().lower()
-        command_keywords = [
-            "قفل", "باز", "بازکردن", "پنل", "خوشامد",
-            "عکس خوشامد", "فیلتر", "سکوت", "بن", "اخطار",
-            "لقب", "اصل", "تگ", "پاکسازی", "گروه", "مدیر", "سودو"
-        ]
+
         if any(text.startswith(word) for word in command_keywords):
             return False  # ⛔ این پیام یه دستوره، نباید سخنگو جواب بده
 
