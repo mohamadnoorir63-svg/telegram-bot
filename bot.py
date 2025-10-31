@@ -1058,6 +1058,13 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # 🚫 جلوگیری از پاسخ در پیوی (فقط جوک و فال مجازند)
     if update.effective_chat.type == "private" and lower_text not in ["جوک", "فال"]:
         return
+        # 🚫 جلوگیری از پاسخ سخنگو به پیام‌های دستوری
+    if update.message and update.message.text:
+        text = update.message.text.strip().lower()
+        command_keywords = [
+            "قفل", "باز", "بازکردن", "پنل", "خوشامد",
+            "عکس خوشامد", "فیلتر", "سکوت", "بن", "اخطار",
+            "لقب", "اصل", "تگ", "پاکسازی", "گروه", "مدیر", "سودو"
     
 
     # ✅ جلوگیری از پاسخ به دستورات خاص (مثل راهنما، خوشامد، ربات و غیره)
@@ -1392,13 +1399,47 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if text.lower() == "ثبت فال" and update.message.reply_to_message:
         await save_fortune(update)
         return
+        # ======================= 🗑 حذف جوک و فال =======================
+
+async def delete_joke(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """حذف جوک از حافظه با عدد ایندکس"""
+    if not context.args:
+        return await update.message.reply_text("🔹 استفاده: حذف جوک <شماره>")
+    try:
+        index = int(context.args[0])
+        data = load_data("jokes.json")
+        if index < 1 or index > len(data):
+            return await update.message.reply_text("⚠️ شماره اشتباه است!")
+        key = list(data.keys())[index - 1]
+        del data[key]
+        save_data("jokes.json", data)
+        await update.message.reply_text(f"✅ جوک شماره {index} حذف شد.")
+    except Exception as e:
+        await update.message.reply_text(f"⚠️ خطا در حذف جوک: {e}")
+
+
+async def delete_fortune(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """حذف فال از حافظه با عدد ایندکس"""
+    if not context.args:
+        return await update.message.reply_text("🔹 استفاده: حذف فال <شماره>")
+    try:
+        index = int(context.args[0])
+        data = load_data("fortunes.json")
+        if index < 1 or index > len(data):
+            return await update.message.reply_text("⚠️ شماره اشتباه است!")
+        key = list(data.keys())[index - 1]
+        del data[key]
+        save_data("fortunes.json", data)
+        await update.message.reply_text(f"✅ فال شماره {index} حذف شد.")
+    except Exception as e:
+        await update.message.reply_text(f"⚠️ خطا در حذف فال: {e}")
 
     # ✅ لیست‌ها
-    if text == "لیست جوک‌ها":
+    if text == "لیست جوک‌ ها":
         await list_jokes(update)
         return
 
-    if text == "لیست فال‌ها":
+    if text == "لیست فال‌ ها":
         await list_fortunes(update)
         return
 
