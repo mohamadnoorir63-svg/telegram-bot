@@ -1009,92 +1009,75 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data["await_restore"] = False
         
 # ======================= 💬 پاسخ و هوش مصنوعی =======================
+
 async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """پاسخ‌دهی اصلی هوش مصنوعی و سیستم یادگیری"""
 
-    # 🧱 جلوگیری از پاسخ دوباره در صورت اجرای هم‌زمان یا تکراری
-    if context.chat_data.get("reply_in_progress"):
+    # 🚫 جلوگیری از پاسخ هوشمند در صورت اجرای دستور سفارشی
+    if context.user_data.get("custom_handled"):
+        context.user_data["custom_handled"] = False
         return
-    context.chat_data["reply_in_progress"] = True
 
+    # 🧠 هر وقت پیام جدیدی از کاربر رسید → بفرست برای userbot
     try:
-        # 🚫 جلوگیری از پاسخ هوشمند در صورت اجرای دستور سفارشی
-        if context.user_data.get("custom_handled"):
-            context.user_data["custom_handled"] = False
-            return
+        await message_queue.put({
+            "chat_id": update.effective_chat.id,
+            "text": update.message.text
+        })
+    except Exception as e:
+        print(f"⚠️ خطا در ارسال پیام به userbot queue: {e}")
 
-        # 🧩 اطمینان از اینکه پیام معتبره
-        if not update.message or not update.message.text:
-            return
+    # 🧩 اطمینان از اینکه پیام معتبره
+    if not update.message or not update.message.text:
+        return
 
-        # 🧠 آماده‌سازی داده‌های پایه
-        uid = update.effective_user.id
-        chat_id = update.effective_chat.id
-        text = update.message.text.strip()
-        lower_text = text.lower()
+    reply_text = process_group_message(uid, chat_id, text)
 
-        # 🧠 ثبت پیام در حافظه کوتاه‌مدت
-        context_memory.add_message(uid, text)
+    # 🧠 فعال‌سازی حافظهٔ کوتاه‌مدت گفتگو
+    uid = update.effective_user.id
+    text = update.message.text.strip()
 
-        # 🧠 گرفتن کل تاریخچه اخیر کاربر
-        recent_context = context_memory.get_context(uid)
+    # 🧠 ثبت پیام در حافظه کوتاه‌مدت
+    context_memory.add_message(uid, text)
 
-        # 🧩 ترکیب سه پیام آخر برای درک بهتر ادامه گفتگو
-        full_context = " ".join(recent_context[-3:]) if recent_context else text
+    # 🧠 گرفتن کل تاریخچه اخیر کاربر
+    recent_context = context_memory.get_context(uid)
 
-        # 🚫 جلوگیری از پاسخ در پیوی (فقط جوک و فال مجازند)
-        if update.effective_chat.type == "private" and lower_text not in ["جوک", "فال"]:
-            return
+    # 🧩 ترکیب سه پیام آخر برای درک بهتر ادامه گفتگو
+    full_context = " ".join(recent_context[-3:]) if recent_context else text
 
-        # 🚫 جلوگیری از پاسخ به درخواست‌های هوا
-        if re.search(r"(هوای|آب[\s‌]*و[\s‌]*هوا)", text):
-            return
+    text = update.message.text.strip()
+    lower_text = text.lower()
+    uid = update.effective_user.id
+    chat_id = update.effective_chat.id
 
-        # 🚫 جلوگیری از پاسخ سخنگو به پیام‌های مدیریتی و دستوری
-        command_keywords = [
-            "قفل", "باز", "بازکردن", "پنل", "خوشامد",
-            "عکس خوشامد", "فیلتر", "سکوت", "بن", "اخطار",
-            "لقب", "اصل", "تگ", "پاکسازی", "گروه", "مدیر", "سودو"
-        ]
-        if any(lower_text.startswith(word) for word in command_keywords):
-            return
+    # 🚫 جلوگیری از پاسخ در پیوی (فقط جوک و فال مجازند)
+    if update.effective_chat.type == "private" and lower_text not in ["جوک", "فال"]:
+        return
 
-        # ✅ جلوگیری از پاسخ به دستورات خاص و سیستمی
-        protected_words = [
-            "راهنما", "ثبت راهنما", "خوشامد", "ثبت خوشامد",
-            "ربات", "save", "del", "panel", "backup", "cloudsync", "leave"
-        ]
-        if any(lower_text.startswith(word) for word in protected_words):
-            return
+    # ✅ جلوگیری از پاسخ به دستورات خاص (مثل راهنما، خوشامد، ربات و غیره)
+    protected_words = [
+        "راهنما", "ثبت راهنما", "خوشامد", "ثبت خوشامد",
+        "ربات", "save", "del", "panel", "backup", "cloudsync", "leave"
+    ]
+    if any(lower_text.startswith(word) for word in protected_words):
+        return
 
-        # 🧠 بررسی حالت ریپلی مود گروهی
-        if await handle_group_reply_mode(update, context):
-            return
+    # 🧠 بررسی حالت ریپلی مود گروهی
+    if await handle_group_reply_mode(update, context):
+        return
 
-        # 🔕 در صورت غیرفعال بودن هوش، فقط یادگیری پنهان انجام می‌شود
-        if not status["active"]:
-            shadow_learn(text, "")
-            return
+    # ثبت کاربر و گروه
+    await register_user(update.effective_user)
+    register_group_activity(chat_id, uid)
 
-        # 👤 ثبت کاربر و گروه
-        await register_user(update.effective_user)
-        register_group_activity(chat_id, uid)
+    if not status["locked"]:
+        auto_learn_from_text(text)
 
-        # 🧩 یادگیری خودکار
-        if not status["locked"]:
-            auto_learn_from_text(text)
+    if not status["active"]:
+        shadow_learn(text, "")
+        return
 
-        # 🧠 پردازش و پاسخ نهایی از ماژول گروه
-        try:
-            reply_text = process_group_message(uid, chat_id, text)
-            if reply_text:
-                await update.message.reply_text(reply_text)
-        except Exception as e:
-            print(f"⚠️ خطا در تولید پاسخ: {e}")
-
-    finally:
-        # 🔓 در هر صورت قفل پاسخ رو باز کن
-        context.chat_data["reply_in_progress"] = False
     # ✅ درصد هوش منطقی
     if text.lower() == "درصد هوش":
         score = 0
@@ -1104,6 +1087,7 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
             data = load_data("memory.json")
             phrases = len(data.get("phrases", {}))
             responses = sum(len(v) for v in data.get("phrases", {}).values()) if phrases else 0
+
             if phrases > 15 and responses > 25:
                 score += 30
                 details.append("🧠 حافظه فعال و گسترده ✅")
@@ -1151,6 +1135,7 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         essential_files = ["memory.json", "group_data.json", "jokes.json", "fortunes.json"]
         stable_count = sum(os.path.exists(f) for f in essential_files)
+
         if stable_count == len(essential_files):
             score += 15
             details.append("💾 حافظه و داده‌ها پایدار ✅")
@@ -1164,15 +1149,14 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
             score = 100
 
         result = (
-            f"🤖 درصد هوش فعلی خنگول: *{score}%*\n\n" +
-            "\n".join(details) +
-            f"\n\n📈 نسخه Cloud+ Supreme Pro Stable+\n🕓 {datetime.now().strftime('%Y/%m/%d %H:%M')}"
+            f"🤖 درصد هوش فعلی خنگول: *{score}%*\n\n"
+            + "\n".join(details)
+            + f"\n\n📈 نسخه Cloud+ Supreme Pro Stable+\n🕓 {datetime.now().strftime('%Y/%m/%d %H:%M')}"
         )
 
         await update.message.reply_text(result, parse_mode="Markdown")
         return
-
-    # ✅ درصد هوش اجتماعی
+        # ✅ درصد هوش اجتماعی
     if text.lower() == "درصد هوش اجتماعی":
         score = 0
         details = []
@@ -1209,6 +1193,7 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
             activity = get_group_stats()
             active_chats = activity.get("active_chats", 0)
             total_msgs = activity.get("messages", 0)
+
             if active_chats > 10 and total_msgs > 200:
                 score += 25
                 details.append("💬 تعاملات زیاد و مداوم 😎")
@@ -1242,9 +1227,10 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
             + "\n".join(details)
             + f"\n\n📊 شاخص تعامل اجتماعی فعال 💬\n🕓 {datetime.now().strftime('%Y/%m/%d %H:%M')}"
         )
-
         await update.message.reply_text(result, parse_mode="Markdown")
-        return# ✅ هوش کلی (ترکیب هوش منطقی + اجتماعی)
+        return
+
+    # ✅ هوش کلی (ترکیب هوش منطقی + اجتماعی)
     if text.lower() == "هوش کلی":
         score = 0
         details = []
@@ -1340,7 +1326,6 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
             + "\n".join(details)
             + f"\n\n📈 نسخه Cloud+ Supreme Pro Stable+\n🕓 {datetime.now().strftime('%Y/%m/%d %H:%M')}"
         )
-
         await update.message.reply_text(result, parse_mode="Markdown")
         return
 
@@ -1352,7 +1337,6 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 key, val = random.choice(list(data.items()))
                 t = val.get("type", "text")
                 v = val.get("value", "")
-
                 try:
                     if t == "text":
                         await update.message.reply_text("😂 " + v)
@@ -1407,11 +1391,11 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     # ✅ لیست‌ها
-    if text == "لیست جوک‌ ها":
+    if text == "لیست جوک‌ها":
         await list_jokes(update)
         return
 
-    if text == "لیست فال‌ ها":
+    if text == "لیست فال‌ها":
         await list_fortunes(update)
         return
 
@@ -1427,10 +1411,8 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if len(parts) > 1:
             phrase = parts[0].strip()
             responses = [p.strip() for p in parts[1:] if p.strip()]
-
             msg = learn(phrase, *responses)
 
-            # 🎨 ساخت خروجی نمایشی با جزئیات و اموجی‌ها
             visual = (
                 f"🧠 <b>خنگول یاد گرفت!</b>\n"
                 f"💬 <b>جمله:</b> <code>{phrase}</code>\n"
@@ -1444,7 +1426,6 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
             # 💾 یادگیری سایه برای تقویت حافظه
             for r in responses:
                 shadow_learn(phrase, r)
-
         else:
             await update.message.reply_text(
                 "❗ بعد از 'یادبگیر' جمله و پاسخ‌هاش رو در خطوط جدا بنویس.\n\n"
@@ -1476,8 +1457,6 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_text = smart_response(full_context, uid) or enhance_sentence(full_context)
 
     await update.message.reply_text(reply_text)
-
-
 
 
 # ======================= 🧹 ریست و ریلود =======================
