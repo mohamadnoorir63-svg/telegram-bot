@@ -1009,23 +1009,6 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data["await_restore"] = False
         
 # ======================= 💬 پاسخ و هوش مصنوعی =======================
-async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """پاسخ‌دهی اصلی هوش مصنوعی و سیستم یادگیری"""
-    
-    # 🚫 جلوگیری از پاسخ هوشمند در صورت اجرای دستور سفارشی
-    if context.user_data.get("custom_handled"):
-        context.user_data["custom_handled"] = False
-        return
-
-    # 🧩 اطمینان از اینکه پیام معتبره
-    if not update.message or not update.message.text:
-        return
-
-    # 🧠 آماده‌سازی متغیرهای پایه
-    uid = update.effective_user.id
-    chat_id = update.effective_chat.id
-    text = update.message.text.strip()
-    lower_text = text.lower()
 
     # 🚫 جلوگیری از پاسخ سخنگو به پیام‌های دستوری
     command_keywords = [
@@ -1036,9 +1019,7 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if any(lower_text.startswith(word) for word in command_keywords):
         return
         
-    def process_group_message(uid, chat_id, text):
-    # منطق پاسخ‌دهی
-        return "پاسخ نهایی"
+    
 
     # 🧠 فعال‌سازی حافظهٔ کوتاه‌مدت گفتگو
     context_memory.add_message(uid, text)
