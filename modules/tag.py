@@ -1,78 +1,98 @@
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-import asyncio
-from datetime import datetime, timedelta
+import json, os, asyncio
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
+from telegram.ext import ContextTypes
 
-# 📍 منوی انتخاب نوع تگ
-async def handle_tag_menu(update, context):
+# 📂 مسیر دیتابیس اعضا
+MEMBERS_FILE = "data/members.json"
+if not os.path.exists("data"):
+    os.makedirs("data")
+if not os.path.exists(MEMBERS_FILE):
+    with open(MEMBERS_FILE, "w") as f:
+        json.dump({}, f)
+
+# 🧠 بارگذاری و ذخیره اعضا
+def load_members():
+    try:
+        with open(MEMBERS_FILE, "r") as f:
+            return json.load(f)
+    except:
+        return {}
+
+def save_members(data):
+    with open(MEMBERS_FILE, "w") as f:
+        json.dump(data, f, indent=2, ensure_ascii=False)
+
+# 🧩 ذخیره هر کاربر که پیام میده
+async def save_user_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not update.message or not update.message.from_user:
+        return
+    user = update.message.from_user
+    chat = update.effective_chat
+    if chat.type not in ["group", "supergroup"]:
+        return
+
+    members = load_members()
+    cid = str(chat.id)
+    if cid not in members:
+        members[cid] = {}
+
+    members[cid][str(user.id)] = user.first_name
+    save_members(members)
+
+# 📋 نمایش منوی تگ
+async def handle_tag_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [
+        [InlineKeyboardButton("👥 تگ همه اعضا", callback_data="tag_all")],
         [InlineKeyboardButton("👑 تگ مدیران", callback_data="tag_admins")],
-        [InlineKeyboardButton("🔥 تگ فعال‌ها", callback_data="tag_active")],
-        [InlineKeyboardButton("👥 تگ 50 کاربر", callback_data="tag_50")],
-        [InlineKeyboardButton("👥 تگ 300 کاربر", callback_data="tag_300")],
-        [InlineKeyboardButton("❌ بستن", callback_data="tag_close")],
+        [InlineKeyboardButton("🔥 تگ 50 نفر اخیر", callback_data="tag_50")],
+        [InlineKeyboardButton("❌ بستن", callback_data="tag_close")]
     ]
     markup = InlineKeyboardMarkup(keyboard)
     await update.message.reply_text("📣 حالت تگ کردن را انتخاب کنید:", reply_markup=markup)
 
-
-# 📍 پاسخ به دکمه‌های تگ
-async def tag_callback(update, context):
+# ⚙️ اجرای تگ‌ها
+async def tag_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    chat = update.effective_chat
-    data = query.data
     await query.answer()
+    chat = update.effective_chat
+    cid = str(chat.id)
 
-    # بستن منو
-    if data == "tag_close":
+    data = load_members()
+    users = data.get(cid, {})
+
+    if query.data == "tag_close":
         return await query.edit_message_text("❌ منوی تگ بسته شد.")
 
-    # دریافت مدیران (مجاز در API)
-    try:
+    if query.data == "tag_admins":
         admins = await context.bot.get_chat_administrators(chat.id)
-    except Exception as e:
-        return await query.edit_message_text(f"⚠️ خطا در دریافت مدیران: {e}")
-
-    # 🧩 نوع تگ
-    if data == "tag_admins":
-        targets = [a.user for a in admins if not a.user.is_bot]
+        targets = {str(a.user.id): a.user.first_name for a in admins if not a.user.is_bot}
         title = "مدیران گروه"
-
-    elif data == "tag_active":
-        # برای تست چون دیتابیس نداریم → تگ همان مدیران
-        targets = [a.user for a in admins if not a.user.is_bot]
-        title = "کاربران فعال (شبیه‌سازی)"
-    elif data == "tag_50":
-        targets = [a.user for a in admins if not a.user.is_bot]
-        title = "۵۰ کاربر اول (در نسخه رسمی فقط مدیران قابل خواندن‌اند)"
-    elif data == "tag_300":
-        targets = [a.user for a in admins if not a.user.is_bot]
-        title = "۳۰۰ کاربر گروه (در نسخه رسمی فقط مدیران قابل خواندن‌اند)"
+    elif query.data == "tag_all":
+        targets = {uid: name for uid, name in users.items()}
+        title = "همه اعضا"
+    elif query.data == "tag_50":
+        targets = dict(list(users.items())[-50:])
+        title = "۵۰ نفر اخیر"
     else:
-        targets = []
-        title = "کاربران"
+        targets = {}
+        title = "اعضا"
 
     if not targets:
         return await query.edit_message_text("⚠️ هیچ کاربری برای تگ وجود ندارد.")
 
     await query.edit_message_text(f"📢 شروع تگ {title} ...")
 
-    # تگ کردن به‌صورت گروهی
-    batch = []
-    count = 0
-    for i, user in enumerate(targets, 1):
-        if user.username:
-            tag = f"@{user.username}"
-        else:
-            tag = f"<a href='tg://user?id={user.id}'>{user.first_name}</a>"
+    batch, count = [], 0
+    for i, (uid, name) in enumerate(targets.items(), 1):
+        tag = f"<a href='tg://user?id={uid}'>{name}</a>"
         batch.append(tag)
-
         if len(batch) >= 5 or i == len(targets):
             try:
                 await context.bot.send_message(chat.id, " ".join(batch), parse_mode="HTML")
-                count += len(batch)
                 batch = []
+                count += 1
                 await asyncio.sleep(1)
             except Exception as e:
-                print(f"❌ خطا در ارسال تگ: {e}")
+                print("❌ خطا در ارسال:", e)
 
-    await context.bot.send_message(chat.id, f"✅ {count} کاربر {title} تگ شدند.", parse_mode="HTML")
+    await context.bot.send_message(chat.id, f"✅ {count*5} کاربر {title} تگ شدند.", parse_mode="HTML")
