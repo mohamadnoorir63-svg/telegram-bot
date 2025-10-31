@@ -2151,6 +2151,11 @@ if __name__ == "__main__":
     application.add_handler(CommandHandler("cloudsync", cloudsync))
     application.add_handler(CommandHandler("leave", leave))
     application.add_handler(CommandHandler("reply", toggle_reply_mode))
+    # ==========================================================
+    # 📢 سیستم تگ کاربران گروه
+    # ==========================================================
+    application.add_handler(CommandHandler("tag", handle_tag_menu))
+    application.add_handler(CallbackQueryHandler(tag_callback, pattern="^tag_"))
 
     # ==========================================================
     # 🎨 فونت‌ساز خنگول
