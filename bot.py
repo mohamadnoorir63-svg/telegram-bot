@@ -1009,16 +1009,16 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data["await_restore"] = False
         
 # ======================= 💬 پاسخ و هوش مصنوعی =======================
-    from telegram import Update
-from telegram.ext import ContextTypes
-import re
-
 async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """پاسخ‌دهی اصلی هوش مصنوعی و سیستم یادگیری"""
 
     # 🚫 جلوگیری از پاسخ هوشمند در صورت اجرای دستور سفارشی
     if context.user_data.get("custom_handled"):
         context.user_data["custom_handled"] = False
+        return
+        
+        # جلوگیری از دوباره پاسخ دادن در صورت پردازش توسط ChatGPT
+    if context.user_data.get("ai_chat_active"):
         return
 
     # 🧩 اطمینان از اینکه پیام معتبره
