@@ -1017,9 +1017,6 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data["custom_handled"] = False
         return
         
-        # جلوگیری از دوباره پاسخ دادن در صورت پردازش توسط ChatGPT
-    if context.user_data.get("ai_chat_active"):
-        return
 
     # 🧩 اطمینان از اینکه پیام معتبره
     if not update.message or not update.message.text:
