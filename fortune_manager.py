@@ -184,7 +184,7 @@ async def send_random_fortune(update: Update, context: ContextTypes.DEFAULT_TYPE
         await update.message.reply_text("⚠️ هیچ فالی سالم برای ارسال پیدا نشد 😔")
 
 
-# ========================= لیست فال‌ها (آخرین ۱۰ تا) =========================
+# ========================= لیست فال‌ ها (آخرین ۱۰ تا) =========================
 async def list_fortunes(update: Update):
     data = load_fortunes()
     if not data: 
