@@ -1010,7 +1010,7 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
 # ======================= 💬 پاسخ و هوش مصنوعی =======================
     async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """پاسخ‌دهی اصلی هوش مصنوعی و سیستم یادگیری"""
+        """پاسخ‌دهی اصلی هوش مصنوعی و سیستم یادگیری"""
 
     # 🚫 جلوگیری از پاسخ هوشمند در صورت اجرای دستور سفارشی
     if context.user_data.get("custom_handled"):
