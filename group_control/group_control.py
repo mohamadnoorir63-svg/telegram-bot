@@ -1561,8 +1561,8 @@ async def group_command_handler(update: Update, context: ContextTypes.DEFAULT_TY
     words = lower_text.split()
     if not words:
         return
-
-    # ✅ پاکسازی‌ها
+        
+        # ✅ پاکسازی‌ها
 valid_clean_cmds = [
     "پاکسازی",
     "پاکسازی کامل",
@@ -1575,14 +1575,13 @@ if words[0] == "پاکسازی":
        len(words) == 1 or \
        (len(words) == 2 and words[1].isdigit()):
         print("🧹 دستور تشخیص داده شد: پاکسازی")
-        
-        # 🔧 اضافه کن تا عدد درست منتقل بشه به handle_clean
-        context.args = words[1:]
-        
-        return await handle_clean(update, context)
+        context.args = words[1:]  # 👈 داخل شرط
+        return await handle_clean(update, context)  # 👈 داخل همون بلاک
     else:
         print("ℹ️ جمله شامل 'پاکسازی' بود اما دستور معتبر نیست.")
         return
+
+
 
     # ✅ دستورات گروه
     if lower_text in ["قفل گروه", "ببند گروه", "lock group"]:
