@@ -3,21 +3,47 @@ import random
 from memory_manager import learn, load_data, save_data, shadow_learn
 
 # ===============================================================
-# 🤖 یادگیری خودکار خنگول Cloud+ — نسخه‌ی بدون ایموجی
+# 🧱 فیلتر ضد ایموجی و ضد تکرار
+# ===============================================================
+def is_emoji_only(text: str) -> bool:
+    """بررسی اینکه آیا متن فقط شامل ایموجی یا علامت است"""
+    if not text or not text.strip():
+        return True
+
+    clean = re.sub(r"[ \n\t.,!?؛،~\-_=+\[\]{}()<>0-9a-zA-Zء-ی]", "", text)
+    emoji_pattern = re.compile(
+        "["u"\U0001F600-\U0001F64F"
+        u"\U0001F300-\U0001F5FF"
+        u"\U0001F680-\U0001F6FF"
+        u"\U0001F1E0-\U0001F1FF"
+        u"\U00002700-\U000027BF"
+        u"\U0001F900-\U0001F9FF"
+        "]+", flags=re.UNICODE,
+    )
+
+    # اگر بعد از حذف ایموجی چیزی نماند، یعنی فقط ایموجی بوده
+    return not re.sub(emoji_pattern, "", clean)
+
+
+# ===============================================================
+# 🤖 یادگیری خودکار خنگول Cloud+ — نسخه‌ی ضد ایموجی و ضد تکرار
 # ===============================================================
 def auto_learn_from_text(text: str):
     """یادگیری خودکار از گفت‌وگوهای طبیعی کاربران با درک احساس و منطق ساده"""
-    # ⚙️ import داخلی برای جلوگیری از حلقه‌ی import
     try:
         from smart_reply import detect_emotion
     except ImportError:
-        detect_emotion = lambda x: None  # اگر در دسترس نبود، احساس رو خنثی کن
+        detect_emotion = lambda x: None
 
-    if not text or len(text) < 3:
+    if not text or len(text.strip()) < 3:
+        return
+
+    # 🚫 جلوگیری از یادگیری از ایموجی‌ها
+    if is_emoji_only(text):
         return
 
     text = text.strip().replace("؟", "?")
-    emotion = detect_emotion(text)  # تشخیص احساس جمله (شاد، غمگین، عصبی، خنثی)
+    emotion = detect_emotion(text)
 
     # ==============================
     # 🎯 الگوهای آماده یادگیری سریع
@@ -36,6 +62,15 @@ def auto_learn_from_text(text: str):
     # 🧩 بررسی و یادگیری سریع بر اساس الگوها
     for pattern, responses in patterns.items():
         if re.search(pattern, text, re.IGNORECASE):
+            mem = load_data("memory.json")
+            data = mem.get("data", {})
+
+            # 🚫 جلوگیری از ذخیره تکراری
+            if pattern in data:
+                existing_texts = [r["text"] if isinstance(r, dict) else r for r in data[pattern]]
+                if any(resp in existing_texts for resp in responses):
+                    return
+
             learn(pattern, *responses)
             shadow_learn(text, random.choice(responses))
             return
@@ -45,12 +80,11 @@ def auto_learn_from_text(text: str):
     # ===============================================================
     words = text.split()
     if len(words) >= 3:
-        # کلید اصلی از دو واژه اول جمله ساخته میشه (بهتر از فقط یک کلمه)
         key = " ".join(words[:2])
         base_reply = random.choice(["آره", "درسته", "جالبه", "باشه", "اوه"])
         tail = random.choice(words[-2:])
 
-        # بر اساس احساس، لحن پاسخ رو تغییر بده (بدون ایموجی)
+        # بر اساس احساس، لحن پاسخ رو تغییر بده
         if emotion == "شاد":
             resp = f"{base_reply} {tail}"
         elif emotion == "غمگین":
@@ -60,17 +94,23 @@ def auto_learn_from_text(text: str):
         else:
             resp = f"{base_reply} {tail}"
 
+        # 🚫 جلوگیری از ذخیره تکراری
+        mem = load_data("memory.json")
+        data = mem.get("data", {})
+        if key in data:
+            existing = [r["text"] if isinstance(r, dict) else r for r in data[key]]
+            if resp in existing:
+                return
+
         shadow_learn(key, resp)
 
 
 # ===============================================================
-# 🧹 پاک‌سازی هوشمند حافظه (نسخه پیشرفته)
+# 🧹 پاک‌سازی هوشمند حافظه
 # ===============================================================
 def clean_duplicates():
     """حذف تکراری‌ها + پاسخ‌های بی‌فایده و بهینه‌سازی داده‌ها"""
     mem = load_data("memory.json")
-
-    # سازگار با هر نوع ساختار حافظه
     data = mem.get("data") or mem.get("phrases") or {}
     if not data:
         return
@@ -83,16 +123,14 @@ def clean_duplicates():
         # حذف پاسخ‌های تکراری و خالی
         cleaned = list({r.strip() for r in responses if r and len(r.strip()) > 1})
 
-        # حذف پاسخ‌های بسیار کوتاه مثل "آه" یا "ها"
+        # حذف پاسخ‌های بسیار کوتاه
         cleaned = [r for r in cleaned if len(r) > 2]
 
-        # در صورت تغییر ذخیره مجدد
         if cleaned != responses:
             data[phrase] = cleaned
             changed = True
 
     if changed:
-        # ذخیره‌سازی تمیز در همان ساختار اصلی
         if "data" in mem:
             mem["data"] = data
         elif "phrases" in mem:
@@ -102,13 +140,10 @@ def clean_duplicates():
 
 
 # ===============================================================
-# 🧩 بهینه‌سازی و رشد خودکار هوش مصنوعی
+# 🧩 رشد تدریجی هوش مصنوعی
 # ===============================================================
 def reinforce_learning():
-    """
-    الگوریتم رشد تدریجی — پاسخ‌هایی که چند بار دیده شدن تقویت می‌شن.
-    باعث میشه پاسخ‌های پرتکرار قوی‌تر و طبیعی‌تر شن.
-    """
+    """افزایش وزن پاسخ‌های پرتکرار و حذف موارد ضعیف"""
     mem = load_data("memory.json")
     data = mem.get("data") or mem.get("phrases") or {}
     weights = mem.get("weights", {})
@@ -126,7 +161,6 @@ def reinforce_learning():
             strengthened += 1
         weights[phrase] = new_weight
 
-    # حذف داده‌های بی‌استفاده
     for phrase in list(weights.keys()):
         if weights[phrase] <= 0.5:
             removed += 1
