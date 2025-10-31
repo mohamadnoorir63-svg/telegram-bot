@@ -2152,14 +2152,17 @@ if __name__ == "__main__":
     application.add_handler(CommandHandler("leave", leave))
     application.add_handler(CommandHandler("reply", toggle_reply_mode))
     # ==========================================================
-    # 📢 سیستم تگ کاربران گروه
-    # ==========================================================
-    
-    # 🟢 فعال‌سازی تگ با /tag یا نوشتن "تگ"
-    application.add_handler(CommandHandler("tag", handle_tag_menu))
-    application.add_handler(MessageHandler(filters.Regex("^تگ$"), handle_tag_menu))
+    from modules.tag import handle_tag_menu, tag_callback, track_member
+    from telegram.ext import CommandHandler, CallbackQueryHandler, MessageHandler, filters
 
-    # 📎 هندلر دکمه‌های منوی تگ
+    # ✅ ثبت اعضا (هر پیامی در گروه ارسال شود، ثبت می‌شود)
+    application.add_handler(MessageHandler(filters.TEXT & filters.Group(), track_member))
+
+    # ✅ دستورهای تگ
+    application.add_handler(CommandHandler("tag", handle_tag_menu))  # /tag
+    application.add_handler(MessageHandler(filters.Regex(r"^تگ$"), handle_tag_menu))  # تگ فارسی
+
+    # ✅ هندلر دکمه‌های منو
     application.add_handler(CallbackQueryHandler(tag_callback, pattern="^tag_"))
     # ==========================================================
     # 🎨 فونت‌ساز خنگول
