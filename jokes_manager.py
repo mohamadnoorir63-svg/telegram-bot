@@ -88,7 +88,7 @@ async def save_joke(update: Update):
         await update.message.reply_text(f"⚠️ خطا در ذخیره جوک: {e}")
 
 
-# 📋 نمایش لیست جوک‌ها
+# 📋 نمایش لیست جوک‌ ها
 async def list_jokes(update: Update):
     """نمایش آخرین 10 جوک ذخیره‌شده"""
     data = load_jokes()
