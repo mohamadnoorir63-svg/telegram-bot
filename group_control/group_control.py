@@ -1373,65 +1373,123 @@ async def handle_list_nicks(update, context):
     await update.message.reply_text(txt, parse_mode="HTML")
 
 # ─────────────────────────────── Tag System ───────────────────────────────
+
 async def handle_tag(update, context):
+    # 🔒 بررسی مجوز
     if not await is_authorized(update, context):
         return await update.message.reply_text("🚫 فقط مدیران یا سودوها!")
+
     text = update.message.text.lower().strip()
     chat = update.effective_chat
-    cid = str(chat.id)
     now = datetime.now()
 
-    data = origins_db.get(cid, {})
-    users = data.get("users", {})
-    if not users and "همه" in text:
-        return await update.message.reply_text("⚠️ هنوز فعالیتی ثبت نشده.")
-
-    targets = []
-    title = "کاربران"
-    if "همه" in text:
-        targets = list(users.keys())
+    # 🔹 تشخیص حالت تگ
+    if "تگ همه" in text or text.endswith("tag all"):
+        mode = "all"
         title = "همه کاربران"
-    elif "فعال" in text:
-        th = now - timedelta(days=3)
-        targets = [u for u, t in users.items() if datetime.fromisoformat(t) >= th]
+    elif "تگ فعال" in text or text.endswith("tag active"):
+        mode = "active"
         title = "کاربران فعال (۳ روز اخیر)"
-    elif "غیرفعال" in text:
-        th = now - timedelta(days=3)
-        targets = [u for u, t in users.items() if datetime.fromisoformat(t) < th]
-        title = "کاربران غیرفعال"
-    elif "مدیر" in text:
-        try:
-            admins = await context.bot.get_chat_administrators(chat.id)
-            targets = [str(a.user.id) for a in admins]
-            title = "مدیران گروه"
-        except:
-            return await update.message.reply_text("⚠️ خطا در دریافت مدیران")
+    elif "تگ غیرفعال" in text or text.endswith("tag inactive"):
+        mode = "inactive"
+        title = "کاربران غیرفعال (۳ روز اخیر)"
+    elif "تگ مدیر" in text or text.endswith("tag admin"):
+        mode = "admins"
+        title = "مدیران گروه"
     elif "تگ " in text and ("@" in text or any(ch.isdigit() for ch in text.split())):
+        mode = "single"
         raw = text.replace("تگ", "").strip()
-        targets = [raw.replace("@", "")]
         title = f"کاربر {raw}"
+        targets = [raw.replace("@", "")]
     else:
         return await update.message.reply_text(
-            "📌 نمونه: «تگ همه» | «تگ فعال» | «تگ غیرفعال» | «تگ مدیران» | «تگ @123»",
+            "📌 نمونه‌ها:\n"
+            "• تگ همه\n"
+            "• تگ فعال\n"
+            "• تگ غیرفعال\n"
+            "• تگ مدیران\n"
+            "• تگ @123456789",
             parse_mode="HTML"
         )
 
-    if not targets:
-        return await update.message.reply_text("⚠️ کاربری برای تگ یافت نشد.")
     await update.message.reply_text(f"📢 شروع تگ {title} ...", parse_mode="HTML")
-    batch, cnt = [], 0
-    for i, uid in enumerate(targets, 1):
-        batch.append(f"<a href='tg://user?id={uid}'>🟢</a>")
+
+    targets = []
+
+    # 🔹 حالت تگ مدیران
+    if mode == "admins":
+        try:
+            admins = await context.bot.get_chat_administrators(chat.id)
+            targets = [a.user for a in admins if not a.user.is_bot]
+        except:
+            return await update.message.reply_text("⚠️ خطا در دریافت مدیران")
+
+    # 🔹 حالت تگ همه اعضا
+    elif mode == "all":
+        async for member in context.bot.get_chat_administrators(chat.id):
+            pass  # فقط برای تأخیر مجازسازی
+        async for m in context.bot.get_chat_members(chat.id):
+            if not m.user.is_bot:
+                targets.append(m.user)
+
+    # 🔹 حالت تگ فعال / غیرفعال (بر اساس آخرین پیام)
+    elif mode in ["active", "inactive"]:
+        # آخرین زمان فعالیت (۳ روز اخیر)
+        threshold = now - timedelta(days=3)
+        seen_users = {}
+        async for msg in context.bot.get_chat_history(chat.id, limit=500):
+            if msg.from_user and not msg.from_user.is_bot:
+                seen_users[msg.from_user.id] = msg.date
+
+        async for m in context.bot.get_chat_members(chat.id):
+            if m.user.is_bot:
+                continue
+            last_seen = seen_users.get(m.user.id)
+            if not last_seen:
+                if mode == "inactive":
+                    targets.append(m.user)
+            else:
+                if mode == "active" and last_seen >= threshold:
+                    targets.append(m.user)
+                elif mode == "inactive" and last_seen < threshold:
+                    targets.append(m.user)
+
+    # 🔹 حالت تگ خاص (آیدی یا یوزرنیم)
+    elif mode == "single":
+        for u in targets:
+            try:
+                user = await context.bot.get_chat_member(chat.id, int(u))
+                targets = [user.user]
+            except:
+                try:
+                    user = await context.bot.get_chat(u)
+                    targets = [user]
+                except:
+                    return await update.message.reply_text("❌ کاربر یافت نشد.")
+        # حذف تکرار
+        if isinstance(targets[0], str):
+            targets = [targets[0]]
+
+    if not targets:
+        return await update.message.reply_text("⚠️ هیچ کاربری برای تگ یافت نشد.")
+
+    # 🔹 ارسال تگ‌ها (بدون لینک آبی)
+    batch, count = [], 0
+    for i, user in enumerate(targets, 1):
+        tag = f"@{user.username}" if user.username else f"ID:{user.id}"
+        batch.append(tag)
+
+        # ارسال هر ۵ تگ در یک پیام
         if len(batch) >= 5 or i == len(targets):
             try:
-                await context.bot.send_message(chat.id, " ".join(batch), parse_mode="HTML")
-                cnt += len(batch)
+                await context.bot.send_message(chat.id, " ".join(batch))
+                count += len(batch)
                 batch = []
                 await asyncio.sleep(1)
             except:
                 pass
-    await update.message.reply_text(f"✅ {cnt} کاربر {title} تگ شدند.", parse_mode="HTML")
 
+    await update.message.reply_text(f"✅ {count} {title} تگ شدند.", parse_mode="HTML")
 # ─────────────────────────────── Alias + Command Core ───────────────────────────────
 DEFAULT_ALIASES = {
     # قفل گروه
@@ -1574,74 +1632,84 @@ async def execute_command(cmd, update, context):
         return await update.message.reply_text("⚠️ دستور ناشناخته.", parse_mode="HTML")
 # ─────────────────────────────── Command Core ───────────────────────────────
 async def group_command_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """📡 نسخه‌ی تستی برای بررسی تشخیص دستورات و alias‌ها"""
+    """📡 هندلر اصلی بررسی و اجرای دستورات گروه (هوشمند + امن)"""
     if not update.message or not update.message.text:
         return
 
     text = update.message.text.strip()
     lower_text = text.lower()
-
-    # 🧠 بررسی اولیه
-    print(f"[ورودی] پیام دریافت شد: {text}")
-
-    # جلوگیری از پاسخ به پیام‌های ساده مثل "پنل"
-    if text in ["پنل", "panel"]:
-        print("⚙️ پیام فقط 'پنل' بود — هیچ واکنشی انجام نمی‌شود.")
-        return
-
     words = lower_text.split()
-    if not words:
+
+    # 🧩 اگر پیام خالی بود یا فقط یک واژه ساده مثل "پنل"
+    if not words or text in ["پنل", "panel"]:
         return
 
-    # ✅ پاکسازی‌ها
-    valid_clean_cmds = [
-        "پاکسازی",
-        "پاکسازی کامل",
-        "پاکسازی همه",
-        "پاکسازی پیام ربات"
-    ]
+    print(f"[ورودی] پیام: {text}")
 
-    if words[0] == "پاکسازی":
+    # 🧠 بررسی دستورات واقعی فقط از ابتدای پیام
+    def starts_with(cmds):
+        """بررسی اینکه آیا پیام با یکی از دستورها شروع شده یا نه"""
+        return any(lower_text.startswith(cmd) for cmd in cmds)
+
+    # ========================= 🧹 پاکسازی =========================
+    if starts_with(["پاکسازی", "clear", "clean", "delete"]):
+        valid_clean_cmds = ["پاکسازی", "پاکسازی کامل", "پاکسازی همه", "پاکسازی پیام ربات"]
         if (
             lower_text in valid_clean_cmds
             or len(words) == 1
             or (len(words) == 2 and words[1].isdigit())
         ):
-            print("🧹 دستور تشخیص داده شد: پاکسازی")
-            context.args = words[1:]  # 👈 عدد یا پارامتر رو منتقل می‌کنیم
+            print("🧹 دستور پاکسازی تشخیص داده شد")
+            context.args = words[1:]
             return await handle_clean(update, context)
         else:
-            print("ℹ️ جمله شامل 'پاکسازی' بود اما دستور معتبر نیست.")
+            print("ℹ️ جمله شامل 'پاکسازی' بود اما دستور واقعی نبود.")
             return
 
-    # ✅ دستورات گروه
+    # ========================= 🔒 قفل کلی گروه =========================
     if lower_text in ["قفل گروه", "ببند گروه", "lock group"]:
-        print("🔒 دستور تشخیص داده شد: قفل گروه")
+        print("🔒 قفل کلی گروه فعال شد")
         return await handle_lockgroup(update, context)
 
     if lower_text in ["باز گروه", "بازکردن گروه", "unlock group"]:
-        print("🔓 دستور تشخیص داده شد: باز کردن گروه")
+        print("🔓 قفل کلی گروه غیرفعال شد")
         return await handle_unlockgroup(update, context)
 
-    # ✅ قفل‌های محتوایی (قفل لینک، باز عکس، ...)
-    if any(lower_text.startswith(prefix + " ") for prefix in ["قفل", "باز"]):
+    # ========================= 🔐 قفل‌های محتوایی =========================
+    if starts_with(["قفل ", "باز "]):
         if len(words) <= 3:
-            print(f"🔐 دستور قفل/باز محتوایی: {text}")
+            print(f"🔐 دستور قفل/باز محتوایی تشخیص داده شد: {text}")
             return await handle_locks_with_alias(update, context)
         else:
-            print(f"ℹ️ جمله شامل '{words[0]}' بود ولی دستور نیست: {text}")
+            print(f"ℹ️ '{words[0]}' در جمله بود اما دستور واقعی نبود: {text}")
             return
 
-    # ✅ سایر دستورات alias
+    # ========================= 📢 تگ‌ها =========================
+    if starts_with(["تگ", "tag "]):
+        # بررسی اینکه دستور واقعی تگ هست، نه وسط جمله
+        # مثلا "تگ همه" مجاز، ولی "نزن تگ همه" غیرمجاز
+        if words[0] in ["تگ", "tag"]:
+            print("📢 دستور تگ شناسایی شد")
+            return await handle_tag(update, context)
+        else:
+            print("⚠️ کلمه 'تگ' وسط جمله بود، نادیده گرفته شد.")
+            return
+
+    # ========================= 🚫 سایر دستورات alias =========================
     for cmd, aliases in ALIASES.items():
         for alias in aliases:
+            # فقط اگر از ابتدای پیام شروع شده باشه
             if lower_text.startswith(alias):
+                # اطمینان از اینکه alias وسط جمله نیست
+                before = lower_text.find(alias)
+                if before > 0:
+                    continue  # وسط جمله بوده
                 context.args = lower_text.replace(alias, "", 1).strip().split()
                 print(f"✅ alias تشخیص داده شد → فرمان اصلی: {cmd} | alias: {alias}")
                 return await execute_command(cmd, update, context)
 
-    # 💤 هیچ دستوری پیدا نشد
-    print("😴 هیچ دستور معتبری پیدا نشد.")
+    # ========================= 😴 پیش‌فرض =========================
+    print("😴 هیچ دستور معتبری شناسایی نشد.")
     return
 # ─────────────────────────────── Bot Join / Leave ───────────────────────────────
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
