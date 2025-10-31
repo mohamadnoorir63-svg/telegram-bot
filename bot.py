@@ -1395,15 +1395,16 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if text.lower() == "حذف فال" and update.message.reply_to_message:
         await delete_fortune(update)
         return
-
-    # ✅ لیست‌ها
-    if text == "لیست جوک‌ها" or text == "لیست جوک‌":
+        
+        # ✅ لیست‌ها
+    if text.strip() in ["لیست جوک", "لیست جوک‌ها", "لیست جوک‌", "لیست جوکها"]:
         await list_jokes(update)
         return
 
-    if text == "لیست فال‌" or text == "لیست فال‌":
+    if text.strip() in ["لیست فال", "لیست فال‌ها", "لیست فال‌", "لیست فالها"]:
         await list_fortunes(update)
         return
+
 
     # ✅ لیست جملات
     if text == "لیست":
