@@ -1361,7 +1361,7 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 key, val = random.choice(list(data.items()))
                 t = val.get("type", "text")
                 v = val.get("value", "")
-                try:
+                try: 
                     if t == "text":
                         await update.message.reply_text("🔮 " + v)
                     elif t == "photo":
@@ -1387,12 +1387,21 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await save_fortune(update)
         return
 
+    # 🗑️ حذف جوک و فال
+    if text.lower() == "حذف جوک" and update.message.reply_to_message:
+        await delete_joke(update)
+        return
+
+    if text.lower() == "حذف فال" and update.message.reply_to_message:
+        await delete_fortune(update)
+        return
+
     # ✅ لیست‌ها
-    if text == "لیست جوک‌ها":
+    if text == "لیست جوک‌ها" or text == "لیست جوک‌":
         await list_jokes(update)
         return
 
-    if text == "لیست فال‌ها":
+    if text == "لیست فال‌ها" or text == "لیست فال‌":
         await list_fortunes(update)
         return
 
