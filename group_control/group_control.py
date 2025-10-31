@@ -578,16 +578,14 @@ async def handle_clean(update, context):
         target_id = message.reply_to_message.from_user.id
         mode = "user"
     elif args and args[0].isdigit():
-        # ✅ فقط همون تعداد درخواستی حذف بشه (نه همه)
-        limit = max(1, min(int(args[0]), 10000))
+        limit = min(int(args[0]), 100000)
         mode = "count"
     elif any(w in text for w in ["همه", "کامل", "full"]):
-        limit = 10000
+        limit = 100000
         mode = "full"
 
     deleted = 0
     last_id = message.message_id
-    batch = []
 
     async def safe_delete(mid):
         try:
@@ -596,57 +594,53 @@ async def handle_clean(update, context):
         except:
             return 0
 
-    # 🔁 حلقه‌ی حذف پیام‌ها — دقیق و کنترل‌شده
-    while deleted < limit and last_id > 1:
+    # 🔁 حلقه حذف دقیق
+    for _ in range(limit):
         last_id -= 1
+        if last_id <= 0:
+            break
         try:
             fwd = await context.bot.forward_message(chat.id, chat.id, last_id)
             sender = fwd.forward_from.id if fwd.forward_from else None
             is_bot = bool(fwd.forward_from and fwd.forward_from.is_bot)
             await context.bot.delete_message(chat.id, fwd.message_id)
 
+            # فیلترهای انتخابی
             if mode == "user" and sender != target_id:
                 continue
             if bot_mode and not is_bot:
                 continue
 
-            batch.append(asyncio.create_task(safe_delete(last_id)))
+            deleted += await safe_delete(last_id)
 
-            # انجام حذف‌های دسته‌ای برای کاهش فشار API
-            if len(batch) >= 20:
-                res = await asyncio.gather(*batch)
-                deleted += sum(res)
-                batch = []
-                await asyncio.sleep(0.2)
+            # توقف برای جلوگیری از flood
+            if deleted % 200 == 0:
+                await asyncio.sleep(0.5)
 
         except Exception:
             continue
 
-    if batch:
-        res = await asyncio.gather(*batch)
-        deleted += sum(res)
-
-    # 🗑 حذف پیام دستور
+    # حذف پیام دستور
     try:
         await context.bot.delete_message(chat.id, message.message_id)
     except:
         pass
 
-    # ✅ پیام موقت در گروه
-    try:
-        if bot_mode:
-            done_text = f"🤖 {deleted} پیام ربات با موفقیت پاک شد!"
-        elif mode == "user":
-            done_text = f"✅ تمام پیام‌های کاربر انتخابی حذف شد ({deleted})"
-        else:
-            done_text = f"✅ {deleted} پیام پاک شد!"
-        done_msg = await message.reply_text(done_text, quote=False)
-        await asyncio.sleep(5)
-        await context.bot.delete_message(chat.id, done_msg.message_id)
-    except:
-        pass
+    # ✅ گزارش دقیق
+    if bot_mode:
+        done_text = f"🤖 {deleted} پیام ربات حذف شد!"
+    elif mode == "user":
+        done_text = f"✅ پیام‌های کاربر انتخابی حذف شد ({deleted})"
+    elif mode == "full":
+        done_text = f"🧹 پاکسازی کامل انجام شد ({deleted} پیام)"
+    else:
+        done_text = f"✅ {deleted} پیام پاک شد!"
 
-    # 📩 گزارش پایانی
+    done_msg = await message.reply_text(done_text)
+    await asyncio.sleep(5)
+    await context.bot.delete_message(chat.id, done_msg.message_id)
+
+    # 📄 گزارش خصوصی دقیق‌تر
     labels = {
         "bot": "پاکسازی پیام‌های ربات‌ها",
         "user": "پاکسازی پیام‌های کاربر خاص",
@@ -658,7 +652,7 @@ async def handle_clean(update, context):
         f"🧹 <b>گزارش پاکسازی</b>\n\n"
         f"🏷 حالت: {labels[mode]}\n"
         f"👤 اجراکننده: {user.first_name}\n"
-        f"🗑 حذف‌شده: {deleted}\n"
+        f"🗑 حذف‌شده واقعی: {deleted}\n"
         f"🕒 زمان: {datetime.now().strftime('%H:%M:%S - %Y/%m/%d')}"
     )
 
