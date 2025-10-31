@@ -2154,9 +2154,8 @@ if __name__ == "__main__":
     # ==========================================================
     # 📢 سیستم تگ کاربران گروه
     # ==========================================================
-    application.add_handler(CommandHandler("tag", handle_tag_menu))
-    application.add_handler(CallbackQueryHandler(tag_callback, pattern="^tag_"))
-
+    app.add_handler(MessageHandler(filters.Regex("^تگ"), handle_tag_menu))
+    app.add_handler(CallbackQueryHandler(tag_callback, pattern="^tag_"))
     # ==========================================================
     # 🎨 فونت‌ساز خنگول
     # ==========================================================
