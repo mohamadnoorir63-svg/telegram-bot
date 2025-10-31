@@ -1028,15 +1028,6 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if msg.from_user and msg.from_user.is_bot:
         return False
 
-    # بررسی دقیق‌تر برای جلوگیری از پاسخ به پیام‌هایی که خود ربات فرستاده
-    try:
-        bot_id = update.get_bot().id
-        if msg.from_user and msg.from_user.id == bot_id:
-            return False
-        if hasattr(msg, "via_bot") and msg.via_bot:
-            return False
-    except Exception:
-        pass
     # 🧠 هر وقت پیام جدیدی از کاربر رسید → بفرست برای userbot
     try:
         await message_queue.put({
