@@ -1009,10 +1009,7 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data["await_restore"] = False
         
 # ======================= 💬 پاسخ و هوش مصنوعی =======================
-     from telegram import Update
-from telegram.ext import ContextTypes
-import re
-
+     
 async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """پاسخ‌دهی اصلی هوش مصنوعی و سیستم یادگیری"""
 
