@@ -1058,13 +1058,17 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # 🚫 جلوگیری از پاسخ در پیوی (فقط جوک و فال مجازند)
     if update.effective_chat.type == "private" and lower_text not in ["جوک", "فال"]:
         return
+        
         # 🚫 جلوگیری از پاسخ سخنگو به پیام‌های دستوری
-    if update.message and update.message.text:
-        text = update.message.text.strip().lower()
-        command_keywords = [
-            "قفل", "باز", "بازکردن", "پنل", "خوشامد",
-            "عکس خوشامد", "فیلتر", "سکوت", "بن", "اخطار",
-            "لقب", "اصل", "تگ", "پاکسازی", "گروه", "مدیر", "سودو"
+if update.message and update.message.text:
+    text = update.message.text.strip().lower()
+    command_keywords = [
+        "قفل", "باز", "بازکردن", "پنل", "خوشامد",
+        "عکس خوشامد", "فیلتر", "سکوت", "بن", "اخطار",
+        "لقب", "اصل", "تگ", "پاکسازی", "گروه", "مدیر", "سودو"
+    ]
+    if any(text.startswith(word) for word in command_keywords):
+        return False
     
 
     # ✅ جلوگیری از پاسخ به دستورات خاص (مثل راهنما، خوشامد، ربات و غیره)
