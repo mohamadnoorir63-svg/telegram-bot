@@ -32,6 +32,7 @@ def _abs_media_path(val: str) -> str:
     return val if os.path.isabs(val) else os.path.join(BASE_DIR, val)
 
 def _load_json(path: str, default):
+    """لود ایمن فایل JSON"""
     if not os.path.exists(path):
         with open(path, "w", encoding="utf-8") as f:
             json.dump(default, f, ensure_ascii=False, indent=2)
@@ -113,6 +114,43 @@ async def save_fortune(update: Update):
     except Exception as e:
         await update.message.reply_text(f"⚠️ خطا در ذخیره فال: {e}")
 
+# ========================= حذف فال (ریپلای) =========================
+async def delete_fortune(update: Update):
+    """با ریپلای روی فال موردنظر، آن را از فایل حذف می‌کند."""
+    reply = update.message.reply_to_message
+    if not reply:
+        return await update.message.reply_text("❗ لطفاً روی پیام فال ریپلای بزن تا حذف شود.")
+
+    data = load_fortunes()
+    if not data:
+        return await update.message.reply_text("📂 هیچ فالی برای حذف وجود ندارد.")
+
+    text = (reply.text or reply.caption or "").strip()
+    if not text:
+        return await update.message.reply_text("⚠️ متن فال برای شناسایی پیدا نشد.")
+
+    key_to_delete = None
+    for k, v in data.items():
+        if v.get("value") == text:
+            key_to_delete = k
+            break
+
+    if key_to_delete:
+        deleted = data.pop(key_to_delete)
+        save_fortunes(data)
+
+        # حذف فایل از سیستم اگر لوکال بود
+        val = _abs_media_path(deleted.get("value", ""))
+        if os.path.exists(val) and not _is_valid_url(val):
+            try:
+                os.remove(val)
+            except Exception as e:
+                print(f"[Delete Fortune Warning] حذف فایل شکست خورد: {e}")
+
+        await update.message.reply_text("🗑️ فال با موفقیت حذف شد ✅")
+    else:
+        await update.message.reply_text("⚠️ فال موردنظر در فایل پیدا نشد.")
+
 # ========================= ارسال فال تصادفی =========================
 async def send_random_fortune(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """ارسال فال تصادفی با بررسی مسیرهای واقعی و حذف فال‌های خراب از فایل."""
@@ -183,16 +221,15 @@ async def send_random_fortune(update: Update, context: ContextTypes.DEFAULT_TYPE
     if not cleaned_data:
         await update.message.reply_text("⚠️ هیچ فالی سالم برای ارسال پیدا نشد 😔")
 
-
 # ========================= لیست فال‌ ها (آخرین ۱۰ تا) =========================
 async def list_fortunes(update: Update):
+    """نمایش ۱۰ فال آخر با نوع و محتوا"""
     data = load_fortunes()
     if not data: 
         return await update.message.reply_text("هنوز هیچ فالی ثبت نشده 😔")
 
     await update.message.reply_text(f"📜 تعداد کل فال‌ها: {len(data)}")
 
-    # نمایش مختصر ایتم‌ها بدون ایجاد خطا
     shown = 0
     for k in sorted(data.keys(), key=lambda x: int(x))[-10:]:
         v = data[k]
