@@ -1,78 +1,65 @@
-
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import CallbackQueryHandler
-from datetime import datetime, timedelta
 import asyncio
+from datetime import datetime, timedelta
 
-# 📍 ساخت منوی انتخاب تگ
+# 📍 منوی انتخاب نوع تگ
 async def handle_tag_menu(update, context):
     keyboard = [
         [InlineKeyboardButton("👑 تگ مدیران", callback_data="tag_admins")],
         [InlineKeyboardButton("🔥 تگ فعال‌ها", callback_data="tag_active")],
         [InlineKeyboardButton("👥 تگ 50 کاربر", callback_data="tag_50")],
         [InlineKeyboardButton("👥 تگ 300 کاربر", callback_data="tag_300")],
-        [InlineKeyboardButton("❌ بستن", callback_data="tag_close")]
+        [InlineKeyboardButton("❌ بستن", callback_data="tag_close")],
     ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    await update.message.reply_text("📣 حالت تگ کردن را انتخاب کنید:", reply_markup=reply_markup)
+    markup = InlineKeyboardMarkup(keyboard)
+    await update.message.reply_text("📣 حالت تگ کردن را انتخاب کنید:", reply_markup=markup)
 
-# 📍 اجرای تگ بر اساس انتخاب
+
+# 📍 پاسخ به دکمه‌های تگ
 async def tag_callback(update, context):
     query = update.callback_query
-    await query.answer()
     chat = update.effective_chat
     data = query.data
+    await query.answer()
 
-    # اگر کاربر بست
+    # بستن منو
     if data == "tag_close":
-        await query.edit_message_text("❌ منوی تگ بسته شد.")
-        return
+        return await query.edit_message_text("❌ منوی تگ بسته شد.")
 
-    # دریافت اعضا
+    # دریافت مدیران (مجاز در API)
     try:
-        admins = [a.user async for a in context.bot.get_chat_administrators(chat.id)]
-        members = [m.user async for m in context.bot.get_chat_members(chat.id)]
+        admins = await context.bot.get_chat_administrators(chat.id)
     except Exception as e:
-        return await query.edit_message_text(f"⚠️ خطا در دریافت اعضا: {e}")
+        return await query.edit_message_text(f"⚠️ خطا در دریافت مدیران: {e}")
 
-    # نوع تگ
+    # 🧩 نوع تگ
     if data == "tag_admins":
-        targets = [u for u in admins if not u.is_bot]
+        targets = [a.user for a in admins if not a.user.is_bot]
         title = "مدیران گروه"
+
     elif data == "tag_active":
-        # برای تگ فعال‌ها (۳ روز اخیر)
-        now = datetime.now()
-        threshold = now - timedelta(days=3)
-        # اینجا فرض می‌کنیم که دیتابیس فعالیت داری → اگر نداری همه اعضا رو می‌گیره
-        try:
-            from data.groups import origins_db
-            active_data = origins_db.get(str(chat.id), {}).get("users", {})
-            targets = [u for u in members if str(u.id) in active_data and datetime.fromisoformat(active_data[str(u.id)]) >= threshold]
-        except:
-            targets = [u for u in members if not u.is_bot][:50]
-        title = "کاربران فعال (۳ روز اخیر)"
+        # برای تست چون دیتابیس نداریم → تگ همان مدیران
+        targets = [a.user for a in admins if not a.user.is_bot]
+        title = "کاربران فعال (شبیه‌سازی)"
     elif data == "tag_50":
-        targets = [u for u in members if not u.is_bot][:50]
-        title = "۵۰ کاربر اول گروه"
+        targets = [a.user for a in admins if not a.user.is_bot]
+        title = "۵۰ کاربر اول (در نسخه رسمی فقط مدیران قابل خواندن‌اند)"
     elif data == "tag_300":
-        targets = [u for u in members if not u.is_bot][:300]
-        title = "۳۰۰ کاربر گروه"
+        targets = [a.user for a in admins if not a.user.is_bot]
+        title = "۳۰۰ کاربر گروه (در نسخه رسمی فقط مدیران قابل خواندن‌اند)"
     else:
         targets = []
         title = "کاربران"
 
     if not targets:
-        await query.edit_message_text("⚠️ هیچ کاربری برای تگ وجود ندارد.")
-        return
+        return await query.edit_message_text("⚠️ هیچ کاربری برای تگ وجود ندارد.")
 
     await query.edit_message_text(f"📢 شروع تگ {title} ...")
 
-    # تگ‌کردن مرحله‌ای
+    # تگ کردن به‌صورت گروهی
     batch = []
     count = 0
     for i, user in enumerate(targets, 1):
-        if user.is_bot:
-            continue
         if user.username:
             tag = f"@{user.username}"
         else:
@@ -86,6 +73,6 @@ async def tag_callback(update, context):
                 batch = []
                 await asyncio.sleep(1)
             except Exception as e:
-                print(f"❌ خطا در ارسال: {e}")
+                print(f"❌ خطا در ارسال تگ: {e}")
 
     await context.bot.send_message(chat.id, f"✅ {count} کاربر {title} تگ شدند.", parse_mode="HTML")
