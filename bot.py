@@ -1009,8 +1009,12 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data["await_restore"] = False
         
 # ======================= 💬 پاسخ و هوش مصنوعی =======================
-    async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """پاسخ‌دهی اصلی هوش مصنوعی و سیستم یادگیری"""
+     from telegram import Update
+from telegram.ext import ContextTypes
+import re
+
+async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """پاسخ‌دهی اصلی هوش مصنوعی و سیستم یادگیری"""
 
     # 🚫 جلوگیری از پاسخ هوشمند در صورت اجرای دستور سفارشی
     if context.user_data.get("custom_handled"):
@@ -1027,7 +1031,7 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
     lower_text = text.lower()
 
-    # 🧠 فعال‌سازی حافظهٔ کوتاه‌مدت گفتگو
+    # 🧠 ثبت پیام در حافظه کوتاه‌مدت
     context_memory.add_message(uid, text)
 
     # 🧠 گرفتن کل تاریخچه اخیر کاربر
@@ -1040,7 +1044,7 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_chat.type == "private" and lower_text not in ["جوک", "فال"]:
         return
 
-    # 🚫 جلوگیری از پاسخ به درخواست‌های مربوط به هوا
+    # 🚫 جلوگیری از پاسخ به درخواست‌های هوا
     if re.search(r"(هوای|آب[\s‌]*و[\s‌]*هوا)", text):
         return
 
