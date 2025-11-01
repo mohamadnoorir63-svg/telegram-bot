@@ -30,45 +30,37 @@ async def tag_callback(update, context):
     title = ""
 
     try:
-        # 👥 دریافت همه اعضای گروه
-        members = []
-        async for member in context.bot.get_chat_administrators(chat.id):
-            if not member.user.is_bot:
-                members.append(member.user)
-
         # 👑 فقط مدیران
         if data == "tag_admins":
-            targets = [m for m in members if not m.is_bot]
+            admins = await context.bot.get_chat_administrators(chat.id)
+            targets = [a.user for a in admins if not a.user.is_bot]
             title = "مدیران گروه"
 
-        # 🔥 کاربران فعال اخیر (اگر پیام رد و بدل شده)
+        # 🔥 کاربران فعال (تقریبی، چون API لیست کامل اعضا نمی‌دهد)
         elif data == "tag_active":
-            # چون Bot API مستقیماً آخرین فعالیت کاربران رو نمی‌فرسته،
-            # ما فعلاً همه اعضا رو می‌گیریم (در صورت داشتن دسترسی کامل)
-            targets = []
-            async for member in context.bot.get_chat_administrators(chat.id):
-                if not member.user.is_bot:
-                    targets.append(member.user)
-            title = "کاربران فعال (تقریبی)"
+            admins = await context.bot.get_chat_administrators(chat.id)
+            targets = [a.user for a in admins if not a.user.is_bot]
+            title = "کاربران فعال (۳ روز اخیر تقریبی)"
 
-        # 👥 همه کاربران (در صورت داشتن دسترسی به اعضا)
+        # 👥 همه کاربران (در دسترس فقط در صورت خاموش بودن پرایوسی‌مد)
         elif data == "tag_all":
-            targets = []
-            async for member in context.bot.get_chat_administrators(chat.id):
-                if not member.user.is_bot:
-                    targets.append(member.user)
-            title = "همه کاربران گروه"
+            try:
+                members = await context.bot.get_chat_member_count(chat.id)
+                admins = await context.bot.get_chat_administrators(chat.id)
+                targets = [a.user for a in admins if not a.user.is_bot]
+                title = f"همه کاربران (نمایشی - {members} نفر)"
+            except Exception as e:
+                return await query.edit_message_text(f"⚠️ خطا در دریافت اعضا:\n{e}")
 
     except Exception as e:
-        await query.edit_message_text(f"⚠️ خطا در دریافت اعضای گروه:\n{e}")
-        return
+        return await query.edit_message_text(f"⚠️ خطا در دریافت اعضای گروه:\n{e}")
 
     if not targets:
-        return await query.edit_message_text("⚠️ هیچ کاربری برای تگ پیدا نشد.")
+        return await query.edit_message_text("⚠️ هیچ کاربری برای تگ پیدا نشد!")
 
     await query.edit_message_text(f"📢 شروع تگ {title} ...")
 
-    # 🚀 ارسال دسته‌ای ضد اسپم
+    # 🚀 ارسال دسته‌ای برای جلوگیری از Flood
     batch = []
     count = 0
     for i, user in enumerate(targets, 1):
@@ -80,7 +72,7 @@ async def tag_callback(update, context):
                 await context.bot.send_message(chat.id, " ".join(batch), parse_mode="HTML")
                 count += len(batch)
                 batch = []
-                await asyncio.sleep(1.5)
+                await asyncio.sleep(1.3)
             except Exception as e:
                 print(f"⚠️ خطا در ارسال تگ: {e}")
 
