@@ -2153,16 +2153,15 @@ if __name__ == "__main__":
     application.add_handler(CommandHandler("reply", toggle_reply_mode))
     # ==========================================================
     from modules.tag import handle_tag_menu, tag_callback, track_member
-    from telegram.ext import CommandHandler, CallbackQueryHandler, MessageHandler, filters
+    from telegram.ext import MessageHandler, CallbackQueryHandler, filters
 
-    # ✅ ثبت اعضا (هر پیامی در گروه ارسال شود، ثبت می‌شود)
-    application.add_handler(MessageHandler(filters.TEXT & filters.Group(), track_member))
+    # 📌 ثبت کاربران دیده‌شده (در گروه‌ها)
+    application.add_handler(MessageHandler(filters.TEXT & (~filters.ChatType.PRIVATE), track_member))
 
-    # ✅ دستورهای تگ
-    application.add_handler(CommandHandler("tag", handle_tag_menu))  # /tag
-    application.add_handler(MessageHandler(filters.Regex(r"^تگ$"), handle_tag_menu))  # تگ فارسی
+    # 📣 فعال‌سازی منوی تگ فقط با "تگ" یا "tag"
+    application.add_handler(MessageHandler(filters.Regex(r"^(تگ|tag)$"), handle_tag_menu))
 
-    # ✅ هندلر دکمه‌های منو
+    # 🎯 کال‌بک دکمه‌های منو
     application.add_handler(CallbackQueryHandler(tag_callback, pattern="^tag_"))
     # ==========================================================
     # 🎨 فونت‌ساز خنگول
