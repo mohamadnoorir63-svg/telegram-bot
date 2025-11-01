@@ -188,8 +188,7 @@ async def handle_locks_status(update: Update, context: ContextTypes.DEFAULT_TYPE
         text += f"▫️ {d}: {'🔒 فعال' if locks.get(k) else '🔓 غیرفعال'}\n"
     await update.message.reply_text(text, parse_mode="HTML")
 
-# قفل/بازکردن به فارسی: «قفل لینک»، «بازکردن لینک»
-_lock_cmd_regex = re.compile(r"^(قفل|باز ?کردن)\s+(.+)$")
+_lock_cmd_regex = re.compile(r"^(قفل|باز ?کردن|lock|unlock)\s+(.+)$")
 
 def _map_persian_to_key(name: str) -> str | None:
     name = name.strip()
@@ -1544,14 +1543,14 @@ async def group_command_handler(update: Update, context: ContextTypes.DEFAULT_TY
         return await handle_unlockgroup(update, context)
 
     # ========================= 🔐 قفل‌های محتوایی =========================
-    if starts_with(["قفل ", "باز "]):
-        if len(words) <= 3:
-            print(f"🔐 دستور قفل/باز محتوایی تشخیص داده شد: {text}")
-            return await handle_locks_with_alias(update, context)
-        else:
-            print(f"ℹ️ '{words[0]}' در جمله بود اما دستور واقعی نبود: {text}")
-            return
-
+    # ========================= 🔐 قفل‌های محتوایی =========================
+if starts_with(["قفل ", "باز ", "lock ", "unlock "]):
+    if len(words) <= 3:
+        print(f"🔐 دستور قفل/باز محتوایی تشخیص داده شد: {text}")
+        return await handle_locks_with_alias(update, context)
+    else:
+        print(f"ℹ️ '{words[0]}' در جمله بود اما دستور واقعی نبود: {text}")
+        return
 
     # ========================= 🚫 سایر دستورات alias =========================
     for cmd, aliases in ALIASES.items():
