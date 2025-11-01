@@ -2152,17 +2152,7 @@ if __name__ == "__main__":
     application.add_handler(CommandHandler("leave", leave))
     application.add_handler(CommandHandler("reply", toggle_reply_mode))
     # ==========================================================
-    from modules.tag import handle_tag_menu, tag_callback, track_member
-    from telegram.ext import MessageHandler, CallbackQueryHandler, filters
-
-    # ✅ ثبت پیام‌های کاربران برای ذخیره اعضا
-    application.add_handler(MessageHandler(filters.TEXT & (~filters.ChatType.PRIVATE), track_member))
-
-    # ✅ دستور تگ فارسی و انگلیسی بدون /
-    application.add_handler(MessageHandler(filters.Regex(r"^(تگ|tag)$"), handle_tag_menu))
-
-    # ✅ کال‌بک دکمه‌ها
-    application.add_handler(CallbackQueryHandler(tag_callback, pattern="^tag_"))
+    
     # ==========================================================
     # 🎨 فونت‌ساز خنگول
     # ==========================================================
@@ -2249,7 +2239,16 @@ if __name__ == "__main__":
     # 🧠 هندلر ورودی هوشمند برای تنظیمات خوشامد
     application.add_handler(MessageHandler(filters.TEXT | filters.PHOTO | filters.ANIMATION, welcome_input_handler), group=-1)
     # ==========================================================
-# 🚀 اجرای نهایی ربات اصلی (خنگول فارسی)
+    from modules.tag import handle_tag_menu, tag_callback
+    from telegram.ext import MessageHandler, CallbackQueryHandler, filters
+
+    # 📣 دستور تگ فقط با "تگ" یا "tag"
+    tag_filter = filters.TEXT & filters.Regex(r"^(تگ|tag)$")
+    application.add_handler(MessageHandler(tag_filter, handle_tag_menu))
+
+    # 🎯 دکمه‌ها
+    application.add_handler(CallbackQueryHandler(tag_callback, pattern="^tag_"))
+    # 🚀 اجرای نهایی ربات اصلی (خنگول فارسی)
 # ==========================================================
 from datetime import time, timezone, timedelta
 import asyncio
