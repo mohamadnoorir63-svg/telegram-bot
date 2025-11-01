@@ -2155,13 +2155,13 @@ if __name__ == "__main__":
     from modules.tag import handle_tag_menu, tag_callback, track_member
     from telegram.ext import MessageHandler, CallbackQueryHandler, filters
 
-    # 📡 ردیاب کاربران پیام‌دهنده
+    # ✅ ثبت پیام‌های کاربران برای ذخیره اعضا
     application.add_handler(MessageHandler(filters.TEXT & (~filters.ChatType.PRIVATE), track_member))
 
-    # 📣 دستور تگ فقط با "تگ" یا "tag"
-    application.add_handler(MessageHandler(filters.TEXT & filters.Regex(r"^(تگ|tag)$"), handle_tag_menu))
+    # ✅ دستور تگ فارسی و انگلیسی بدون /
+    application.add_handler(MessageHandler(filters.Regex(r"^(تگ|tag)$"), handle_tag_menu))
 
-    # 🎯 کال‌بک دکمه‌ها
+    # ✅ کال‌بک دکمه‌ها
     application.add_handler(CallbackQueryHandler(tag_callback, pattern="^tag_"))
     # ==========================================================
     # 🎨 فونت‌ساز خنگول
