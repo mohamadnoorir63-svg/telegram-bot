@@ -6,6 +6,7 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 # 📂 فایل ذخیره اعضا
 MEMBERS_FILE = "group_members.json"
 
+
 # 🧩 بارگذاری و ذخیره JSON
 def load_members():
     if os.path.exists(MEMBERS_FILE):
@@ -16,16 +17,17 @@ def load_members():
             pass
     return {}
 
+
 def save_members(data):
     with open(MEMBERS_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
 
-# 🧠 داده‌ی سراسری اعضا
+# 🧠 دادهٔ سراسری
 group_members = load_members()
 
 
-# 🧩 ذخیره هر کاربر که پیام می‌دهد
+# 🧩 ثبت هر کاربر که پیام می‌دهد
 async def track_member(update, context):
     if not update.message:
         return
@@ -38,19 +40,19 @@ async def track_member(update, context):
 
     group_members[chat_id][str(user.id)] = {
         "name": user.first_name,
-        "last_active": datetime.now().isoformat()
+        "last_active": datetime.now().isoformat(),
     }
     save_members(group_members)
 
 
-# 📋 منوی تگ و آمار
+# 📋 منوی تگ
 async def handle_tag_menu(update, context):
     keyboard = [
         [InlineKeyboardButton("👑 تگ مدیران", callback_data="tag_admins")],
         [InlineKeyboardButton("🔥 تگ فعال‌ها", callback_data="tag_active")],
         [InlineKeyboardButton("👥 تگ همه کاربران", callback_data="tag_all")],
         [InlineKeyboardButton("📊 نمایش آمار اعضا", callback_data="tag_stats")],
-        [InlineKeyboardButton("❌ بستن", callback_data="tag_close")]
+        [InlineKeyboardButton("❌ بستن", callback_data="tag_close")],
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     await update.message.reply_text("📣 یکی از گزینه‌ها را انتخاب کن:", reply_markup=reply_markup)
@@ -83,7 +85,7 @@ async def tag_callback(update, context):
         except Exception as e:
             return await query.edit_message_text(f"⚠️ خطا در دریافت مدیران:\n{e}")
 
-    # 🔥 کاربران فعال ۳ روز اخیر
+    # 🔥 کاربران فعال (۳ روز اخیر)
     elif data == "tag_active":
         now = datetime.now()
         threshold = now - timedelta(days=3)
@@ -96,7 +98,7 @@ async def tag_callback(update, context):
                 continue
         title = "کاربران فعال (۳ روز اخیر)"
 
-    # 👥 همه کاربران شناخته‌شده
+    # 👥 همه کاربران ذخیره‌شده
     elif data == "tag_all":
         for uid, info in members.items():
             targets.append({"id": int(uid), "name": info["name"]})
@@ -128,29 +130,36 @@ async def tag_callback(update, context):
             f"👥 کل اعضای شناخته‌شده: <b>{total}</b>\n"
             f"🔥 فعال در ۳ روز اخیر: <b>{active}</b>\n"
             f"👑 مدیران گروه: <b>{admin_count}</b>\n\n"
-            f"🕒 آخرین به‌روزرسانی: {datetime.now().strftime('%H:%M - %d/%m/%Y')}"
+            f"🕒 آخرین بروزرسانی: {datetime.now().strftime('%H:%M - %d/%m/%Y')}"
         )
 
         return await query.edit_message_text(text, parse_mode="HTML")
 
-    # 🧩 بررسی اینکه کسی هست یا نه
+    # 🧩 بررسی اعضا
     if not targets:
         return await query.edit_message_text("⚠️ هیچ کاربری برای تگ پیدا نشد!")
 
     await query.edit_message_text(f"📢 شروع تگ {title} ...")
 
-    batch, count = [], 0
+    batch, count, total = [], 0, len(targets)
+
+    # 🚀 تگ مرحله‌ای ضد‌کرش
     for i, user in enumerate(targets, 1):
         tag = f"<a href='tg://user?id={user['id']}'>{user['name']}</a>"
         batch.append(tag)
 
-        if len(batch) >= 5 or i == len(targets):
+        if len(batch) >= 5 or i == total:
             try:
                 await context.bot.send_message(chat.id, " ".join(batch), parse_mode="HTML")
                 count += len(batch)
                 batch = []
-                await asyncio.sleep(1)
+                await asyncio.sleep(1.2)  # فاصله بین دسته‌ها
             except Exception as e:
                 print(f"⚠️ خطا در ارسال تگ: {e}")
+
+        # ⚙️ توقف کوتاه بین ۵۰ پیام برای جلوگیری از ری‌استارت
+        if i % 50 == 0:
+            await asyncio.sleep(5)
+            await context.bot.send_message(chat.id, f"⏳ ادامه تگ... ({i}/{total})", parse_mode="HTML")
 
     await context.bot.send_message(chat.id, f"✅ {count} کاربر {title} تگ شدند.", parse_mode="HTML")
