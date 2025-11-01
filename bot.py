@@ -88,7 +88,7 @@ from weather_module.weather_panel import show_weather
 from modules.azan_module import get_azan_time, get_ramadan_status
 from panels.link_panel import link_panel, link_panel_buttons
 from panels.panel_menu import Tastatur_menu, Tastatur_buttons
-from modules.tag import handle_tag_menu, tag_callback
+from modules.tag import handle_tag_menu, tag_callback, track_member
 # ======================= ⚙️ تنظیمات پایه و سودوها =======================
 from telegram import Update
 from telegram.ext import ContextTypes
@@ -2239,14 +2239,8 @@ if __name__ == "__main__":
     # 🧠 هندلر ورودی هوشمند برای تنظیمات خوشامد
     application.add_handler(MessageHandler(filters.TEXT | filters.PHOTO | filters.ANIMATION, welcome_input_handler), group=-1)
     # ==========================================================
-    from modules.tag import handle_tag_menu, tag_callback
-    from telegram.ext import MessageHandler, CallbackQueryHandler, filters
-
-    # 📣 دستور تگ فقط با "تگ" یا "tag"
-    tag_filter = filters.TEXT & filters.Regex(r"^(تگ|tag)$")
-    application.add_handler(MessageHandler(tag_filter, handle_tag_menu))
-
-    # 🎯 دکمه‌ها
+    application.add_handler(MessageHandler(filters.TEXT & (~filters.ChatType.PRIVATE), track_member))
+    application.add_handler(MessageHandler(filters.Regex(r"^(تگ|tag)$"), handle_tag_menu))
     application.add_handler(CallbackQueryHandler(tag_callback, pattern="^tag_"))
     # 🚀 اجرای نهایی ربات اصلی (خنگول فارسی)
 # ==========================================================
