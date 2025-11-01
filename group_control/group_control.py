@@ -1543,15 +1543,47 @@ async def group_command_handler(update: Update, context: ContextTypes.DEFAULT_TY
         return await handle_unlockgroup(update, context)
 
     # ========================= 🔐 قفل‌های محتوایی =========================
-    # ========================= 🔐 قفل‌های محتوایی =========================
-if starts_with(["قفل ", "باز ", "lock ", "unlock "]):
-    if len(words) <= 3:
-        print(f"🔐 دستور قفل/باز محتوایی تشخیص داده شد: {text}")
-        return await handle_locks_with_alias(update, context)
-    else:
-        print(f"ℹ️ '{words[0]}' در جمله بود اما دستور واقعی نبود: {text}")
+    # 🔐 قفل و بازکردن فارسی و انگلیسی
+_lock_cmd_regex = re.compile(r"^(قفل|باز ?کردن|lock|unlock)\s+(.+)$")
+
+def _map_persian_to_key(name: str) -> str | None:
+    name = name.strip()
+    # فارسی‌ها
+    if name in PERSIAN_TO_KEY:
+        return PERSIAN_TO_KEY[name]
+    for fa, key in PERSIAN_TO_KEY.items():
+        if fa in name:
+            return key
+    # انگلیسی‌ها (اسم‌های داخلی)
+    for key in LOCK_TYPES:
+        if key in name:
+            return key
+    return None
+
+async def handle_locks_with_alias(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not update.message or not update.message.text:
         return
 
+    tx = update.message.text.strip().lower()
+    m = _lock_cmd_regex.match(tx)
+    if not m:
+        return
+
+    action, rest = m.groups()
+    key = _map_persian_to_key(rest)
+
+    # اگه دقیقاً همون کلید انگلیسی رو فرستاده بود
+    if not key and rest in LOCK_TYPES:
+        key = rest
+
+    if not key:
+        return await update.message.reply_text("⚠️ نام قفل نامعتبر است.")
+
+    # قفل یا باز
+    if action.startswith("قفل") or action == "lock":
+        return await handle_lock(update, context, key)
+    else:
+        return await handle_unlock(update, context, key)
     # ========================= 🚫 سایر دستورات alias =========================
     for cmd, aliases in ALIASES.items():
         for alias in aliases:
