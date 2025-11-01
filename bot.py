@@ -2241,10 +2241,12 @@ if __name__ == "__main__":
     # 🧠 هندلر ورودی هوشمند برای تنظیمات خوشامد
     application.add_handler(MessageHandler(filters.TEXT | filters.PHOTO | filters.ANIMATION, welcome_input_handler), group=-1)
     # ==========================================================
-    # 📣 سیستم تگ کاربران
+    # ==========================================================
+    # 📣 سیستم تگ کاربران (فقط دستور فارسی "تگ" و انگلیسی بدون "/")
+    # ==========================================================
     application.add_handler(ChatMemberHandler(track_member, ChatMemberHandler.CHAT_MEMBER))
     application.add_handler(MessageHandler(filters.TEXT & (~filters.ChatType.PRIVATE), track_member))
-    application.add_handler(MessageHandler(filters.Regex(r"^(تگ|tag)$"), handle_tag_menu))
+    application.add_handler(MessageHandler(filters.Regex(r"^(تگ|tag)$") & (~filters.ChatType.PRIVATE), handle_tag_menu))
     application.add_handler(CallbackQueryHandler(tag_callback, pattern="^tag_"))
 # ==========================================================
 from datetime import time, timezone, timedelta
