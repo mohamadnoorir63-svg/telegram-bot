@@ -88,9 +88,6 @@ from weather_module.weather_panel import show_weather
 from modules.azan_module import get_azan_time, get_ramadan_status
 from panels.link_panel import link_panel, link_panel_buttons
 from panels.panel_menu import Tastatur_menu, Tastatur_buttons
-# 🧩 تگ کاربران
-from modules.tag import handle_tag_menu, tag_callback, track_member
-from telegram.ext import MessageHandler, CallbackQueryHandler, ChatMemberHandler, filters
 # ======================= ⚙️ تنظیمات پایه و سودوها =======================
 from telegram import Update
 from telegram.ext import ContextTypes
@@ -2241,13 +2238,7 @@ if __name__ == "__main__":
     # 🧠 هندلر ورودی هوشمند برای تنظیمات خوشامد
     application.add_handler(MessageHandler(filters.TEXT | filters.PHOTO | filters.ANIMATION, welcome_input_handler), group=-1)
     # ==========================================================
-    # ==========================================================
-    # 📣 سیستم تگ کاربران (فقط دستور فارسی "تگ" و انگلیسی بدون "/")
-    # ==========================================================
-    application.add_handler(ChatMemberHandler(track_member, ChatMemberHandler.CHAT_MEMBER))
-    application.add_handler(MessageHandler(filters.TEXT & (~filters.ChatType.PRIVATE), track_member))
-    application.add_handler(MessageHandler(filters.Regex(r"^(تگ|tag)$") & (~filters.ChatType.PRIVATE), handle_tag_menu))
-    application.add_handler(CallbackQueryHandler(tag_callback, pattern="^tag_"))
+
 # ==========================================================
 from datetime import time, timezone, timedelta
 import asyncio
