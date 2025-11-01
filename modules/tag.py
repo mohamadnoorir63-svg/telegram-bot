@@ -3,12 +3,11 @@ import json, os
 from datetime import datetime, timedelta
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
-
-# 📂 فایل ذخیره اعضا (برای حالت پرایوسی روشن)
+# 📂 فایل ذخیره اعضا
 MEMBERS_FILE = "group_members.json"
 
 
-# 🧠 لود / ذخیره اعضا
+# 🧠 لود و ذخیره اطلاعات
 def load_members():
     if os.path.exists(MEMBERS_FILE):
         try:
@@ -27,13 +26,22 @@ def save_members(data):
 group_members = load_members()
 
 
-# 📡 ثبت خودکار کاربران وقتی پیام می‌دن
+# 📡 ثبت خودکار کاربران (پیام یا جوین)
 async def track_member(update, context):
-    if not update.message:
+    user = None
+    chat_id = None
+
+    if update.message:
+        user = update.effective_user
+        chat_id = str(update.effective_chat.id)
+    elif update.chat_member:
+        user = update.chat_member.new_chat_member.user
+        chat_id = str(update.chat_member.chat.id)
+    else:
         return
 
-    chat_id = str(update.effective_chat.id)
-    user = update.effective_user
+    if not user or user.is_bot:
+        return
 
     if chat_id not in group_members:
         group_members[chat_id] = {}
@@ -46,12 +54,12 @@ async def track_member(update, context):
     save_members(group_members)
 
 
-# 📋 منوی تگ پیشرفته
+# 📋 ساخت منوی تگ
 async def handle_tag_menu(update, context):
     keyboard = [
         [InlineKeyboardButton("👑 تگ کاربران مقام‌دار (ادمین)", callback_data="tag_admins")],
-        [InlineKeyboardButton("🔥 تگ 50 کاربر فعال اخیر", callback_data="tag_active50")],
-        [InlineKeyboardButton("👥 تگ تمام اعضا (حداکثر 300)", callback_data="tag_all300")],
+        [InlineKeyboardButton("🔥 تگ ۵۰ کاربر فعال اخیر", callback_data="tag_active50")],
+        [InlineKeyboardButton("👥 تگ تمام اعضا (حداکثر ۳۰۰)", callback_data="tag_all300")],
         [InlineKeyboardButton("❌ بستن منو", callback_data="tag_close")]
     ]
     markup = InlineKeyboardMarkup(keyboard)
@@ -62,7 +70,7 @@ async def handle_tag_menu(update, context):
     )
 
 
-# 🎯 کال‌بک منو
+# 🎯 کال‌بک دکمه‌ها
 async def tag_callback(update, context):
     query = update.callback_query
     await query.answer()
@@ -79,13 +87,15 @@ async def tag_callback(update, context):
     title = ""
 
     try:
-        # 👑 مدیران گروه
+        # 👑 مدیران
         if data == "tag_admins":
             admins = await context.bot.get_chat_administrators(chat.id)
-            targets = [a.user for a in admins if not a.user.is_bot]
+            for admin in admins:
+                if not admin.user.is_bot:
+                    targets.append({"id": admin.user.id, "name": admin.user.first_name})
             title = "کاربران مقام‌دار"
 
-        # 🔥 کاربران فعال اخیر
+        # 🔥 فعال‌ترین ۵۰ نفر اخیر
         elif data == "tag_active50":
             now = datetime.now()
             threshold = now - timedelta(days=3)
@@ -97,19 +107,26 @@ async def tag_callback(update, context):
                         recent.append((uid, info["name"], last))
                 except:
                     continue
-            # مرتب‌سازی از جدیدترین به قدیمی‌تر
             recent.sort(key=lambda x: x[2], reverse=True)
             for uid, name, _ in recent[:50]:
                 targets.append({"id": int(uid), "name": name})
             title = "۵۰ کاربر فعال اخیر"
 
-        # 👥 همه کاربران (تا ۳۰۰ نفر)
+        # 👥 همه کاربران (حداکثر ۳۰۰)
         elif data == "tag_all300":
+            # از فایل
             for i, (uid, info) in enumerate(members_data.items()):
                 if i >= 300:
                     break
                 targets.append({"id": int(uid), "name": info["name"]})
-            title = "۳۰۰ عضو گروه"
+
+            # در صورت نیاز، مدیرها رو هم اضافه کن
+            admins = await context.bot.get_chat_administrators(chat.id)
+            for a in admins:
+                if not a.user.is_bot and a.user.id not in [t["id"] for t in targets]:
+                    targets.append({"id": a.user.id, "name": a.user.first_name})
+
+            title = "تمام اعضا (حداکثر ۳۰۰)"
 
     except Exception as e:
         return await query.edit_message_text(f"⚠️ خطا در دریافت اطلاعات:\n{e}")
@@ -122,7 +139,7 @@ async def tag_callback(update, context):
     batch, count = [], 0
     total = len(targets)
 
-    # 🚀 ارسال مرحله‌ای
+    # 🚀 ارسال مرحله‌ای برای جلوگیری از اسپم
     for i, user in enumerate(targets, 1):
         tag = f"<a href='tg://user?id={user['id']}'>{user['name']}</a>"
         batch.append(tag)
@@ -132,7 +149,7 @@ async def tag_callback(update, context):
                 await context.bot.send_message(chat.id, " ".join(batch), parse_mode="HTML")
                 count += len(batch)
                 batch = []
-                await asyncio.sleep(1.5)
+                await asyncio.sleep(1.2)
             except Exception as e:
                 print(f"⚠️ خطا در ارسال تگ: {e}")
 
