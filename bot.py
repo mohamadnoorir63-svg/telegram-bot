@@ -163,7 +163,7 @@ def load_sudos():
                 return json.load(f)
         except:
             pass
-    return [7089376754]  # آیدی مدیر اصلی به‌صورت پیش‌فرض
+    return [8588347189]  # آیدی مدیر اصلی به‌صورت پیش‌فرض
 
 def save_sudos(data):
     with open(ADMIN_FILE, "w", encoding="utf-8") as f:
