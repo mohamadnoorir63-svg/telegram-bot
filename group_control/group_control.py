@@ -997,6 +997,64 @@ async def list_sudos(update, context):
         text += f"• <a href='tg://user?id={uid}'>کاربر {uid}</a>\n"
     await update.message.reply_text(text, parse_mode="HTML")
     # ==========================================================
+# 🧩 FIX — توابع کمکی و جایگزین‌های حذف‌شده
+# ==========================================================
+
+# ─────────────── ۱. بررسی مجاز بودن مدیران محلی / سودو ───────────────
+async def is_authorized(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """بررسی اینکه آیا کاربر مدیر تلگرام، مدیر محلی یا سودو است"""
+    chat = update.effective_chat
+    user = update.effective_user
+    uid, cid = str(user.id), str(chat.id)
+
+    # اگر سودو
+    if user.id in SUDO_IDS:
+        return True
+
+    # اگر مدیر تلگرام
+    try:
+        member = await context.bot.get_chat_member(chat.id, user.id)
+        if member.status in ("administrator", "creator"):
+            return True
+    except:
+        pass
+
+    # اگر مدیر محلی ثبت شده
+    if cid in ADMINS and uid in ADMINS[cid]:
+        return True
+
+    return False
+
+
+# ─────────────── ۲. فیلترها (برای هماهنگی با نام‌های handle_) ───────────────
+async def handle_add_filter(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    return await add_filter(update, context)
+
+async def handle_remove_filter(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    return await remove_filter(update, context)
+
+async def handle_list_filters(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    return await list_filters(update, context)
+
+
+# ─────────────── ۳. سیستم alias (فعلاً خاموش تا بعداً بسازیمش) ───────────────
+async def handle_locks_with_alias(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """در حال حاضر هیچ alias ثبت نشده است."""
+    # برای جلوگیری از خطا، فقط ساکت برگرد
+    return
+
+
+# ─────────────── ۴. تابع‌های نمایش اصل و لقب شخصی ───────────────
+async def show_my_original(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """نمایش اصل خود کاربر"""
+    target_id = str(update.effective_user.id)
+    await show_origin(update, context, target_id=target_id)
+
+async def show_my_nickname(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """نمایش لقب خود کاربر"""
+    target_id = str(update.effective_user.id)
+    await show_nickname(update, context, target_id=target_id)
+    # ==========================================================
 # 🧱 GROUP CONTROL SYSTEM — STEP 11
 # گزارش کامل وضعیت گروه (Group Report System)
 # ==========================================================
