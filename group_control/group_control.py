@@ -415,3 +415,27 @@ async def handle_lock_panel_callback(update: Update, context: ContextTypes.DEFAU
                 pass
             else:
                 print(f"⚠️ خطا در تغییر وضعیت قفل: {e}")
+                # ─────────────────────────────── نمایش پنل وضعیت قفل‌ها ───────────────────────────────
+
+async def handle_lock_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """نمایش پنل وضعیت قفل‌ها با دکمه‌های ⛔ / ✅"""
+    if not await is_authorized(update, context):
+        return await update.message.reply_text("🚫 فقط مدیران یا سودوها مجازند!")
+
+    chat = update.effective_chat
+    locks = _locks_get(chat.id)
+    active = [LOCK_TYPES[k] for k, v in locks.items() if v]
+
+    text = "<b>📋 وضعیت قفل‌های گروه</b>\n\n"
+    if active:
+        text += "🔒 قفل‌های فعال:\n" + "\n".join([f"• {x}" for x in active]) + "\n\n"
+    else:
+        text += "✅ در حال حاضر هیچ قفلی فعال نیست.\n\n"
+
+    text += "برای فعال یا غیرفعال کردن، روی دکمه‌های زیر کلیک کنید 👇"
+
+    await update.message.reply_text(
+        text,
+        reply_markup=_generate_lock_panel(chat.id),
+        parse_mode="HTML"
+    )
