@@ -47,10 +47,9 @@ LOCK_TYPES = {
     "reply": "ریپلای / پاسخ",
 }
 
-
 # ─────────────────────────────── ذخیره / بارگذاری عمومی ───────────────────────────────
 def _load_json(path, default=None):
-    """لود فایل JSON عمومی با مقدار پیش‌فرض"""
+    """لود فایل JSON با مقدار پیش‌فرض"""
     try:
         if os.path.exists(path):
             with open(path, "r", encoding="utf-8") as f:
@@ -67,11 +66,12 @@ def _save_json(path, data):
     except Exception as e:
         print(f"⚠️ خطا در ذخیره {path}: {e}")
 
-# فایل قفل‌ها
-LOCK_FILE = "group_locks.json"
+# ─────────────────────────────── لود قفل‌ها ───────────────────────────────
 LOCKS = _load_json(LOCK_FILE, {})
+
 # ─────────────────────────────── بررسی سطح دسترسی ───────────────────────────────
 async def _is_admin_or_sudo(context, chat_id: int, user_id: int):
+    """بررسی اینکه کاربر مدیر یا سودو هست یا نه"""
     if user_id in SUDO_IDS:
         return True
     try:
@@ -89,7 +89,7 @@ def _set_lock(chat_id: int, key: str, status: bool):
     locks = LOCKS.get(cid, {})
     locks[key] = bool(status)
     LOCKS[cid] = locks
-    _save_json(LOCKS)
+    _save_json(LOCK_FILE, LOCKS)
 
 # ─────────────────────────────── فعال‌سازی قفل ───────────────────────────────
 async def handle_lock(update: Update, context: ContextTypes.DEFAULT_TYPE, key: str):
