@@ -1074,13 +1074,88 @@ async def handle_group_report(update: Update, context: ContextTypes.DEFAULT_TYPE
             f"⚠️ خطا در ایجاد گزارش:\n<code>{e}</code>",
             parse_mode="HTML"
         )
-
         # ==========================================================
-# 🧱 CENTRAL HANDLER — گروه کنترل اصلی
+# 🧱 STEP 12 — سیستم دستورهای سفارشی (Alias System)
+# ==========================================================
+
+ALIAS_FILE = "aliases.json"
+
+# ─────────────────────────────── اطمینان از وجود فایل ───────────────────────────────
+if not os.path.exists(ALIAS_FILE):
+    with open(ALIAS_FILE, "w", encoding="utf-8") as f:
+        json.dump({}, f, ensure_ascii=False, indent=2)
+
+ALIASES = _load_json(ALIAS_FILE, {})
+
+def _save_aliases():
+    _save_json(ALIAS_FILE, ALIASES)
+
+# ─────────────────────────────── افزودن دستور ───────────────────────────────
+async def handle_add_alias(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """افزودن یک دستور سفارشی (Alias)"""
+    chat = update.effective_chat
+    user = update.effective_user
+    text = update.message.text.strip()
+
+    if not await _is_admin_or_sudo(context, chat.id, user.id):
+        return await update.message.reply_text("🚫 فقط مدیران یا سودوها می‌تونن دستور جدید اضافه کنن.")
+
+    # قالب: افزودن دستور جدید = دستور اصلی
+    if "=" not in text:
+        return await update.message.reply_text("📘 مثال:\n<code>افزودن دستور بنش = بن</code>", parse_mode="HTML")
+
+    parts = text.split("دستور", 1)[1].strip().split("=")
+    if len(parts) != 2:
+        return await update.message.reply_text("⚠️ فرمت دستور اشتباه است.", parse_mode="HTML")
+
+    alias = parts[0].strip()
+    real = parts[1].strip()
+
+    if not alias or not real:
+        return await update.message.reply_text("⚠️ لطفاً نام دستور و عمل اصلی را مشخص کن.")
+
+    chat_id = str(chat.id)
+    ALIASES.setdefault(chat_id, {})
+    ALIASES[chat_id][alias] = real
+    _save_aliases()
+
+    await update.message.reply_text(f"✅ دستور <b>{alias}</b> به عنوان معادل <b>{real}</b> ثبت شد.", parse_mode="HTML")
+
+# ─────────────────────────────── لیست دستورهای سفارشی ───────────────────────────────
+async def handle_list_aliases(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """نمایش لیست aliasها"""
+    chat_id = str(update.effective_chat.id)
+    data = ALIASES.get(chat_id, {})
+    if not data:
+        return await update.message.reply_text("ℹ️ هیچ دستوری ثبت نشده است.")
+    text = "<b>📜 لیست دستورهای سفارشی:</b>\n\n"
+    for k, v in data.items():
+        text += f"• {k} → {v}\n"
+    await update.message.reply_text(text, parse_mode="HTML")
+
+# ─────────────────────────────── تشخیص aliasها ───────────────────────────────
+async def handle_locks_with_alias(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """بررسی و اجرای aliasهای ثبت‌شده"""
+    chat = update.effective_chat
+    text = update.message.text.strip().lower()
+    chat_id = str(chat.id)
+
+    if chat_id not in ALIASES:
+        return
+
+    if text in ALIASES[chat_id]:
+        new_cmd = ALIASES[chat_id][text]
+        update.message.text = new_cmd
+        print(f"[ALIAS] {text} → {new_cmd}")
+        return await handle_group_message(update, context)
+
+        
+# ==========================================================
+# 🧱 CENTRAL HANDLER — نسخه نهایی گروه کنترل
 # ==========================================================
 
 async def handle_group_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """دستگاه مرکزی دریافت تمام پیام‌های متنی گروه"""
+    """دستگاه مرکزی برای تمام پیام‌های متنی گروه"""
     if not update.message or not update.message.text:
         return
 
@@ -1091,17 +1166,23 @@ async def handle_group_message(update: Update, context: ContextTypes.DEFAULT_TYP
     # ─────────────────────────────── قفل‌ها ───────────────────────────────
     if text.startswith("قفل "):
         key = text.replace("قفل", "").strip()
-        return await handle_lock(update, context, _map_to_key(key)) if _map_to_key(key) else await _unknown_lock_error(update, key)
+        mapped = _map_to_key(key)
+        if not mapped:
+            return await update.message.reply_text(f"⚠️ قفل '{key}' یافت نشد.")
+        return await handle_lock(update, context, mapped)
 
     if text.startswith("باز کردن "):
         key = text.replace("باز کردن", "").strip()
-        return await handle_unlock(update, context, _map_to_key(key)) if _map_to_key(key) else await _unknown_lock_error(update, key)
+        mapped = _map_to_key(key)
+        if not mapped:
+            return await update.message.reply_text(f"⚠️ قفل '{key}' یافت نشد.")
+        return await handle_unlock(update, context, mapped)
 
     if text in ["قفل گروه", "بستن گروه", "بستن"]:
-        return await lock_group(update, context, text)
+        return await lock_group(update, context)
 
     if text in ["باز کردن گروه", "باز کردن", "گروه باز"]:
-        return await unlock_group(update, context, text)
+        return await unlock_group(update, context)
 
     if text in ["وضعیت قفل‌ها", "وضعیت قفل", "locks"]:
         return await handle_locks_status(update, context)
@@ -1111,19 +1192,30 @@ async def handle_group_message(update: Update, context: ContextTypes.DEFAULT_TYP
 
     # ─────────────────────────────── فیلتر کلمات ───────────────────────────────
     if text.startswith("فیلتر "):
-        return await handle_add_filter(update, context)
+        return await add_filter(update, context)
+
     if text.startswith("حذف فیلتر "):
-        return await handle_remove_filter(update, context)
+        return await remove_filter(update, context)
+
     if text in ["لیست فیلتر", "لیست فیلترها"]:
-        return await handle_list_filters(update, context)
+        return await list_filters(update, context)
 
     # ─────────────────────────────── بن / سکوت / اخطار ───────────────────────────────
-    if text in ["بن", "ban"] and update.message.reply_to_message:
+    if text in ["بن", "ban"]:
+        if not update.message.reply_to_message:
+            return await update.message.reply_text("📎 روی پیام فرد ریپلای کن تا بن شود.")
         return await _do_ban(update, context, update.message.reply_to_message.from_user)
-    if text in ["سکوت", "mute"] and update.message.reply_to_message:
+
+    if text in ["سکوت", "mute"]:
+        if not update.message.reply_to_message:
+            return await update.message.reply_text("📎 روی پیام فرد ریپلای کن تا ساکت شود.")
         return await _do_mute(update, context, update.message.reply_to_message.from_user)
-    if text in ["اخطار", "warn"] and update.message.reply_to_message:
+
+    if text in ["اخطار", "warn"]:
+        if not update.message.reply_to_message:
+            return await update.message.reply_text("📎 روی پیام فرد ریپلای کن تا اخطار بگیرد.")
         return await _do_warn(update, context, update.message.reply_to_message.from_user)
+
     if text in ["لیست اخطار", "warns"]:
         return await list_warns(update, context)
 
@@ -1145,11 +1237,11 @@ async def handle_group_message(update: Update, context: ContextTypes.DEFAULT_TYP
 
     # ─────────────────────────────── ثبت اصل / لقب ───────────────────────────────
     if text == "ثبت اصل":
-        return await register_original(update, context)
+        return await set_origin(update, context)
     if text == "ثبت لقب":
-        return await register_nickname(update, context)
+        return await set_nickname(update, context)
     if text == "اصل":
-        return await show_original(update, context)
+        return await show_origin(update, context)
     if text == "اصل من":
         return await show_my_original(update, context)
     if text == "لقب":
@@ -1158,12 +1250,14 @@ async def handle_group_message(update: Update, context: ContextTypes.DEFAULT_TYP
         return await show_my_nickname(update, context)
 
     # ─────────────────────────────── تگ کردن ───────────────────────────────
-    if text in ["تگ همه", "تگ فعال"]:
-        return await tag_all_members(update, context)
+    if text == "تگ همه":
+        return await tag_users(update, context, "all")
+    if text == "تگ فعال":
+        return await tag_users(update, context, "active")
     if text == "تگ غیرفعال":
-        return await tag_inactive(update, context)
+        return await tag_users(update, context, "inactive")
     if text == "تگ مدیران":
-        return await tag_admins(update, context)
+        return await tag_users(update, context, "admins")
 
     # ─────────────────────────────── پاکسازی پیام‌ها ───────────────────────────────
     if text == "پاکسازی":
@@ -1172,7 +1266,7 @@ async def handle_group_message(update: Update, context: ContextTypes.DEFAULT_TYP
         try:
             number = int(text.split(" ")[1])
             return await purge_count(update, context, number)
-        except:
+        except Exception:
             return await update.message.reply_text("⚠️ لطفاً عدد معتبر بنویس. مثال: حذف 50")
     if text == "حذف" and update.message.reply_to_message:
         return await purge_user(update, context)
@@ -1189,6 +1283,8 @@ async def handle_group_message(update: Update, context: ContextTypes.DEFAULT_TYP
 
     # ─────────────────────────────── تشخیص خودکار aliasها ───────────────────────────────
     return await handle_locks_with_alias(update, context)
+    
+
     # ==========================================================
 # 🧩 FIX — توابع کمکی و جایگزین‌های حذف‌شده
 # ==========================================================
