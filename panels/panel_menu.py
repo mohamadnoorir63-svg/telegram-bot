@@ -1,9 +1,8 @@
 # ====================== 🌟 پنل مدیریت ربات — یک‌فایلِ پنل ======================
-
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 from group_control.group_control import (
-    _locks_get, _locks_set, _save_json, group_data, GROUP_CTRL_FILE, LOCK_TYPES
+    _get_locks, _set_lock, _save_json, LOCK_TYPES
 )
 
 # ───────────────────────────── عنوان اصلی ─────────────────────────────
