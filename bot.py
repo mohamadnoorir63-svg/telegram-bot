@@ -56,8 +56,7 @@ from group_control.group_control import (
     handle_pin,
     handle_unpin,
     is_authorized,
-    
-    handle_bot_removed,
+
     handle_bot_added   # 👈 این خط جدید رو اضافه کن
 )
 
