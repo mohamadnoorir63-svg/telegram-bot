@@ -531,7 +531,7 @@ async def handle_lock_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=_generate_lock_panel(chat.id),
         parse_mode="HTML"
 )
-# ==========================================================
+    # ==========================================================
 # 🧱 GROUP CONTROL SYSTEM — STEP 4
 # مدیریت کاربران: بن، سکوت، اخطار (با alias)
 # ==========================================================
@@ -565,9 +565,17 @@ BANS = _load(BAN_FILE)
 MUTES = _load(MUTE_FILE)
 WARNS = _load(WARN_FILE)
 
+# ─────────────────────────────── alias برای مدیریت کاربران ───────────────────────────────
+# alias‌ها در aliases.json هم ذخیره می‌شن (اشتراک با قفل‌ها)
+USER_ACTION_ALIASES = {
+    "ban": ["بن", "اخراج", "remove"],
+    "mute": ["سکوت", "خفه شو", "بی‌صدا", "mute"],
+    "warn": ["اخطار", "هشدار", "warn"]
+}
+
 # ─────────────────────────────── تابع بررسی هدف ───────────────────────────────
 async def _check_target(update: Update, context: ContextTypes.DEFAULT_TYPE, target):
-    """بررسی مجاز بودن هدف برای عملیات (ربات / مدیر / سودو / خودش)"""
+    """بررسی اینکه روی چه کسی دستور اجرا می‌شود"""
     user = update.effective_user
     chat = update.effective_chat
 
@@ -599,11 +607,22 @@ async def _check_target(update: Update, context: ContextTypes.DEFAULT_TYPE, targ
     return True
 
 
+# ─────────────────────────────── تشخیص alias دستور ───────────────────────────────
+def _get_user_action(text: str) -> str | None:
+    """تبدیل متن به نوع عملیات (ban/mute/warn)"""
+    text = text.strip().lower()
+    for action, aliases in USER_ACTION_ALIASES.items():
+        if text in aliases:
+            return action
+    return None
+
+
 # ─────────────────────────────── بن ───────────────────────────────
 async def handle_ban_with_alias(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """بن کردن کاربر (با ریپلای)"""
+    """بن کردن کاربر (با alias)"""
     text = update.message.text.strip().lower()
-    if text not in ["بن", "ban"]:
+    action = _get_user_action(text)
+    if action != "ban":
         return
 
     if not await is_authorized(update, context):
@@ -616,9 +635,14 @@ async def handle_ban_with_alias(update: Update, context: ContextTypes.DEFAULT_TY
     chat = update.effective_chat
     try:
         await context.bot.ban_chat_member(chat.id, target.id)
-        BANS.setdefault(str(chat.id), []).append(target.id)
+        BANS.setdefault(str(chat.id), [])
+        if target.id not in BANS[str(chat.id)]:
+            BANS[str(chat.id)].append(target.id)
         _save(BAN_FILE, BANS)
-        await update.message.reply_text(f"🚫 <b>{target.first_name}</b> از گروه بن شد.", parse_mode="HTML")
+        await update.message.reply_text(
+            f"🚫 کاربر <b>{target.first_name}</b> از گروه بن شد.",
+            parse_mode="HTML"
+        )
     except Exception as e:
         await update.message.reply_text(f"⚠️ خطا در بن:\n<code>{e}</code>", parse_mode="HTML")
 
@@ -627,7 +651,8 @@ async def handle_ban_with_alias(update: Update, context: ContextTypes.DEFAULT_TY
 async def handle_mute_with_alias(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """ساکت کردن کاربر (با alias)"""
     text = update.message.text.strip().lower()
-    if text not in ["سکوت", "mute"]:
+    action = _get_user_action(text)
+    if action != "mute":
         return
 
     if not await is_authorized(update, context):
@@ -638,7 +663,6 @@ async def handle_mute_with_alias(update: Update, context: ContextTypes.DEFAULT_T
         return
 
     chat = update.effective_chat
-
     try:
         await context.bot.restrict_chat_member(
             chat.id,
@@ -655,16 +679,16 @@ async def handle_mute_with_alias(update: Update, context: ContextTypes.DEFAULT_T
             f"🤐 کاربر <b>{target.first_name}</b> در گروه ساکت شد.",
             parse_mode="HTML"
         )
-
     except Exception as e:
         await update.message.reply_text(f"⚠️ خطا در سکوت:\n<code>{e}</code>", parse_mode="HTML")
 
 
 # ─────────────────────────────── اخطار ───────────────────────────────
 async def handle_warn_with_alias(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """دادن اخطار (۳ اخطار = بن)"""
+    """دادن اخطار (۳ اخطار = بن) با alias"""
     text = update.message.text.strip().lower()
-    if text not in ["اخطار", "warn"]:
+    action = _get_user_action(text)
+    if action != "warn":
         return
 
     if not await is_authorized(update, context):
