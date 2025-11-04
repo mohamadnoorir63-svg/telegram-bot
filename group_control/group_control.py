@@ -197,6 +197,73 @@ async def handle_unlock(update: Update, context: ContextTypes.DEFAULT_TYPE, key:
         f"🔓 قفل <b>{LOCK_TYPES[key]}</b> با موفقیت باز شد.",
         parse_mode="HTML"
     )
+    from telegram import ChatPermissions
+
+# ─────────────────────────────── قفل و باز کردن کل گروه (نسخه حرفه‌ای با طراحی بنری) ───────────────────────────────
+
+async def lock_group(update: Update, context: ContextTypes.DEFAULT_TYPE, cmd_text: str = "قفل گروه"):
+    """بستن کامل گروه با طراحی زیبا"""
+    chat = update.effective_chat
+    user = update.effective_user
+
+    if not await is_authorized(update, context):
+        return await update.message.reply_text("🚫 فقط مدیران یا سودوها می‌توانند گروه را ببندند.")
+
+    try:
+        await context.bot.set_chat_permissions(
+            chat_id=chat.id,
+            permissions=ChatPermissions(can_send_messages=False)
+        )
+        _locks_set(chat.id, "group", True)
+
+        text = (
+            "━━━━━━━━━━━━━━━\n"
+            "🔒 <b>گروه بسته شد</b>\n"
+            f"📌 <b>دستور:</b> <code>{cmd_text}</code>\n"
+            f"👮 <b>مدیر:</b> <a href='tg://user?id={user.id}'>{user.first_name}</a>\n"
+            "🚫 <b>تا اطلاع ثانوی بسته است</b>\n"
+            "━━━━━━━━━━━━━━━"
+        )
+
+        await update.message.reply_text(text, parse_mode="HTML")
+
+    except Exception as e:
+        await update.message.reply_text(f"⚠️ خطا در بستن گروه:\n<code>{e}</code>", parse_mode="HTML")
+
+
+async def unlock_group(update: Update, context: ContextTypes.DEFAULT_TYPE, cmd_text: str = "باز کردن گروه"):
+    """باز کردن کامل گروه با طراحی زیبا"""
+    chat = update.effective_chat
+    user = update.effective_user
+
+    if not await is_authorized(update, context):
+        return await update.message.reply_text("🚫 فقط مدیران یا سودوها می‌توانند گروه را باز کنند.")
+
+    try:
+        await context.bot.set_chat_permissions(
+            chat_id=chat.id,
+            permissions=ChatPermissions(
+                can_send_messages=True,
+                can_send_media_messages=True,
+                can_send_other_messages=True,
+                can_add_web_page_previews=True
+            )
+        )
+        _locks_set(chat.id, "group", False)
+
+        text = (
+            "━━━━━━━━━━━━━━━\n"
+            "✅ <b>گروه باز شد</b>\n"
+            f"📌 <b>دستور:</b> <code>{cmd_text}</code>\n"
+            f"👮 <b>مدیر:</b> <a href='tg://user?id={user.id}'>{user.first_name}</a>\n"
+            "💬 <b>اکنون همه کاربران می‌توانند پیام ارسال کنند</b>\n"
+            "━━━━━━━━━━━━━━━"
+        )
+
+        await update.message.reply_text(text, parse_mode="HTML")
+
+    except Exception as e:
+        await update.message.reply_text(f"⚠️ خطا در باز کردن گروه:\n<code>{e}</code>", parse_mode="HTML")
 
 # ─────────────────────────────── نمایش وضعیت قفل‌ها ───────────────────────────────
 
