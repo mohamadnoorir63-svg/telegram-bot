@@ -271,15 +271,17 @@ async def unlock_group(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ─────────────────────────────── تنظیم ساعت قفل خودکار ───────────────────────────────
 AUTOLOCK_FILE = "autolock.json"
 
+# اطمینان از وجود فایل
 if not os.path.exists(AUTOLOCK_FILE):
     with open(AUTOLOCK_FILE, "w", encoding="utf-8") as f:
         json.dump({}, f, ensure_ascii=False, indent=2)
 
-AUTOLOCKS = _load_json() if os.path.exists(AUTOLOCK_FILE) else {}
+# لود داده از فایل (با تابع جدید)
+AUTOLOCKS = _load_json(AUTOLOCK_FILE, {})
 
+# ذخیره داده در فایل
 def _save_autolocks():
-    with open(AUTOLOCK_FILE, "w", encoding="utf-8") as f:
-        json.dump(AUTOLOCKS, f, ensure_ascii=False, indent=2)
+    _save_json(AUTOLOCK_FILE, AUTOLOCKS)
 
 
 # ─────────────────────────────── دستور تنظیم خودکار ───────────────────────────────
