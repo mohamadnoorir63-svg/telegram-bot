@@ -2039,10 +2039,15 @@ if __name__ == "__main__":
         await update.message.reply_text(text, parse_mode="HTML")
     # ======================= 🧱 Group Control System (Central Handler) =======================
 
-    from group_control.group_control import handle_group_message
+    from group_control.group_control import handle_group_message, handle_lock_panel_callback
+    from telegram.ext import MessageHandler, CallbackQueryHandler, filters
 
-    # تمام پیام‌های متنی برن برای group_control
+    # تمام پیام‌های متنی به ماژول کنترل گروه
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_group_message))
+
+    # برای پنل دکمه‌ای قفل‌ها
+    application.add_handler(CallbackQueryHandler(handle_lock_panel_callback, pattern="^lock"))
+    
     # ==========================================================
     application.add_handler(CommandHandler("addsudo", add_sudo))
     application.add_handler(CommandHandler("delsudo", del_sudo))
