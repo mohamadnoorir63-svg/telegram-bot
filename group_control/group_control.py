@@ -445,6 +445,7 @@ async def handle_list_aliases(update: Update, context: ContextTypes.DEFAULT_TYPE
 
 
 # ─────────────────────────────── ساخت پنل قفل‌ها با ⛔ / ✅ ───────────────────────────────
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.error import BadRequest
 
 def _generate_lock_panel(chat_id: int) -> InlineKeyboardMarkup:
