@@ -2031,28 +2031,19 @@ if __name__ == "__main__":
         for i, sid in enumerate(SUDO_IDS, start=1):
             text += f"{i}. <code>{sid}</code>\n"
         await update.message.reply_text(text, parse_mode="HTML")
-
-    # ==========================================================
-    # ⚙️ سیستم مدیریت گروه (اولویت بالا)
-    # ==========================================================
-    # 🔹 ورود ربات به گروه
-    application.add_handler(ChatMemberHandler(handle_bot_added, ChatMemberHandler.MY_CHAT_MEMBER), group=-25)
-    application.add_handler(ChatMemberHandler(handle_bot_added, ChatMemberHandler.CHAT_MEMBER), group=-24)
     
-    # 🔹 ثبت فعالیت کاربران (برای تگ فعال/غیرفعال)
-    application.add_handler(MessageHandler(filters.ALL, auto_clean_old_origins), group=-11)
-
-    # 🔹 قفل‌ها
-    application.add_handler(MessageHandler(filters.ALL, check_message_locks), group=-10)
-
-    # 🔹 فرمان‌های فارسی / انگلیسی
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, group_command_handler), group=-9)
-
-    # 🔹 خروج ربات از گروه
-    application.add_handler(ChatMemberHandler(handle_bot_removed, ChatMemberHandler.MY_CHAT_MEMBER), group=-20)
-    application.add_handler(ChatMemberHandler(handle_bot_removed, ChatMemberHandler.CHAT_MEMBER), group=-19)
     # ==========================================================
+    # ⚙️ سیستم مدیریت گروه (موقتاً غیرفعال)
+    # ==========================================================
+    # application.add_handler(ChatMemberHandler(handle_bot_added, ChatMemberHandler.MY_CHAT_MEMBER), group=-25)
+    # application.add_handler(ChatMemberHandler(handle_bot_added, ChatMemberHandler.CHAT_MEMBER), group=-24)
     
+    # application.add_handler(MessageHandler(filters.ALL, auto_clean_old_origins), group=-11)
+    # application.add_handler(MessageHandler(filters.ALL, check_message_locks), group=-10)
+    # application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, group_command_handler), group=-9)
+
+    # application.add_handler(ChatMemberHandler(handle_bot_removed, ChatMemberHandler.MY_CHAT_MEMBER), group=-20)
+    # application.add_handler(ChatMemberHandler(handle_bot_removed, ChatMemberHandler.CHAT_MEMBER), group=-19)
 
     # ==========================================================
     application.add_handler(CommandHandler("addsudo", add_sudo))
