@@ -211,7 +211,7 @@ async def handle_unlock(update: Update, context: ContextTypes.DEFAULT_TYPE, key:
         parse_mode="HTML"
     )
 
-
+from telegram import ChatPermissions
 # ─────────────────────────────── قفل کامل گروه ───────────────────────────────
 async def lock_group(update: Update, context: ContextTypes.DEFAULT_TYPE, cmd_text: str = "قفل گروه"):
     """بستن کامل گروه با طراحی زیبا"""
