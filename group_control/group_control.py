@@ -287,25 +287,30 @@ async def handle_locks_with_alias(update: Update, context: ContextTypes.DEFAULT_
 
 # ─────────────────────────────── افزودن دستور جدید (Alias) ───────────────────────────────
 
+
 async def handle_add_alias(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """افزودن دستور جدید برای یک قفل (با یا بدون /)"""
     if not await is_authorized(update, context):
         return await update.message.reply_text("🚫 فقط مدیران و سودوها می‌توانند دستور جدید بسازند.")
 
     text = update.message.text.strip()
-    # حذف پیشوند "افزودن دستور" یا "/addalias"
+
+    # حذف بخش اول «افزودن دستور» یا «/addalias»
     if text.startswith("افزودن دستور"):
-        parts = text.split(maxsplit=2)
+        text = text.replace("افزودن دستور", "", 1).strip()
     elif text.startswith("/addalias"):
-        parts = text.split(maxsplit=2)
-    else:
-        return
+        text = text.replace("/addalias", "", 1).strip()
 
-    if len(parts) < 3:
-        return await update.message.reply_text("📘 مثال:\n<code>افزودن دستور لینک لینک‌بند</code>", parse_mode="HTML")
+    # حالا متن باقی‌مانده مثلاً میشه: "لینک لینک‌بند"
+    parts = text.split(maxsplit=1)
+    if len(parts) < 2:
+        return await update.message.reply_text(
+            "📘 مثال:\n<code>افزودن دستور لینک لینک‌بند</code>",
+            parse_mode="HTML"
+        )
 
-    lock_name = parts[1].lower()
-    alias_word = parts[2].lower()
+    lock_name = parts[0].lower()
+    alias_word = parts[1].lower()
 
     key = _map_to_key(lock_name)
     if not key:
@@ -325,22 +330,14 @@ async def handle_add_alias(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"🆕 دستور جدید: <code>{alias_word}</code>",
         parse_mode="HTML"
     )
-# ─────────────────────────────── لیست Alias‌ها ───────────────────────────────
-
-async def handle_list_aliases(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """نمایش تمام alias های ثبت‌شده"""
-    if not ALIASES:
-        return await update.message.reply_text("ℹ️ هیچ دستور سفارشی ثبت نشده است.")
-    text = "<b>🧩 دستورات سفارشی (Alias):</b>\n\n"
-    for k, v in ALIASES.items():
-        text += f"🔹 <b>{LOCK_TYPES.get(k, k)}</b> → {', '.join(v)}\n"
-    await update.message.reply_text(text, parse_mode="HTML")
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.error import BadRequest
 
 
 
 # ─────────────────────────────── ساخت پنل با ⛔ / ✅ ───────────────────────────────
+
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.error import BadRequest
+
 
 def _generate_lock_panel(chat_id: int) -> InlineKeyboardMarkup:
     """ساخت دکمه‌های وضعیت قفل‌ها با ⛔ / ✅ فقط با دکمه بستن"""
