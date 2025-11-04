@@ -47,20 +47,29 @@ LOCK_TYPES = {
     "reply": "ریپلای / پاسخ",
 }
 
-# ─────────────────────────────── ذخیره / بارگذاری ───────────────────────────────
-def _load_json():
+
+# ─────────────────────────────── ذخیره / بارگذاری عمومی ───────────────────────────────
+def _load_json(path, default=None):
+    """لود فایل JSON عمومی با مقدار پیش‌فرض"""
     try:
-        with open(LOCK_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except:
-        return {}
+        if os.path.exists(path):
+            with open(path, "r", encoding="utf-8") as f:
+                return json.load(f)
+    except Exception as e:
+        print(f"⚠️ خطا در لود {path}: {e}")
+    return default or {}
 
-def _save_json(data):
-    with open(LOCK_FILE, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
+def _save_json(path, data):
+    """ذخیره فایل JSON عمومی"""
+    try:
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        print(f"⚠️ خطا در ذخیره {path}: {e}")
 
-LOCKS = _load_json()
-
+# فایل قفل‌ها
+LOCK_FILE = "group_locks.json"
+LOCKS = _load_json(LOCK_FILE, {})
 # ─────────────────────────────── بررسی سطح دسترسی ───────────────────────────────
 async def _is_admin_or_sudo(context, chat_id: int, user_id: int):
     if user_id in SUDO_IDS:
