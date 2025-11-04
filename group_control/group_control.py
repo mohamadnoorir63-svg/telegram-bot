@@ -288,16 +288,24 @@ async def handle_locks_with_alias(update: Update, context: ContextTypes.DEFAULT_
 # ─────────────────────────────── افزودن دستور جدید (Alias) ───────────────────────────────
 
 async def handle_add_alias(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """افزودن دستور جدید برای یک قفل"""
+    """افزودن دستور جدید برای یک قفل (با یا بدون /)"""
     if not await is_authorized(update, context):
         return await update.message.reply_text("🚫 فقط مدیران و سودوها می‌توانند دستور جدید بسازند.")
 
-    args = context.args
-    if len(args) < 2:
-        return await update.message.reply_text("📘 مثال:\n`افزودن دستور لینک بستنlink`", parse_mode="Markdown")
+    text = update.message.text.strip()
+    # حذف پیشوند "افزودن دستور" یا "/addalias"
+    if text.startswith("افزودن دستور"):
+        parts = text.split(maxsplit=2)
+    elif text.startswith("/addalias"):
+        parts = text.split(maxsplit=2)
+    else:
+        return
 
-    lock_name = args[0].lower()
-    alias_word = args[1].lower()
+    if len(parts) < 3:
+        return await update.message.reply_text("📘 مثال:\n<code>افزودن دستور لینک لینک‌بند</code>", parse_mode="HTML")
+
+    lock_name = parts[1].lower()
+    alias_word = parts[2].lower()
 
     key = _map_to_key(lock_name)
     if not key:
@@ -311,8 +319,12 @@ async def handle_add_alias(update: Update, context: ContextTypes.DEFAULT_TYPE):
     ALIASES[key] = aliases_for_lock
     _save_aliases()
 
-    await update.message.reply_text(f"✅ دستور جدید برای قفل <b>{LOCK_TYPES[key]}</b> ثبت شد:\n➕ <code>{alias_word}</code>", parse_mode="HTML")
-
+    await update.message.reply_text(
+        f"🧩 <b>Alias جدید ثبت شد!</b>\n"
+        f"🔒 قفل: <b>{LOCK_TYPES[key]}</b>\n"
+        f"🆕 دستور جدید: <code>{alias_word}</code>",
+        parse_mode="HTML"
+    )
 # ─────────────────────────────── لیست Alias‌ها ───────────────────────────────
 
 async def handle_list_aliases(update: Update, context: ContextTypes.DEFAULT_TYPE):
