@@ -212,14 +212,19 @@ async def handle_unlock(update: Update, context: ContextTypes.DEFAULT_TYPE, key:
     )
 
 from telegram import ChatPermissions
+
 # ─────────────────────────────── قفل کامل گروه ───────────────────────────────
 async def lock_group(update: Update, context: ContextTypes.DEFAULT_TYPE, cmd_text: str = "قفل گروه"):
-    """بستن کامل گروه با طراحی زیبا"""
+    """بستن کامل گروه با بررسی وضعیت قبلی و طراحی زیبا"""
     chat = update.effective_chat
     user = update.effective_user
 
     if not await is_authorized(update, context):
         return await update.message.reply_text("🚫 فقط مدیران یا سودوها می‌توانند گروه را ببندند.")
+
+    locks = _locks_get(chat.id)
+    if locks.get("group"):
+        return await update.message.reply_text("🔒 گروه از قبل بسته بوده است.", parse_mode="HTML")
 
     try:
         await context.bot.set_chat_permissions(
@@ -240,20 +245,20 @@ async def lock_group(update: Update, context: ContextTypes.DEFAULT_TYPE, cmd_tex
         await update.message.reply_text(text, parse_mode="HTML")
 
     except Exception as e:
-        await update.message.reply_text(
-            f"⚠️ خطا در بستن گروه:\n<code>{e}</code>",
-            parse_mode="HTML"
-        )
+        await update.message.reply_text(f"⚠️ خطا در بستن گروه:\n<code>{e}</code>", parse_mode="HTML")
 
-
-# ─────────────────────────────── باز کردن کامل گروه ───────────────────────────────
+# ─────────────────────────────── باز کردن گروه ───────────────────────────────
 async def unlock_group(update: Update, context: ContextTypes.DEFAULT_TYPE, cmd_text: str = "باز کردن گروه"):
-    """باز کردن کامل گروه با طراحی زیبا"""
+    """باز کردن کامل گروه با بررسی وضعیت قبلی و طراحی زیبا"""
     chat = update.effective_chat
     user = update.effective_user
 
     if not await is_authorized(update, context):
         return await update.message.reply_text("🚫 فقط مدیران یا سودوها می‌توانند گروه را باز کنند.")
+
+    locks = _locks_get(chat.id)
+    if not locks.get("group"):
+        return await update.message.reply_text("✅ گروه از قبل باز بوده است.", parse_mode="HTML")
 
     try:
         await context.bot.set_chat_permissions(
@@ -285,7 +290,6 @@ async def unlock_group(update: Update, context: ContextTypes.DEFAULT_TYPE, cmd_t
 
     except Exception as e:
         await update.message.reply_text(f"⚠️ خطا در باز کردن گروه:\n<code>{e}</code>", parse_mode="HTML")
-
 # ─────────────────────────────── نمایش وضعیت قفل‌ها ───────────────────────────────
 async def handle_locks_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """نمایش وضعیت تمام قفل‌ها در گروه"""
