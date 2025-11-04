@@ -323,27 +323,22 @@ async def handle_list_aliases(update: Update, context: ContextTypes.DEFAULT_TYPE
     for k, v in ALIASES.items():
         text += f"🔹 <b>{LOCK_TYPES.get(k, k)}</b> → {', '.join(v)}\n"
     await update.message.reply_text(text, parse_mode="HTML")
-    # ==========================================================
-# 🧱 GROUP CONTROL SYSTEM — STEP 4
-# پنل وضعیت قفل‌ها (با دکمه فعال / غیرفعال)
-# ==========================================================
-
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import CallbackQueryHandler
+from telegram.error import BadRequest
 
-# ─────────────────────────────── ساخت پنل ───────────────────────────────
+# ─────────────────────────────── ساخت پنل با ⛔ / ✅ ───────────────────────────────
 
 def _generate_lock_panel(chat_id: int) -> InlineKeyboardMarkup:
-    """ساخت دکمه‌های وضعیت قفل‌ها"""
+    """ساخت دکمه‌های وضعیت قفل‌ها با ⛔ / ✅ و دکمه بستن"""
     locks = _locks_get(chat_id)
     keyboard = []
     row = []
     i = 0
     for key, title in LOCK_TYPES.items():
         status = locks.get(key, False)
-        emoji = "🔒" if status else "🔓"
+        icon = "⛔" if status else "✅"
         button = InlineKeyboardButton(
-            f"{emoji} {title}",
+            f"{icon} {title}",
             callback_data=f"locktoggle|{key}"
         )
         row.append(button)
@@ -353,59 +348,70 @@ def _generate_lock_panel(chat_id: int) -> InlineKeyboardMarkup:
             row = []
     if row:
         keyboard.append(row)
-    keyboard.append([InlineKeyboardButton("🔁 بروزرسانی", callback_data="lockrefresh")])
+
+    # دکمه‌های پایین پنل
+    keyboard.append([
+        InlineKeyboardButton("🔁 بروزرسانی وضعیت", callback_data="lockrefresh")
+    ])
+    keyboard.append([
+        InlineKeyboardButton("❌ بستن پنل", callback_data="lockclose")
+    ])
+
     return InlineKeyboardMarkup(keyboard)
 
-# ─────────────────────────────── دستور نمایش پنل ───────────────────────────────
 
-async def handle_lock_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """نمایش پنل وضعیت قفل‌ها با دکمه"""
-    if not await is_authorized(update, context):
-        return await update.message.reply_text("🚫 فقط مدیران یا سودوها مجازند!")
-
-    chat = update.effective_chat
-    locks = _locks_get(chat.id)
-    active = [LOCK_TYPES[k] for k, v in locks.items() if v]
-
-    text = "<b>📋 وضعیت قفل‌های گروه</b>\n\n"
-    if active:
-        text += "🔒 قفل‌های فعال:\n" + "\n".join([f"• {x}" for x in active]) + "\n\n"
-    else:
-        text += "✅ در حال حاضر هیچ قفلی فعال نیست.\n\n"
-
-    text += "برای فعال یا غیرفعال کردن، روی دکمه‌های زیر کلیک کنید 👇"
-
-    await update.message.reply_text(
-        text,
-        reply_markup=_generate_lock_panel(chat.id),
-        parse_mode="HTML"
-    )
-
-# ─────────────────────────────── کنترل دکمه‌ها ───────────────────────────────
+# ─────────────────────────────── کنترل دکمه‌های پنل ───────────────────────────────
 
 async def handle_lock_panel_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """مدیریت دکمه‌های پنل قفل‌ها"""
+    """مدیریت دکمه‌های پنل قفل‌ها با آیکون ⛔ / ✅ و بستن"""
     query = update.callback_query
     user = query.from_user
     chat = query.message.chat
 
+    # بررسی سطح دسترسی مدیر
     if not await _is_admin_or_sudo_uid(context, chat.id, user.id):
         return await query.answer("🚫 فقط مدیران مجازند.", show_alert=True)
 
     data = query.data
 
-    # بروزرسانی صفحه
-    if data == "lockrefresh":
-        await query.edit_message_reply_markup(reply_markup=_generate_lock_panel(chat.id))
-        return await query.answer("🔁 بروزرسانی شد.", show_alert=False)
+    # ✅ دکمه بستن
+    if data == "lockclose":
+        try:
+            await query.message.delete()
+        except:
+            try:
+                await query.edit_message_text("✅ پنل بسته شد.")
+            except:
+                pass
+        return await query.answer("❌ پنل بسته شد.", show_alert=False)
 
-    # تغییر وضعیت قفل
+    # 🔁 دکمه بروزرسانی
+    if data == "lockrefresh":
+        try:
+            await query.edit_message_reply_markup(reply_markup=_generate_lock_panel(chat.id))
+            await query.answer("🔁 بروزرسانی انجام شد.", show_alert=False)
+        except BadRequest as e:
+            if "Message is not modified" in str(e):
+                pass
+            else:
+                print(f"⚠️ خطا در بروزرسانی: {e}")
+        return
+
+    # ⛔ / ✅ تغییر وضعیت قفل
     if data.startswith("locktoggle|"):
         key = data.split("|")[1]
         locks = _locks_get(chat.id)
         current = locks.get(key, False)
         _locks_set(chat.id, key, not current)
 
-        new_status = "فعال شد 🔒" if not current else "غیرفعال شد 🔓"
-        await query.answer(f"{LOCK_TYPES[key]} {new_status}", show_alert=True)
-        await query.edit_message_reply_markup(reply_markup=_generate_lock_panel(chat.id))
+        new_status = "⛔ فعال شد" if not current else "✅ غیرفعال شد"
+        await query.answer(f"{LOCK_TYPES[key]} {new_status}", show_alert=False)
+
+        # بروزرسانی دکمه‌ها
+        try:
+            await query.edit_message_reply_markup(reply_markup=_generate_lock_panel(chat.id))
+        except BadRequest as e:
+            if "Message is not modified" in str(e):
+                pass
+            else:
+                print(f"⚠️ خطا در تغییر وضعیت قفل: {e}")
