@@ -49,15 +49,12 @@ from auto_brain.command_manager import (
 )
 # 🧱 کنترل گروه (مدیریت + قفل‌ها + پاکسازی + پین)
 from group_control.group_control import (
-    group_command_handler,
-    check_message_locks,
-
-    handle_clean,
-    handle_pin,
-    handle_unpin,
-    is_authorized,
-
-    handle_bot_added   # 👈 این خط جدید رو اضافه کن
+    group_command_handler,   # مدیریت دستورات فارسی
+    check_message_locks,     # بررسی پیام‌ها برای قفل‌ها و فیلترها
+    handle_clean,            # پاکسازی پیام‌ها
+    handle_pin,              # پین کردن پیام
+    handle_unpin,            # حذف پین
+    is_authorized            # بررسی مجوز مدیر/سودو
 )
 
 from group_control.daily_stats import (
