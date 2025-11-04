@@ -76,21 +76,6 @@ from weather_module.weather_panel import show_weather
 from modules.azan_module import get_azan_time, get_ramadan_status
 from panels.link_panel import link_panel, link_panel_buttons
 from panels.panel_menu import Tastatur_menu, Tastatur_buttons
-from group_control.group_control import (
-    handle_ban_with_alias,
-    handle_mute_with_alias,
-    handle_warn_with_alias,
-    handle_list_mutes,
-    handle_list_warns
-)
-# ───── ایمپورت کنترل گروه ─────
-from group_control.group_control import (
-    handle_locks_with_alias,     # تشخیص دستورات قفل/بازکردن
-    handle_lock_panel,           # نمایش پنل وضعیت قفل‌ها
-    handle_lock_panel_callback,  # مدیریت دکمه‌های پنل
-    handle_add_alias,            # افزودن دستور جدید (alias)
-    handle_list_aliases          # لیست دستورات alias
-)
 
 from telegram.ext import (
     MessageHandler,
@@ -2052,28 +2037,12 @@ if __name__ == "__main__":
         for i, sid in enumerate(SUDO_IDS, start=1):
             text += f"{i}. <code>{sid}</code>\n"
         await update.message.reply_text(text, parse_mode="HTML")
-    # ─────────────── مدیریت کاربران: بن / سکوت / اخطار / لیست‌ها ───────────────
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_ban_with_alias))
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_mute_with_alias))
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_warn_with_alias))
-    application.add_handler(MessageHandler(filters.Regex("^(لیست سکوت|mutes)$"), handle_list_mutes))
-    application.add_handler(MessageHandler(filters.Regex("^(لیست اخطار|warns)$"), handle_list_warns))
-    # ======================= 🧱 Group Control System =======================
+    # ======================= 🧱 Group Control System (Central Handler) =======================
 
-    # 🟢 دستورات فارسی و انگلیسی قفل‌ها (با alias)
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_locks_with_alias), group=-10)
+    from group_control.group_control import handle_group_message
 
-    # 🟢 پنل وضعیت قفل‌ها (فارسی و انگلیسی)
-    application.add_handler(MessageHandler(filters.Regex("^(وضعیت قفل(ها)?|locks)$"), handle_lock_panel), group=-9)
-
-    # ⚙️ مدیریت دکمه‌های قفل‌ها (باز/بستن از پنل)
-    application.add_handler(CallbackQueryHandler(handle_lock_panel_callback, pattern="^lock"))
-
-    # 🧩 افزودن دستور سفارشی (alias)
-    application.add_handler(MessageHandler(filters.Regex("^افزودن دستور"), handle_add_alias), group=-8)
-
-    # 📜 دیدن لیست دستورهای سفارشی
-    application.add_handler(MessageHandler(filters.Regex("^(لیست دستورها|لیست alias)"), handle_list_aliases), group=-7)
+    # تمام پیام‌های متنی برن برای group_control
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_group_message))
     # ==========================================================
     application.add_handler(CommandHandler("addsudo", add_sudo))
     application.add_handler(CommandHandler("delsudo", del_sudo))
