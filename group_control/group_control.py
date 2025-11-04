@@ -1000,42 +1000,42 @@ async def list_sudos(update, context):
 # 🧱 GROUP CONTROL SYSTEM — STEP 11
 # گزارش کامل وضعیت گروه (Group Report System)
 # ==========================================================
-
 from datetime import datetime
 
 async def handle_group_report(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """نمایش گزارش کامل گروه برای مدیران و سودوها"""
+    """📊 نمایش گزارش کامل وضعیت گروه (فقط برای مدیران و سودوها)"""
     chat = update.effective_chat
     user = update.effective_user
 
+    # بررسی مجوز
     if not await _is_admin_or_sudo(context, chat.id, user.id):
-        return await update.message.reply_text("🚫 فقط مدیران و سودوها مجاز به دریافت گزارش هستند.")
+        return await update.message.reply_text("🚫 فقط مدیران یا سودوها مجاز به دریافت گزارش هستند.")
 
     try:
-        # آمار زنده از تلگرام
+        # 📈 آمار زنده از تلگرام
         members = await context.bot.get_chat_members_count(chat.id)
         admins = await context.bot.get_chat_administrators(chat.id)
         admin_count = len(admins)
 
-        # قفل‌های فعال
-        locks = _locks_get(chat.id)
+        # 🔒 قفل‌های فعال
+        locks = _get_locks(chat.id)
         active_locks = [LOCK_TYPES[k] for k, v in locks.items() if v]
 
-        # سکوت / بن / اخطار
+        # 🚫 کاربران محدودشده
         mutes = MUTES.get(str(chat.id), [])
         bans = BANS.get(str(chat.id), [])
         warns = WARNS.get(str(chat.id), {})
 
-        # مدیران محلی
+        # 👮 مدیران محلی
         local_admins = ADMINS.get(str(chat.id), [])
 
-        # زمان فعلی
-        now = datetime.now().strftime("%Y-%m-%d | %H:%M:%S")
-
-        # سودوها
+        # 👑 سودوها
         sudo_count = len(SUDO_IDS)
 
-        # ساخت گزارش نهایی
+        # 🕒 زمان فعلی
+        now = datetime.now().strftime("%Y-%m-%d | %H:%M:%S")
+
+        # 📋 ساخت متن گزارش
         text = (
             "━━━━━━━━━━━━━━━\n"
             f"📊 <b>گزارش وضعیت گروه</b>\n"
@@ -1049,14 +1049,13 @@ async def handle_group_report(update: Update, context: ContextTypes.DEFAULT_TYPE
             "━━━━━━━━━━━━━━━\n"
         )
 
-        # 🔒 قفل‌ها
+        # 🔒 قفل‌های فعال
         if active_locks:
-            text += "🔒 <b>قفل‌های فعال:</b>\n"
-            text += "، ".join(active_locks) + "\n"
+            text += "🔒 <b>قفل‌های فعال:</b>\n" + "، ".join(active_locks) + "\n"
         else:
             text += "✅ هیچ قفلی فعال نیست.\n"
 
-        # 🚫 کاربران
+        # 🚫 وضعیت کاربران محدودشده
         text += (
             "\n━━━━━━━━━━━━━━━\n"
             f"🤐 <b>در سکوت:</b> {len(mutes)} نفر\n"
@@ -1070,7 +1069,11 @@ async def handle_group_report(update: Update, context: ContextTypes.DEFAULT_TYPE
         await update.message.reply_text(text, parse_mode="HTML")
 
     except Exception as e:
-        await update.message.reply_text(f"⚠️ خطا در ایجاد گزارش:\n<code>{e}</code>", parse_mode="HTML")
+        await update.message.reply_text(
+            f"⚠️ خطا در ایجاد گزارش:\n<code>{e}</code>",
+            parse_mode="HTML"
+        )
+
         # ==========================================================
 # 🧱 CENTRAL HANDLER — گروه کنترل اصلی
 # ==========================================================
