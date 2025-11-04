@@ -260,9 +260,14 @@ async def unlock_group(update: Update, context: ContextTypes.DEFAULT_TYPE, cmd_t
             chat_id=chat.id,
             permissions=ChatPermissions(
                 can_send_messages=True,
-                can_send_media_messages=True,
-                can_send_other_messages=True,
-                can_add_web_page_previews=True
+                can_send_audios=True,
+                can_send_documents=True,
+                can_send_photos=True,
+                can_send_videos=True,
+                can_send_voice_notes=True,
+                can_invite_users=True,
+                can_send_polls=True,
+                can_pin_messages=False
             )
         )
         _locks_set(chat.id, "group", False)
@@ -279,11 +284,7 @@ async def unlock_group(update: Update, context: ContextTypes.DEFAULT_TYPE, cmd_t
         await update.message.reply_text(text, parse_mode="HTML")
 
     except Exception as e:
-        await update.message.reply_text(
-            f"⚠️ خطا در باز کردن گروه:\n<code>{e}</code>",
-            parse_mode="HTML"
-        )
-
+        await update.message.reply_text(f"⚠️ خطا در باز کردن گروه:\n<code>{e}</code>", parse_mode="HTML")
 
 # ─────────────────────────────── نمایش وضعیت قفل‌ها ───────────────────────────────
 async def handle_locks_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
