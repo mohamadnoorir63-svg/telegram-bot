@@ -303,7 +303,7 @@ async def register_user(user):
 # ======================= 📢 اطلاع به ادمین هنگام استارت =======================
 async def notify_admin_on_startup(app):
     """ارسال پیام فعال‌سازی به ادمین هنگام استارت"""
-    ADMIN_ID = int(os.getenv("ADMIN_ID", "7089376754"))  # اگر از قبل داری، خطش رو تکرار نکن
+    ADMIN_ID = int(os.getenv("ADMIN_ID", "8588347189"))  # اگر از قبل داری، خطش رو تکرار نکن
     try:
         await app.bot.send_message(
             chat_id=ADMIN_ID,
@@ -410,7 +410,7 @@ from telegram.ext import ContextTypes
 
 async def sudo_bot_call(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """وقتی سازنده پیام «ربات» بفرسته — پاسخ‌های مخصوص فقط برای سودو اصلی"""
-    ADMIN_ID = int(os.getenv("ADMIN_ID", "7089376754"))
+    ADMIN_ID = int(os.getenv("ADMIN_ID", "8588347189"))
     user_id = update.effective_user.id
 
     # 🚫 فقط برای ادمین اصلی (سودو)
@@ -463,7 +463,7 @@ async def unlock_learning(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ======================= 📊 آمار خنگول واقعی =======================
 async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """نمایش آمار کلی — فقط برای مدیر اصلی یا سودوها"""
-    ADMIN_ID = int(os.getenv("ADMIN_ID", "7089376754"))
+    ADMIN_ID = int(os.getenv("ADMIN_ID", "8588347189"))
     user = update.effective_user
     user_id = user.id
 
@@ -508,7 +508,7 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ======================= 📊 آمار کامل گروه‌ها (فقط برای مدیر اصلی و سودوها) =======================
 async def fullstats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """نمایش آمار فقط برای گروه‌ها — فقط مدیر اصلی و سودوها"""
-    ADMIN_ID = int(os.getenv("ADMIN_ID", "7089376754"))
+    ADMIN_ID = int(os.getenv("ADMIN_ID", "8588347189"))
     user = update.effective_user
     user_id = user.id
 
@@ -847,7 +847,7 @@ from telegram.ext import ContextTypes
 
 # 🧩 تنظیمات پایه
 BACKUP_FOLDER = "backups"
-ADMIN_ID = int(os.getenv("ADMIN_ID", "7089376754"))
+ADMIN_ID = int(os.getenv("ADMIN_ID", "8588347189"))
 
 # ======================= ⚙️ توابع اصلی =======================
 
