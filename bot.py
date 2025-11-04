@@ -47,15 +47,7 @@ from auto_brain.command_manager import (
     list_commands,
     cleanup_group_commands
 )
-# 🧱 کنترل گروه (مدیریت + قفل‌ها + پاکسازی + پین)
-from group_control.group_control import (
-    group_command_handler,   # مدیریت دستورات فارسی
-    check_message_locks,     # بررسی پیام‌ها برای قفل‌ها و فیلترها
-    handle_clean,            # پاکسازی پیام‌ها
-    handle_pin,              # پین کردن پیام
-    handle_unpin,            # حذف پین
-    is_authorized            # بررسی مجوز مدیر/سودو
-)
+
 
 from group_control.daily_stats import (
     record_message_activity,
