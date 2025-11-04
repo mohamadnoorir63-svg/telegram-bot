@@ -331,7 +331,18 @@ async def handle_add_alias(update: Update, context: ContextTypes.DEFAULT_TYPE):
         parse_mode="HTML"
     )
 
+# ─────────────────────────────── لیست Alias‌ها ───────────────────────────────
 
+async def handle_list_aliases(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """نمایش تمام alias های ثبت‌شده"""
+    if not ALIASES:
+        return await update.message.reply_text("ℹ️ هیچ دستور سفارشی ثبت نشده است.")
+    
+    text = "<b>🧩 دستورات سفارشی (Alias):</b>\n\n"
+    for k, v in ALIASES.items():
+        text += f"🔹 <b>{LOCK_TYPES.get(k, k)}</b> → {', '.join(v)}\n"
+    
+    await update.message.reply_text(text, parse_mode="HTML")
 
 # ─────────────────────────────── ساخت پنل با ⛔ / ✅ ───────────────────────────────
 
