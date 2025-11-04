@@ -264,26 +264,32 @@ def _map_to_key(name: str) -> str | None:
 _lock_cmd_regex = re.compile(r"^(قفل|باز ?کردن|lock|unlock)\s+(.+)$")
 
 async def handle_locks_with_alias(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """تشخیص خودکار قفل یا بازکردن (فارسی و انگلیسی)"""
+    """تشخیص خودکار قفل یا بازکردن (با alias یا بدون قید 'قفل')"""
     if not update.message or not update.message.text:
         return
 
     text = update.message.text.strip().lower()
+
+    # 1️⃣ اگر جمله با "قفل" یا "بازکردن" شروع بشه → روش قبلی
     match = _lock_cmd_regex.match(text)
-    if not match:
-        return
+    if match:
+        action, rest = match.groups()
+        key = _map_to_key(rest)
+        if not key:
+            return await update.message.reply_text("⚠️ نام قفل ناشناخته است.")
+        if action in ["قفل", "lock"]:
+            return await handle_lock(update, context, key)
+        else:
+            return await handle_unlock(update, context, key)
 
-    action, rest = match.groups()
-    key = _map_to_key(rest)
-
-    if not key:
-        return await update.message.reply_text("⚠️ نام قفل ناشناخته است.")
-
-    # تشخیص عمل
-    if action in ["قفل", "lock"]:
-        await handle_lock(update, context, key)
-    else:
-        await handle_unlock(update, context, key)
+    # 2️⃣ اگر فقط alias نوشته شده باشه (مثلاً "ببند" یا "بازکن")
+    key = _map_to_key(text)
+    if key:
+        # بررسی می‌کنیم آیا alias شامل واژه‌هایی مثل "باز" یا "آزاد" هست → یعنی بازکردن
+        if any(w in text for w in ["باز", "آزاد", "آنلاک", "open", "unlock"]):
+            return await handle_unlock(update, context, key)
+        else:
+            return await handle_lock(update, context, key)
 
 # ─────────────────────────────── افزودن دستور جدید (Alias) ───────────────────────────────
 
