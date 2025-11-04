@@ -2052,21 +2052,12 @@ if __name__ == "__main__":
         for i, sid in enumerate(SUDO_IDS, start=1):
             text += f"{i}. <code>{sid}</code>\n"
         await update.message.reply_text(text, parse_mode="HTML")
-    # ==========================================================
-    # 🧱 USER CONTROL SYSTEM
-    # (بن، سکوت، اخطار + alias + لیست‌ها)
-    # ==========================================================
-
-    # 🧩 هندلرهای مدیریتی کاربران
-    application.add_handler(MessageHandler(filters.Regex("^(لیست سکوت|mutedlist)$"), handle_list_mutes), group=-6)
-    application.add_handler(MessageHandler(filters.Regex("^(لیست اخطار|warnlist)$"), handle_list_warns), group=-6)
-
-    # 🎯 هندلرهای اصلی با alias (با ریپلای کار می‌کنند)
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_ban_with_alias), group=-6)
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_mute_with_alias), group=-6)
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_warn_with_alias), group=-6)
-    
-    
+    # ─────────────── مدیریت کاربران: بن / سکوت / اخطار / لیست‌ها ───────────────
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_ban_with_alias))
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_mute_with_alias))
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_warn_with_alias))
+    application.add_handler(MessageHandler(filters.Regex("^(لیست سکوت|mutes)$"), handle_list_mutes))
+    application.add_handler(MessageHandler(filters.Regex("^(لیست اخطار|warns)$"), handle_list_warns))
     # ======================= 🧱 Group Control System =======================
 
     # 🟢 دستورات فارسی و انگلیسی قفل‌ها (با alias)
