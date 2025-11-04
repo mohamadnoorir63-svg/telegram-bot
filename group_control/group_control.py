@@ -583,151 +583,142 @@ async def _check_target(update: Update, context: ContextTypes.DEFAULT_TYPE, targ
 
     try:
         member = await context.bot.get_chat_member(chat.id, target.id)
-        if member.status in ["administrator", "creator"]:
-            await update.message.reply_text("⚠️ این کاربر مدیر گروه است و نمی‌توان اقدامی انجام داد.")
+        if member.status in ("administrator", "creator"):
+            await update.message.reply_text("🛡️ این کاربر مدیر گروه است و نمی‌توانم این دستور را روی او اعمال کنم.")
             return False
     except:
         pass
 
     return True
 
-# ─────────────────────────────── بن ───────────────────────────────
-async def handle_ban(update: Update, context: ContextTypes.DEFAULT_TYPE, target, reason=""):
-    chat = update.effective_chat
-    user = update.effective_user
+
+# ─────────────────────────────── تابع بن کاربر ───────────────────────────────
+async def handle_ban_with_alias(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """بن کردن کاربر (با پشتیبانی از alias)"""
+    text = update.message.text.strip().lower()
+    if text not in ["بن", "ban"]:
+        return
 
     if not await is_authorized(update, context):
-        return await update.message.reply_text("🚫 فقط مدیران یا سودوها می‌توانند بن کنند.")
+        return await update.message.reply_text("🚫 فقط مدیران و سودوها می‌توانند از این دستور استفاده کنند.")
+
+    target = update.message.reply_to_message.from_user if update.message.reply_to_message else None
     if not await _check_target(update, context, target):
         return
 
+    chat = update.effective_chat
     try:
         await context.bot.ban_chat_member(chat.id, target.id)
-        BANS[str(target.id)] = {"by": user.id, "chat": chat.id}
+        BANS[str(chat.id)] = BANS.get(str(chat.id), []) + [target.id]
         _save(BAN_FILE, BANS)
 
-        msg = (
-            "━━━━━━━━━━━━━━━\n"
-            "🚫 <b>کاربر بن شد</b>\n"
-            f"👤 <a href='tg://user?id={target.id}'>{target.first_name}</a>\n"
-            f"📌 <b>توسط:</b> <a href='tg://user?id={user.id}'>{user.first_name}</a>\n"
+        await update.message.reply_text(
+            f"🚫 <b>{target.first_name}</b> از گروه بن شد.",
+            parse_mode="HTML"
         )
-        if reason:
-            msg += f"📝 <b>علت:</b> {reason}\n"
-        msg += "━━━━━━━━━━━━━━━"
-
-        await update.message.reply_text(msg, parse_mode="HTML")
-
     except Exception as e:
         await update.message.reply_text(f"⚠️ خطا در بن کردن:\n<code>{e}</code>", parse_mode="HTML")
 
-# ─────────────────────────────── سکوت ───────────────────────────────
-async def handle_mute(update: Update, context: ContextTypes.DEFAULT_TYPE, target):
-    chat = update.effective_chat
-    user = update.effective_user
+
+# ─────────────────────────────── تابع سکوت کاربر ───────────────────────────────
+async def handle_mute_with_alias(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """ساکت کردن کاربر (با alias)"""
+    text = update.message.text.strip().lower()
+    if text not in ["سکوت", "mute"]:
+        return
 
     if not await is_authorized(update, context):
-        return await update.message.reply_text("🚫 فقط مدیران یا سودوها می‌توانند ساکت کنند.")
+        return await update.message.reply_text("🚫 فقط مدیران و سودوها می‌توانند از این دستور استفاده کنند.")
+
+    target = update.message.reply_to_message.from_user if update.message.reply_to_message else None
     if not await _check_target(update, context, target):
         return
 
+    chat = update.effective_chat
     try:
         await context.bot.restrict_chat_member(
             chat.id,
             target.id,
             permissions=ChatPermissions(can_send_messages=False)
         )
-
-        MUTES[str(target.id)] = {"by": user.id, "chat": chat.id}
+        MUTES[str(chat.id)] = MUTES.get(str(chat.id), []) + [target.id]
         _save(MUTE_FILE, MUTES)
 
         await update.message.reply_text(
-            f"🤫 کاربر <a href='tg://user?id={target.id}'>{target.first_name}</a> ساکت شد.",
+            f"🤐 <b>{target.first_name}</b> در گروه ساکت شد.",
             parse_mode="HTML"
         )
-
     except Exception as e:
-        await update.message.reply_text(f"⚠️ خطا در سکوت:\n<code>{e}</code>", parse_mode="HTML")
+        await update.message.reply_text(f"⚠️ خطا در سکوت کاربر:\n<code>{e}</code>", parse_mode="HTML")
 
-# ─────────────────────────────── اخطار ───────────────────────────────
-async def handle_warn(update: Update, context: ContextTypes.DEFAULT_TYPE, target):
-    chat = update.effective_chat
-    user = update.effective_user
+
+# ─────────────────────────────── تابع اخطار (۳ اخطار = بن) ───────────────────────────────
+async def handle_warn_with_alias(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """افزودن اخطار به کاربر"""
+    text = update.message.text.strip().lower()
+    if text not in ["اخطار", "warn"]:
+        return
 
     if not await is_authorized(update, context):
-        return await update.message.reply_text("🚫 فقط مدیران یا سودوها می‌توانند اخطار دهند.")
+        return await update.message.reply_text("🚫 فقط مدیران یا سودوها مجاز به اخطار دادن هستند.")
+
+    target = update.message.reply_to_message.from_user if update.message.reply_to_message else None
     if not await _check_target(update, context, target):
         return
 
-    uid = str(target.id)
-    WARNS[uid] = WARNS.get(uid, 0) + 1
+    chat = update.effective_chat
+    chat_id = str(chat.id)
+    user_id = str(target.id)
+
+    warns = WARNS.get(chat_id, {})
+    warns[user_id] = warns.get(user_id, 0) + 1
+    WARNS[chat_id] = warns
     _save(WARN_FILE, WARNS)
 
-    warn_count = WARNS[uid]
-    if warn_count >= 3:
-        await handle_ban(update, context, target, reason="دریافت ۳ اخطار متوالی")
-        WARNS.pop(uid, None)
-        _save(WARN_FILE, WARNS)
+    if warns[user_id] >= 3:
+        # بعد از سه اخطار → بن شود
+        try:
+            await context.bot.ban_chat_member(chat.id, target.id)
+            del warns[user_id]
+            WARNS[chat_id] = warns
+            _save(WARN_FILE, WARNS)
+            await update.message.reply_text(
+                f"🚫 کاربر <b>{target.first_name}</b> به دلیل ۳ اخطار از گروه بن شد.",
+                parse_mode="HTML"
+            )
+        except Exception as e:
+            await update.message.reply_text(f"⚠️ خطا در بن بعد از اخطار:\n<code>{e}</code>", parse_mode="HTML")
     else:
         await update.message.reply_text(
-            f"⚠️ <a href='tg://user?id={target.id}'>{target.first_name}</a> "
-            f"اخطار شماره {warn_count} را دریافت کرد.",
+            f"⚠️ به <b>{target.first_name}</b> اخطار داده شد.\n"
+            f"🔢 تعداد اخطارها: <b>{warns[user_id]}</b> / 3",
             parse_mode="HTML"
         )
 
-# ─────────────────────────────── لیست‌ها ───────────────────────────────
+
+# ─────────────────────────────── لیست کاربران ساکت ───────────────────────────────
 async def handle_list_mutes(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not MUTES:
-        return await update.message.reply_text("ℹ️ هیچ کاربر ساکتی وجود ندارد.")
-    text = "<b>🤫 لیست کاربران ساکت:</b>\n\n"
-    for uid in MUTES:
-        text += f"🔸 <a href='tg://user?id={uid}'>کاربر {uid}</a>\n"
+    """نمایش لیست کاربران ساکت"""
+    chat_id = str(update.effective_chat.id)
+    muted = MUTES.get(chat_id, [])
+    if not muted:
+        return await update.message.reply_text("✅ هیچ کاربری در سکوت نیست.")
+
+    text = "<b>🤐 کاربران ساکت:</b>\n\n"
+    for uid in muted:
+        text += f"• <a href='tg://user?id={uid}'>کاربر {uid}</a>\n"
     await update.message.reply_text(text, parse_mode="HTML")
 
+
+# ─────────────────────────────── لیست اخطارها ───────────────────────────────
 async def handle_list_warns(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not WARNS:
-        return await update.message.reply_text("ℹ️ هیچ اخطاری وجود ندارد.")
+    """نمایش لیست اخطارها"""
+    chat_id = str(update.effective_chat.id)
+    warns = WARNS.get(chat_id, {})
+    if not warns:
+        return await update.message.reply_text("✅ هیچ کاربری اخطار ندارد.")
+
     text = "<b>⚠️ لیست اخطارها:</b>\n\n"
-    for uid, count in WARNS.items():
-        text += f"👤 <a href='tg://user?id={uid}'>کاربر {uid}</a> — {count} اخطار\n"
+    for uid, count in warns.items():
+        text += f"• <a href='tg://user?id={uid}'>کاربر {uid}</a> → <b>{count}</b> اخطار\n"
     await update.message.reply_text(text, parse_mode="HTML")
-
-# ─────────────────────────────── alias فرمان‌ها ───────────────────────────────
-_ban_cmd = re.compile(r"^(بن|ban)\s+(.+)$")
-_mute_cmd = re.compile(r"^(سکوت|mute)\s+(.+)$")
-_warn_cmd = re.compile(r"^(اخطار|warn)\s+(.+)$")
-
-async def handle_ban_with_alias(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not update.message or not update.message.text:
-        return
-    text = update.message.text.strip().lower()
-
-    match = _ban_cmd.match(text)
-    if match:
-        if update.message.reply_to_message:
-            target = update.message.reply_to_message.from_user
-        else:
-            if not update.message.entities or len(update.message.entities) < 2:
-                return await update.message.reply_text("⚠️ لطفاً کاربر را ریپلای یا منشن کنید.")
-            target = update.message.parse_entities().get(list(update.message.entities)[1])
-        return await handle_ban(update, context, target)
-
-async def handle_mute_with_alias(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not update.message or not update.message.text:
-        return
-    text = update.message.text.strip().lower()
-
-    match = _mute_cmd.match(text)
-    if match:
-        target = update.message.reply_to_message.from_user if update.message.reply_to_message else None
-        return await handle_mute(update, context, target)
-
-async def handle_warn_with_alias(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not update.message or not update.message.text:
-        return
-    text = update.message.text.strip().lower()
-
-    match = _warn_cmd.match(text)
-    if match:
-        target = update.message.reply_to_message.from_user if update.message.reply_to_message else None
-        return await handle_warn(update, context, target)
