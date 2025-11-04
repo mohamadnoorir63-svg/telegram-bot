@@ -326,14 +326,17 @@ async def handle_list_aliases(update: Update, context: ContextTypes.DEFAULT_TYPE
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.error import BadRequest
 
+
+
 # ─────────────────────────────── ساخت پنل با ⛔ / ✅ ───────────────────────────────
 
 def _generate_lock_panel(chat_id: int) -> InlineKeyboardMarkup:
-    """ساخت دکمه‌های وضعیت قفل‌ها با ⛔ / ✅ و دکمه بستن"""
+    """ساخت دکمه‌های وضعیت قفل‌ها با ⛔ / ✅ فقط با دکمه بستن"""
     locks = _locks_get(chat_id)
     keyboard = []
     row = []
     i = 0
+
     for key, title in LOCK_TYPES.items():
         status = locks.get(key, False)
         icon = "⛔" if status else "✅"
@@ -346,16 +349,12 @@ def _generate_lock_panel(chat_id: int) -> InlineKeyboardMarkup:
         if i % 2 == 0:
             keyboard.append(row)
             row = []
+
     if row:
         keyboard.append(row)
 
-    # دکمه‌های پایین پنل
-    keyboard.append([
-        InlineKeyboardButton("🔁 بروزرسانی وضعیت", callback_data="lockrefresh")
-    ])
-    keyboard.append([
-        InlineKeyboardButton("❌ بستن پنل", callback_data="lockclose")
-    ])
+    # فقط دکمه بستن در پایین پنل
+    keyboard.append([InlineKeyboardButton("❌ بستن پنل", callback_data="lockclose")])
 
     return InlineKeyboardMarkup(keyboard)
 
@@ -385,18 +384,6 @@ async def handle_lock_panel_callback(update: Update, context: ContextTypes.DEFAU
                 pass
         return await query.answer("❌ پنل بسته شد.", show_alert=False)
 
-    # 🔁 دکمه بروزرسانی
-    if data == "lockrefresh":
-        try:
-            await query.edit_message_reply_markup(reply_markup=_generate_lock_panel(chat.id))
-            await query.answer("🔁 بروزرسانی انجام شد.", show_alert=False)
-        except BadRequest as e:
-            if "Message is not modified" in str(e):
-                pass
-            else:
-                print(f"⚠️ خطا در بروزرسانی: {e}")
-        return
-
     # ⛔ / ✅ تغییر وضعیت قفل
     if data.startswith("locktoggle|"):
         key = data.split("|")[1]
@@ -415,7 +402,9 @@ async def handle_lock_panel_callback(update: Update, context: ContextTypes.DEFAU
                 pass
             else:
                 print(f"⚠️ خطا در تغییر وضعیت قفل: {e}")
-                # ─────────────────────────────── نمایش پنل وضعیت قفل‌ها ───────────────────────────────
+
+
+# ─────────────────────────────── نمایش پنل وضعیت قفل‌ها ───────────────────────────────
 
 async def handle_lock_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """نمایش پنل وضعیت قفل‌ها با دکمه‌های ⛔ / ✅"""
