@@ -2032,19 +2032,15 @@ if __name__ == "__main__":
             text += f"{i}. <code>{sid}</code>\n"
         await update.message.reply_text(text, parse_mode="HTML")
     
-    # ==========================================================
-    # ⚙️ سیستم مدیریت گروه (موقتاً غیرفعال)
-    # ==========================================================
-    # application.add_handler(ChatMemberHandler(handle_bot_added, ChatMemberHandler.MY_CHAT_MEMBER), group=-25)
-    # application.add_handler(ChatMemberHandler(handle_bot_added, ChatMemberHandler.CHAT_MEMBER), group=-24)
-    
-    # application.add_handler(MessageHandler(filters.ALL, auto_clean_old_origins), group=-11)
-    # application.add_handler(MessageHandler(filters.ALL, check_message_locks), group=-10)
-    # application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, group_command_handler), group=-9)
+    from group_control.group_control import handle_locks_with_alias, handle_lock_panel, handle_lock_panel_callback
+    from telegram.ext import MessageHandler, CallbackQueryHandler, filters
 
-    # application.add_handler(ChatMemberHandler(handle_bot_removed, ChatMemberHandler.MY_CHAT_MEMBER), group=-20)
-    # application.add_handler(ChatMemberHandler(handle_bot_removed, ChatMemberHandler.CHAT_MEMBER), group=-19)
+    # برای دستورات متنی قفل‌ها
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_locks_with_alias))
 
+    # برای پنل وضعیت
+    application.add_handler(MessageHandler(filters.Regex("^(وضعیت قفل|locks)$"), handle_lock_panel))
+    application.add_handler(CallbackQueryHandler(handle_lock_panel_callback, pattern="^lock"))
     # ==========================================================
     application.add_handler(CommandHandler("addsudo", add_sudo))
     application.add_handler(CommandHandler("delsudo", del_sudo))
