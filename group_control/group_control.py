@@ -531,3 +531,203 @@ async def handle_lock_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=_generate_lock_panel(chat.id),
         parse_mode="HTML"
 )
+    # ==========================================================
+# 🧱 GROUP CONTROL SYSTEM — STEP 4
+# مدیریت کاربران: بن، سکوت، اخطار (با alias)
+# ==========================================================
+
+import re, json, os
+from telegram import Update, ChatPermissions
+from telegram.ext import ContextTypes
+
+# ─────────────────────────────── فایل‌های ذخیره ───────────────────────────────
+BAN_FILE = "bans.json"
+MUTE_FILE = "mutes.json"
+WARN_FILE = "warns.json"
+
+for f in [BAN_FILE, MUTE_FILE, WARN_FILE]:
+    if not os.path.exists(f):
+        with open(f, "w", encoding="utf-8") as w:
+            json.dump({}, w, ensure_ascii=False, indent=2)
+
+def _load(path):
+    with open(path, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+def _save(path, data):
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
+# ─────────────────────────────── داده‌ها ───────────────────────────────
+BANS = _load(BAN_FILE)
+MUTES = _load(MUTE_FILE)
+WARNS = _load(WARN_FILE)
+
+# ─────────────────────────────── تابع تشخیص سطح کاربر ───────────────────────────────
+async def _check_target(update: Update, context: ContextTypes.DEFAULT_TYPE, target):
+    """بررسی مجاز بودن هدف برای عملیات"""
+    user = update.effective_user
+    chat = update.effective_chat
+
+    if not target:
+        await update.message.reply_text("⚠️ لطفاً کاربر مورد نظر را ریپلای یا منشن کنید.")
+        return False
+
+    if target.id == user.id:
+        await update.message.reply_text("😅 نمی‌تونم این دستور رو روی خودم اجرا کنم.")
+        return False
+
+    if target.id in SUDO_IDS:
+        await update.message.reply_text("👑 این کاربر سودو است و من اجازه این کار را ندارم.")
+        return False
+
+    try:
+        member = await context.bot.get_chat_member(chat.id, target.id)
+        if member.status in ["administrator", "creator"]:
+            await update.message.reply_text("⚠️ این کاربر مدیر گروه است و نمی‌توان اقدامی انجام داد.")
+            return False
+    except:
+        pass
+
+    return True
+
+# ─────────────────────────────── بن ───────────────────────────────
+async def handle_ban(update: Update, context: ContextTypes.DEFAULT_TYPE, target, reason=""):
+    chat = update.effective_chat
+    user = update.effective_user
+
+    if not await is_authorized(update, context):
+        return await update.message.reply_text("🚫 فقط مدیران یا سودوها می‌توانند بن کنند.")
+    if not await _check_target(update, context, target):
+        return
+
+    try:
+        await context.bot.ban_chat_member(chat.id, target.id)
+        BANS[str(target.id)] = {"by": user.id, "chat": chat.id}
+        _save(BAN_FILE, BANS)
+
+        msg = (
+            "━━━━━━━━━━━━━━━\n"
+            "🚫 <b>کاربر بن شد</b>\n"
+            f"👤 <a href='tg://user?id={target.id}'>{target.first_name}</a>\n"
+            f"📌 <b>توسط:</b> <a href='tg://user?id={user.id}'>{user.first_name}</a>\n"
+        )
+        if reason:
+            msg += f"📝 <b>علت:</b> {reason}\n"
+        msg += "━━━━━━━━━━━━━━━"
+
+        await update.message.reply_text(msg, parse_mode="HTML")
+
+    except Exception as e:
+        await update.message.reply_text(f"⚠️ خطا در بن کردن:\n<code>{e}</code>", parse_mode="HTML")
+
+# ─────────────────────────────── سکوت ───────────────────────────────
+async def handle_mute(update: Update, context: ContextTypes.DEFAULT_TYPE, target):
+    chat = update.effective_chat
+    user = update.effective_user
+
+    if not await is_authorized(update, context):
+        return await update.message.reply_text("🚫 فقط مدیران یا سودوها می‌توانند ساکت کنند.")
+    if not await _check_target(update, context, target):
+        return
+
+    try:
+        await context.bot.restrict_chat_member(
+            chat.id,
+            target.id,
+            permissions=ChatPermissions(can_send_messages=False)
+        )
+
+        MUTES[str(target.id)] = {"by": user.id, "chat": chat.id}
+        _save(MUTE_FILE, MUTES)
+
+        await update.message.reply_text(
+            f"🤫 کاربر <a href='tg://user?id={target.id}'>{target.first_name}</a> ساکت شد.",
+            parse_mode="HTML"
+        )
+
+    except Exception as e:
+        await update.message.reply_text(f"⚠️ خطا در سکوت:\n<code>{e}</code>", parse_mode="HTML")
+
+# ─────────────────────────────── اخطار ───────────────────────────────
+async def handle_warn(update: Update, context: ContextTypes.DEFAULT_TYPE, target):
+    chat = update.effective_chat
+    user = update.effective_user
+
+    if not await is_authorized(update, context):
+        return await update.message.reply_text("🚫 فقط مدیران یا سودوها می‌توانند اخطار دهند.")
+    if not await _check_target(update, context, target):
+        return
+
+    uid = str(target.id)
+    WARNS[uid] = WARNS.get(uid, 0) + 1
+    _save(WARN_FILE, WARNS)
+
+    warn_count = WARNS[uid]
+    if warn_count >= 3:
+        await handle_ban(update, context, target, reason="دریافت ۳ اخطار متوالی")
+        WARNS.pop(uid, None)
+        _save(WARN_FILE, WARNS)
+    else:
+        await update.message.reply_text(
+            f"⚠️ <a href='tg://user?id={target.id}'>{target.first_name}</a> "
+            f"اخطار شماره {warn_count} را دریافت کرد.",
+            parse_mode="HTML"
+        )
+
+# ─────────────────────────────── لیست‌ها ───────────────────────────────
+async def handle_list_mutes(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not MUTES:
+        return await update.message.reply_text("ℹ️ هیچ کاربر ساکتی وجود ندارد.")
+    text = "<b>🤫 لیست کاربران ساکت:</b>\n\n"
+    for uid in MUTES:
+        text += f"🔸 <a href='tg://user?id={uid}'>کاربر {uid}</a>\n"
+    await update.message.reply_text(text, parse_mode="HTML")
+
+async def handle_list_warns(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not WARNS:
+        return await update.message.reply_text("ℹ️ هیچ اخطاری وجود ندارد.")
+    text = "<b>⚠️ لیست اخطارها:</b>\n\n"
+    for uid, count in WARNS.items():
+        text += f"👤 <a href='tg://user?id={uid}'>کاربر {uid}</a> — {count} اخطار\n"
+    await update.message.reply_text(text, parse_mode="HTML")
+
+# ─────────────────────────────── alias فرمان‌ها ───────────────────────────────
+_ban_cmd = re.compile(r"^(بن|ban)\s+(.+)$")
+_mute_cmd = re.compile(r"^(سکوت|mute)\s+(.+)$")
+_warn_cmd = re.compile(r"^(اخطار|warn)\s+(.+)$")
+
+async def handle_ban_with_alias(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not update.message or not update.message.text:
+        return
+    text = update.message.text.strip().lower()
+
+    match = _ban_cmd.match(text)
+    if match:
+        if update.message.reply_to_message:
+            target = update.message.reply_to_message.from_user
+        else:
+            if not update.message.entities or len(update.message.entities) < 2:
+                return await update.message.reply_text("⚠️ لطفاً کاربر را ریپلای یا منشن کنید.")
+            target = update.message.parse_entities().get(list(update.message.entities)[1])
+        return await handle_ban(update, context, target)
+
+async def handle_mute_with_alias(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not update.message or not update.message.text:
+        return
+    text = update.message.text.strip().lower()
+
+    match = _mute_cmd.match(text)
+    if match:
+        target = update.message.reply_to_message.from_user if update.message.reply_to_message else None
+        return await handle_mute(update, context, target)
+
+async def handle_warn_with_alias(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not update.message or not update.message.text:
+        return
+    text = update.message.text.strip().lower()
+
+    match = _warn_cmd.match(text)
+    if match:
+        target = update.message.reply_to_message.from_user if update.message.reply_to_message else None
+        return await handle_warn(update, context, target)
