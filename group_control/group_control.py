@@ -98,6 +98,7 @@ def _get_locks(chat_id: int):
     return LOCKS.get(str(chat_id), {})
 
 def _set_lock(chat_id: int, key: str, status: bool):
+    """ذخیره قفل در حافظه و فایل"""
     cid = str(chat_id)
     if cid not in LOCKS:
         LOCKS[cid] = {}
@@ -125,10 +126,10 @@ async def _del_msg(update: Update, warn_text: str = None):
     except Exception as e:
         print(f"[Delete Error] {e}")
 
-# ─────────────────────────────── اعمال قفل‌ها روی پیام ───────────────────────────────
+# ─────────────────────────────── بررسی پیام‌ها و اعمال قفل ───────────────────────────────
 
 async def check_message_locks(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """بررسی پیام و اعمال قفل‌های فعال"""
+    """بررسی پیام و حذف در صورت نقض قفل‌ها"""
     if not update.message:
         return
 
@@ -141,11 +142,10 @@ async def check_message_locks(update: Update, context: ContextTypes.DEFAULT_TYPE
     if not any(locks.values()):
         return
 
-    # معافیت برای مدیران و سودوها
+    # مدیران و سودوها معاف هستند
     if await _is_admin_or_sudo(context, chat.id, user.id):
         return
 
-    # ویژگی‌های پیام
     has_photo = bool(msg.photo)
     has_video = bool(msg.video)
     has_doc = bool(msg.document)
@@ -204,7 +204,7 @@ async def check_message_locks(update: Update, context: ContextTypes.DEFAULT_TYPE
     if locks.get("text") and text and not (has_photo or has_video or has_doc):
         return await _del_msg(update, "🚫 ارسال پیام متنی ممنوع است.")
 
-# ─────────────────────────────── فعال و غیرفعال کردن قفل ───────────────────────────────
+# ─────────────────────────────── فعال‌سازی / غیرفعال‌سازی قفل ───────────────────────────────
 
 async def handle_lock(update: Update, context: ContextTypes.DEFAULT_TYPE, key: str):
     """فعال‌سازی قفل"""
@@ -221,6 +221,9 @@ async def handle_lock(update: Update, context: ContextTypes.DEFAULT_TYPE, key: s
         return await update.message.reply_text(f"🔒 قفل {LOCK_TYPES[key]} از قبل فعال است.")
 
     _set_lock(chat.id, key, True)
+    global LOCKS
+    LOCKS = _load_json(LOCK_FILE, {})  # ← بروزرسانی حافظه بعد از تغییر
+
     await update.message.reply_text(f"✅ قفل {LOCK_TYPES[key]} فعال شد.")
 
 async def handle_unlock(update: Update, context: ContextTypes.DEFAULT_TYPE, key: str):
@@ -238,12 +241,15 @@ async def handle_unlock(update: Update, context: ContextTypes.DEFAULT_TYPE, key:
         return await update.message.reply_text(f"🔓 قفل {LOCK_TYPES[key]} از قبل باز است.")
 
     _set_lock(chat.id, key, False)
+    global LOCKS
+    LOCKS = _load_json(LOCK_FILE, {})  # ← بروزرسانی حافظه بعد از تغییر
+
     await update.message.reply_text(f"🔓 قفل {LOCK_TYPES[key]} باز شد.")
 
-# ─────────────────────────────── مدیریت دستورات قفل / بازکردن ───────────────────────────────
+# ─────────────────────────────── تشخیص دستور قفل / بازکردن ───────────────────────────────
 
 async def handle_lock_commands(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """تشخیص و اجرای دستور قفل یا بازکردن (بدون پیام اضافی)"""
+    """تشخیص و اجرای دستور قفل یا بازکردن"""
     if not update.message or not update.message.text:
         return
 
@@ -254,13 +260,12 @@ async def handle_lock_commands(update: Update, context: ContextTypes.DEFAULT_TYP
             return await handle_lock(update, context, key)
         if text in (f"باز کردن {fa}", f"بازکردن {fa}"):
             return await handle_unlock(update, context, key)
-    # هیچ پاسخی در صورت اشتباه
-    return
+    return  # بدون پیام اضافی
 
-# ─────────────────────────────── هندلر اصلی گروه ───────────────────────────────
+# ─────────────────────────────── هندلر مرکزی گروه ───────────────────────────────
 
 async def handle_group_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """هندلر مرکزی پیام‌ها در گروه"""
+    """هندلر اصلی پیام‌های گروه"""
     await check_message_locks(update, context)
     text = (update.message.text or update.message.caption or "").strip().lower() if update.message else ""
     if text.startswith("قفل ") or text.startswith("باز کردن ") or text.startswith("بازکردن "):
