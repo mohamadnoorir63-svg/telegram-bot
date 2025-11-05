@@ -266,14 +266,14 @@ async def handle_lock_commands(update: Update, context: ContextTypes.DEFAULT_TYP
     """اجرای دستورات قفل / بازکردن بر اساس متن"""
     text = (update.message.text or "").strip().lower()
 
-    # مثال: "قفل لینک" → links
     for key, fa in LOCK_TYPES.items():
         if text == f"قفل {fa}":
             return await handle_lock(update, context, key)
         if text == f"بازکردن {fa}" or text == f"باز کردن {fa}":
             return await handle_unlock(update, context, key)
-            # ==========================================================
-# 🧱 بخش ۲ — قفل گروه، بازکردن گروه، و قفل خودکار
+
+    # 🆕 اگر هیچ قفلی match نشد:
+    await update.message.reply_text("⚠️ دستور قفل یا بازکردن نامعتبر است.")
 # ==========================================================
 
 AUTOLOCK_FILE = path("autolock.json")
