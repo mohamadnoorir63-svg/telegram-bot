@@ -76,7 +76,7 @@ from weather_module.weather_panel import show_weather
 from modules.azan_module import get_azan_time, get_ramadan_status
 from panels.link_panel import link_panel, link_panel_buttons
 from panels.panel_menu import Tastatur_menu, Tastatur_buttons
-
+from group_control.group_control import handle_group_message
 from telegram.ext import (
     MessageHandler,
     CallbackQueryHandler,
@@ -2038,9 +2038,9 @@ if __name__ == "__main__":
             text += f"{i}. <code>{sid}</code>\n"
         await update.message.reply_text(text, parse_mode="HTML")
     # ======================= 🧱 Group Control System (Central Handler) =======================
-    from group_control.group_control import handle_group_message
+    
     from panels.link_panel import link_panel, link_panel_buttons  # 👈 اگه فایل جدا داری
-    from telegram.ext import MessageHandler, CallbackQueryHandler, filters
+    
 
     # 🟢 پنل لینک‌ها (در اولویت بالا)
     application.add_handler(
