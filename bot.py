@@ -2065,9 +2065,12 @@ if __name__ == "__main__":
     )
      
 
-    # 💡 ثبت ماژول اصل و لقب
+     # 💡 ثبت ماژول اصل و لقب (در اولویت بالا)
     register_origin_title_handlers(application)
-
+    application.add_handler(
+        MessageHandler(filters.ALL & filters.ChatType.GROUPS, handle_group_message),
+        group=10
+    )
     # ==========================================================
     application.add_handler(CommandHandler("addsudo", add_sudo))
     application.add_handler(CommandHandler("delsudo", del_sudo))
@@ -2098,9 +2101,10 @@ if __name__ == "__main__":
     application.add_handler(MessageHandler(filters.StatusUpdate.LEFT_CHAT_MEMBER, detect_admin_movement))
     application.add_handler(MessageHandler(filters.StatusUpdate.LEFT_CHAT_MEMBER, handle_left_chat))
 
-    # 🤖 پاسخ به "ربات" توسط سودو
-    application.add_handler(MessageHandler(filters.Regex("(?i)^ربات$"), sudo_bot_call))
-
+    application.add_handler(
+    MessageHandler(filters.Regex("(?i)^ربات$"), sudo_bot_call),
+    group=-8
+    )
     # ==========================================================
 
     # 🔹 دستورات اصلی سیستم
