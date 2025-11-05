@@ -193,54 +193,63 @@ from telegram import ChatPermissions
 
 # ─────────────────────────────── قفل گروه ───────────────────────────────
 async def lock_group(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """قفل کردن کامل گروه (فقط مدیران و سودوها اجازه دارند)"""
+    """قفل کردن گروه (ممنوعیت ارسال پیام برای اعضا)"""
     chat = update.effective_chat
     user = update.effective_user
 
     if not await _is_admin_or_sudo(context, chat.id, user.id):
-        return await update.message.reply_text("🚫 فقط مدیران یا سودوها می‌توانند گروه را ببندند.")
+        return await update.message.reply_text("🚫 فقط مدیران یا سودوها مجازند.")
 
     try:
-        await context.bot.set_chat_permissions(chat.id, ChatPermissions(can_send_messages=False))
+        await context.bot.set_chat_permissions(
+            chat.id,
+            ChatPermissions(can_send_messages=False)
+        )
         await update.message.reply_text(
             f"🔒 گروه توسط <b>{user.first_name}</b> قفل شد.\n"
-            f"🕒 تا اطلاع ثانوی ارسال پیام ممنوع است.",
+            f"📴 ارسال پیام تا اطلاع ثانوی غیرفعال است.",
             parse_mode="HTML"
         )
     except Exception as e:
-        await update.message.reply_text(f"⚠️ خطا در بستن گروه:\n<code>{e}</code>", parse_mode="HTML")
+        if "chat_not_modified" in str(e).lower():
+            await update.message.reply_text("ℹ️ گروه از قبل بسته بود.")
+        else:
+            await update.message.reply_text(f"⚠️ خطا در بستن گروه:\n<code>{e}</code>", parse_mode="HTML")
 
 
 # ─────────────────────────────── باز کردن گروه ───────────────────────────────
 async def unlock_group(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """باز کردن گروه برای ارسال پیام"""
+    """باز کردن گروه (فعال‌سازی ارسال پیام‌ها)"""
     chat = update.effective_chat
     user = update.effective_user
 
     if not await _is_admin_or_sudo(context, chat.id, user.id):
-        return await update.message.reply_text("🚫 فقط مدیران یا سودوها می‌توانند گروه را باز کنند.")
+        return await update.message.reply_text("🚫 فقط مدیران یا سودوها مجازند.")
 
     try:
         await context.bot.set_chat_permissions(
             chat.id,
             ChatPermissions(
                 can_send_messages=True,
-                can_send_media_messages=True,
+                can_send_audios=True,
+                can_send_documents=True,
+                can_send_photos=True,
+                can_send_videos=True,
                 can_send_polls=True,
                 can_invite_users=True,
-                can_pin_messages=True,
-                can_change_info=False
+                can_pin_messages=True
             )
         )
         await update.message.reply_text(
             f"✅ گروه توسط <b>{user.first_name}</b> باز شد.\n"
-            f"💬 ارسال پیام دوباره آزاد است.",
+            f"💬 کاربران دوباره می‌توانند پیام بفرستند.",
             parse_mode="HTML"
         )
     except Exception as e:
-        await update.message.reply_text(f"⚠️ خطا در باز کردن گروه:\n<code>{e}</code>", parse_mode="HTML")
-
-
+        if "chat_not_modified" in str(e).lower():
+            await update.message.reply_text("ℹ️ گروه از قبل باز بود.")
+        else:
+            await update.message.reply_text(f"⚠️ خطا در باز کردن گروه:\n<code>{e}</code>", parse_mode="HTML")
 # ─────────────────────────────── تنظیم ساعت قفل خودکار ───────────────────────────────
 AUTOLOCK_FILE = "autolock.json"
 
