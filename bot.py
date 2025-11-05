@@ -2052,17 +2052,10 @@ if __name__ == "__main__":
         group=-10
     )
 
-    # 🧱 تمام پیام‌های متنی به ماژول کنترل گروه
-    application.add_handler(
-        MessageHandler(filters.TEXT & ~filters.COMMAND, handle_group_message),
-        group=0
-    )
-
-    # 🧱 برای پنل دکمه‌ای قفل‌ها
-    application.add_handler(
-        CallbackQueryHandler(handle_lock_panel_callback, pattern="^lock"),
-        group=1
-    )
+    # کنترل پیام‌های متنی گروه و اعمال قفل‌ها
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_group_message))
+    # بررسی همه پیام‌ها برای اعمال قفل روی عکس، ویدیو و ... 
+    application.add_handler(MessageHandler(filters.ALL, handle_group_message))
     # ==========================================================
     application.add_handler(CommandHandler("addsudo", add_sudo))
     application.add_handler(CommandHandler("delsudo", del_sudo))
