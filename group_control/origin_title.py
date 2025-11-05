@@ -1,80 +1,110 @@
-import json, os
+import os
+import json
 from telegram import Update
 from telegram.ext import ContextTypes, MessageHandler, filters
 
+# ================= ⚙️ تنظیمات اولیه =================
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DATA_FILE = os.path.join(BASE_DIR, "titles.json")
+DATA_FILE = os.path.join(BASE_DIR, "origin_title.json")
 
+SUDO_IDS = [8588347189]  # آیدی سودوها (خودت + ادمین‌های ثابت)
+
+# فایل ذخیره‌سازی
 if not os.path.exists(DATA_FILE):
     with open(DATA_FILE, "w", encoding="utf-8") as f:
-        json.dump({}, f)
+        json.dump({}, f, ensure_ascii=False, indent=2)
 
 def _load_data():
-    with open(DATA_FILE, "r", encoding="utf-8") as f:
-        return json.load(f)
+    try:
+        with open(DATA_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except:
+        return {}
 
 def _save_data(data):
     with open(DATA_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
-# ---------------------------------------------------------------------
+USER_DATA = _load_data()
 
+# ================= 🔐 بررسی ادمین / سودو =================
+async def _has_access(context, chat_id: int, user_id: int) -> bool:
+    if user_id in SUDO_IDS:
+        return True
+    try:
+        member = await context.bot.get_chat_member(chat_id, user_id)
+        return member.status in ("creator", "administrator")
+    except:
+        return False
+
+# ================= 🪪 مدیریت اصل و لقب =================
 async def handle_origin_title(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """مدیریت اصل و لقب"""
-    msg = update.message
-    if not msg or not msg.text:
+    msg = update.effective_message
+    user = update.effective_user
+    chat = update.effective_chat
+
+    if not msg or chat.type not in ("group", "supergroup"):
         return
-    chat_id = str(msg.chat_id)
-    user = msg.from_user
-    text = msg.text.strip().lower()
-    data = _load_data()
 
-    if chat_id not in data:
-        data[chat_id] = {}
+    text = (msg.text or "").strip()
 
-    # ثبت اصل
+    # --- ثبت اصل ---
     if msg.reply_to_message and text == "ثبت اصل":
-        origin_user = msg.reply_to_message.from_user
-        data[chat_id][str(origin_user.id)] = {"origin": msg.reply_to_message.text, "title": None}
-        _save_data(data)
-        return await msg.reply_text(f"✅ اصل {origin_user.first_name} ثبت شد.")
-
-    # ثبت لقب
-    if msg.reply_to_message and text == "ثبت لقب":
-        origin_user = msg.reply_to_message.from_user
-        data[chat_id].setdefault(str(origin_user.id), {})["title"] = msg.reply_to_message.text
-        _save_data(data)
-        return await msg.reply_text(f"✅ لقب {origin_user.first_name} ثبت شد.")
-
-    # نمایش اصل من
-    if text == "اصل من":
-        udata = data.get(chat_id, {}).get(str(user.id))
-        if udata and udata.get("origin"):
-            return await msg.reply_text(f"🧾 اصل شما:\n{udata['origin']}")
-        else:
-            return await msg.reply_text("❌ اصل شما ثبت نشده است.")
-
-    # نمایش لقب من
-    if text == "لقب من":
-        udata = data.get(chat_id, {}).get(str(user.id))
-        if udata and udata.get("title"):
-            return await msg.reply_text(f"🏷️ لقب شما:\n{udata['title']}")
-        else:
-            return await msg.reply_text("❌ لقبی برای شما ثبت نشده است.")
-
-    # وقتی روی پیام کسی ریپلای بزنی و بنویسی "اصل" یا "لقب"
-    if msg.reply_to_message:
+        if not await _has_access(context, chat.id, user.id):
+            return await msg.reply_text("🚫 فقط مدیران یا سودوها مجاز به ثبت اصل هستند.")
         target = msg.reply_to_message.from_user
-        tdata = data.get(chat_id, {}).get(str(target.id))
-        if not tdata:
-            return
-        if text == "اصل" and tdata.get("origin"):
-            return await msg.reply_text(f"🧾 اصل {target.first_name}:\n{tdata['origin']}")
-        if text == "لقب" and tdata.get("title"):
-            return await msg.reply_text(f"🏷️ لقب {target.first_name}:\n{tdata['title']}")
+        USER_DATA[str(target.id)] = USER_DATA.get(str(target.id), {})
+        USER_DATA[str(target.id)]["origin"] = msg.reply_to_message.text or "—"
+        _save_data(USER_DATA)
+        return await msg.reply_text(f"✅ اصل {target.first_name} با موفقیت ثبت شد.")
 
-# ---------------------------------------------------------------------
+    # --- ثبت لقب ---
+    if msg.reply_to_message and text == "ثبت لقب":
+        if not await _has_access(context, chat.id, user.id):
+            return await msg.reply_text("🚫 فقط مدیران یا سودوها مجاز به ثبت لقب هستند.")
+        target = msg.reply_to_message.from_user
+        USER_DATA[str(target.id)] = USER_DATA.get(str(target.id), {})
+        USER_DATA[str(target.id)]["title"] = msg.reply_to_message.text or "—"
+        _save_data(USER_DATA)
+        return await msg.reply_text(f"✅ لقب {target.first_name} با موفقیت ثبت شد.")
 
+    # --- نمایش اصل ---
+    if msg.reply_to_message and text == "اصل":
+        target = msg.reply_to_message.from_user
+        info = USER_DATA.get(str(target.id), {}).get("origin")
+        if info:
+            return await msg.reply_text(f"📜 اصل {target.first_name}:\n<code>{info}</code>", parse_mode="HTML")
+        else:
+            return  # هیچی نگه
+
+    # --- نمایش لقب ---
+    if msg.reply_to_message and text == "لقب":
+        target = msg.reply_to_message.from_user
+        info = USER_DATA.get(str(target.id), {}).get("title")
+        if info:
+            return await msg.reply_text(f"🏷️ لقب {target.first_name}:\n<code>{info}</code>", parse_mode="HTML")
+        else:
+            return  # هیچی نگه
+
+    # --- نمایش اصل خود ---
+    if text == "اصل من":
+        info = USER_DATA.get(str(user.id), {}).get("origin")
+        if info:
+            return await msg.reply_text(f"📜 اصل شما:\n<code>{info}</code>", parse_mode="HTML")
+        else:
+            return await msg.reply_text("😅 هنوز اصل شما ثبت نشده است.")
+
+    # --- نمایش لقب خود ---
+    if text == "لقب من":
+        info = USER_DATA.get(str(user.id), {}).get("title")
+        if info:
+            return await msg.reply_text(f"🏷️ لقب شما:\n<code>{info}</code>", parse_mode="HTML")
+        else:
+            return await msg.reply_text("😅 هنوز لقب شما ثبت نشده است.")
+
+# ================= 🔧 ثبت هندلر =================
 def register_origin_title_handlers(application):
-    """ثبت هندلرها در اپ اصلی"""
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_origin_title))
+    """افزودن هندلر اصل و لقب به برنامه اصلی"""
+    application.add_handler(
+        MessageHandler(filters.TEXT & ~filters.COMMAND, handle_origin_title)
+    )
