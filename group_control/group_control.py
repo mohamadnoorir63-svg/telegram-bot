@@ -1,8 +1,3 @@
-# ==========================================================
-# 🧱 GROUP CONTROL SYSTEM — STEP 1 (FINAL FIXED)
-# سیستم قفل‌ها — نسخه پایدار بدون پنل آنلاین
-# ==========================================================
-
 import os
 import json
 import re
@@ -13,14 +8,15 @@ from telegram.ext import ContextTypes
 
 # ─────────────────────────────── مسیر فایل ───────────────────────────────
 
-LOCK_FILE = "group_locks.json"
-if not os.path.exists(LOCK_FILE):
-    with open(LOCK_FILE, "w", encoding="utf-8") as f:
-        json.dump({}, f, ensure_ascii=False, indent=2)
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+def path(filename: str) -> str:
+    """برمی‌گردونه مسیر کامل فایل داخل فولدر group_control"""
+    return os.path.join(BASE_DIR, filename)
 
 # ─────────────────────────────── سودوها ───────────────────────────────
-
-SUDO_IDS = [8588347189]  # ← آیدی خودت رو اینجا بزار
+# آیدی خودت رو اینجا بزار
+SUDO_IDS = [123456789]
 
 # ─────────────────────────────── انواع قفل‌ها ───────────────────────────────
 
@@ -35,19 +31,33 @@ LOCK_TYPES = {
     "gifs": "گیف",
     "media": "رسانه‌ها",
     "forward": "فوروارد",
-    "ads": "تبچی / تبلیغ",
-    "usernames": "یوزرنیم / تگ",
-    "mention": "منشن با @",
+    "ads": "تبلیغ",
+    "usernames": "یوزرنیم",
+    "mention": "منشن",
     "arabic": "حروف عربی",
     "english": "حروف انگلیسی",
     "text": "پیام متنی",
-    "audio": "آهنگ / موزیک",
+    "audio": "موزیک",
     "emoji": "فقط ایموجی",
     "caption": "کپشن",
-    "reply": "ریپلای / پاسخ",
+    "reply": "ریپلای",
+    "voicechat": "ویس چت",
+    "location": "مکان",
+    "contact": "مخاطب",
+    "poll": "نظرسنجی",
+    "bots": "ربات‌ها",
+    "join": "ورود کاربران جدید"
 }
 
-# ─────────────────────────────── مدیریت فایل ───────────────────────────────
+# ─────────────────────────────── فایل ذخیره قفل‌ها ───────────────────────────────
+
+LOCK_FILE = path("group_locks.json")
+
+if not os.path.exists(LOCK_FILE):
+    with open(LOCK_FILE, "w", encoding="utf-8") as f:
+        json.dump({}, f, ensure_ascii=False, indent=2)
+
+# ─────────────────────────────── توابع کمکی فایل ───────────────────────────────
 
 def _load_json(path, default=None):
     try:
@@ -65,7 +75,7 @@ def _save_json(path, data):
     except Exception as e:
         print(f"⚠️ خطا در ذخیره {path}: {e}")
 
-# ─────────────────────────────── بارگذاری اولیه ───────────────────────────────
+# ─────────────────────────────── مدیریت قفل‌ها ───────────────────────────────
 
 LOCKS = _load_json(LOCK_FILE, {})
 
@@ -73,18 +83,18 @@ def _get_locks(chat_id: int):
     return LOCKS.get(str(chat_id), {})
 
 def _set_lock(chat_id: int, key: str, status: bool):
-    """ذخیره و آپدیت هم‌زمان فایل و حافظه"""
+    """ذخیره و آپدیت قفل در حافظه و فایل"""
     global LOCKS
     cid = str(chat_id)
     locks = LOCKS.get(cid, {})
     locks[key] = bool(status)
     LOCKS[cid] = locks
     _save_json(LOCK_FILE, LOCKS)
-    LOCKS = _load_json(LOCK_FILE)  # ← فیکس مهم برای به‌روزرسانی در حافظه
+    LOCKS = _load_json(LOCK_FILE)
 
-# ─────────────────────────────── بررسی مدیر / سودو ───────────────────────────────
+# ─────────────────────────────── بررسی مدیر یا سودو ───────────────────────────────
 
-async def _is_admin_or_sudo(context, chat_id: int, user_id: int):
+async def _is_admin_or_sudo(context, chat_id: int, user_id: int) -> bool:
     if user_id in SUDO_IDS:
         return True
     try:
@@ -93,7 +103,23 @@ async def _is_admin_or_sudo(context, chat_id: int, user_id: int):
     except:
         return False
 
-# ─────────────────────────────── فعال / غیرفعال کردن قفل ───────────────────────────────
+# ─────────────────────────────── حذف پیام ممنوع ───────────────────────────────
+
+async def _del_msg(update: Update, warn_text: str = None):
+    try:
+        msg = update.message
+        user = update.effective_user
+        await msg.delete()
+        if warn_text:
+            warn = await msg.chat.send_message(
+                f"{warn_text}\n👤 {user.first_name}", parse_mode="HTML"
+            )
+            await asyncio.sleep(4)
+            await warn.delete()
+    except Exception as e:
+        print(f"[Delete Error] {e}")
+
+# ─────────────────────────────── قفل‌ها ───────────────────────────────
 
 async def handle_lock(update: Update, context: ContextTypes.DEFAULT_TYPE, key: str):
     chat = update.effective_chat
@@ -101,6 +127,7 @@ async def handle_lock(update: Update, context: ContextTypes.DEFAULT_TYPE, key: s
 
     if not await _is_admin_or_sudo(context, chat.id, user.id):
         return await update.message.reply_text("🚫 فقط مدیران یا سودوها مجازند.")
+
     if key not in LOCK_TYPES:
         return await update.message.reply_text("⚠️ نام قفل معتبر نیست.")
 
@@ -113,101 +140,109 @@ async def handle_unlock(update: Update, context: ContextTypes.DEFAULT_TYPE, key:
 
     if not await _is_admin_or_sudo(context, chat.id, user.id):
         return await update.message.reply_text("🚫 فقط مدیران یا سودوها مجازند.")
+
     if key not in LOCK_TYPES:
         return await update.message.reply_text("⚠️ نام قفل معتبر نیست.")
 
     _set_lock(chat.id, key, False)
     await update.message.reply_text(f"🔓 قفل <b>{LOCK_TYPES[key]}</b> باز شد.", parse_mode="HTML")
 
-# ─────────────────────────────── حذف پیام ───────────────────────────────
+# ─────────────────────────────── کنترل پیام‌های ورودی ───────────────────────────────
 
-async def _del_msg(update: Update, warn_text: str = None):
-    try:
-        msg = update.message
-        user = update.effective_user
-        await msg.delete()
-        if warn_text:
-            warn = await msg.chat.send_message(
-                f"{warn_text}\n👤 {user.first_name}", parse_mode="HTML"
-            )
-            await asyncio.sleep(5)
-            await warn.delete()
-    except Exception as e:
-        print(f"[Lock Delete Error] {e}")
+async def check_message_locks(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """بررسی پیام و اعمال قفل‌ها"""
+    if not update.message:
+        return
 
-# ─────────────────────────────── کنترل پیام‌ها ───────────────────────────────
+    msg = update.message
+    text = (msg.text or msg.caption or "").lower()
+    chat = msg.chat
+    user = msg.from_user
 
+    locks = _get_locks(chat.id)
+    if not any(locks.values()):
+        return  # هیچ قفلی فعال نیست
 
+    # مدیران و سودوها از قفل‌ها مستثنی‌اند
+    if await _is_admin_or_sudo(context, chat.id, user.id):
+        return
 
+    # خصوصیات پیام
+    has_photo = bool(msg.photo)
+    has_video = bool(msg.video)
+    has_doc = bool(msg.document)
+    has_voice = bool(msg.voice)
+    has_anim = bool(msg.animation)
+    has_stick = bool(msg.sticker)
+    has_fwd = bool(msg.forward_date)
+
+    # 🚫 قفل لینک‌ها
+    if locks.get("links") and any(x in text for x in ["http://", "https://", "t.me", "telegram.me"]):
+        return await _del_msg(update, "🚫 ارسال لینک ممنوع است.")
+
+    # 🚫 تبلیغ
+    if locks.get("ads") and any(x in text for x in ["joinchat", "promo", "invite", "bot?start=", "channel"]):
+        return await _del_msg(update, "🚫 تبلیغات در گروه ممنوع است.")
+
+    # 🚫 رسانه‌ها
+    if locks.get("photos") and has_photo:
+        return await _del_msg(update, "🚫 ارسال عکس ممنوع است.")
+    if locks.get("videos") and has_video:
+        return await _del_msg(update, "🚫 ارسال ویدیو ممنوع است.")
+    if locks.get("files") and has_doc:
+        return await _del_msg(update, "🚫 ارسال فایل ممنوع است.")
+    if locks.get("voices") and has_voice:
+        return await _del_msg(update, "🚫 ارسال ویس ممنوع است.")
+    if locks.get("stickers") and has_stick:
+        return await _del_msg(update, "🚫 ارسال استیکر ممنوع است.")
+    if locks.get("gifs") and has_anim:
+        return await _del_msg(update, "🚫 ارسال گیف ممنوع است.")
+    if locks.get("forward") and has_fwd:
+        return await _del_msg(update, "🚫 فوروارد پیام ممنوع است.")
+
+    # 🚫 منشن و یوزرنیم
+    if (locks.get("usernames") or locks.get("mention")) and "@" in text:
+        return await _del_msg(update, "🚫 استفاده از @ یا منشن ممنوع است.")
+
+    # 🚫 حروف عربی / انگلیسی
+    if locks.get("arabic") and any("\u0600" <= c <= "\u06FF" for c in text):
+        return await _del_msg(update, "🚫 استفاده از حروف عربی ممنوع است.")
+    if locks.get("english") and any("a" <= c <= "z" or "A" <= c <= "Z" for c in text):
+        return await _del_msg(update, "🚫 استفاده از حروف انگلیسی ممنوع است.")
+
+    # 🚫 کپشن / ریپلای
+    if locks.get("caption") and msg.caption:
+        return await _del_msg(update, "🚫 کپشن‌گذاری ممنوع است.")
+    if locks.get("reply") and msg.reply_to_message:
+        return await _del_msg(update, "🚫 پاسخ دادن ممنوع است.")
+
+    # 🚫 فقط ایموجی
+    if locks.get("emoji"):
+        emoji_pattern = re.compile(r"[\U00010000-\U0010ffff]", flags=re.UNICODE)
+        if text and all(emoji_pattern.match(c) for c in text if not c.isspace()):
+            return await _del_msg(update, "🚫 ارسال فقط ایموجی مجاز نیست.")
+
+    # 🚫 پیام متنی
+    if locks.get("text") and text and not (has_photo or has_video or has_doc):
+        return await _del_msg(update, "🚫 ارسال پیام متنی ممنوع است.")
+
+# ─────────────────────────────── دستورات قفل و بازکردن ───────────────────────────────
+
+async def handle_lock_commands(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """اجرای دستورات قفل / بازکردن بر اساس متن"""
+    text = (update.message.text or "").strip().lower()
+
+    # مثال: "قفل لینک" → links
+    for key, fa in LOCK_TYPES.items():
+        if text == f"قفل {fa}":
+            return await handle_lock(update, context, key)
+        if text == f"بازکردن {fa}" or text == f"باز کردن {fa}":
+            return await handle_unlock(update, context, key)
+            # ==========================================================
+# 🧱 بخش ۲ — قفل گروه، بازکردن گروه، و قفل خودکار
 # ==========================================================
-# 🧱 GROUP CONTROL SYSTEM — STEP 2
-# قفل گروه، بازکردن گروه، و قفل خودکار زمان‌بندی‌شده
-# ==========================================================
 
-# ─────────────────────────────── قفل گروه ───────────────────────────────
-
-async def lock_group(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """قفل کردن گروه (ممنوعیت ارسال پیام برای اعضا)"""
-    chat = update.effective_chat
-    user = update.effective_user
-
-    if not await _is_admin_or_sudo(context, chat.id, user.id):
-        return await update.message.reply_text("🚫 فقط مدیران یا سودوها مجازند.")
-
-    try:
-        await context.bot.set_chat_permissions(
-            chat.id,
-            ChatPermissions(can_send_messages=False)
-        )
-        await update.message.reply_text(
-            f"🔒 گروه توسط <b>{user.first_name}</b> قفل شد.\n"
-            f"📴 ارسال پیام تا اطلاع ثانوی غیرفعال است.",
-            parse_mode="HTML"
-        )
-    except Exception as e:
-        if "chat_not_modified" in str(e).lower():
-            await update.message.reply_text("ℹ️ گروه از قبل بسته بود.")
-        else:
-            await update.message.reply_text(f"⚠️ خطا در بستن گروه:\n<code>{e}</code>", parse_mode="HTML")
-
-# ─────────────────────────────── باز کردن گروه ───────────────────────────────
-
-async def unlock_group(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """باز کردن گروه (فعال‌سازی ارسال پیام‌ها)"""
-    chat = update.effective_chat
-    user = update.effective_user
-
-    if not await _is_admin_or_sudo(context, chat.id, user.id):
-        return await update.message.reply_text("🚫 فقط مدیران یا سودوها مجازند.")
-
-    try:
-        await context.bot.set_chat_permissions(
-            chat.id,
-            ChatPermissions(
-                can_send_messages=True,
-                can_send_audios=True,
-                can_send_documents=True,
-                can_send_photos=True,
-                can_send_videos=True,
-                can_send_polls=True,
-                can_invite_users=True,
-                can_pin_messages=True
-            )
-        )
-        await update.message.reply_text(
-            f"✅ گروه توسط <b>{user.first_name}</b> باز شد.\n"
-            f"💬 کاربران دوباره می‌توانند پیام بفرستند.",
-            parse_mode="HTML"
-        )
-    except Exception as e:
-        if "chat_not_modified" in str(e).lower():
-            await update.message.reply_text("ℹ️ گروه از قبل باز بود.")
-        else:
-            await update.message.reply_text(f"⚠️ خطا در باز کردن گروه:\n<code>{e}</code>", parse_mode="HTML")
-
-# ─────────────────────────────── تنظیم ساعت قفل خودکار ───────────────────────────────
-
-AUTOLOCK_FILE = "autolock.json"
+AUTOLOCK_FILE = path("autolock.json")
 
 if not os.path.exists(AUTOLOCK_FILE):
     with open(AUTOLOCK_FILE, "w", encoding="utf-8") as f:
@@ -218,597 +253,308 @@ AUTOLOCKS = _load_json(AUTOLOCK_FILE, {})
 def _save_autolocks():
     _save_json(AUTOLOCK_FILE, AUTOLOCKS)
 
-# ─────────────────────────────── دستور تنظیم خودکار ───────────────────────────────
+# ─────────────────────────────── قفل گروه دستی ───────────────────────────────
+
+async def lock_group(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """قفل کردن کل گروه (ممنوعیت ارسال پیام برای اعضا)"""
+    chat = update.effective_chat
+    user = update.effective_user
+
+    if not await _is_admin_or_sudo(context, chat.id, user.id):
+        return await update.message.reply_text("🚫 فقط مدیران یا سودوها می‌تونن گروه رو قفل کنن.")
+
+    try:
+        await context.bot.set_chat_permissions(
+            chat.id,
+            ChatPermissions(can_send_messages=False)
+        )
+        await update.message.reply_text(
+            f"🔒 گروه توسط <b>{user.first_name}</b> قفل شد.\n📴 ارسال پیام برای اعضا غیرفعال شد.",
+            parse_mode="HTML"
+        )
+        _set_lock(chat.id, "group", True)
+    except Exception as e:
+        await update.message.reply_text(f"⚠️ خطا در قفل گروه:\n<code>{e}</code>", parse_mode="HTML")
+
+# ─────────────────────────────── بازکردن گروه دستی ───────────────────────────────
+
+async def unlock_group(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """باز کردن کل گروه (فعال کردن ارسال پیام)"""
+    chat = update.effective_chat
+    user = update.effective_user
+
+    if not await _is_admin_or_sudo(context, chat.id, user.id):
+        return await update.message.reply_text("🚫 فقط مدیران یا سودوها می‌تونن گروه رو باز کنن.")
+
+    try:
+        await context.bot.set_chat_permissions(
+            chat.id,
+            ChatPermissions(
+                can_send_messages=True,
+                can_send_media_messages=True,
+                can_send_polls=True,
+                can_send_other_messages=True,
+                can_add_web_page_previews=True,
+                can_invite_users=True,
+            )
+        )
+        await update.message.reply_text(
+            f"✅ گروه توسط <b>{user.first_name}</b> باز شد.\n💬 کاربران می‌تونن پیام بفرستن.",
+            parse_mode="HTML"
+        )
+        _set_lock(chat.id, "group", False)
+    except Exception as e:
+        await update.message.reply_text(f"⚠️ خطا در باز کردن گروه:\n<code>{e}</code>", parse_mode="HTML")
+
+# ─────────────────────────────── تنظیم قفل خودکار ───────────────────────────────
 
 async def set_auto_lock(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """تنظیم قفل خودکار گروه. مثال: تنظیم قفل خودکار 23:00 06:00"""
-    if not await _is_admin_or_sudo(context, update.effective_chat.id, update.effective_user.id):
+    """
+    تنظیم زمان قفل خودکار گروه
+    مثال: تنظیم قفل خودکار 23:00 06:00
+    """
+    chat = update.effective_chat
+    user = update.effective_user
+
+    if not await _is_admin_or_sudo(context, chat.id, user.id):
         return await update.message.reply_text("🚫 فقط مدیران یا سودوها می‌تونن تنظیم کنن.")
 
-    text = update.message.text.strip().split()
-    if len(text) != 3:
-        return await update.message.reply_text("📘 مثال:\n<code>تنظیم قفل خودکار 23:00 06:00</code>", parse_mode="HTML")
+    parts = update.message.text.split()
+    if len(parts) != 4:
+        return await update.message.reply_text(
+            "📘 مثال:\n<code>تنظیم قفل خودکار 23:00 06:00</code>", parse_mode="HTML"
+        )
 
-    start, end = text[1], text[2]
+    start_time, end_time = parts[2], parts[3]
     try:
-        datetime.strptime(start, "%H:%M")
-        datetime.strptime(end, "%H:%M")
+        datetime.strptime(start_time, "%H:%M")
+        datetime.strptime(end_time, "%H:%M")
     except:
-        return await update.message.reply_text("⚠️ فرمت ساعت اشتباه است. از 24 ساعته استفاده کن مثل 23:00", parse_mode="HTML")
+        return await update.message.reply_text("⚠️ ساعت باید به‌صورت HH:MM باشه مثل 23:00")
 
-    chat_id = str(update.effective_chat.id)
-    AUTOLOCKS[chat_id] = {"start": start, "end": end}
+    AUTOLOCKS[str(chat.id)] = {"start": start_time, "end": end_time, "enabled": True}
     _save_autolocks()
 
     await update.message.reply_text(
-        f"⏰ قفل خودکار تنظیم شد!\n"
-        f"🔒 بستن در: <b>{start}</b>\n"
-        f"🔓 باز کردن در: <b>{end}</b>",
+        f"⏰ قفل خودکار فعال شد!\n🔒 قفل در: <b>{start_time}</b>\n🔓 باز شدن در: <b>{end_time}</b>",
         parse_mode="HTML"
     )
 
-# ─────────────────────────────── اجرای خودکار قفل / بازکردن ───────────────────────────────
+# ─────────────────────────────── خاموش کردن قفل خودکار ───────────────────────────────
 
-async def auto_lock_checker(context: ContextTypes.DEFAULT_TYPE):
-    """بررسی خودکار قفل گروه بر اساس ساعت تنظیم‌شده"""
+async def disable_auto_lock(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """خاموش کردن قفل خودکار گروه"""
+    chat = update.effective_chat
+    user = update.effective_user
+
+    if not await _is_admin_or_sudo(context, chat.id, user.id):
+        return await update.message.reply_text("🚫 فقط مدیران یا سودوها مجازند.")
+
+    if str(chat.id) in AUTOLOCKS:
+        AUTOLOCKS[str(chat.id)]["enabled"] = False
+        _save_autolocks()
+        await update.message.reply_text("🕓 قفل خودکار غیرفعال شد.")
+    else:
+        await update.message.reply_text("ℹ️ قفل خودکار از قبل تنظیم نشده بود.")
+
+# ─────────────────────────────── بررسی خودکار زمان‌بندی ───────────────────────────────
+
+async def check_auto_lock(context: ContextTypes.DEFAULT_TYPE):
+    """اجرای خودکار قفل و باز کردن گروه طبق زمان‌بندی"""
     now = datetime.now().strftime("%H:%M")
-    for chat_id, times in AUTOLOCKS.items():
-        start, end = times["start"], times["end"]
-        locks = _get_locks(int(chat_id))
 
+    for chat_id, cfg in AUTOLOCKS.items():
+        if not cfg.get("enabled", False):
+            continue
+
+        start = cfg.get("start")
+        end = cfg.get("end")
+        if not start or not end:
+            continue
+
+        # بازه زمانی بین start تا end
         if start <= now or now < end:
-            if not locks.get("group", False):
-                try:
-                    await context.bot.set_chat_permissions(
-                        chat_id=int(chat_id),
-                        permissions=ChatPermissions(can_send_messages=False)
-                    )
-                    _set_lock(int(chat_id), "group", True)
-                    print(f"[AUTOLOCK] Group {chat_id} closed at {now}")
-                except Exception as e:
-                    print(f"[AUTOLOCK ERROR] {e}")
+            # قفل کردن گروه
+            try:
+                await context.bot.set_chat_permissions(
+                    int(chat_id),
+                    ChatPermissions(can_send_messages=False)
+                )
+                _set_lock(int(chat_id), "group", True)
+                print(f"[AUTOLOCK] Group {chat_id} closed at {now}")
+            except Exception as e:
+                print(f"[AUTOLOCK ERROR] {e}")
         else:
-            if locks.get("group", False):
-                try:
-                    await context.bot.set_chat_permissions(
-                        chat_id=int(chat_id),
-                        permissions=ChatPermissions(
-                            can_send_messages=True,
-                            can_send_audios=True,
-                            can_send_documents=True,
-                            can_send_photos=True,
-                            can_send_videos=True,
-                            can_send_voice_notes=True,
-                            can_invite_users=True,
-                            can_send_polls=True
-                        )
+            # باز کردن گروه
+            try:
+                await context.bot.set_chat_permissions(
+                    int(chat_id),
+                    ChatPermissions(
+                        can_send_messages=True,
+                        can_send_media_messages=True,
+                        can_send_polls=True,
+                        can_send_other_messages=True,
+                        can_add_web_page_previews=True,
+                        can_invite_users=True,
                     )
-                    _set_lock(int(chat_id), "group", False)
-                    print(f"[AUTOLOCK] Group {chat_id} opened at {now}")
-                except Exception as e:
-                    print(f"[AUTOLOCK ERROR] {e}")
-                    # ==========================================================
-# 🧱 GROUP CONTROL SYSTEM — STEP 3
-# فیلتر کلمات + حذف خودکار پیام‌های شامل فیلتر
+                )
+                _set_lock(int(chat_id), "group", False)
+                print(f"[AUTOLOCK] Group {chat_id} opened at {now}")
+            except Exception as e:
+                print(f"[AUTOLOCK ERROR] {e}")
+
+# ─────────────────────────────── دستورات کاربر ───────────────────────────────
+
+async def handle_group_lock_commands(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """اجرای دستورات قفل گروه"""
+    text = (update.message.text or "").strip().lower()
+
+    if text in ["قفل گروه", "بستن گروه"]:
+        return await lock_group(update, context)
+    if text in ["باز کردن گروه", "بازکردن گروه", "باز کردن"]:
+        return await unlock_group(update, context)
+    if text.startswith("تنظیم قفل خودکار"):
+        return await set_auto_lock(update, context)
+    if text in ["قفل خودکار خاموش", "خاموش کردن قفل خودکار"]:
+        return await disable_auto_lock(update, context)
+        # ==========================================================
+# 🧱 بخش ۳ — فیلتر کلمات (Filter System)
 # ==========================================================
 
-FILTER_FILE = "filters.json"
+FILTER_FILE = path("filters.json")
 
-# اطمینان از وجود فایل فیلترها
 if not os.path.exists(FILTER_FILE):
     with open(FILTER_FILE, "w", encoding="utf-8") as f:
         json.dump({}, f, ensure_ascii=False, indent=2)
 
-def _load_filters():
-    try:
-        with open(FILTER_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except:
-        return {}
+FILTERS = _load_json(FILTER_FILE, {})
 
-def _save_filters(data):
-    with open(FILTER_FILE, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
-
-FILTERS = _load_filters()
+def _save_filters():
+    _save_json(FILTER_FILE, FILTERS)
 
 # ─────────────────────────────── افزودن فیلتر ───────────────────────────────
 
 async def add_filter(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """افزودن یک کلمه به لیست فیلتر"""
-    if not await _is_admin_or_sudo(context, update.effective_chat.id, update.effective_user.id):
-        return await update.message.reply_text("🚫 فقط مدیران یا سودوها می‌تونن فیلتر اضافه کنن.")
+    chat = update.effective_chat
+    user = update.effective_user
+    text = (update.message.text or "").strip()
 
-    text = update.message.text.strip().split(maxsplit=1)
-    if len(text) < 2:
-        return await update.message.reply_text("📘 مثال:\n<code>فیلتر کلمه</code>", parse_mode="HTML")
+    if not await _is_admin_or_sudo(context, chat.id, user.id):
+        return await update.message.reply_text("🚫 فقط مدیران و سودوها مجازند.")
 
-    word = text[1].lower()
-    chat_id = str(update.effective_chat.id)
+    parts = text.split("فیلتر", 1)
+    if len(parts) < 2 or not parts[1].strip():
+        return await update.message.reply_text("📘 مثال: <code>فیلتر سگ</code>", parse_mode="HTML")
+
+    word = parts[1].strip().lower()
+    chat_id = str(chat.id)
 
     FILTERS.setdefault(chat_id, [])
     if word in FILTERS[chat_id]:
-        return await update.message.reply_text("⚠️ این کلمه از قبل در لیست فیلتر است.")
+        return await update.message.reply_text("ℹ️ این کلمه از قبل فیلتر شده است.")
 
     FILTERS[chat_id].append(word)
-    _save_filters(FILTERS)
-    await update.message.reply_text(f"🚫 کلمه <b>{word}</b> به فیلتر اضافه شد.", parse_mode="HTML")
+    _save_filters()
+
+    await update.message.reply_text(f"🚫 کلمه <b>{word}</b> به لیست فیلترها اضافه شد.", parse_mode="HTML")
 
 # ─────────────────────────────── حذف فیلتر ───────────────────────────────
 
 async def remove_filter(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """حذف یک کلمه از فیلتر"""
-    if not await _is_admin_or_sudo(context, update.effective_chat.id, update.effective_user.id):
-        return await update.message.reply_text("🚫 فقط مدیران یا سودوها می‌تونن فیلتر حذف کنن.")
+    chat = update.effective_chat
+    user = update.effective_user
+    text = (update.message.text or "").strip()
 
-    text = update.message.text.strip().split(maxsplit=2)
-    if len(text) < 3:
-        return await update.message.reply_text("📘 مثال:\n<code>حذف فیلتر کلمه</code>", parse_mode="HTML")
+    if not await _is_admin_or_sudo(context, chat.id, user.id):
+        return await update.message.reply_text("🚫 فقط مدیران و سودوها مجازند.")
 
-    word = text[2].lower()
-    chat_id = str(update.effective_chat.id)
+    parts = text.split("حذف فیلتر", 1)
+    if len(parts) < 2 or not parts[1].strip():
+        return await update.message.reply_text("📘 مثال: <code>حذف فیلتر سگ</code>", parse_mode="HTML")
+
+    word = parts[1].strip().lower()
+    chat_id = str(chat.id)
 
     if chat_id not in FILTERS or word not in FILTERS[chat_id]:
-        return await update.message.reply_text("⚠️ این کلمه در فیلتر وجود ندارد.")
+        return await update.message.reply_text("ℹ️ این کلمه در لیست فیلتر نیست.")
 
     FILTERS[chat_id].remove(word)
-    _save_filters(FILTERS)
-    await update.message.reply_text(f"✅ کلمه <b>{word}</b> از فیلتر حذف شد.", parse_mode="HTML")
+    _save_filters()
+
+    await update.message.reply_text(f"✅ کلمه <b>{word}</b> از فیلترها حذف شد.", parse_mode="HTML")
 
 # ─────────────────────────────── لیست فیلترها ───────────────────────────────
 
 async def list_filters(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """نمایش تمام کلمات فیلترشده"""
+    """نمایش لیست کلمات فیلترشده"""
     chat_id = str(update.effective_chat.id)
-    words = FILTERS.get(chat_id, [])
-    if not words:
+    chat_filters = FILTERS.get(chat_id, [])
+
+    if not chat_filters:
         return await update.message.reply_text("✅ هیچ کلمه‌ای فیلتر نشده است.")
 
-    text = "🚫 <b>لیست کلمات فیلتر شده:</b>\n\n" + "\n".join([f"• {w}" for w in words])
+    text = "<b>🚫 لیست کلمات فیلتر شده:</b>\n\n"
+    for i, word in enumerate(chat_filters, 1):
+        text += f"{i}. {word}\n"
+
     await update.message.reply_text(text, parse_mode="HTML")
 
-# ─────────────────────────────── بررسی و حذف پیام فیلتر ───────────────────────────────
+# ─────────────────────────────── بررسی پیام‌ها ───────────────────────────────
 
-async def check_filtered_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """بررسی پیام و حذف در صورت وجود کلمه فیلتر"""
+async def check_filtered_words(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """بررسی پیام‌ها برای کلمات فیلترشده"""
     if not update.message or not update.message.text:
         return
 
-    chat_id = str(update.effective_chat.id)
-    if chat_id not in FILTERS or not FILTERS[chat_id]:
+    msg = update.message
+    chat = msg.chat
+    user = msg.from_user
+    text = msg.text.lower()
+    chat_id = str(chat.id)
+
+    # مدیرها و سودوها معافند
+    if await _is_admin_or_sudo(context, chat.id, user.id):
         return
 
-    text = update.message.text.lower()
-    for word in FILTERS[chat_id]:
-        if word in text:
+    chat_filters = FILTERS.get(chat_id, [])
+    if not chat_filters:
+        return
+
+    for word in chat_filters:
+        # بررسی کلمه به صورت جداگانه
+        if re.search(rf"\b{re.escape(word)}\b", text):
             try:
-                msg = await update.message.reply_text(
-                    f"⚠️ پیام شما به دلیل استفاده از کلمه ممنوعه <b>{word}</b> حذف شد.",
+                await msg.delete()
+                warn = await msg.chat.send_message(
+                    f"🚫 پیام شما به دلیل استفاده از کلمه <b>{word}</b> حذف شد.",
                     parse_mode="HTML"
                 )
-                await asyncio.sleep(10)
-                await update.message.delete()
-                await msg.delete()
+                await asyncio.sleep(4)
+                await warn.delete()
             except Exception as e:
                 print(f"[Filter Error] {e}")
-            break
-
-
-# ==========================================================
-# 🧱 GROUP CONTROL SYSTEM — STEP 4
-# ثبت اصل و لقب (پروفایل کاربران در گروه)
-# ==========================================================
-
-ORIGIN_FILE = "origins.json"
-
-if not os.path.exists(ORIGIN_FILE):
-    with open(ORIGIN_FILE, "w", encoding="utf-8") as f:
-        json.dump({}, f, ensure_ascii=False, indent=2)
-
-def _load_origins():
-    try:
-        with open(ORIGIN_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except:
-        return {}
-
-def _save_origins(data):
-    with open(ORIGIN_FILE, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
-
-ORIGINS = _load_origins()
-
-# ─────────────────────────────── ثبت اصل ───────────────────────────────
-
-async def set_origin(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """ثبت اصل برای کاربر (فقط مدیر یا سودو)"""
-    if not await _is_admin_or_sudo(context, update.effective_chat.id, update.effective_user.id):
-        return await update.message.reply_text("🚫 فقط مدیران یا سودوها می‌تونن اصل ثبت کنن.")
-
-    target = update.message.reply_to_message.from_user if update.message.reply_to_message else None
-    if not target:
-        return await update.message.reply_text("📎 روی پیام کاربر مورد نظر ریپلای بزن و بنویس: ثبت اصل")
-
-    chat_id = str(update.effective_chat.id)
-    ORIGINS.setdefault(chat_id, {})
-    ORIGINS[chat_id].setdefault(str(target.id), {})
-    ORIGINS[chat_id][str(target.id)]["origin"] = update.message.text.replace("ثبت اصل", "").strip() or "نامشخص"
-
-    _save_origins(ORIGINS)
-
-    await update.message.reply_text(
-        f"🪪 برای <b>{target.first_name}</b>\nاصل ثبت شد: <b>{ORIGINS[chat_id][str(target.id)]['origin']}</b>",
-        parse_mode="HTML"
-    )
-
-# ─────────────────────────────── ثبت لقب ───────────────────────────────
-
-async def set_nickname(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """ثبت لقب برای کاربر (فقط مدیر یا سودو)"""
-    if not await _is_admin_or_sudo(context, update.effective_chat.id, update.effective_user.id):
-        return await update.message.reply_text("🚫 فقط مدیران یا سودوها می‌تونن لقب ثبت کنن.")
-
-    target = update.message.reply_to_message.from_user if update.message.reply_to_message else None
-    if not target:
-        return await update.message.reply_text("📎 روی پیام کاربر مورد نظر ریپلای بزن و بنویس: ثبت لقب")
-
-    chat_id = str(update.effective_chat.id)
-    ORIGINS.setdefault(chat_id, {})
-    ORIGINS[chat_id].setdefault(str(target.id), {})
-    ORIGINS[chat_id][str(target.id)]["nickname"] = update.message.text.replace("ثبت لقب", "").strip() or "نامشخص"
-
-    _save_origins(ORIGINS)
-
-    await update.message.reply_text(
-        f"🏷️ برای <b>{target.first_name}</b>\nلقب ثبت شد: <b>{ORIGINS[chat_id][str(target.id)]['nickname']}</b>",
-        parse_mode="HTML"
-    )
-
-# ─────────────────────────────── نمایش اصل ───────────────────────────────
-
-async def show_origin(update: Update, context: ContextTypes.DEFAULT_TYPE, target_id=None):
-    """نمایش اصل فرد"""
-    chat_id = str(update.effective_chat.id)
-    target_id = target_id or str(update.effective_user.id)
-    if chat_id not in ORIGINS or target_id not in ORIGINS[chat_id] or "origin" not in ORIGINS[chat_id][target_id]:
-        return await update.message.reply_text("ℹ️ برای این کاربر اصل ثبت نشده است.")
-
-    origin = ORIGINS[chat_id][target_id]["origin"]
-    await update.message.reply_text(f"🪪 اصل کاربر: <b>{origin}</b>", parse_mode="HTML")
-
-# ─────────────────────────────── نمایش لقب ───────────────────────────────
-
-async def show_nickname(update: Update, context: ContextTypes.DEFAULT_TYPE, target_id=None):
-    """نمایش لقب فرد"""
-    chat_id = str(update.effective_chat.id)
-    target_id = target_id or str(update.effective_user.id)
-    if chat_id not in ORIGINS or target_id not in ORIGINS[chat_id] or "nickname" not in ORIGINS[chat_id][target_id]:
-        return await update.message.reply_text("ℹ️ برای این کاربر لقب ثبت نشده است.")
-
-    nickname = ORIGINS[chat_id][target_id]["nickname"]
-    await update.message.reply_text(f"🏷️ لقب کاربر: <b>{nickname}</b>", parse_mode="HTML")
-    # ==========================================================
-# 🧱 GROUP CONTROL SYSTEM — STEP 5
-# امتیازدهی (XP) و رتبه کاربران
-# ==========================================================
-
-from datetime import datetime
-
-XP_FILE = "xp.json"
-
-# ─────────────────────────────── اطمینان از وجود فایل ───────────────────────────────
-if not os.path.exists(XP_FILE):
-    with open(XP_FILE, "w", encoding="utf-8") as f:
-        json.dump({}, f, ensure_ascii=False, indent=2)
-
-def _load_xp():
-    try:
-        with open(XP_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except:
-        return {}
-
-def _save_xp(data):
-    with open(XP_FILE, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
-
-XP_DATA = _load_xp()
-
-# ─────────────────────────────── افزودن امتیاز ───────────────────────────────
-
-async def add_xp(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """افزودن امتیاز به کاربر با هر پیام"""
-    if not update.message or not update.effective_user or update.effective_user.is_bot:
-        return
-
-    user = update.effective_user
-    chat_id = str(update.effective_chat.id)
-    user_id = str(user.id)
-
-    XP_DATA.setdefault(chat_id, {})
-    XP_DATA[chat_id].setdefault(user_id, {"xp": 0, "last": None})
-
-    now = datetime.now()
-    last = XP_DATA[chat_id][user_id].get("last")
-
-    # ضد اسپم: فقط هر 30 ثانیه یک بار امتیاز بده
-    if last and (now.timestamp() - last) < 30:
-        return
-
-    XP_DATA[chat_id][user_id]["xp"] += 1
-    XP_DATA[chat_id][user_id]["last"] = now.timestamp()
-
-    _save_xp(XP_DATA)
-
-# ─────────────────────────────── نمایش رتبه من ───────────────────────────────
-
-async def show_my_rank(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """نمایش رتبه کاربر در گروه"""
-    chat_id = str(update.effective_chat.id)
-    user_id = str(update.effective_user.id)
-
-    if chat_id not in XP_DATA or user_id not in XP_DATA[chat_id]:
-        return await update.message.reply_text("ℹ️ هنوز امتیازی برایت ثبت نشده است.")
-
-    user_xp = XP_DATA[chat_id][user_id]["xp"]
-    sorted_users = sorted(XP_DATA[chat_id].items(), key=lambda x: x[1]["xp"], reverse=True)
-    rank = next((i + 1 for i, (uid, _) in enumerate(sorted_users) if uid == user_id), None)
-
-    await update.message.reply_text(
-        f"🏅 <b>رتبه شما در گروه</b>\n\n"
-        f"🎯 امتیاز: <b>{user_xp}</b>\n"
-        f"📊 جایگاه: <b>{rank}</b> از <b>{len(sorted_users)}</b>",
-        parse_mode="HTML"
-    )
-
-# ─────────────────────────────── نمایش لیست رتبه‌ها ───────────────────────────────
-
-async def show_rank_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """نمایش 10 کاربر برتر گروه"""
-    chat_id = str(update.effective_chat.id)
-    if chat_id not in XP_DATA or not XP_DATA[chat_id]:
-        return await update.message.reply_text("ℹ️ هنوز امتیازی برای هیچ‌کس ثبت نشده است.")
-
-    sorted_users = sorted(XP_DATA[chat_id].items(), key=lambda x: x[1]["xp"], reverse=True)
-    text = "<b>🏆 10 کاربر برتر گروه:</b>\n\n"
-
-    for i, (uid, data) in enumerate(sorted_users[:10], start=1):
-        text += f"{i}. <a href='tg://user?id={uid}'>کاربر {uid}</a> — <b>{data['xp']}</b> امتیاز\n"
-
-    await update.message.reply_text(text, parse_mode="HTML")
-
-# ─────────────────────────────── ریست رتبه‌ها ───────────────────────────────
-
-async def reset_ranks(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """فقط مدیر یا سودو می‌تونه امتیازها رو ریست کنه"""
-    if not await _is_admin_or_sudo(context, update.effective_chat.id, update.effective_user.id):
-        return await update.message.reply_text("🚫 فقط مدیران یا سودوها می‌تونن رتبه‌ها رو ریست کنن.")
-
-    chat_id = str(update.effective_chat.id)
-    if chat_id in XP_DATA:
-        XP_DATA[chat_id] = {}
-        _save_xp(XP_DATA)
-        await update.message.reply_text("♻️ تمام امتیازها و رتبه‌ها ریست شد.")
-    else:
-        await update.message.reply_text("ℹ️ هیچ داده‌ای برای این گروه وجود ندارد.")
-
-
-# ==========================================================
-# 🧱 GROUP CONTROL SYSTEM — STEP 6
-# تگ گروهی (همه / فعال / غیرفعال / مدیران)
-# ==========================================================
-
-import asyncio
-
-async def tag_users(update: Update, context: ContextTypes.DEFAULT_TYPE, mode: str):
-    """تگ کاربران بر اساس حالت (همه، فعال، غیرفعال، مدیران)"""
-    chat = update.effective_chat
-    user = update.effective_user
-
-    if not await _is_admin_or_sudo(context, chat.id, user.id):
-        return await update.message.reply_text("🚫 فقط مدیران و سودوها می‌توانند از این دستور استفاده کنند.")
-
-    try:
-        members = await context.bot.get_chat_administrators(chat.id)
-        admins = [m.user.id for m in members]
-
-        if mode == "admins":
-            users_to_tag = admins
-        else:
-            chat_id = str(chat.id)
-            all_users = XP_DATA.get(chat_id, {})
-
-            if not all_users:
-                return await update.message.reply_text("ℹ️ هنوز داده‌ای از کاربران وجود ندارد.")
-
-            sorted_users = sorted(all_users.items(), key=lambda x: x[1].get("last", 0), reverse=True)
-
-            if mode == "active":
-                users_to_tag = [int(uid) for uid, data in sorted_users[:10]]
-            elif mode == "inactive":
-                users_to_tag = [int(uid) for uid, data in sorted_users[-10:]]
-            else:
-                users_to_tag = [int(uid) for uid in all_users.keys()]
-
-        me = await context.bot.get_me()
-        users_to_tag = [uid for uid in users_to_tag if uid != me.id]
-
-        if not users_to_tag:
-            return await update.message.reply_text("ℹ️ کاربری برای تگ یافت نشد.")
-
-        await update.message.reply_text("📢 در حال تگ کردن کاربران...")
-
-        batch_size = 5  # تعداد کاربران در هر پیام
-        for i in range(0, len(users_to_tag), batch_size):
-            batch = users_to_tag[i:i + batch_size]
-            mentions = " ".join([f"<a href='tg://user?id={uid}'>👤</a>" for uid in batch])
-            try:
-                await context.bot.send_message(chat.id, mentions, parse_mode="HTML")
-                await asyncio.sleep(2)  # تأخیر بین پیام‌ها برای جلوگیری از Flood
-            except Exception as e:
-                print(f"[Tag Error] {e}")
-
-        await update.message.reply_text("✅ تگ کاربران انجام شد.", parse_mode="HTML")
-
-    except Exception as e:
-        await update.message.reply_text(
-            f"⚠️ خطا در دریافت کاربران:\n<code>{e}</code>",
-            parse_mode="HTML"
-        )
+            break  # فقط اولین تطبیق کافی‌ست
+
+# ─────────────────────────────── دستورات فیلتر ───────────────────────────────
+
+async def handle_filter_commands(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """دستورات فیلتر / حذف فیلتر / لیست فیلتر"""
+    text = (update.message.text or "").strip().lower()
+
+    if text.startswith("فیلتر "):
+        return await add_filter(update, context)
+    if text.startswith("حذف فیلتر "):
+        return await remove_filter(update, context)
+    if text in ["لیست فیلتر", "لیست فیلترها"]:
+        return await list_filters(update, context)
         # ==========================================================
-# 🧹 STEP 13 — سیستم پاکسازی نهایی (Purge System v4)
-# کاملاً سازگار با PTB v20+ و بدون متد get_history
+# 🧱 بخش ۴ — بن، سکوت، اخطار و حذف آن‌ها
 # ==========================================================
 
-import asyncio
-from datetime import datetime
-from telegram.error import BadRequest, RetryAfter
+PUNISH_FILE = path("punishments.json")
 
-# ─────────────────────────────── ابزار حذف امن ───────────────────────────────
-
-async def _safe_delete(context, chat_id, msg_id):
-    try:
-        await context.bot.delete_message(chat_id, msg_id)
-        await asyncio.sleep(0.05)
-        return True
-    except RetryAfter as r:
-        await asyncio.sleep(r.retry_after + 1)
-        return await _safe_delete(context, chat_id, msg_id)
-    except BadRequest as e:
-        if "message can't be deleted" in str(e).lower():
-            return False
-        return False
-    except:
-        return False
-
-# ─────────────────────────────── پاکسازی عددی ───────────────────────────────
-
-async def purge_count(update: Update, context: ContextTypes.DEFAULT_TYPE, count: int):
-    """🧹 حذف تعداد مشخصی از پیام‌ها"""
-    chat = update.effective_chat
-    user = update.effective_user
-    msg_id = update.message.message_id
-
-    if not await _is_admin_or_sudo(context, chat.id, user.id):
-        return await update.message.reply_text("🚫 فقط مدیران و سودوها مجازند.")
-
-    deleted = 0
-    await update.message.reply_text(f"🧹 در حال حذف {count} پیام اخیر...")
-
-    for mid in range(msg_id, msg_id - count, -1):
-        if mid <= 0:
-            break
-        if await _safe_delete(context, chat.id, mid):
-            deleted += 1
-
-    now = datetime.now().strftime("%Y-%m-%d | %H:%M:%S")
-    await context.bot.send_message(
-        chat.id,
-        f"✅ {deleted} پیام حذف شد.\n🕒 {now}\n👤 مدیر: <a href='tg://user?id={user.id}'>{user.first_name}</a>",
-        parse_mode="HTML"
-    )
-
-# ─────────────────────────────── حذف پیام‌های یک کاربر ───────────────────────────────
-
-async def purge_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """🧹 حذف پیام‌های اخیر یک کاربر خاص"""
-    chat = update.effective_chat
-    user = update.effective_user
-    reply = update.message.reply_to_message
-
-    if not await _is_admin_or_sudo(context, chat.id, user.id):
-        return await update.message.reply_text("🚫 فقط مدیران و سودوها مجازند.")
-    if not reply:
-        return await update.message.reply_text("📎 روی پیام کاربر ریپلای کن و بنویس: حذف")
-
-    target = reply.from_user
-    deleted = 0
-
-    await update.message.reply_text(f"🧹 در حال حذف پیام‌های {target.first_name}...")
-
-    for mid in range(update.message.message_id, update.message.message_id - 500, -1):
-        try:
-            msg = await context.bot.get_message(chat.id, mid)
-            if msg and msg.from_user and msg.from_user.id == target.id:
-                if await _safe_delete(context, chat.id, mid):
-                    deleted += 1
-        except:
-            continue
-
-    now = datetime.now().strftime("%Y-%m-%d | %H:%M:%S")
-    await context.bot.send_message(
-        chat.id,
-        f"✅ {deleted} پیام از {target.first_name} حذف شد.\n🕒 {now}",
-        parse_mode="HTML"
-    )
-
-# ─────────────────────────────── پاکسازی بین دو پیام ───────────────────────────────
-
-async def purge_between(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """🧹 پاکسازی بین دو پیام (از ریپلای تا دستور فعلی)"""
-    chat = update.effective_chat
-    user = update.effective_user
-    reply = update.message.reply_to_message
-
-    if not await _is_admin_or_sudo(context, chat.id, user.id):
-        return await update.message.reply_text("🚫 فقط مدیران یا سودوها مجازند.")
-    if not reply:
-        return await update.message.reply_text("📎 روی پیام قدیمی ریپلای کن و بنویس: تا اینجا حذف")
-
-    start_id = reply.message_id
-    end_id = update.message.message_id
-    deleted = 0
-
-    for mid in range(end_id, start_id - 1, -1):
-        if await _safe_delete(context, chat.id, mid):
-            deleted += 1
-
-    now = datetime.now().strftime("%Y-%m-%d | %H:%M:%S")
-    await context.bot.send_message(
-        chat.id,
-        f"✅ {deleted} پیام بین دو نقطه حذف شد.\n🕒 {now}\n👤 مدیر: <a href='tg://user?id={user.id}'>{user.first_name}</a>",
-        parse_mode="HTML"
-    )
-
-# ─────────────────────────────── پاکسازی کل گروه ───────────────────────────────
-
-async def purge_all(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """🧹 حذف کل پیام‌ها (حداکثر 10000 مورد)"""
-    chat = update.effective_chat
-    user = update.effective_user
-    msg_id = update.message.message_id
-
-    if not await _is_admin_or_sudo(context, chat.id, user.id):
-        return await update.message.reply_text("🚫 فقط مدیران یا سودوها مجازند.")
-
-    await update.message.reply_text("🧹 در حال پاکسازی کل گروه...\nلطفاً صبر کنید.")
-
-    deleted = 0
-    for mid in range(msg_id, msg_id - 10000, -1):
-        if mid <= 0:
-            break
-        if await _safe_delete(context, chat.id, mid):
-            deleted += 1
-        if mid % 200 == 0:
-            await asyncio.sleep(1)
-
-    now = datetime.now().strftime("%Y-%m-%d | %H:%M:%S")
-    await context.bot.send_message(
-        chat.id,
-        f"✅ گروه تا حد مجاز پاکسازی شد.\n🧾 {deleted} پیام حذف شد.\n🕒 {now}",
-        parse_mode="HTML"
-    )
-
-
-# ==========================================================
-# 🧱 GROUP CONTROL SYSTEM — STEP 8
-# بن / سکوت / اخطار با alias
-# ==========================================================
-
-import json
-from telegram import ChatPermissions
-
-PUNISH_FILE = "punishments.json"
 if not os.path.exists(PUNISH_FILE):
     with open(PUNISH_FILE, "w", encoding="utf-8") as f:
         json.dump({}, f, ensure_ascii=False, indent=2)
@@ -818,495 +564,1034 @@ PUNISH_DATA = _load_json(PUNISH_FILE, {})
 def _save_punish():
     _save_json(PUNISH_FILE, PUNISH_DATA)
 
-# ─────────────── اعمال‌ها ───────────────
+# ─────────────────────────────── بررسی نقش هدف ───────────────────────────────
 
-async def _do_ban(update, context, target):
-    chat = update.effective_chat
-    await context.bot.ban_chat_member(chat.id, target.id)
-    await update.message.reply_text(f"🚫 <b>{target.first_name}</b> بن شد.", parse_mode="HTML")
+async def _check_target(update: Update, context: ContextTypes.DEFAULT_TYPE, target):
+    """بررسی هدف برای جلوگیری از بن یا اخطار اشتباهی"""
+    me = await context.bot.get_me()
 
-async def _do_mute(update, context, target):
-    chat = update.effective_chat
-    await context.bot.restrict_chat_member(
-        chat.id, target.id, permissions=ChatPermissions(can_send_messages=False)
-    )
-    await update.message.reply_text(f"🤐 <b>{target.first_name}</b> ساکت شد.", parse_mode="HTML")
+    if target.id == me.id:
+        await update.message.reply_text("😅 منو می‌خوای بن کنی؟! من فقط رباتم!")
+        return False
 
-async def _do_warn(update, context, target):
+    if target.id in SUDO_IDS:
+        await update.message.reply_text("👑 این کاربر سودو رباته — نمی‌تونی کاریش کنی!")
+        return False
+
+    try:
+        member = await context.bot.get_chat_member(update.effective_chat.id, target.id)
+        if member.status in ("administrator", "creator"):
+            await update.message.reply_text("🛡️ این کاربر مدیر گروهه — نمی‌تونی بن یا سکوتش کنی!")
+            return False
+    except:
+        pass
+
+    return True
+
+# ─────────────────────────────── بن ───────────────────────────────
+
+async def ban_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """بن کردن کاربر"""
     chat = update.effective_chat
-    cid, uid = str(chat.id), str(target.id)
-    PUNISH_DATA.setdefault(cid, {}).setdefault("warns", {})
-    warns = PUNISH_DATA[cid]["warns"]
-    warns[uid] = warns.get(uid, 0) + 1
+    user = update.effective_user
+    reply = update.message.reply_to_message
+
+    if not reply:
+        return await update.message.reply_text("📎 روی پیام کسی ریپلای کن و بن بنویس.")
+
+    if not await _is_admin_or_sudo(context, chat.id, user.id):
+        return await update.message.reply_text("🚫 فقط مدیران یا سودوها می‌تونن بن کنن.")
+
+    target = reply.from_user
+    if not await _check_target(update, context, target):
+        return
+
+    try:
+        await context.bot.ban_chat_member(chat.id, target.id)
+        PUNISH_DATA.setdefault(str(chat.id), {}).setdefault("banned", [])
+        if target.id not in PUNISH_DATA[str(chat.id)]["banned"]:
+            PUNISH_DATA[str(chat.id)]["banned"].append(target.id)
+        _save_punish()
+        await update.message.reply_text(f"🚫 <b>{target.first_name}</b> بن شد.", parse_mode="HTML")
+    except Exception as e:
+        await update.message.reply_text(f"⚠️ خطا در بن:\n<code>{e}</code>", parse_mode="HTML")
+
+# ─────────────────────────────── حذف بن ───────────────────────────────
+
+async def unban_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """رفع بن کاربر"""
+    chat = update.effective_chat
+    user = update.effective_user
+    reply = update.message.reply_to_message
+
+    if not reply:
+        return await update.message.reply_text("📎 روی پیام کاربر بن‌شده ریپلای کن و بن حذف کن.")
+
+    if not await _is_admin_or_sudo(context, chat.id, user.id):
+        return await update.message.reply_text("🚫 فقط مدیران یا سودوها مجازند.")
+
+    target = reply.from_user
+    try:
+        await context.bot.unban_chat_member(chat.id, target.id)
+        if str(chat.id) in PUNISH_DATA:
+            PUNISH_DATA[str(chat.id)].get("banned", []).remove(target.id)
+            _save_punish()
+        await update.message.reply_text(f"✅ <b>{target.first_name}</b> از بن خارج شد.", parse_mode="HTML")
+    except Exception as e:
+        await update.message.reply_text(f"⚠️ خطا در حذف بن:\n<code>{e}</code>", parse_mode="HTML")
+
+# ─────────────────────────────── سکوت ───────────────────────────────
+
+async def mute_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """ساکت کردن کاربر"""
+    chat = update.effective_chat
+    user = update.effective_user
+    reply = update.message.reply_to_message
+
+    if not reply:
+        return await update.message.reply_text("📎 روی پیام کسی ریپلای کن و سکوت بنویس.")
+
+    if not await _is_admin_or_sudo(context, chat.id, user.id):
+        return await update.message.reply_text("🚫 فقط مدیران یا سودوها مجازند.")
+
+    target = reply.from_user
+    if not await _check_target(update, context, target):
+        return
+
+    try:
+        await context.bot.restrict_chat_member(
+            chat.id, target.id, permissions=ChatPermissions(can_send_messages=False)
+        )
+        PUNISH_DATA.setdefault(str(chat.id), {}).setdefault("muted", [])
+        if target.id not in PUNISH_DATA[str(chat.id)]["muted"]:
+            PUNISH_DATA[str(chat.id)]["muted"].append(target.id)
+        _save_punish()
+        await update.message.reply_text(f"🤐 <b>{target.first_name}</b> در سکوت قرار گرفت.", parse_mode="HTML")
+    except Exception as e:
+        await update.message.reply_text(f"⚠️ خطا در سکوت:\n<code>{e}</code>", parse_mode="HTML")
+
+# ─────────────────────────────── حذف سکوت ───────────────────────────────
+
+async def unmute_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """حذف سکوت کاربر"""
+    chat = update.effective_chat
+    user = update.effective_user
+    reply = update.message.reply_to_message
+
+    if not reply:
+        return await update.message.reply_text("📎 روی پیام کاربر سکوت‌شده ریپلای کن و حذف سکوت بنویس.")
+
+    if not await _is_admin_or_sudo(context, chat.id, user.id):
+        return await update.message.reply_text("🚫 فقط مدیران یا سودوها مجازند.")
+
+    target = reply.from_user
+    try:
+        await context.bot.restrict_chat_member(chat.id, target.id, permissions=ChatPermissions(can_send_messages=True))
+        if str(chat.id) in PUNISH_DATA:
+            PUNISH_DATA[str(chat.id)].get("muted", []).remove(target.id)
+            _save_punish()
+        await update.message.reply_text(f"✅ <b>{target.first_name}</b> از سکوت خارج شد.", parse_mode="HTML")
+    except Exception as e:
+        await update.message.reply_text(f"⚠️ خطا در حذف سکوت:\n<code>{e}</code>", parse_mode="HTML")
+
+# ─────────────────────────────── اخطار ───────────────────────────────
+
+async def warn_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """دادن اخطار به کاربر"""
+    chat = update.effective_chat
+    user = update.effective_user
+    reply = update.message.reply_to_message
+
+    if not reply:
+        return await update.message.reply_text("📎 روی پیام کسی ریپلای کن و اخطار بنویس.")
+
+    if not await _is_admin_or_sudo(context, chat.id, user.id):
+        return await update.message.reply_text("🚫 فقط مدیران یا سودوها مجازند.")
+
+    target = reply.from_user
+    if not await _check_target(update, context, target):
+        return
+
+    chat_id = str(chat.id)
+    PUNISH_DATA.setdefault(chat_id, {}).setdefault("warns", {})
+    warns = PUNISH_DATA[chat_id]["warns"]
+    warns[str(target.id)] = warns.get(str(target.id), 0) + 1
     _save_punish()
 
-    if warns[uid] >= 3:
-        await _do_ban(update, context, target)
-        del warns[uid]
+    if warns[str(target.id)] >= 3:
+        await ban_user(update, context)
+        del warns[str(target.id)]
         _save_punish()
-        return await update.message.reply_text(
-            f"🚨 <b>{target.first_name}</b> با ۳ اخطار بن شد.", parse_mode="HTML"
-        )
+        await update.message.reply_text(f"🚨 {target.first_name} با ۳ اخطار بن شد!", parse_mode="HTML")
+    else:
+        await update.message.reply_text(f"⚠️ به {target.first_name} اخطار داده شد ({warns[str(target.id)]}/3)", parse_mode="HTML")
 
-    await update.message.reply_text(
-        f"⚠️ به <b>{target.first_name}</b> اخطار داده شد ({warns[uid]}/3)", parse_mode="HTML"
-    )
+# ─────────────────────────────── حذف اخطار ───────────────────────────────
 
-# ─────────────── لیست اخطارها ───────────────
+async def remove_warn(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """حذف یک اخطار از کاربر"""
+    chat = update.effective_chat
+    user = update.effective_user
+    reply = update.message.reply_to_message
 
-async def list_warns(update, context):
-    cid = str(update.effective_chat.id)
-    warns = PUNISH_DATA.get(cid, {}).get("warns", {})
+    if not reply:
+        return await update.message.reply_text("📎 روی پیام کسی ریپلای کن و حذف اخطار بنویس.")
+
+    if not await _is_admin_or_sudo(context, chat.id, user.id):
+        return await update.message.reply_text("🚫 فقط مدیران یا سودوها مجازند.")
+
+    target = reply.from_user
+    chat_id = str(chat.id)
+    warns = PUNISH_DATA.get(chat_id, {}).get("warns", {})
+
+    if str(target.id) not in warns:
+        return await update.message.reply_text("ℹ️ این کاربر اخطاری ندارد.")
+
+    warns[str(target.id)] -= 1
+    if warns[str(target.id)] <= 0:
+        del warns[str(target.id)]
+    _save_punish()
+
+    await update.message.reply_text(f"✅ یک اخطار از {target.first_name} حذف شد.", parse_mode="HTML")
+
+# ─────────────────────────────── لیست سکوت و اخطار ───────────────────────────────
+
+async def list_mutes(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = str(update.effective_chat.id)
+    muted = PUNISH_DATA.get(chat_id, {}).get("muted", [])
+    if not muted:
+        return await update.message.reply_text("✅ هیچ‌کس در سکوت نیست.")
+    text = "<b>🤐 لیست افراد در سکوت:</b>\n\n"
+    for i, uid in enumerate(muted, 1):
+        text += f"{i}. <a href='tg://user?id={uid}'>کاربر {uid}</a>\n"
+    await update.message.reply_text(text, parse_mode="HTML")
+
+async def list_warns(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = str(update.effective_chat.id)
+    warns = PUNISH_DATA.get(chat_id, {}).get("warns", {})
     if not warns:
         return await update.message.reply_text("✅ هیچ اخطاری وجود ندارد.")
-
-    text = "⚠️ <b>لیست اخطارها:</b>\n"
+    text = "<b>⚠️ لیست اخطارها:</b>\n\n"
     for uid, count in warns.items():
-        text += f"• کاربر {uid} — {count}/3\n"
+        text += f"• <a href='tg://user?id={uid}'>کاربر {uid}</a> — {count}/3\n"
+    await update.message.reply_text(text, parse_mode="HTML")
+
+# ─────────────────────────────── دستورات مدیریت ───────────────────────────────
+
+async def handle_punish_commands(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """تشخیص دستورات مدیریتی"""
+    text = (update.message.text or "").strip().lower()
+
+    if text == "بن":
+        return await ban_user(update, context)
+    if text == "حذف بن":
+        return await unban_user(update, context)
+    if text == "سکوت":
+        return await mute_user(update, context)
+    if text == "حذف سکوت":
+        return await unmute_user(update, context)
+    if text == "اخطار":
+        return await warn_user(update, context)
+    if text == "حذف اخطار":
+        return await remove_warn(update, context)
+    if text in ["لیست سکوت", "لیست ساکت‌ها"]:
+        return await list_mutes(update, context)
+    if text in ["لیست اخطار", "لیست اخطارها"]:
+        return await list_warns(update, context)
+        # ==========================================================
+# 🧱 بخش ۵ — سیستم ثبت اصل کاربران
+# ==========================================================
+
+ORIGIN_FILE = path("origins.json")
+
+if not os.path.exists(ORIGIN_FILE):
+    with open(ORIGIN_FILE, "w", encoding="utf-8") as f:
+        json.dump({}, f, ensure_ascii=False, indent=2)
+
+ORIGINS = _load_json(ORIGIN_FILE, {})
+
+def _save_origins():
+    _save_json(ORIGIN_FILE, ORIGINS)
+
+# ─────────────────────────────── ثبت اصل ───────────────────────────────
+
+async def set_origin(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """ثبت اصل برای یک کاربر (فقط مدیر یا سودو)"""
+    chat = update.effective_chat
+    user = update.effective_user
+    msg = update.message
+
+    # فقط مدیر یا سودو
+    if not await _is_admin_or_sudo(context, chat.id, user.id):
+        return await msg.reply_text("🚫 فقط مدیران یا سودوها می‌تونن اصل ثبت کنن.")
+
+    if not msg.reply_to_message:
+        return await msg.reply_text("📎 روی پیام فرد مورد نظر ریپلای کن و بنویس: ثبت اصل <اصل کاربر>")
+
+    parts = msg.text.strip().split("ثبت اصل", 1)
+    if len(parts) < 2 or not parts[1].strip():
+        return await msg.reply_text("📘 مثال:\n<code>ثبت اصل شمالی</code>", parse_mode="HTML")
+
+    target = msg.reply_to_message.from_user
+    origin_value = parts[1].strip()
+    chat_id = str(chat.id)
+
+    ORIGINS.setdefault(chat_id, {})
+    ORIGINS[chat_id][str(target.id)] = origin_value
+    _save_origins()
+
+    await msg.reply_text(
+        f"🪪 برای <b>{target.first_name}</b>\nاصل ثبت شد: <b>{origin_value}</b>",
+        parse_mode="HTML"
+    )
+
+# ─────────────────────────────── نمایش اصل ───────────────────────────────
+
+async def show_origin(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """نمایش اصل فرد"""
+    msg = update.message
+    chat_id = str(msg.chat.id)
+    user = msg.from_user
+    text = (msg.text or "").strip().lower()
+
+    # اگر روی پیام کسی گفت "اصل"
+    if msg.reply_to_message:
+        target = msg.reply_to_message.from_user
+        target_id = str(target.id)
+        if chat_id in ORIGINS and target_id in ORIGINS[chat_id]:
+            origin = ORIGINS[chat_id][target_id]
+            return await msg.reply_text(f"🪪 اصل <b>{target.first_name}</b>: <b>{origin}</b>", parse_mode="HTML")
+        return  # هیچ پاسخی نده
+
+    # اگر خودش گفت "اصل من"
+    if text == "اصل من":
+        target_id = str(user.id)
+        if chat_id in ORIGINS and target_id in ORIGINS[chat_id]:
+            origin = ORIGINS[chat_id][target_id]
+            return await msg.reply_text(f"🪪 اصل شما: <b>{origin}</b>", parse_mode="HTML")
+        return  # هیچی نگو
+
+    # اگر گفت "اصل" بدون ریپلای
+    if text == "اصل":
+        return  # بدون ریپلای هیچی نگو
+
+# ─────────────────────────────── لیست همه اصل‌ها ───────────────────────────────
+
+async def list_origins(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """نمایش لیست تمام اصل‌های ثبت‌شده"""
+    chat_id = str(update.effective_chat.id)
+    origins = ORIGINS.get(chat_id, {})
+
+    if not origins:
+        return await update.message.reply_text("ℹ️ هنوز هیچ اصلی ثبت نشده است.")
+
+    text = "<b>🪪 لیست اصل‌های ثبت‌شده:</b>\n\n"
+    for uid, origin in origins.items():
+        text += f"• <a href='tg://user?id={uid}'>کاربر {uid}</a> — {origin}\n"
 
     await update.message.reply_text(text, parse_mode="HTML")
 
-# 🔧 این بخش را یک‌بار به فایل اضافه کن (بالای handle_group_message)
-import re
+# ─────────────────────────────── دستورات مرتبط ───────────────────────────────
 
-async def _apply_locks_if_needed(update: Update, context: ContextTypes.DEFAULT_TYPE, text: str, chat, user) -> bool:
-    """
-    اگر هر قفلی نقض شود:
-      - پیام حذف می‌شود
-      - هشدار مناسب (در صورت نیاز) داده می‌شود
-      - True برمی‌گردد تا جریان اصلی متوقف شود
-    در غیر این صورت False برمی‌گردد.
-    """
-    locks = _get_locks(chat.id)
-    if not any(locks.values()):
-        return False
+async def handle_origin_commands(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """تشخیص دستورات مرتبط با اصل"""
+    text = (update.message.text or "").strip().lower()
 
-    msg = update.message
-    is_admin = await _is_admin_or_sudo(context, chat.id, user.id)
-
-    # 🚫 قفل گروه (فقط غیرمدیر)
-    if locks.get("group") and not is_admin:
-        try:
-            await msg.delete()
-        except:
-            pass
-        return True
-
-    # --- خصوصیات پیام ---
-    has_photo = bool(msg.photo)
-    has_video = bool(msg.video)
-    has_doc   = bool(msg.document)
-    has_voice = bool(msg.voice)
-    has_anim  = bool(msg.animation)
-    has_stick = bool(msg.sticker)
-    has_fwd   = bool(msg.forward_date)
-    has_caption = bool(msg.caption)
-
-    # 🚫 لینک‌ها
-    if locks.get("links"):
-        if any(x in text for x in ["http://", "https://", "t.me", "telegram.me"]):
-            await _del_msg(update, "🚫 ارسال لینک ممنوع است.")
-            return True
-        # تشخیص دامنه‌های بدون http (مثل example.com)
-        if re.search(r"(?:^|\s)(?:[a-z0-9-]+\.)+[a-z]{2,}(?:/\S*)?", text):
-            await _del_msg(update, "🚫 ارسال لینک ممنوع است.")
-            return True
-
-    # 🚫 رسانه‌ها
-    if locks.get("photos") and has_photo:
-        await _del_msg(update, "🚫 ارسال عکس ممنوع است."); return True
-    if locks.get("videos") and has_video:
-        await _del_msg(update, "🚫 ارسال ویدیو ممنوع است."); return True
-    if locks.get("files") and has_doc:
-        await _del_msg(update, "🚫 ارسال فایل ممنوع است."); return True
-    if locks.get("voices") and has_voice:
-        await _del_msg(update, "🚫 ارسال ویس ممنوع است."); return True
-    if locks.get("stickers") and has_stick:
-        await _del_msg(update, "🚫 ارسال استیکر ممنوع است."); return True
-    if locks.get("gifs") and has_anim:
-        await _del_msg(update, "🚫 ارسال گیف ممنوع است."); return True
-    if locks.get("forward") and has_fwd:
-        await _del_msg(update, "🚫 فوروارد پیام ممنوع است."); return True
-    if locks.get("media") and (has_photo or has_video or has_doc or has_anim):
-        await _del_msg(update, "🚫 ارسال رسانه‌ها ممنوع است."); return True
-
-    # 🚫 منشن / یوزرنیم
-    if (locks.get("usernames") or locks.get("mention")) and "@" in text:
-        await _del_msg(update, "🚫 استفاده از @ یا منشن ممنوع است."); return True
-
-    # 🚫 تبلیغ
-    if locks.get("ads") and any(x in text for x in ["t.me/", "joinchat", "promo", "invite", "channel", "bot?start="]):
-        await _del_msg(update, "🚫 تبلیغات در گروه ممنوع است."); return True
-
-    # 🚫 عربی / انگلیسی
-    if locks.get("arabic") and any("\u0600" <= c <= "\u06FF" for c in text):
-        await _del_msg(update, "🚫 استفاده از حروف عربی ممنوع است."); return True
-    if locks.get("english") and any(("a" <= c <= "z") or ("A" <= c <= "Z") for c in text):
-        await _del_msg(update, "🚫 استفاده از حروف انگلیسی ممنوع است."); return True
-
-    # 🚫 کپشن
-    if locks.get("caption") and has_caption:
-        await _del_msg(update, "🚫 کپشن‌گذاری ممنوع است."); return True
-
-    # 🚫 ریپلای
-    if locks.get("reply") and msg.reply_to_message:
-        await _del_msg(update, "🚫 پاسخ دادن (ریپلای) ممنوع است."); return True
-
-    # 🚫 فقط ایموجی
-    if locks.get("emoji"):
-        emoji_pattern = re.compile(r"[\U00010000-\U0010ffff]", flags=re.UNICODE)
-        # همهٔ کاراکترهای غیر فاصله اگر ایموجی باشند => حذف
-        if text and all(emoji_pattern.match(c) for c in text if not c.isspace()):
-            await _del_msg(update, "🚫 ارسال فقط ایموجی مجاز نیست."); return True
-
-    # 🚫 پیام متنی (وقتی رسانه‌ای نیست)
-    if locks.get("text") and text and not (has_photo or has_video or has_doc):
-        await _del_msg(update, "🚫 ارسال پیام متنی ممنوع است."); return True
-
-    return False
-    # ==========================================================
-# 🧱 STEP 9 — مدیریت مدیران هر گروه (Local Admins)
+    if text.startswith("ثبت اصل"):
+        return await set_origin(update, context)
+    if text in ["اصل", "اصل من"]:
+        return await show_origin(update, context)
+    if text in ["لیست اصل", "لیست اصل‌ها", "همه اصل"]:
+        return await list_origins(update, context)
+        # ==========================================================
+# 🧱 بخش ۶ — سیستم ثبت لقب کاربران
 # ==========================================================
 
-ADMINS_FILE = "group_admins.json"
+# لقب‌ها در همان فایل origins.json ذخیره می‌شوند
+# ساختار: ORIGINS[chat_id][user_id] = {"origin": "...", "nickname": "..."}
+
+# ─────────────────────────────── ثبت لقب ───────────────────────────────
+
+async def set_nickname(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """ثبت لقب برای یک کاربر (فقط مدیر یا سودو)"""
+    chat = update.effective_chat
+    user = update.effective_user
+    msg = update.message
+
+    if not await _is_admin_or_sudo(context, chat.id, user.id):
+        return await msg.reply_text("🚫 فقط مدیران یا سودوها می‌تونن لقب ثبت کنن.")
+
+    if not msg.reply_to_message:
+        return await msg.reply_text("📎 روی پیام فرد مورد نظر ریپلای کن و بنویس: ثبت لقب <لقب>")
+
+    parts = msg.text.strip().split("ثبت لقب", 1)
+    if len(parts) < 2 or not parts[1].strip():
+        return await msg.reply_text("📘 مثال:\n<code>ثبت لقب شجاع‌دل</code>", parse_mode="HTML")
+
+    target = msg.reply_to_message.from_user
+    nickname = parts[1].strip()
+    chat_id = str(chat.id)
+
+    ORIGINS.setdefault(chat_id, {})
+    ORIGINS[chat_id].setdefault(str(target.id), {})
+    ORIGINS[chat_id][str(target.id)]["nickname"] = nickname
+    _save_origins()
+
+    await msg.reply_text(
+        f"🏷️ برای <b>{target.first_name}</b>\nلقب ثبت شد: <b>{nickname}</b>",
+        parse_mode="HTML"
+    )
+
+# ─────────────────────────────── نمایش لقب ───────────────────────────────
+
+async def show_nickname(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """نمایش لقب فرد"""
+    msg = update.message
+    chat_id = str(msg.chat.id)
+    user = msg.from_user
+    text = (msg.text or "").strip().lower()
+
+    # اگر روی پیام کسی گفت "لقب"
+    if msg.reply_to_message:
+        target = msg.reply_to_message.from_user
+        data = ORIGINS.get(chat_id, {}).get(str(target.id), {})
+        nickname = data.get("nickname")
+        if nickname:
+            return await msg.reply_text(f"🏷️ لقب <b>{target.first_name}</b>: <b>{nickname}</b>", parse_mode="HTML")
+        return  # هیچ پاسخی نده
+
+    # اگر خودش گفت "لقب من"
+    if text == "لقب من":
+        data = ORIGINS.get(chat_id, {}).get(str(user.id), {})
+        nickname = data.get("nickname")
+        if nickname:
+            return await msg.reply_text(f"🏷️ لقب شما: <b>{nickname}</b>", parse_mode="HTML")
+        return  # ساکت باش
+
+    # اگر گفت "لقب" بدون ریپلای
+    if text == "لقب":
+        return  # ساکت
+
+# ─────────────────────────────── لیست همه لقب‌ها ───────────────────────────────
+
+async def list_nicknames(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """نمایش لیست تمام لقب‌های ثبت‌شده"""
+    chat_id = str(update.effective_chat.id)
+    origins = ORIGINS.get(chat_id, {})
+
+    # استخراج فقط کاربرانی که لقب دارند
+    nicknamed = {uid: data.get("nickname") for uid, data in origins.items() if data.get("nickname")}
+    if not nicknamed:
+        return await update.message.reply_text("ℹ️ هنوز هیچ لقبی ثبت نشده است.")
+
+    text = "<b>🏷️ لیست لقب‌های ثبت‌شده:</b>\n\n"
+    for uid, nickname in nicknamed.items():
+        text += f"• <a href='tg://user?id={uid}'>کاربر {uid}</a> — {nickname}\n"
+
+    await update.message.reply_text(text, parse_mode="HTML")
+
+# ─────────────────────────────── دستورات مرتبط ───────────────────────────────
+
+async def handle_nickname_commands(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """تشخیص دستورات مرتبط با لقب"""
+    text = (update.message.text or "").strip().lower()
+
+    if text.startswith("ثبت لقب"):
+        return await set_nickname(update, context)
+    if text in ["لقب", "لقب من"]:
+        return await show_nickname(update, context)
+    if text in ["لیست لقب", "لیست لقب‌ها", "همه لقب"]:
+        return await list_nicknames(update, context)
+        # ==========================================================
+# 🧱 بخش ۷ — تگ گروهی کاربران
+# ==========================================================
+
+TAG_BATCH_SIZE = 5  # تعداد کاربران در هر پیام تگ
+TAG_DELAY = 2       # فاصله بین پیام‌ها (ثانیه)
+
+# ─────────────────────────────── تگ همه ───────────────────────────────
+
+async def tag_all(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """تگ کردن همه کاربران گروه"""
+    chat = update.effective_chat
+    user = update.effective_user
+
+    if not await _is_admin_or_sudo(context, chat.id, user.id):
+        return await update.message.reply_text("🚫 فقط مدیران و سودوها می‌تونن از این دستور استفاده کنن.")
+
+    await update.message.reply_text("📢 در حال تگ کردن همه کاربران... لطفاً صبر کنید.")
+
+    try:
+        members = await context.bot.get_chat_administrators(chat.id)
+        me = await context.bot.get_me()
+
+        # فهرست اعضا از داده‌های XP (در بخش XP اضافه می‌شه)
+        chat_id = str(chat.id)
+        all_users = XP_DATA.get(chat_id, {})
+
+        if not all_users:
+            return await update.message.reply_text("ℹ️ هنوز اطلاعاتی از کاربران وجود ندارد.")
+
+        users_to_tag = [int(uid) for uid in all_users.keys() if int(uid) != me.id]
+
+        # تگ در گروه
+        for i in range(0, len(users_to_tag), TAG_BATCH_SIZE):
+            batch = users_to_tag[i:i + TAG_BATCH_SIZE]
+            mentions = " ".join([f"<a href='tg://user?id={uid}'>👤</a>" for uid in batch])
+            await context.bot.send_message(chat.id, mentions, parse_mode="HTML")
+            await asyncio.sleep(TAG_DELAY)
+
+        await update.message.reply_text("✅ تگ همه کاربران انجام شد.", parse_mode="HTML")
+
+    except Exception as e:
+        await update.message.reply_text(f"⚠️ خطا در تگ همه:\n<code>{e}</code>", parse_mode="HTML")
+
+# ─────────────────────────────── تگ مدیران ───────────────────────────────
+
+async def tag_admins(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """تگ کردن فقط مدیران گروه"""
+    chat = update.effective_chat
+    user = update.effective_user
+
+    if not await _is_admin_or_sudo(context, chat.id, user.id):
+        return await update.message.reply_text("🚫 فقط مدیران و سودوها مجازند.")
+
+    try:
+        admins = await context.bot.get_chat_administrators(chat.id)
+        me = await context.bot.get_me()
+
+        admin_ids = [m.user.id for m in admins if m.user.id != me.id]
+
+        if not admin_ids:
+            return await update.message.reply_text("ℹ️ مدیری یافت نشد.")
+
+        for i in range(0, len(admin_ids), TAG_BATCH_SIZE):
+            batch = admin_ids[i:i + TAG_BATCH_SIZE]
+            mentions = " ".join([f"<a href='tg://user?id={uid}'>👮</a>" for uid in batch])
+            await context.bot.send_message(chat.id, mentions, parse_mode="HTML")
+            await asyncio.sleep(TAG_DELAY)
+
+        await update.message.reply_text("✅ تگ مدیران انجام شد.", parse_mode="HTML")
+
+    except Exception as e:
+        await update.message.reply_text(f"⚠️ خطا در تگ مدیران:\n<code>{e}</code>", parse_mode="HTML")
+
+# ─────────────────────────────── تگ فعال‌ها ───────────────────────────────
+
+async def tag_active(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """تگ کاربران فعال (آخرین ۱۰ کاربر فعال)"""
+    chat = update.effective_chat
+    user = update.effective_user
+    chat_id = str(chat.id)
+
+    if not await _is_admin_or_sudo(context, chat.id, user.id):
+        return await update.message.reply_text("🚫 فقط مدیران و سودوها مجازند.")
+
+    if chat_id not in XP_DATA or not XP_DATA[chat_id]:
+        return await update.message.reply_text("ℹ️ هنوز هیچ کاربری فعالیتی نداشته است.")
+
+    sorted_users = sorted(
+        XP_DATA[chat_id].items(),
+        key=lambda x: x[1].get("last", 0),
+        reverse=True
+    )
+
+    users_to_tag = [int(uid) for uid, _ in sorted_users[:10]]
+
+    for i in range(0, len(users_to_tag), TAG_BATCH_SIZE):
+        batch = users_to_tag[i:i + TAG_BATCH_SIZE]
+        mentions = " ".join([f"<a href='tg://user?id={uid}'>🔥</a>" for uid in batch])
+        await context.bot.send_message(chat.id, mentions, parse_mode="HTML")
+        await asyncio.sleep(TAG_DELAY)
+
+    await update.message.reply_text("✅ تگ کاربران فعال انجام شد.", parse_mode="HTML")
+
+# ─────────────────────────────── تگ غیرفعال‌ها ───────────────────────────────
+
+async def tag_inactive(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """تگ کاربران غیرفعال (آخرین ۱۰ کاربر کم‌فعال)"""
+    chat = update.effective_chat
+    user = update.effective_user
+    chat_id = str(chat.id)
+
+    if not await _is_admin_or_sudo(context, chat.id, user.id):
+        return await update.message.reply_text("🚫 فقط مدیران و سودوها مجازند.")
+
+    if chat_id not in XP_DATA or not XP_DATA[chat_id]:
+        return await update.message.reply_text("ℹ️ هنوز هیچ کاربری فعالیتی نداشته است.")
+
+    sorted_users = sorted(
+        XP_DATA[chat_id].items(),
+        key=lambda x: x[1].get("last", 0)
+    )
+
+    users_to_tag = [int(uid) for uid, _ in sorted_users[:10]]
+
+    for i in range(0, len(users_to_tag), TAG_BATCH_SIZE):
+        batch = users_to_tag[i:i + TAG_BATCH_SIZE]
+        mentions = " ".join([f"<a href='tg://user?id={uid}'>💤</a>" for uid in batch])
+        await context.bot.send_message(chat.id, mentions, parse_mode="HTML")
+        await asyncio.sleep(TAG_DELAY)
+
+    await update.message.reply_text("✅ تگ کاربران غیرفعال انجام شد.", parse_mode="HTML")
+
+# ─────────────────────────────── کنترل دستورات ───────────────────────────────
+
+async def handle_tag_commands(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """تشخیص دستورات تگ"""
+    text = (update.message.text or "").strip().lower()
+
+    if text in ["تگ همه", "تگ کل"]:
+        return await tag_all(update, context)
+    if text in ["تگ مدیران", "تگ ادمین‌ها"]:
+        return await tag_admins(update, context)
+    if text in ["تگ فعال", "تگ کاربران فعال"]:
+        return await tag_active(update, context)
+    if text in ["تگ غیرفعال", "تگ غیر فعال"]:
+        return await tag_inactive(update, context)
+        # ==========================================================
+# 🧱 بخش ۸ — سیستم پاکسازی پیام‌ها
+# ==========================================================
+
+MAX_DELETE = 1000  # حداکثر تعداد پیام قابل حذف در یک بار
+DELETE_DELAY = 0.05  # تاخیر کوتاه بین حذف‌ها برای جلوگیری از Flood
+
+# ─────────────────────────────── حذف عددی ───────────────────────────────
+
+async def delete_last_messages(update: Update, context: ContextTypes.DEFAULT_TYPE, count: int):
+    """حذف آخرین n پیام از گروه"""
+    chat = update.effective_chat
+    user = update.effective_user
+
+    if not await _is_admin_or_sudo(context, chat.id, user.id):
+        return await update.message.reply_text("🚫 فقط مدیران یا سودوها می‌تونن پاکسازی کنن.")
+
+    deleted = 0
+    try:
+        async for msg in context.bot.get_chat_history(chat.id, limit=count + 1):
+            try:
+                await context.bot.delete_message(chat.id, msg.message_id)
+                deleted += 1
+                await asyncio.sleep(DELETE_DELAY)
+            except:
+                continue
+        await update.message.reply_text(f"🧹 {deleted} پیام با موفقیت حذف شد.", parse_mode="HTML")
+    except Exception as e:
+        await update.message.reply_text(f"⚠️ خطا در حذف پیام‌ها:\n<code>{e}</code>", parse_mode="HTML")
+
+# ─────────────────────────────── پاکسازی کل چت ───────────────────────────────
+
+async def clear_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """پاکسازی کامل چت (در محدوده قابل دسترس)"""
+    chat = update.effective_chat
+    user = update.effective_user
+
+    if not await _is_admin_or_sudo(context, chat.id, user.id):
+        return await update.message.reply_text("🚫 فقط مدیران یا سودوها می‌تونن پاکسازی کنن.")
+
+    await update.message.reply_text("🧹 در حال پاکسازی کل چت... لطفاً صبر کنید.")
+    deleted = 0
+
+    try:
+        async for msg in context.bot.get_chat_history(chat.id, limit=MAX_DELETE):
+            try:
+                await context.bot.delete_message(chat.id, msg.message_id)
+                deleted += 1
+                await asyncio.sleep(DELETE_DELAY)
+            except:
+                continue
+
+        await update.message.reply_text(f"✅ پاکسازی انجام شد ({deleted} پیام حذف شد).", parse_mode="HTML")
+    except Exception as e:
+        await update.message.reply_text(f"⚠️ خطا در پاکسازی:\n<code>{e}</code>", parse_mode="HTML")
+
+# ─────────────────────────────── حذف پیام‌های کاربر خاص ───────────────────────────────
+
+async def delete_user_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """حذف پیام‌های اخیر یک کاربر خاص با ریپلای"""
+    chat = update.effective_chat
+    user = update.effective_user
+    msg = update.message
+
+    if not msg.reply_to_message:
+        return await msg.reply_text("📎 روی پیام کاربر مورد نظر ریپلای کن و بنویس: حذف")
+
+    if not await _is_admin_or_sudo(context, chat.id, user.id):
+        return await msg.reply_text("🚫 فقط مدیران یا سودوها می‌تونن پیام‌های دیگران رو حذف کنن.")
+
+    target = msg.reply_to_message.from_user
+    target_id = target.id
+    deleted = 0
+
+    await msg.reply_text(f"🧹 در حال حذف پیام‌های اخیر <b>{target.first_name}</b>...", parse_mode="HTML")
+
+    try:
+        async for m in context.bot.get_chat_history(chat.id, limit=MAX_DELETE):
+            if m.from_user and m.from_user.id == target_id:
+                try:
+                    await context.bot.delete_message(chat.id, m.message_id)
+                    deleted += 1
+                    await asyncio.sleep(DELETE_DELAY)
+                except:
+                    continue
+
+        await context.bot.send_message(chat.id, f"✅ پیام‌های <b>{target.first_name}</b> حذف شد ({deleted} پیام).", parse_mode="HTML")
+    except Exception as e:
+        await msg.reply_text(f"⚠️ خطا در حذف پیام‌های کاربر:\n<code>{e}</code>", parse_mode="HTML")
+
+# ─────────────────────────────── کنترل دستورات ───────────────────────────────
+
+async def handle_clean_commands(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """تشخیص دستورات پاکسازی"""
+    text = (update.message.text or "").strip().lower()
+
+    # پاکسازی کامل
+    if text == "پاکسازی":
+        return await clear_chat(update, context)
+
+    # حذف عددی
+    if text.startswith("حذف "):
+        try:
+            count = int(text.split()[1])
+            if count <= 0:
+                return await update.message.reply_text("⚠️ عدد باید مثبت باشد.")
+            if count > MAX_DELETE:
+                count = MAX_DELETE
+            return await delete_last_messages(update, context, count)
+        except (IndexError, ValueError):
+            return await update.message.reply_text("📘 مثال: <code>حذف 50</code>", parse_mode="HTML")
+
+    # حذف پیام‌های فرد خاص (با ریپلای)
+    if text == "حذف" and update.message.reply_to_message:
+        return await delete_user_messages(update, context)
+        # ==========================================================
+# 🧱 بخش ۹ — سیستم کاربران ویژه (VIP System)
+# ==========================================================
+
+VIP_FILE = path("vips.json")
+
+if not os.path.exists(VIP_FILE):
+    with open(VIP_FILE, "w", encoding="utf-8") as f:
+        json.dump({}, f, ensure_ascii=False, indent=2)
+
+VIPS = _load_json(VIP_FILE, {})
+
+def _save_vips():
+    _save_json(VIP_FILE, VIPS)
+
+# ─────────────────────────────── بررسی کاربر ویژه ───────────────────────────────
+
+def _is_vip(chat_id: int, user_id: int) -> bool:
+    """بررسی اینکه آیا کاربر ویژه است یا خیر"""
+    chat_id = str(chat_id)
+    return user_id in VIPS.get(chat_id, [])
+
+# ─────────────────────────────── افزودن ویژه ───────────────────────────────
+
+async def add_vip(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """افزودن کاربر به لیست ویژه"""
+    chat = update.effective_chat
+    user = update.effective_user
+    msg = update.message
+
+    if not await _is_admin_or_sudo(context, chat.id, user.id):
+        return await msg.reply_text("🚫 فقط مدیران یا سودوها می‌تونن کاربر ویژه اضافه کنن.")
+
+    if not msg.reply_to_message:
+        return await msg.reply_text("📎 روی پیام فرد مورد نظر ریپلای کن و بنویس: افزودن ویژه")
+
+    target = msg.reply_to_message.from_user
+    chat_id = str(chat.id)
+
+    VIPS.setdefault(chat_id, [])
+    if target.id in VIPS[chat_id]:
+        return await msg.reply_text(f"ℹ️ {target.first_name} از قبل ویژه است.")
+
+    VIPS[chat_id].append(target.id)
+    _save_vips()
+
+    await msg.reply_text(f"🌟 <b>{target.first_name}</b> به لیست کاربران ویژه اضافه شد!", parse_mode="HTML")
+
+# ─────────────────────────────── حذف ویژه ───────────────────────────────
+
+async def remove_vip(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """حذف کاربر از لیست ویژه"""
+    chat = update.effective_chat
+    user = update.effective_user
+    msg = update.message
+
+    if not await _is_admin_or_sudo(context, chat.id, user.id):
+        return await msg.reply_text("🚫 فقط مدیران یا سودوها مجازند.")
+
+    if not msg.reply_to_message:
+        return await msg.reply_text("📎 روی پیام کاربر ویژه ریپلای کن و بنویس: حذف ویژه")
+
+    target = msg.reply_to_message.from_user
+    chat_id = str(chat.id)
+
+    if chat_id not in VIPS or target.id not in VIPS[chat_id]:
+        return await msg.reply_text(f"ℹ️ {target.first_name} در لیست ویژه نیست.")
+
+    VIPS[chat_id].remove(target.id)
+    _save_vips()
+
+    await msg.reply_text(f"❌ <b>{target.first_name}</b> از لیست ویژه حذف شد.", parse_mode="HTML")
+
+# ─────────────────────────────── لیست ویژه ───────────────────────────────
+
+async def list_vips(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """نمایش لیست کاربران ویژه"""
+    chat_id = str(update.effective_chat.id)
+    vip_list = VIPS.get(chat_id, [])
+
+    if not vip_list:
+        return await update.message.reply_text("ℹ️ هیچ کاربر ویژه‌ای ثبت نشده است.")
+
+    text = "<b>🌟 لیست کاربران ویژه:</b>\n\n"
+    for i, uid in enumerate(vip_list, 1):
+        text += f"{i}. <a href='tg://user?id={uid}'>کاربر {uid}</a>\n"
+
+    await update.message.reply_text(text, parse_mode="HTML")
+
+# ─────────────────────────────── کنترل دستورات ───────────────────────────────
+
+async def handle_vip_commands(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """تشخیص دستورات ویژه"""
+    text = (update.message.text or "").strip().lower()
+
+    if text in ["افزودن ویژه", "ویژه کردن"]:
+        return await add_vip(update, context)
+    if text in ["حذف ویژه", "ویژه حذف"]:
+        return await remove_vip(update, context)
+    if text in ["لیست ویژه", "کاربران ویژه"]:
+        return await list_vips(update, context)
+        # ==========================================================
+# 🧱 بخش ۱۰ — مدیریت مدیران گروه (Admin Control System)
+# ==========================================================
+
+ADMINS_FILE = path("group_admins.json")
+
+if not os.path.exists(ADMINS_FILE):
+    with open(ADMINS_FILE, "w", encoding="utf-8") as f:
+        json.dump({}, f, ensure_ascii=False, indent=2)
+
 ADMINS = _load_json(ADMINS_FILE, {})
 
 def _save_admins():
     _save_json(ADMINS_FILE, ADMINS)
 
-async def add_admin(update, context):
-    if not await _is_admin_or_sudo(context, update.effective_chat.id, update.effective_user.id):
-        return await update.message.reply_text("🚫 فقط مدیران اصلی می‌تونن مدیر جدید اضافه کنن.")
+def _is_local_admin(chat_id: int, user_id: int) -> bool:
+    """بررسی مدیر بودن محلی"""
+    chat_id = str(chat_id)
+    return str(user_id) in ADMINS.get(chat_id, [])
 
-    reply = update.message.reply_to_message
-    if not reply:
-        return await update.message.reply_text("📎 روی پیام فردی ریپلای کن تا مدیرش کنم.")
+# ─────────────────────────────── افزودن مدیر ───────────────────────────────
 
-    cid, uid = str(update.effective_chat.id), str(reply.from_user.id)
-    ADMINS.setdefault(cid, [])
-    if uid not in ADMINS[cid]:
-        ADMINS[cid].append(uid)
-        _save_admins()
-
-    await update.message.reply_text(f"👮 <b>{reply.from_user.first_name}</b> مدیر گروه شد.", parse_mode="HTML")
-
-async def del_admin(update, context):
-    if not await _is_admin_or_sudo(context, update.effective_chat.id, update.effective_user.id):
-        return await update.message.reply_text("🚫 فقط مدیران اصلی می‌تونن حذف کنن.")
-
-    reply = update.message.reply_to_message
-    if not reply:
-        return await update.message.reply_text("📎 روی پیام مدیر ریپلای کن تا حذفش کنم.")
-
-    cid, uid = str(update.effective_chat.id), str(reply.from_user.id)
-    if uid in ADMINS.get(cid, []):
-        ADMINS[cid].remove(uid)
-        _save_admins()
-        await update.message.reply_text(f"🧹 <b>{reply.from_user.first_name}</b> از مدیران حذف شد.", parse_mode="HTML")
-
-async def list_admins(update, context):
-    cid = str(update.effective_chat.id)
-    admins = ADMINS.get(cid, [])
-    if not admins:
-        return await update.message.reply_text("ℹ️ هنوز هیچ مدیر محلی ثبت نشده.")
-    text = "👮 <b>مدیران ثبت‌شده:</b>\n"
-    for uid in admins:
-        text += f"• کاربر {uid}\n"
-    await update.message.reply_text(text, parse_mode="HTML")
-
-
-# ==========================================================
-# 🧱 STEP 10 — مدیریت سودوهای ربات (Global Sudo)
-# ==========================================================
-
-SUDO_FILE = "sudos.json"
-SUDOS = _load_json(SUDO_FILE, {})
-
-def _save_sudos():
-    _save_json(SUDO_FILE, SUDOS)
-
-async def add_sudo(update, context):
-    if update.effective_user.id not in SUDO_IDS:
-        return await update.message.reply_text("🚫 فقط سودوی اصلی ربات می‌تونه سودو جدید اضافه کنه.")
-
-    reply = update.message.reply_to_message
-    if not reply:
-        return await update.message.reply_text("📎 روی پیام کاربر ریپلای کن تا سودو بشه.")
-
-    uid = str(reply.from_user.id)
-    if int(uid) not in SUDO_IDS:
-        SUDO_IDS.append(int(uid))
-        _save_sudos()
-    await update.message.reply_text(f"👑 <b>{reply.from_user.first_name}</b> به سودوهای جهانی افزوده شد.", parse_mode="HTML")
-
-async def del_sudo(update, context):
-    if update.effective_user.id not in SUDO_IDS:
-        return await update.message.reply_text("🚫 فقط سودوی اصلی می‌تونه حذف کنه.")
-
-    reply = update.message.reply_to_message
-    if not reply:
-        return await update.message.reply_text("📎 روی پیام سودو ریپلای کن تا حذفش کنم.")
-
-    uid = str(reply.from_user.id)
-    if int(uid) in SUDO_IDS:
-        SUDO_IDS.remove(int(uid))
-        _save_sudos()
-
-    await update.message.reply_text(f"🧹 <b>{reply.from_user.first_name}</b> از سودوها حذف شد.", parse_mode="HTML")
-
-async def list_sudos(update, context):
-    if not SUDO_IDS:
-        return await update.message.reply_text("ℹ️ هیچ سودویی ثبت نشده.")
-    text = "👑 <b>سودوهای ربات:</b>\n"
-    for uid in SUDO_IDS:
-        text += f"• کاربر {uid}\n"
-    await update.message.reply_text(text, parse_mode="HTML")
-
-
-# ==========================================================
-# 🧱 STEP 11 — گزارش کامل وضعیت گروه (Group Report System)
-# ==========================================================
-
-async def handle_group_report(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """📊 نمایش گزارش کامل وضعیت گروه (فقط برای مدیران و سودوها)"""
+async def add_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """افزودن مدیر جدید (درصورت داشتن مجوز، واقعی؛ در غیراینصورت محلی)"""
     chat = update.effective_chat
     user = update.effective_user
+    msg = update.message
 
     if not await _is_admin_or_sudo(context, chat.id, user.id):
-        return await update.message.reply_text("🚫 فقط مدیران یا سودوها مجاز به دریافت گزارش هستند.")
+        return await msg.reply_text("🚫 فقط مدیران یا سودوها می‌تونن مدیر اضافه کنن.")
+
+    if not msg.reply_to_message:
+        return await msg.reply_text("📎 روی پیام فرد مورد نظر ریپلای کن و بنویس: افزودن مدیر")
+
+    target = msg.reply_to_message.from_user
+    chat_id = str(chat.id)
+
+    # تلاش برای ارتقای واقعی در تلگرام
+    try:
+        await context.bot.promote_chat_member(
+            chat_id=chat.id,
+            user_id=target.id,
+            can_manage_chat=True,
+            can_delete_messages=True,
+            can_restrict_members=True,
+            can_invite_users=True,
+            can_pin_messages=True,
+            can_manage_video_chats=True,
+            can_promote_members=False
+        )
+        await msg.reply_text(f"👮 <b>{target.first_name}</b> به عنوان مدیر گروه ارتقا یافت.", parse_mode="HTML")
+    except Exception as e:
+        print(f"[Admin Promote Error] {e}")
+        # اگر دسترسی نداشت، به‌صورت محلی ثبت می‌کنیم
+        ADMINS.setdefault(chat_id, [])
+        if str(target.id) not in ADMINS[chat_id]:
+            ADMINS[chat_id].append(str(target.id))
+            _save_admins()
+        await msg.reply_text(f"✅ <b>{target.first_name}</b> به عنوان مدیر محلی ثبت شد.", parse_mode="HTML")
+
+# ─────────────────────────────── حذف مدیر ───────────────────────────────
+
+async def remove_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """حذف مدیر از گروه یا فایل محلی"""
+    chat = update.effective_chat
+    user = update.effective_user
+    msg = update.message
+
+    if not await _is_admin_or_sudo(context, chat.id, user.id):
+        return await msg.reply_text("🚫 فقط مدیران یا سودوها مجاز به حذف مدیر هستند.")
+
+    if not msg.reply_to_message:
+        return await msg.reply_text("📎 روی پیام مدیر مورد نظر ریپلای کن و بنویس: حذف مدیر")
+
+    target = msg.reply_to_message.from_user
+    chat_id = str(chat.id)
+
+    # تلاش برای حذف واقعی از مدیران تلگرام
+    try:
+        await context.bot.promote_chat_member(
+            chat_id=chat.id,
+            user_id=target.id,
+            can_manage_chat=False,
+            can_delete_messages=False,
+            can_restrict_members=False,
+            can_invite_users=False,
+            can_pin_messages=False,
+            can_manage_video_chats=False,
+            can_promote_members=False
+        )
+        await msg.reply_text(f"🧹 <b>{target.first_name}</b> از مدیران گروه حذف شد.", parse_mode="HTML")
+    except Exception as e:
+        print(f"[Admin Demote Error] {e}")
+        # اگر دسترسی نداشت، فقط از فایل محلی حذف می‌کنیم
+        if chat_id in ADMINS and str(target.id) in ADMINS[chat_id]:
+            ADMINS[chat_id].remove(str(target.id))
+            _save_admins()
+            await msg.reply_text(f"🧹 <b>{target.first_name}</b> از مدیران محلی حذف شد.", parse_mode="HTML")
+        else:
+            await msg.reply_text(f"ℹ️ {target.first_name} در لیست مدیران محلی نیست.", parse_mode="HTML")
+
+# ─────────────────────────────── لیست مدیران ───────────────────────────────
+
+async def list_admins(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """نمایش مدیران واقعی و محلی گروه"""
+    chat = update.effective_chat
+    chat_id = str(chat.id)
+
+    text = "👮 <b>مدیران گروه:</b>\n\n"
 
     try:
-        members = await context.bot.get_chat_members_count(chat.id)
-        admins = await context.bot.get_chat_administrators(chat.id)
-        admin_count = len(admins)
-
-        locks = _get_locks(chat.id)
-        active_locks = [LOCK_TYPES[k] for k, v in locks.items() if v]
-
-        cid = str(chat.id)
-        mutes = PUNISH_DATA.get(cid, {}).get("mutes", [])
-        warns = PUNISH_DATA.get(cid, {}).get("warns", {})
-        local_admins = ADMINS.get(cid, [])
-        sudo_count = len(SUDO_IDS)
-        now = datetime.now().strftime("%Y-%m-%d | %H:%M:%S")
-
-        text = (
-            "━━━━━━━━━━━━━━━\n"
-            f"📊 <b>گزارش وضعیت گروه</b>\n"
-            f"🕒 <i>{now}</i>\n"
-            "━━━━━━━━━━━━━━━\n"
-            f"🏷️ <b>نام گروه:</b> {chat.title}\n"
-            f"👥 <b>تعداد اعضا:</b> {members}\n"
-            f"👮 <b>مدیران تلگرام:</b> {admin_count}\n"
-            f"🔧 <b>مدیران محلی:</b> {len(local_admins)}\n"
-            f"👑 <b>سودوها:</b> {sudo_count}\n"
-            "━━━━━━━━━━━━━━━\n"
-        )
-
-        if active_locks:
-            text += "🔒 <b>قفل‌های فعال:</b>\n" + "، ".join(active_locks) + "\n"
-        else:
-            text += "✅ هیچ قفلی فعال نیست.\n"
-
-        text += (
-            "\n━━━━━━━━━━━━━━━\n"
-            f"🤐 <b>در سکوت:</b> {len(mutes)} نفر\n"
-            f"⚠️ <b>دارای اخطار:</b> {len(warns)} نفر\n"
-            "━━━━━━━━━━━━━━━\n"
-            f"👤 <b>درخواست توسط:</b> <a href='tg://user?id={user.id}'>{user.first_name}</a>\n"
-            "━━━━━━━━━━━━━━━"
-        )
-
-        await update.message.reply_text(text, parse_mode="HTML")
-
+        real_admins = await context.bot.get_chat_administrators(chat.id)
+        for admin in real_admins:
+            text += f"• {admin.user.first_name} — <i>مدیر واقعی</i>\n"
     except Exception as e:
-        await update.message.reply_text(f"⚠️ خطا در ایجاد گزارش:\n<code>{e}</code>", parse_mode="HTML")
+        text += f"⚠️ خطا در دریافت مدیران واقعی: {e}\n"
 
-
-# ==========================================================
-# 🧱 STEP 12 — سیستم دستورهای سفارشی (Alias System)
-# ==========================================================
-
-ALIAS_FILE = "aliases.json"
-
-if not os.path.exists(ALIAS_FILE):
-    with open(ALIAS_FILE, "w", encoding="utf-8") as f:
-        json.dump({}, f, ensure_ascii=False, indent=2)
-
-ALIASES = _load_json(ALIAS_FILE, {})
-
-def _save_aliases():
-    _save_json(ALIAS_FILE, ALIASES)
-
-async def handle_add_alias(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """افزودن یک دستور سفارشی (Alias)"""
-    chat = update.effective_chat
-    user = update.effective_user
-    text = update.message.text.strip()
-
-    if not await _is_admin_or_sudo(context, chat.id, user.id):
-        return await update.message.reply_text("🚫 فقط مدیران یا سودوها می‌تونن دستور جدید اضافه کنن.")
-
-    if "=" not in text:
-        return await update.message.reply_text("📘 مثال:\n<code>افزودن دستور بنش = بن</code>", parse_mode="HTML")
-
-    parts = text.split("دستور", 1)[1].strip().split("=")
-    if len(parts) != 2:
-        return await update.message.reply_text("⚠️ فرمت دستور اشتباه است.", parse_mode="HTML")
-
-    alias = parts[0].strip()
-    real = parts[1].strip()
-
-    if not alias or not real:
-        return await update.message.reply_text("⚠️ لطفاً نام دستور و عمل اصلی را مشخص کن.")
-
-    chat_id = str(chat.id)
-    ALIASES.setdefault(chat_id, {})
-    ALIASES[chat_id][alias] = real
-    _save_aliases()
-
-    await update.message.reply_text(f"✅ دستور <b>{alias}</b> به عنوان معادل <b>{real}</b> ثبت شد.", parse_mode="HTML")
-
-async def handle_list_aliases(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """نمایش لیست aliasها"""
-    chat_id = str(update.effective_chat.id)
-    data = ALIASES.get(chat_id, {})
-    if not data:
-        return await update.message.reply_text("ℹ️ هیچ دستوری ثبت نشده است.")
-
-    text = "📜 <b>لیست دستورهای سفارشی:</b>\n\n"
-    for k, v in data.items():
-        text += f"• {k} → {v}\n"
+    local_admins = ADMINS.get(chat_id, [])
+    if local_admins:
+        text += "\n📂 <b>مدیران محلی:</b>\n"
+        for uid in local_admins:
+            text += f"• <a href='tg://user?id={uid}'>کاربر {uid}</a>\n"
 
     await update.message.reply_text(text, parse_mode="HTML")
 
-async def handle_locks_with_alias(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """بررسی و اجرای aliasهای ثبت‌شده"""
-    chat = update.effective_chat
-    text = update.message.text.strip().lower()
-    chat_id = str(chat.id)
+# ─────────────────────────────── کنترل دستورات ───────────────────────────────
 
-    if chat_id not in ALIASES:
-        return
+async def handle_admin_commands(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """تشخیص دستورات مدیریتی"""
+    text = (update.message.text or "").strip().lower()
 
-    if text in ALIASES[chat_id]:
-        new_cmd = ALIASES[chat_id][text]
-        update.message.text = new_cmd
-        print(f"[ALIAS] {text} → {new_cmd}")
-        return await handle_group_message(update, context)
-
-
-# ==========================================================
-# 🧱 تابع مرکزی نهایی — کنترل همهٔ سیستم‌ها
-# ==========================================================
-
-import re
-
-async def handle_group_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """دستگاه مرکزی کنترل گروه — نسخه پایدار و نهایی"""
-    if not update.message:
-        return
-
-    raw_text = (update.message.text or update.message.caption or "").strip()
-    text = raw_text.lower()
-    chat = update.effective_chat
-    user = update.effective_user
-
-    # ─── بررسی قفل‌ها در ابتدای مسیر ───
-    if await _apply_locks_if_needed(update, context, text, chat, user):
-        return
-
-    # ─── دستورات گروه ───
-    if text in ["قفل گروه", "بستن گروه", "بستن"]:
-        return await lock_group(update, context)
-    if text in ["باز کردن گروه", "باز کردن", "گروه باز"]:
-        return await unlock_group(update, context)
-
-    # فیلترها
-    if text.startswith("فیلتر "):
-        return await add_filter(update, context)
-    if text.startswith("حذف فیلتر "):
-        return await remove_filter(update, context)
-    if text in ["لیست فیلتر", "لیست فیلترها"]:
-        return await list_filters(update, context)
-
-    # بن / سکوت / اخطار
-    if text in ["بن", "ban"]:
-        if not update.message.reply_to_message:
-            return await update.message.reply_text("📎 روی پیام فرد ریپلای کن تا بن شود.")
-        return await _do_ban(update, context, update.message.reply_to_message.from_user)
-
-    if text in ["سکوت", "mute"]:
-        if not update.message.reply_to_message:
-            return await update.message.reply_text("📎 روی پیام فرد ریپلای کن تا ساکت شود.")
-        return await _do_mute(update, context, update.message.reply_to_message.from_user)
-
-    if text in ["اخطار", "warn"]:
-        if not update.message.reply_to_message:
-            return await update.message.reply_text("📎 روی پیام فرد ریپلای کن تا اخطار بگیرد.")
-        return await _do_warn(update, context, update.message.reply_to_message.from_user)
-
-    if text in ["لیست اخطار", "warns"]:
-        return await list_warns(update, context)
-
-    # مدیران / سودوها
-    if text in ["افزودن مدیر", "add admin"]:
+    if text in ["افزودن مدیر", "مدیر کردن"]:
         return await add_admin(update, context)
-    if text in ["حذف مدیر", "remove admin"]:
-        return await del_admin(update, context)
-    if text in ["لیست مدیران", "admins list"]:
+    if text in ["حذف مدیر", "مدیر حذف"]:
+        return await remove_admin(update, context)
+    if text in ["لیست مدیران", "مدیران"]:
         return await list_admins(update, context)
+        # ==========================================================
+# 🧱 بخش ۱۱ — مدیریت سودوهای جهانی (Global Sudo System)
+# ==========================================================
 
-    if text in ["افزودن سودو", "add sudo"]:
+SUDO_FILE = path("sudos.json")
+
+if not os.path.exists(SUDO_FILE):
+    with open(SUDO_FILE, "w", encoding="utf-8") as f:
+        json.dump({"sudo_ids": []}, f, ensure_ascii=False, indent=2)
+
+SUDO_DATA = _load_json(SUDO_FILE, {})
+SUDO_IDS = set(SUDO_DATA.get("sudo_ids", []))
+
+def _save_sudos():
+    SUDO_DATA["sudo_ids"] = list(SUDO_IDS)
+    _save_json(SUDO_FILE, SUDO_DATA)
+
+# ─────────────────────────────── بررسی سودو ───────────────────────────────
+
+def _is_sudo(user_id: int) -> bool:
+    """بررسی اینکه آیا کاربر سودو هست یا خیر"""
+    return user_id in SUDO_IDS
+
+# ─────────────────────────────── افزودن سودو ───────────────────────────────
+
+async def add_sudo(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """افزودن کاربر جدید به سودوهای جهانی"""
+    user = update.effective_user
+    msg = update.message
+
+    # فقط سودوی اصلی می‌تونه سودو اضافه کنه
+    if user.id not in SUDO_IDS:
+        return await msg.reply_text("🚫 فقط سودوی اصلی ربات می‌تونه سودو جدید اضافه کنه.")
+
+    if not msg.reply_to_message:
+        return await msg.reply_text("📎 روی پیام فرد مورد نظر ریپلای کن و بنویس: افزودن سودو")
+
+    target = msg.reply_to_message.from_user
+
+    if target.id in SUDO_IDS:
+        return await msg.reply_text(f"ℹ️ <b>{target.first_name}</b> از قبل سودو است.", parse_mode="HTML")
+
+    SUDO_IDS.add(target.id)
+    _save_sudos()
+    await msg.reply_text(f"👑 <b>{target.first_name}</b> به سودوهای جهانی اضافه شد!", parse_mode="HTML")
+
+# ─────────────────────────────── حذف سودو ───────────────────────────────
+
+async def remove_sudo(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """حذف سودو از لیست جهانی"""
+    user = update.effective_user
+    msg = update.message
+
+    if user.id not in SUDO_IDS:
+        return await msg.reply_text("🚫 فقط سودوی اصلی می‌تونه سودو حذف کنه.")
+
+    if not msg.reply_to_message:
+        return await msg.reply_text("📎 روی پیام سودو مورد نظر ریپلای کن و بنویس: حذف سودو")
+
+    target = msg.reply_to_message.from_user
+
+    if target.id not in SUDO_IDS:
+        return await msg.reply_text(f"ℹ️ {target.first_name} در لیست سودوها نیست.", parse_mode="HTML")
+
+    SUDO_IDS.remove(target.id)
+    _save_sudos()
+    await msg.reply_text(f"🧹 <b>{target.first_name}</b> از سودوها حذف شد.", parse_mode="HTML")
+
+# ─────────────────────────────── لیست سودوها ───────────────────────────────
+
+async def list_sudos(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """نمایش لیست تمام سودوهای جهانی"""
+    if not SUDO_IDS:
+        return await update.message.reply_text("ℹ️ هنوز هیچ سودویی ثبت نشده است.")
+
+    text = "👑 <b>لیست سودوهای جهانی ربات:</b>\n\n"
+    for i, uid in enumerate(SUDO_IDS, start=1):
+        text += f"{i}. <a href='tg://user?id={uid}'>کاربر {uid}</a>\n"
+
+    await update.message.reply_text(text, parse_mode="HTML")
+
+# ─────────────────────────────── کنترل دستورات ───────────────────────────────
+
+async def handle_sudo_commands(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """تشخیص دستورات سودو"""
+    text = (update.message.text or "").strip().lower()
+
+    if text in ["افزودن سودو", "sudo add"]:
         return await add_sudo(update, context)
-    if text in ["حذف سودو", "remove sudo"]:
-        return await del_sudo(update, context)
-    if text in ["لیست سودو", "sudo list"]:
+    if text in ["حذف سودو", "sudo del"]:
+        return await remove_sudo(update, context)
+    if text in ["لیست سودو", "لیست سودوها", "sudo list"]:
         return await list_sudos(update, context)
-
-    # اصل / لقب
-    if text.startswith("ثبت اصل"):
-        return await set_origin(update, context)
-    if text.startswith("ثبت لقب"):
-        return await set_nickname(update, context)
-    if text == "اصل":
-        return await show_origin(update, context)
-    if text == "لقب":
-        return await show_nickname(update, context)
-
-    # تگ گروهی
-    if text == "تگ همه":
-        return await tag_users(update, context, "all")
-    if text == "تگ فعال":
-        return await tag_users(update, context, "active")
-    if text == "تگ غیرفعال":
-        return await tag_users(update, context, "inactive")
-    if text == "تگ مدیران":
-        return await tag_users(update, context, "admins")
-
-    # پاکسازی
-    if text == "پاکسازی":
-        return await purge_all(update, context)
-    if text.startswith("حذف "):
-        parts = text.split()
-        if len(parts) == 2 and parts[1].isdigit():
-            return await purge_count(update, context, int(parts[1]))
-        else:
-            return await update.message.reply_text("⚠️ مثال درست: حذف 50")
-    if text == "حذف" and update.message.reply_to_message:
-        return await purge_user(update, context)
-    if text in ["تا اینجا حذف", "پاکسازی بین"]:
-        return await purge_between(update, context)
-
-    # گزارش
-    if text in ["گزارش گروه", "وضعیت گروه", "report"]:
-        return await handle_group_report(update, context)
-
-    # alias
-    if text.startswith("افزودن دستور"):
-        return await handle_add_alias(update, context)
-    if text in ["لیست دستورها", "لیست alias"]:
-        return await handle_list_aliases(update, context)
-
-    # در انتها بررسی alias
-    await handle_locks_with_alias(update, context)
