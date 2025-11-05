@@ -2038,6 +2038,9 @@ if __name__ == "__main__":
             text += f"{i}. <code>{sid}</code>\n"
         await update.message.reply_text(text, parse_mode="HTML")
     # ======================= 🧱 Group Control System (Central Handler) =======================
+    application.add_handler(
+    MessageHandler(filters.TEXT & filters.Regex(r"^(لینک|Link)$"), link_panel)
+    )
 
     from group_control.group_control import handle_group_message, handle_lock_panel_callback
     from telegram.ext import MessageHandler, CallbackQueryHandler, filters
@@ -2124,8 +2127,6 @@ if __name__ == "__main__":
     application.add_handler(CommandHandler("selectivebackup", selective_backup_menu))
     application.add_handler(CallbackQueryHandler(selective_backup_buttons, pattern="^selbk_"))
     application.add_handler(CommandHandler("restore", restore))
-    application.add_handler(MessageHandler(filters.TEXT & filters.Regex(r"^(لینک|Link)$"), link_panel))
-    application.add_handler(CallbackQueryHandler(link_panel_buttons, pattern="^link_"))
     application.add_handler(CommandHandler("reset", reset_memory))
     application.add_handler(CommandHandler("reload", reload_memory))
     application.add_handler(CommandHandler("broadcast", broadcast))
