@@ -5,15 +5,15 @@ from typing import Deque, Tuple
 from telegram import Update
 from telegram.ext import ContextTypes, CommandHandler, MessageHandler, filters
 
-# ================== ⚙️ تنظیمات اصلی ==================
+# ================== ⚙️ تنظیمات ==================
 DEFAULT_BULK = 300
 MAX_BULK = 10000
 TRACK_BUFFER = 600
-SLEEP_EVERY = 100
-SLEEP_SEC = 0.3
-SUDO_IDS = [8588347189]  # آیدی سودوها
+BATCH_SIZE = 20         # چند پیام همزمان حذف شود
+SLEEP_SEC = 0.25        # فاصله بین batchها
+SUDO_IDS = [8588347189] # آیدی سودو
 
-# ================== 🧠 ذخیره پیام‌ها برای حذف هدف‌دار ==================
+# ================== 🧠 بافر پیام‌ها ==================
 track_map: dict[int, Deque[Tuple[int, int]]] = defaultdict(lambda: deque(maxlen=TRACK_BUFFER))
 
 async def track_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -21,7 +21,7 @@ async def track_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if msg and msg.from_user and update.effective_chat.type in ("group", "supergroup"):
         track_map[update.effective_chat.id].append((msg.message_id, msg.from_user.id))
 
-# ================== 🔐 بررسی سطح دسترسی ==================
+# ================== 🔐 بررسی دسترسی ==================
 async def _has_access(context: ContextTypes.DEFAULT_TYPE, chat_id: int, user_id: int) -> bool:
     if user_id in SUDO_IDS:
         return True
@@ -31,36 +31,39 @@ async def _has_access(context: ContextTypes.DEFAULT_TYPE, chat_id: int, user_id:
     except:
         return False
 
-# ================== 🗑️ توابع حذف ==================
+# ================== 🗑️ حذف سریع Batch ==================
+async def _batch_delete(context, chat_id: int, ids: list[int]) -> int:
+    """حذف گروهی پیام‌ها با gather"""
+    if not ids:
+        return 0
+    results = await asyncio.gather(
+        *[context.bot.delete_message(chat_id, mid) for mid in ids],
+        return_exceptions=True
+    )
+    return sum(1 for r in results if not isinstance(r, Exception))
+
 async def _delete_last_n(context, chat_id: int, last_msg_id: int, n: int) -> int:
+    """حذف n پیام اخیر با Batch"""
     deleted = 0
     start = max(1, last_msg_id - n)
-    for mid in range(last_msg_id, start - 1, -1):
-        try:
-            await context.bot.delete_message(chat_id, mid)
-            deleted += 1
-        except:
-            pass
-        if deleted and deleted % SLEEP_EVERY == 0:
-            await asyncio.sleep(SLEEP_SEC)
+    mids = list(range(last_msg_id, start - 1, -1))
+    for i in range(0, len(mids), BATCH_SIZE):
+        batch = mids[i:i + BATCH_SIZE]
+        deleted += await _batch_delete(context, chat_id, batch)
+        await asyncio.sleep(SLEEP_SEC)
     return deleted
 
 async def _delete_by_user_from_buffer(context, chat_id: int, user_id: int) -> int:
+    """حذف سریع پیام‌های یک کاربر از بافر"""
     deleted = 0
-    snapshot = list(track_map.get(chat_id, []))
-    for mid, uid in reversed(snapshot):
-        if uid != user_id:
-            continue
-        try:
-            await context.bot.delete_message(chat_id, mid)
-            deleted += 1
-        except:
-            pass
-        if deleted and deleted % SLEEP_EVERY == 0:
-            await asyncio.sleep(SLEEP_SEC)
+    mids = [mid for mid, uid in reversed(track_map.get(chat_id, [])) if uid == user_id]
+    for i in range(0, len(mids), BATCH_SIZE):
+        batch = mids[i:i + BATCH_SIZE]
+        deleted += await _batch_delete(context, chat_id, batch)
+        await asyncio.sleep(SLEEP_SEC)
     return deleted
 
-# ================== 🧹 دستور اصلی پاکسازی ==================
+# ================== 🧹 دستور اصلی ==================
 async def funny_cleanup(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat = update.effective_chat
     msg = update.effective_message
@@ -72,18 +75,18 @@ async def funny_cleanup(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return await msg.reply_text("🚫 این دستور فقط در گروه‌ها قابل استفاده است.")
 
     if not await _has_access(context, chat.id, user.id):
-        return await msg.reply_text("🚫 فقط مدیران یا سودوها اجازه استفاده از این دستور را دارند.")
+        return await msg.reply_text("🚫 فقط مدیران یا سودوها مجازند.")
 
     deleted = 0
     action_type = "نامشخص"
 
-    # ریپلای → حذف پیام‌های فرد خاص
+    # 🧑‍💻 ریپلای → حذف پیام‌های فرد خاص
     if msg.reply_to_message and (text.startswith("پاک") or text.startswith("حذف")):
         target = msg.reply_to_message.from_user
         deleted = await _delete_by_user_from_buffer(context, chat.id, target.id)
         action_type = f"🧑‍💻 حذف پیام‌های {target.first_name}"
 
-    # حذف عددی
+    # 🧹 حذف عددی
     elif text.startswith("حذف") or text.startswith("پاک"):
         try:
             n = int(args[0]) if args else int(text.split()[1])
@@ -93,7 +96,7 @@ async def funny_cleanup(update: Update, context: ContextTypes.DEFAULT_TYPE):
         deleted = await _delete_last_n(context, chat.id, msg.message_id, n)
         action_type = f"🧹 حذف عددی {n} پیام"
 
-    # پاکسازی کلی
+    # 🧼 پاکسازی کلی
     elif text in ("پاکسازی", "clean"):
         deleted = await _delete_last_n(context, chat.id, msg.message_id, DEFAULT_BULK)
         action_type = "🧼 پاکسازی کلی"
@@ -101,8 +104,16 @@ async def funny_cleanup(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         return
 
-    # گزارش مطمئن (بعد از حذف کامل)
-    await asyncio.sleep(1)
+    # حذف خود پیام دستور برای تمیزی بیشتر
+    try:
+        await msg.delete()
+    except:
+        pass
+
+    # ⏳ تأخیر کوتاه برای اطمینان از اتمام حذف
+    await asyncio.sleep(0.8)
+
+    # 🕓 گزارش نهایی
     time_now = datetime.now().strftime("%H:%M:%S")
     report = (
         f"✅ <b>گزارش پاکسازی</b>\n\n"
@@ -119,6 +130,7 @@ async def funny_cleanup(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ================== 🔧 رجیستر هندلرها ==================
 def register_cleanup_handlers(application):
+    """ثبت هندلرها در برنامه اصلی"""
     application.add_handler(CommandHandler("clean", funny_cleanup))
     application.add_handler(
         MessageHandler(
