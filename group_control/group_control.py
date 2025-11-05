@@ -942,6 +942,105 @@ async def list_warns(update, context):
         text += f"• کاربر {uid} — {count}/3\n"
 
     await update.message.reply_text(text, parse_mode="HTML")
+
+# 🔧 این بخش را یک‌بار به فایل اضافه کن (بالای handle_group_message)
+import re
+
+async def _apply_locks_if_needed(update: Update, context: ContextTypes.DEFAULT_TYPE, text: str, chat, user) -> bool:
+    """
+    اگر هر قفلی نقض شود:
+      - پیام حذف می‌شود
+      - هشدار مناسب (در صورت نیاز) داده می‌شود
+      - True برمی‌گردد تا جریان اصلی متوقف شود
+    در غیر این صورت False برمی‌گردد.
+    """
+    locks = _get_locks(chat.id)
+    if not any(locks.values()):
+        return False
+
+    msg = update.message
+    is_admin = await _is_admin_or_sudo(context, chat.id, user.id)
+
+    # 🚫 قفل گروه (فقط غیرمدیر)
+    if locks.get("group") and not is_admin:
+        try:
+            await msg.delete()
+        except:
+            pass
+        return True
+
+    # --- خصوصیات پیام ---
+    has_photo = bool(msg.photo)
+    has_video = bool(msg.video)
+    has_doc   = bool(msg.document)
+    has_voice = bool(msg.voice)
+    has_anim  = bool(msg.animation)
+    has_stick = bool(msg.sticker)
+    has_fwd   = bool(msg.forward_date)
+    has_caption = bool(msg.caption)
+
+    # 🚫 لینک‌ها
+    if locks.get("links"):
+        if any(x in text for x in ["http://", "https://", "t.me", "telegram.me"]):
+            await _del_msg(update, "🚫 ارسال لینک ممنوع است.")
+            return True
+        # تشخیص دامنه‌های بدون http (مثل example.com)
+        if re.search(r"(?:^|\s)(?:[a-z0-9-]+\.)+[a-z]{2,}(?:/\S*)?", text):
+            await _del_msg(update, "🚫 ارسال لینک ممنوع است.")
+            return True
+
+    # 🚫 رسانه‌ها
+    if locks.get("photos") and has_photo:
+        await _del_msg(update, "🚫 ارسال عکس ممنوع است."); return True
+    if locks.get("videos") and has_video:
+        await _del_msg(update, "🚫 ارسال ویدیو ممنوع است."); return True
+    if locks.get("files") and has_doc:
+        await _del_msg(update, "🚫 ارسال فایل ممنوع است."); return True
+    if locks.get("voices") and has_voice:
+        await _del_msg(update, "🚫 ارسال ویس ممنوع است."); return True
+    if locks.get("stickers") and has_stick:
+        await _del_msg(update, "🚫 ارسال استیکر ممنوع است."); return True
+    if locks.get("gifs") and has_anim:
+        await _del_msg(update, "🚫 ارسال گیف ممنوع است."); return True
+    if locks.get("forward") and has_fwd:
+        await _del_msg(update, "🚫 فوروارد پیام ممنوع است."); return True
+    if locks.get("media") and (has_photo or has_video or has_doc or has_anim):
+        await _del_msg(update, "🚫 ارسال رسانه‌ها ممنوع است."); return True
+
+    # 🚫 منشن / یوزرنیم
+    if (locks.get("usernames") or locks.get("mention")) and "@" in text:
+        await _del_msg(update, "🚫 استفاده از @ یا منشن ممنوع است."); return True
+
+    # 🚫 تبلیغ
+    if locks.get("ads") and any(x in text for x in ["t.me/", "joinchat", "promo", "invite", "channel", "bot?start="]):
+        await _del_msg(update, "🚫 تبلیغات در گروه ممنوع است."); return True
+
+    # 🚫 عربی / انگلیسی
+    if locks.get("arabic") and any("\u0600" <= c <= "\u06FF" for c in text):
+        await _del_msg(update, "🚫 استفاده از حروف عربی ممنوع است."); return True
+    if locks.get("english") and any(("a" <= c <= "z") or ("A" <= c <= "Z") for c in text):
+        await _del_msg(update, "🚫 استفاده از حروف انگلیسی ممنوع است."); return True
+
+    # 🚫 کپشن
+    if locks.get("caption") and has_caption:
+        await _del_msg(update, "🚫 کپشن‌گذاری ممنوع است."); return True
+
+    # 🚫 ریپلای
+    if locks.get("reply") and msg.reply_to_message:
+        await _del_msg(update, "🚫 پاسخ دادن (ریپلای) ممنوع است."); return True
+
+    # 🚫 فقط ایموجی
+    if locks.get("emoji"):
+        emoji_pattern = re.compile(r"[\U00010000-\U0010ffff]", flags=re.UNICODE)
+        # همهٔ کاراکترهای غیر فاصله اگر ایموجی باشند => حذف
+        if text and all(emoji_pattern.match(c) for c in text if not c.isspace()):
+            await _del_msg(update, "🚫 ارسال فقط ایموجی مجاز نیست."); return True
+
+    # 🚫 پیام متنی (وقتی رسانه‌ای نیست)
+    if locks.get("text") and text and not (has_photo or has_video or has_doc):
+        await _del_msg(update, "🚫 ارسال پیام متنی ممنوع است."); return True
+
+    return False
     # ==========================================================
 # 🧱 STEP 9 — مدیریت مدیران هر گروه (Local Admins)
 # ==========================================================
