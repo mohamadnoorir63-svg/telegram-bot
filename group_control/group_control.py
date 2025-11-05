@@ -1193,6 +1193,187 @@ async def handle_group_message(update: Update, context: ContextTypes.DEFAULT_TYP
 
     if text in ["پنل قفل", "پنل قفل‌ها", "lock panel"]:
         return await handle_lock_panel(update, context)
+        # ─────────────── بررسی قفل‌های فعال ───────────────
+    locks = _get_locks(chat.id)
+
+    # اگر هیچ قفلی فعال نیست، ادامه بده
+    if not any(locks.values()):
+        pass
+    else:
+        # اجازه برای مدیران و سودوها
+        is_admin = await _is_admin_or_sudo(context, chat.id, user.id)
+
+        # 🚫 قفل گروه (هیچ‌کس جز مدیر پیام نده)
+        if locks.get("group") and not is_admin:
+            try:
+                await update.message.delete()
+            except:
+                pass
+            return
+
+        # 🚫 قفل لینک‌ها
+        if locks.get("links") and ("http" in text or "t.me" in text or "telegram.me" in text):
+            await update.message.delete()
+            msg = await update.message.reply_text("🚫 ارسال لینک ممنوع است.", parse_mode="HTML")
+            await asyncio.sleep(5)
+            await msg.delete()
+            return
+
+        # 🚫 قفل عکس
+        if locks.get("photos") and update.message.photo:
+            await update.message.delete()
+            msg = await update.message.reply_text("🚫 ارسال عکس ممنوع است.", parse_mode="HTML")
+            await asyncio.sleep(5)
+            await msg.delete()
+            return
+
+        # 🚫 قفل ویدیو
+        if locks.get("videos") and update.message.video:
+            await update.message.delete()
+            msg = await update.message.reply_text("🚫 ارسال ویدیو ممنوع است.", parse_mode="HTML")
+            await asyncio.sleep(5)
+            await msg.delete()
+            return
+
+        # 🚫 قفل فایل‌ها
+        if locks.get("files") and update.message.document:
+            await update.message.delete()
+            msg = await update.message.reply_text("🚫 ارسال فایل ممنوع است.", parse_mode="HTML")
+            await asyncio.sleep(5)
+            await msg.delete()
+            return
+
+        # 🚫 قفل ویس
+        if locks.get("voices") and update.message.voice:
+            await update.message.delete()
+            msg = await update.message.reply_text("🚫 ارسال ویس ممنوع است.", parse_mode="HTML")
+            await asyncio.sleep(5)
+            await msg.delete()
+            return
+
+        # 🚫 قفل ویدیو مسیج
+        if locks.get("vmsgs") and update.message.video_note:
+            await update.message.delete()
+            msg = await update.message.reply_text("🚫 ارسال ویدیو مسیج ممنوع است.", parse_mode="HTML")
+            await asyncio.sleep(5)
+            await msg.delete()
+            return
+
+        # 🚫 قفل استیکر
+        if locks.get("stickers") and update.message.sticker:
+            await update.message.delete()
+            msg = await update.message.reply_text("🚫 ارسال استیکر ممنوع است.", parse_mode="HTML")
+            await asyncio.sleep(5)
+            await msg.delete()
+            return
+
+        # 🚫 قفل گیف
+        if locks.get("gifs") and update.message.animation:
+            await update.message.delete()
+            msg = await update.message.reply_text("🚫 ارسال گیف ممنوع است.", parse_mode="HTML")
+            await asyncio.sleep(5)
+            await msg.delete()
+            return
+
+        # 🚫 قفل فوروارد
+        if locks.get("forward") and update.message.forward_date:
+            await update.message.delete()
+            msg = await update.message.reply_text("🚫 فوروارد پیام ممنوع است.", parse_mode="HTML")
+            await asyncio.sleep(5)
+            await msg.delete()
+            return
+
+        # 🚫 قفل رسانه‌ها (هر نوع عکس، ویدیو، فایل و گیف)
+        if locks.get("media") and (update.message.photo or update.message.video or update.message.document or update.message.animation):
+            await update.message.delete()
+            msg = await update.message.reply_text("🚫 ارسال رسانه ممنوع است.", parse_mode="HTML")
+            await asyncio.sleep(5)
+            await msg.delete()
+            return
+
+        # 🚫 قفل یوزرنیم / تگ
+        if locks.get("usernames") and "@" in text:
+            await update.message.delete()
+            msg = await update.message.reply_text("🚫 استفاده از @ یا یوزرنیم ممنوع است.", parse_mode="HTML")
+            await asyncio.sleep(5)
+            await msg.delete()
+            return
+
+        # 🚫 قفل منشن
+        if locks.get("mention") and "@" in text:
+            await update.message.delete()
+            msg = await update.message.reply_text("🚫 منشن کردن کاربران ممنوع است.", parse_mode="HTML")
+            await asyncio.sleep(5)
+            await msg.delete()
+            return
+
+        # 🚫 قفل تبلیغ / تبچی
+        if locks.get("ads") and ("t.me/" in text or "joinchat" in text or "promo" in text):
+            await update.message.delete()
+            msg = await update.message.reply_text("🚫 تبلیغات ممنوع است.", parse_mode="HTML")
+            await asyncio.sleep(5)
+            await msg.delete()
+            return
+
+        # 🚫 قفل عربی / انگلیسی
+        if locks.get("arabic") and any("\u0600" <= c <= "\u06FF" for c in text):
+            await update.message.delete()
+            msg = await update.message.reply_text("🚫 استفاده از حروف عربی ممنوع است.", parse_mode="HTML")
+            await asyncio.sleep(5)
+            await msg.delete()
+            return
+        if locks.get("english") and any("a" <= c <= "z" or "A" <= c <= "Z" for c in text):
+            await update.message.delete()
+            msg = await update.message.reply_text("🚫 استفاده از حروف انگلیسی ممنوع است.", parse_mode="HTML")
+            await asyncio.sleep(5)
+            await msg.delete()
+            return
+
+        # 🚫 قفل کپشن
+        if locks.get("caption") and update.message.caption:
+            await update.message.delete()
+            msg = await update.message.reply_text("🚫 کپشن‌گذاری ممنوع است.", parse_mode="HTML")
+            await asyncio.sleep(5)
+            await msg.delete()
+            return
+
+        # 🚫 قفل ویرایش
+        if locks.get("edit") and update.edited_message:
+            try:
+                await update.edited_message.delete()
+            except:
+                pass
+            msg = await context.bot.send_message(chat.id, "🚫 ویرایش پیام ممنوع است.", parse_mode="HTML")
+            await asyncio.sleep(5)
+            await msg.delete()
+            return
+
+        # 🚫 قفل ریپلای
+        if locks.get("reply") and update.message.reply_to_message:
+            await update.message.delete()
+            msg = await update.message.reply_text("🚫 پاسخ دادن (ریپلای) ممنوع است.", parse_mode="HTML")
+            await asyncio.sleep(5)
+            await msg.delete()
+            return
+
+        # 🚫 قفل فقط ایموجی
+        if locks.get("emoji"):
+            import re
+            emoji_pattern = re.compile("[\U00010000-\U0010ffff]", flags=re.UNICODE)
+            if all(emoji_pattern.match(c) for c in text if not c.isspace()):
+                await update.message.delete()
+                msg = await update.message.reply_text("🚫 ارسال فقط ایموجی مجاز نیست.", parse_mode="HTML")
+                await asyncio.sleep(5)
+                await msg.delete()
+                return
+
+        # 🚫 قفل پیام متنی
+        if locks.get("text") and not update.message.photo and not update.message.video:
+            await update.message.delete()
+            msg = await update.message.reply_text("🚫 ارسال پیام متنی ممنوع است.", parse_mode="HTML")
+            await asyncio.sleep(5)
+            await msg.delete()
+            return
 
     # ─────────────────────────────── فیلتر کلمات ───────────────────────────────
     if text.startswith("فیلتر "):
