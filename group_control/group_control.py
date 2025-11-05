@@ -1356,10 +1356,6 @@ async def handle_group_message(update: Update, context: ContextTypes.DEFAULT_TYP
     if text in ["لیست دستورها", "لیست alias"]:
         return await handle_list_aliases(update, context)
 
-    # تشخیص aliasها (فعلاً خاموش)
-    return await handle_locks_with_alias(update, context)
-
-
 # ==========================================================
 # 🧩 توابع پشتیبان
 # ==========================================================
