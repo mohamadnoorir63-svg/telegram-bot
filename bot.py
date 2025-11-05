@@ -2052,7 +2052,20 @@ if __name__ == "__main__":
         group=-10
     )
 
-    
+    # 📦 کنترل گروه‌ها
+    from group_control.group_control import handle_group_message
+
+    # 🧹 هندلرهای پاکسازی
+    register_cleanup_handlers(application)
+
+    # ⚙️ کنترل پیام‌های گروهی (فقط در گروه‌ها)
+    application.add_handler(
+        MessageHandler(
+            filters.ALL & (filters.ChatType.GROUPS | filters.ChatType.SUPERGROUPS),
+            handle_group_message
+        ),
+        group=10
+    )
     # ==========================================================
     application.add_handler(CommandHandler("addsudo", add_sudo))
     application.add_handler(CommandHandler("delsudo", del_sudo))
