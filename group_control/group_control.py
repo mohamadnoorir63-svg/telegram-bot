@@ -2,16 +2,15 @@ import os
 import json
 import re
 import asyncio
-from datetime import datetime
-from telegram import Update, ChatPermissions
+from telegram import Update
 from telegram.ext import ContextTypes
 
-# ─────────────────────────────── تنظیمات اولیه و دسترسی ───────────────────────────────
+# ─────────────────────────────── تنظیمات دسترسی ───────────────────────────────
 
-SUDO_IDS = [8588347189]  # آیدی سودوی اصلی
+SUDO_IDS = [8588347189]  # آیدی سودو
 
 async def _is_admin_or_sudo(context, chat_id: int, user_id: int) -> bool:
-    """بررسی مدیر یا سودو"""
+    """بررسی اینکه کاربر مدیر گروه یا سودو هست یا نه"""
     if user_id in SUDO_IDS:
         return True
     try:
@@ -27,7 +26,7 @@ def _is_vip(chat_id: int, user_id: int) -> bool:
         return False
 
 async def _has_full_access(context, chat_id: int, user_id: int) -> bool:
-    """بررسی دسترسی کامل"""
+    """سودو + مدیر + ویژه = دسترسی کامل"""
     if user_id in SUDO_IDS:
         return True
     if await _is_admin_or_sudo(context, chat_id, user_id):
@@ -36,7 +35,7 @@ async def _has_full_access(context, chat_id: int, user_id: int) -> bool:
         return True
     return False
 
-# ─────────────────────────────── مسیر فایل‌ها ───────────────────────────────
+# ─────────────────────────────── مسیر فایل و لود قفل‌ها ───────────────────────────────
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 LOCK_FILE = os.path.join(BASE_DIR, "group_locks.json")
@@ -61,7 +60,9 @@ def _save_json(path, data):
     except Exception as e:
         print(f"[⚠️] خطا در ذخیره {path}: {e}")
 
-# ─────────────────────────────── انواع قفل‌ها ───────────────────────────────
+LOCKS = _load_json(LOCK_FILE, {})
+
+# ─────────────────────────────── لیست کامل قفل‌ها ───────────────────────────────
 
 LOCK_TYPES = {
     "links": "لینک",
@@ -91,15 +92,12 @@ LOCK_TYPES = {
     "join": "ورود"
 }
 
-# ─────────────────────────────── عملیات روی قفل‌ها ───────────────────────────────
-
-LOCKS = _load_json(LOCK_FILE, {})
+# ─────────────────────────────── توابع مدیریت فایل قفل ───────────────────────────────
 
 def _get_locks(chat_id: int):
     return LOCKS.get(str(chat_id), {})
 
 def _set_lock(chat_id: int, key: str, status: bool):
-    """ذخیره قفل در حافظه و فایل"""
     cid = str(chat_id)
     if cid not in LOCKS:
         LOCKS[cid] = {}
@@ -107,12 +105,12 @@ def _set_lock(chat_id: int, key: str, status: bool):
     _save_json(LOCK_FILE, LOCKS)
 
 def _is_locked(chat_id: int, key: str) -> bool:
-    """بررسی فعال بودن قفل"""
     return LOCKS.get(str(chat_id), {}).get(key, False)
 
 # ─────────────────────────────── حذف پیام ممنوع ───────────────────────────────
 
 async def _del_msg(update: Update, warn_text: str = None):
+    """حذف پیام و ارسال هشدار موقت"""
     try:
         msg = update.message
         user = update.effective_user
@@ -143,7 +141,7 @@ async def check_message_locks(update: Update, context: ContextTypes.DEFAULT_TYPE
     if not any(locks.values()):
         return
 
-    # مدیرها و سودوها مستثنی هستند
+    # معافیت برای مدیران و سودوها
     if await _is_admin_or_sudo(context, chat.id, user.id):
         return
 
@@ -156,7 +154,7 @@ async def check_message_locks(update: Update, context: ContextTypes.DEFAULT_TYPE
     has_stick = bool(msg.sticker)
     has_fwd = bool(msg.forward_date)
 
-    # 🚫 قفل لینک
+    # 🚫 لینک
     if locks.get("links") and any(x in text for x in ["http://", "https://", "t.me", "telegram.me"]):
         return await _del_msg(update, "🚫 ارسال لینک ممنوع است.")
 
@@ -209,6 +207,7 @@ async def check_message_locks(update: Update, context: ContextTypes.DEFAULT_TYPE
 # ─────────────────────────────── فعال و غیرفعال کردن قفل ───────────────────────────────
 
 async def handle_lock(update: Update, context: ContextTypes.DEFAULT_TYPE, key: str):
+    """فعال‌سازی قفل"""
     chat = update.effective_chat
     user = update.effective_user
 
@@ -216,14 +215,16 @@ async def handle_lock(update: Update, context: ContextTypes.DEFAULT_TYPE, key: s
         return await update.message.reply_text("🚫 فقط مدیران یا سودوها مجازند.")
 
     if key not in LOCK_TYPES:
-        return await update.message.reply_text("⚠️ نوع قفل معتبر نیست.")
+        return
 
     if _is_locked(chat.id, key):
         return await update.message.reply_text(f"🔒 قفل {LOCK_TYPES[key]} از قبل فعال است.")
+
     _set_lock(chat.id, key, True)
     await update.message.reply_text(f"✅ قفل {LOCK_TYPES[key]} فعال شد.")
 
 async def handle_unlock(update: Update, context: ContextTypes.DEFAULT_TYPE, key: str):
+    """غیرفعال‌سازی قفل"""
     chat = update.effective_chat
     user = update.effective_user
 
@@ -231,34 +232,36 @@ async def handle_unlock(update: Update, context: ContextTypes.DEFAULT_TYPE, key:
         return await update.message.reply_text("🚫 فقط مدیران یا سودوها مجازند.")
 
     if key not in LOCK_TYPES:
-        return await update.message.reply_text("⚠️ نوع قفل معتبر نیست.")
+        return
 
     if not _is_locked(chat.id, key):
         return await update.message.reply_text(f"🔓 قفل {LOCK_TYPES[key]} از قبل باز است.")
+
     _set_lock(chat.id, key, False)
     await update.message.reply_text(f"🔓 قفل {LOCK_TYPES[key]} باز شد.")
 
-# ─────────────────────────────── دستورات متنی ───────────────────────────────
+# ─────────────────────────────── مدیریت دستورات قفل / بازکردن ───────────────────────────────
 
 async def handle_lock_commands(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """تشخیص دستور قفل / بازکردن"""
-    text = (update.message.text or "").strip().lower()
+    """تشخیص و اجرای دستور قفل یا بازکردن (بدون پیام اضافی)"""
+    if not update.message or not update.message.text:
+        return
+
+    text = update.message.text.strip().lower()
 
     for key, fa in LOCK_TYPES.items():
         if text == f"قفل {fa}":
             return await handle_lock(update, context, key)
-        if text in [f"باز کردن {fa}", f"بازکردن {fa}"]:
+        if text in (f"باز کردن {fa}", f"بازکردن {fa}"):
             return await handle_unlock(update, context, key)
+    # هیچ پاسخی در صورت اشتباه
+    return
 
-    await update.message.reply_text("⚠️ دستور قفل یا بازکردن معتبر نیست.")
-
-# ─────────────────────────────── هندلر اصلی پیام‌های گروه ───────────────────────────────
+# ─────────────────────────────── هندلر اصلی گروه ───────────────────────────────
 
 async def handle_group_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """هندلر مرکزی پیام‌ها در گروه‌ها.
-    این تابع به‌ترتیب تمام سیستم‌ها رو صدا می‌زنه (در حال حاضر فقط قفل‌ها فعال‌اند)."""
-    # 🔒 مرحله ۱: بررسی و اعمال قفل‌ها
+    """هندلر مرکزی پیام‌ها در گروه"""
     await check_message_locks(update, context)
-
-    # 🔐 مرحله ۲: دستورات قفل و بازکردن قفل‌ها
-    await handle_lock_commands(update, context)
+    text = (update.message.text or update.message.caption or "").strip().lower() if update.message else ""
+    if text.startswith("قفل ") or text.startswith("باز کردن ") or text.startswith("بازکردن "):
+        await handle_lock_commands(update, context)
