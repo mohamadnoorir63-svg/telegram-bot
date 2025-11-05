@@ -1177,6 +1177,102 @@ async def _del_msg(update: Update, warn_text: str = None):
             await warn.delete()
     except Exception as e:
         print(f"[Lock Delete Error] {e}")
+        # ─────────────────────────────── ابزار حذف و اخطار ───────────────────────────────
+import asyncio
+
+async def _del_msg(update: Update, warn_text: str = None):
+    """حذف پیام کاربر و نمایش هشدار موقت"""
+    try:
+        chat_id = update.effective_chat.id
+        user = update.effective_user
+        await update.message.delete()
+        if warn_text:
+            warn = await update.effective_chat.send_message(
+                f"{warn_text}\n👤 <a href='tg://user?id={user.id}'>{user.first_name}</a>",
+                parse_mode="HTML"
+            )
+            await asyncio.sleep(5)
+            await warn.delete()
+    except Exception as e:
+        print(f"[Lock Delete Error] {e}")
+
+# ───────────────── بررسی و اعمال قفل‌ها (Helper) ─────────────────
+async def _apply_locks_if_needed(update: Update, context: ContextTypes.DEFAULT_TYPE, text: str, chat, user) -> bool:
+    """
+    اگر قفلی نقض شده باشد پیام را حذف می‌کند و True برمی‌گرداند.
+    اگر کاری نبود انجام دهد، False برمی‌گرداند.
+    """
+    locks = _get_locks(chat.id)
+    if not any(locks.values()):
+        return False
+
+    is_admin = await _is_admin_or_sudo(context, chat.id, user.id)
+
+    # 🚫 قفل گروه
+    if locks.get("group") and not is_admin:
+        try:
+            await update.message.delete()
+        except:
+            pass
+        return True
+
+    # 🚫 لینک‌ها
+    if locks.get("links") and any(x in text for x in ["http://", "https://", "t.me", "telegram.me"]):
+        await _del_msg(update, "🚫 ارسال لینک ممنوع است.")
+        return True
+
+    # 🚫 رسانه‌ها
+    if locks.get("photos") and update.message.photo:
+        await _del_msg(update, "🚫 ارسال عکس ممنوع است."); return True
+    if locks.get("videos") and update.message.video:
+        await _del_msg(update, "🚫 ارسال ویدیو ممنوع است."); return True
+    if locks.get("files") and update.message.document:
+        await _del_msg(update, "🚫 ارسال فایل ممنوع است."); return True
+    if locks.get("voices") and update.message.voice:
+        await _del_msg(update, "🚫 ارسال ویس ممنوع است."); return True
+    if locks.get("stickers") and update.message.sticker:
+        await _del_msg(update, "🚫 ارسال استیکر ممنوع است."); return True
+    if locks.get("gifs") and update.message.animation:
+        await _del_msg(update, "🚫 ارسال گیف ممنوع است."); return True
+    if locks.get("forward") and update.message.forward_date:
+        await _del_msg(update, "🚫 فوروارد پیام ممنوع است."); return True
+    if locks.get("media") and (update.message.photo or update.message.video or update.message.document or update.message.animation):
+        await _del_msg(update, "🚫 ارسال رسانه‌ها ممنوع است."); return True
+
+    # 🚫 منشن / یوزرنیم
+    if (locks.get("usernames") or locks.get("mention")) and "@" in text:
+        await _del_msg(update, "🚫 استفاده از @ یا منشن ممنوع است."); return True
+
+    # 🚫 تبلیغ
+    if locks.get("ads") and any(x in text for x in ["t.me/", "joinchat", "promo", "invite", "channel"]):
+        await _del_msg(update, "🚫 تبلیغات در گروه ممنوع است."); return True
+
+    # 🚫 عربی / انگلیسی
+    if locks.get("arabic") and any("\u0600" <= c <= "\u06FF" for c in text):
+        await _del_msg(update, "🚫 استفاده از حروف عربی ممنوع است."); return True
+    if locks.get("english") and any("a" <= c <= "z" or "A" <= c <= "Z" for c in text):
+        await _del_msg(update, "🚫 استفاده از حروف انگلیسی ممنوع است."); return True
+
+    # 🚫 کپشن
+    if locks.get("caption") and update.message.caption:
+        await _del_msg(update, "🚫 کپشن‌گذاری ممنوع است."); return True
+
+    # 🚫 ریپلای
+    if locks.get("reply") and update.message.reply_to_message:
+        await _del_msg(update, "🚫 پاسخ دادن (ریپلای) ممنوع است."); return True
+
+    # 🚫 فقط ایموجی
+    if locks.get("emoji"):
+        import re
+        emoji_pattern = re.compile("[\U00010000-\U0010ffff]", flags=re.UNICODE)
+        if all(emoji_pattern.match(c) for c in text if not c.isspace()):
+            await _del_msg(update, "🚫 ارسال فقط ایموجی مجاز نیست."); return True
+
+    # 🚫 پیام متنی
+    if locks.get("text") and not (update.message.photo or update.message.video or update.message.document):
+        await _del_msg(update, "🚫 ارسال پیام متنی ممنوع است."); return True
+
+    return False
         
 # ==========================================================
 # 🧱 تابع مرکزی گروه (نسخه اصلاح‌شده نهایی)
