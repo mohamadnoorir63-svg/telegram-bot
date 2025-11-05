@@ -47,35 +47,35 @@ def path(filename: str) -> str:
     """برمی‌گردونه مسیر کامل فایل داخل فولدر group_control"""
     return os.path.join(BASE_DIR, filename)
 
-
 LOCK_TYPES = {
     "group": "گروه",
-    "links": "ارسال لینک",
-    "photos": "ارسال عکس",
-    "videos": "ارسال ویدیو",
-    "files": "ارسال فایل",
-    "voices": "ارسال ویس",
+    "links": "لینک",
+    "photos": "عکس",
+    "videos": "ویدیو",
+    "files": "فایل",
+    "voices": "ویس",
     "stickers": "استیکر",
     "gifs": "گیف",
-    "media": "رسانه‌ها",
+    "media": "رسانه",
     "forward": "فوروارد",
     "ads": "تبلیغ",
     "usernames": "یوزرنیم",
     "mention": "منشن",
-    "arabic": "حروف عربی",
-    "english": "حروف انگلیسی",
-    "text": "پیام متنی",
+    "arabic": "عربی",
+    "english": "انگلیسی",
+    "text": "متن",
     "audio": "موزیک",
-    "emoji": "فقط ایموجی",
+    "emoji": "ایموجی",
     "caption": "کپشن",
     "reply": "ریپلای",
     "voicechat": "ویس چت",
     "location": "مکان",
     "contact": "مخاطب",
     "poll": "نظرسنجی",
-    "bots": "ربات‌ها",
-    "join": "ورود کاربران جدید"
+    "bots": "ربات",
+    "join": "ورود"
 }
+
 
 # ─────────────────────────────── فایل ذخیره قفل‌ها ───────────────────────────────
 
