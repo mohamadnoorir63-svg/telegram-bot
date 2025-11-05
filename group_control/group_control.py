@@ -1,23 +1,18 @@
-# ==========================================================
-# 🧱 GROUP CONTROL SYSTEM — STEP 1
-# ۲۵ نوع قفل، کنترل وضعیت، و پنل مدیریتی با ⛔ / ✅
-# ==========================================================
+# file: simple_locks.py
+import os
+import json
+import asyncio
+import re
+from datetime import datetime
+from typing import Optional
 
-import os, json
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ChatPermissions
+from telegram import Update, ChatPermissions
 from telegram.ext import ContextTypes
-from telegram.error import BadRequest
 
-# ─────────────────────────────── مسیر فایل ───────────────────────────────
+# -------------------------
 LOCK_FILE = "group_locks.json"
-if not os.path.exists(LOCK_FILE):
-    with open(LOCK_FILE, "w", encoding="utf-8") as f:
-        json.dump({}, f, ensure_ascii=False, indent=2)
+SUDO_IDS = [8588347189]  # ← آیدی خودت رو اینجا بذار
 
-# ─────────────────────────────── سودوها ───────────────────────────────
-SUDO_IDS = [8588347189]  # 👈 آیدی خودت رو اینجا بذار
-
-# ─────────────────────────────── تعریف قفل‌ها ───────────────────────────────
 LOCK_TYPES = {
     "group": "گروه",
     "links": "ارسال لینک",
@@ -46,145 +41,290 @@ LOCK_TYPES = {
     "edit": "ویرایش پیام",
     "reply": "ریپلای / پاسخ",
 }
+# -------------------------
 
-# ─────────────────────────────── ذخیره / بارگذاری عمومی ───────────────────────────────
-def _load_json(path, default=None):
-    """لود فایل JSON با مقدار پیش‌فرض"""
+def _ensure_file(path: str):
+    if not os.path.exists(path):
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump({}, f, ensure_ascii=False, indent=2)
+
+def _load_json(path: str):
     try:
         if os.path.exists(path):
             with open(path, "r", encoding="utf-8") as f:
                 return json.load(f)
     except Exception as e:
-        print(f"⚠️ خطا در لود {path}: {e}")
-    return default or {}
+        print(f"[load_json] {e}")
+    return {}
 
-def _save_json(path, data):
-    """ذخیره فایل JSON عمومی"""
+def _save_json(path: str, data):
     try:
         with open(path, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
     except Exception as e:
-        print(f"⚠️ خطا در ذخیره {path}: {e}")
+        print(f"[save_json] {e}")
 
-# ─────────────────────────────── لود قفل‌ها ───────────────────────────────
-LOCKS = _load_json(LOCK_FILE, {})
+_ensure_file(LOCK_FILE)
+LOCKS = _load_json(LOCK_FILE)  # structure: { "<chat_id>": { "group": true, ... } }
 
-# ─────────────────────────────── بررسی سطح دسترسی ───────────────────────────────
-async def _is_admin_or_sudo(context, chat_id: int, user_id: int):
-    """بررسی اینکه کاربر مدیر یا سودو هست یا نه"""
+# ---------- helpers ----------
+def _get_locks(chat_id: int) -> dict:
+    return LOCKS.get(str(chat_id), {})
+
+def _set_lock(chat_id: int, key: str, val: bool):
+    cid = str(chat_id)
+    locks = LOCKS.get(cid, {})
+    locks[key] = bool(val)
+    LOCKS[cid] = locks
+    _save_json(LOCK_FILE, LOCKS)
+
+async def _is_admin_or_sudo(context: ContextTypes.DEFAULT_TYPE, chat_id: int, user_id: int) -> bool:
     if user_id in SUDO_IDS:
         return True
     try:
         member = await context.bot.get_chat_member(chat_id, user_id)
         return member.status in ("administrator", "creator")
-    except:
+    except Exception:
         return False
 
-# ─────────────────────────────── مدیریت قفل‌ها ───────────────────────────────
-def _get_locks(chat_id: int):
-    return LOCKS.get(str(chat_id), {})
+async def _delete_and_temp_warn(update: Update, context: ContextTypes.DEFAULT_TYPE, text: str, delay: float = 4.0):
+    try:
+        await update.message.delete()
+    except Exception:
+        pass
+    try:
+        m = await context.bot.send_message(update.effective_chat.id, text)
+        await asyncio.sleep(delay)
+        await m.delete()
+    except Exception:
+        pass
 
-def _set_lock(chat_id: int, key: str, status: bool):
-    cid = str(chat_id)
-    locks = LOCKS.get(cid, {})
-    locks[key] = bool(status)
-    LOCKS[cid] = locks
-    _save_json(LOCK_FILE, LOCKS)
+# ---------- mapping input text -> key ----------
+# قبولِ نام فارسی کامل ('ارسال عکس') یا کوتاه/معمولی ('عکس') یا خودِ کلید انگلیسی
+COMMON_ALIASES = {
+    "عکس": "photos",
+    "تصویر": "photos",
+    "ویدیو": "videos",
+    "فیلم": "videos",
+    "لینک": "links",
+    "فوروارد": "forward",
+    "استیکر": "stickers",
+    "ویس": "voices",
+    "موزیک": "audio",
+    "فایل": "files",
+    "تبلیغ": "ads",
+    "یوزرنیم": "usernames",
+    "منشن": "mention",
+    "ربات": "bots",
+    "ورود": "join",
+    "سیستمی": "tgservices",
+    "خوش‌آمد": "joinmsg",
+    "عربی": "arabic",
+    "انگلیسی": "english",
+    "متن": "text",
+    "کپشن": "caption",
+    "ریپلای": "reply",
+    "ایموجی": "emoji",
+    "گروه": "group",
+    "رسانه": "media",
+    "گیف": "gifs",
+    "وی‌مسج": "vmsgs",
+    "ویرایش": "edit",
+    "آهنگ": "audio",
+    "تبچی": "ads",
+}
 
-# ─────────────────────────────── فعال‌سازی قفل ───────────────────────────────
-async def handle_lock(update: Update, context: ContextTypes.DEFAULT_TYPE, key: str):
-    chat = update.effective_chat
-    user = update.effective_user
-    if not await _is_admin_or_sudo(context, chat.id, user.id):
-        return await update.message.reply_text("🚫 فقط مدیران یا سودوها مجازند.")
-    if key not in LOCK_TYPES:
-        return await update.message.reply_text("⚠️ نام قفل معتبر نیست.")
+def _map_to_key(human: str) -> Optional[str]:
+    if not human:
+        return None
+    t = human.strip().lower()
+    # حذف واژه‌های معمول (قفل، باز، غیرفعال، فعال)
+    for w in ["قفل", "بستن", "باز کردن", "باز", "غیرفعال", "فعال"]:
+        t = t.replace(w, "").strip()
+    # مستقیم تطابق با کلید
+    if t in LOCK_TYPES:
+        return t
+    # تطابق با عنوان فارسی کامل
+    for k, v in LOCK_TYPES.items():
+        if t == v or t == v.lower():
+            return k
+    # تطابق با alias
+    if t in COMMON_ALIASES:
+        return COMMON_ALIASES[t]
+    # شاید user وارد english key باشه
+    if t in LOCK_TYPES.keys():
+        return t
+    return None
 
-    locks = _get_locks(chat.id)
+# ---------- API: commands to lock/unlock/status ----------
+async def command_lock_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """قالب: 'قفل <اسم قفل>' یا 'lock <key>'"""
+    text = (update.message.text or "").strip()
+    key = _map_to_key(text)
+    if not key:
+        return await update.message.reply_text("⚠️ قفل شناسایی نشد. مثال: `قفل لینک` یا `قفل گروه`", parse_mode="Markdown")
+    if not await _is_admin_or_sudo(context, update.effective_chat.id, update.effective_user.id):
+        return await update.message.reply_text("🚫 فقط مدیران یا سودوها می‌تونن قفل رو فعال کنن.")
+    locks = _get_locks(update.effective_chat.id)
     if locks.get(key):
-        return await update.message.reply_text(f"🔒 قفل <b>{LOCK_TYPES[key]}</b> از قبل فعال بوده است.", parse_mode="HTML")
+        return await update.message.reply_text(f"ℹ️ قفل {LOCK_TYPES[key]} قبلاً فعال است.")
+    _set_lock(update.effective_chat.id, key, True)
 
-    _set_lock(chat.id, key, True)
+    # اگر قفل گروه بود تلاش کن سطح دسترسی عمومی رو ببندی (فقط پیام‌ها)
+    if key == "group":
+        try:
+            await context.bot.set_chat_permissions(update.effective_chat.id, ChatPermissions(can_send_messages=False))
+        except Exception as e:
+            # بی‌خیال — پیامک وضعیت بده
+            print("[lock_group] ", e)
+
     await update.message.reply_text(f"✅ قفل <b>{LOCK_TYPES[key]}</b> فعال شد.", parse_mode="HTML")
 
-# ─────────────────────────────── غیرفعال‌سازی قفل ───────────────────────────────
-async def handle_unlock(update: Update, context: ContextTypes.DEFAULT_TYPE, key: str):
-    chat = update.effective_chat
-    user = update.effective_user
-    if not await _is_admin_or_sudo(context, chat.id, user.id):
-        return await update.message.reply_text("🚫 فقط مدیران یا سودوها مجازند.")
-    if key not in LOCK_TYPES:
-        return await update.message.reply_text("⚠️ نام قفل معتبر نیست.")
-
-    locks = _get_locks(chat.id)
+async def command_unlock_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """قالب: 'باز کردن <اسم قفل>' یا 'باز <اسم>'"""
+    text = (update.message.text or "").strip()
+    key = _map_to_key(text)
+    if not key:
+        return await update.message.reply_text("⚠️ قفل شناسایی نشد. مثال: `باز کردن لینک` یا `باز کردن گروه`", parse_mode="Markdown")
+    if not await _is_admin_or_sudo(context, update.effective_chat.id, update.effective_user.id):
+        return await update.message.reply_text("🚫 فقط مدیران یا سودوها می‌تونن قفل رو غیرفعال کنن.")
+    locks = _get_locks(update.effective_chat.id)
     if not locks.get(key):
-        return await update.message.reply_text(f"🔓 قفل <b>{LOCK_TYPES[key]}</b> از قبل غیرفعال بوده است.", parse_mode="HTML")
+        return await update.message.reply_text(f"ℹ️ قفل {LOCK_TYPES[key]} قبلاً غیرفعال است.")
+    _set_lock(update.effective_chat.id, key, False)
 
-    _set_lock(chat.id, key, False)
-    await update.message.reply_text(f"🔓 قفل <b>{LOCK_TYPES[key]}</b> باز شد.", parse_mode="HTML")
-
-# ─────────────────────────────── پنل قفل‌ها ───────────────────────────────
-def _generate_lock_panel(chat_id: int):
-    locks = _get_locks(chat_id)
-    keyboard, row = [], []
-    for i, (key, title) in enumerate(LOCK_TYPES.items()):
-        icon = "⛔" if locks.get(key, False) else "✅"
-        row.append(InlineKeyboardButton(f"{icon} {title}", callback_data=f"locktoggle|{key}"))
-        if i % 2 == 1:
-            keyboard.append(row)
-            row = []
-    if row:
-        keyboard.append(row)
-    keyboard.append([InlineKeyboardButton("❌ بستن پنل", callback_data="lockclose")])
-    return InlineKeyboardMarkup(keyboard)
-
-# ─────────────────────────────── واکنش به دکمه‌ها ───────────────────────────────
-async def handle_lock_panel_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    user = query.from_user
-    chat = query.message.chat
-    if not await _is_admin_or_sudo(context, chat.id, user.id):
-        return await query.answer("🚫 فقط مدیران مجازند.", show_alert=True)
-
-    data = query.data
-    if data == "lockclose":
+    if key == "group":
         try:
-            await query.message.delete()
-        except:
-            await query.edit_message_text("✅ پنل بسته شد.")
-        return await query.answer("❌ پنل بسته شد.")
+            # باز کردن ساده: اجازه ارسال پیام‌ها را می‌دهیم
+            await context.bot.set_chat_permissions(update.effective_chat.id, ChatPermissions(can_send_messages=True))
+        except Exception as e:
+            print("[unlock_group] ", e)
 
-    if data.startswith("locktoggle|"):
-        key = data.split("|")[1]
-        locks = _get_locks(chat.id)
-        new_status = not locks.get(key, False)
-        _set_lock(chat.id, key, new_status)
-        status_text = "⛔ فعال شد" if new_status else "✅ غیرفعال شد"
-        await query.answer(f"{LOCK_TYPES[key]} {status_text}")
-        try:
-            await query.edit_message_reply_markup(reply_markup=_generate_lock_panel(chat.id))
-        except BadRequest:
-            pass
+    await update.message.reply_text(f"✅ قفل <b>{LOCK_TYPES[key]}</b> غیرفعال شد.", parse_mode="HTML")
 
-# ─────────────────────────────── نمایش پنل ───────────────────────────────
-async def handle_lock_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    chat = update.effective_chat
-    user = update.effective_user
-    if not await _is_admin_or_sudo(context, chat.id, user.id):
-        return await update.message.reply_text("🚫 فقط مدیران یا سودوها مجازند!")
-
-    locks = _get_locks(chat.id)
+async def command_locks_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    locks = _get_locks(update.effective_chat.id)
+    if not locks or not any(locks.values()):
+        return await update.message.reply_text("✅ هیچ قفلی فعال نیست.")
     active = [LOCK_TYPES[k] for k, v in locks.items() if v]
-    text = "<b>📋 وضعیت قفل‌های گروه</b>\n\n"
-    if active:
-        text += "🔒 قفل‌های فعال:\n" + "\n".join([f"• {x}" for x in active]) + "\n\n"
-    else:
-        text += "✅ هیچ قفلی فعال نیست.\n\n"
-    text += "برای فعال یا غیرفعال کردن روی دکمه‌های زیر کلیک کنید 👇"
+    await update.message.reply_text("🔒 قفل‌های فعال:\n" + "\n".join(f"• {x}" for x in active), parse_mode="HTML")
 
-    await update.message.reply_text(
-        text, reply_markup=_generate_lock_panel(chat.id), parse_mode="HTML"
-    )
+# ---------- main message handler (enforcer) ----------
+async def handle_group_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    تک پیامِ مرکزی: 
+    - از هِدر برای دستورات قفل استفاده کن (قفل ... / باز ... / وضعیت)
+    - در بقیه پیام‌ها قفل‌ها را اعمال می‌کند (حذف + هشدار)
+    """
+    if not update.message:
+        return
+
+    text = (update.message.text or update.message.caption or "").strip()
+    low = text.lower()
+
+    # اول: دستورات متنی قفل/باز/وضعیت را همینجا بررسی کن
+    # توجه: این بخش فقط به عباراتی که با 'قفل' یا 'باز' یا 'وضعیت' شروع می شوند واکنش نشان می دهد
+    if low.startswith("قفل ") or low.startswith("lock "):
+        return await command_lock_text(update, context)
+    if low.startswith("باز ") or low.startswith("باز کردن ") or low.startswith("unlock "):
+        return await command_unlock_text(update, context)
+    if low.startswith("وضعیت قفل") or low.strip() in ("وضعیت قفل‌ها", "locks", "status locks"):
+        return await command_locks_status(update, context)
+
+    # سپس: اعمال قفل‌ها
+    chat_id = update.effective_chat.id
+    locks = _get_locks(chat_id)
+    if not locks:
+        return  # هیچ قفلی تنظیم نشده
+
+    is_admin = await _is_admin_or_sudo(context, chat_id, update.effective_user.id)
+    # مدیران از قفل‌ها معاف‌اند
+    if is_admin:
+        return
+
+    # قفل گروه: اگر فعال باشه همه‌ی پیام‌ها حذف میشه (غیر از مدیرها که اینجا مستثنی شدن)
+    if locks.get("group"):
+        try:
+            await update.message.delete()
+        except Exception:
+            pass
+        return
+
+    # بررسی سریع لینک
+    if locks.get("links") and re.search(r"(https?://|t\.me/|telegram\.me/|www\.)", low):
+        return await _delete_and_temp_warn(update, context, "🚫 ارسال لینک در این گروه ممنوع است.")
+
+    # عکس
+    if locks.get("photos") and update.message.photo:
+        return await _delete_and_temp_warn(update, context, "🚫 ارسال عکس ممنوع است.")
+
+    # ویدیو
+    if locks.get("videos") and (update.message.video or update.message.video_note):
+        return await _delete_and_temp_warn(update, context, "🚫 ارسال ویدیو ممنوع است.")
+
+    # فایل
+    if locks.get("files") and update.message.document:
+        return await _delete_and_temp_warn(update, context, "🚫 ارسال فایل ممنوع است.")
+
+    # ویس
+    if locks.get("voices") and update.message.voice:
+        return await _delete_and_temp_warn(update, context, "🚫 ارسال ویس ممنوع است.")
+
+    # ویدیو مسیج
+    if locks.get("vmsgs") and update.message.video_note:
+        return await _delete_and_temp_warn(update, context, "🚫 ارسال ویدیو مسیج ممنوع است.")
+
+    # استیکر
+    if locks.get("stickers") and update.message.sticker:
+        return await _delete_and_temp_warn(update, context, "🚫 ارسال استیکر ممنوع است.")
+
+    # گیف
+    if locks.get("gifs") and update.message.animation:
+        return await _delete_and_temp_warn(update, context, "🚫 ارسال گیف ممنوع است.")
+
+    # فوروارد
+    if locks.get("forward") and update.message.forward_date:
+        return await _delete_and_temp_warn(update, context, "🚫 فوروارد پیام ممنوع است.")
+
+    # رسانه کلی
+    if locks.get("media") and any([update.message.photo, update.message.video, update.message.document, update.message.animation]):
+        return await _delete_and_temp_warn(update, context, "🚫 ارسال رسانه ممنوع است.")
+
+    # منشن / یوزرنیم
+    if (locks.get("mention") or locks.get("usernames")) and "@" in low:
+        return await _delete_and_temp_warn(update, context, "🚫 استفاده از @ یا منشن ممنوع است.")
+
+    # تبلیغ
+    if locks.get("ads") and any(word in low for word in ["t.me/", "joinchat", "promo", "invite", "bot?start="]):
+        return await _delete_and_temp_warn(update, context, "🚫 تبلیغات ممنوع است.")
+
+    # حروف عربی
+    if locks.get("arabic") and re.search(r"[\u0600-\u06FF]", low):
+        return await _delete_and_temp_warn(update, context, "🚫 استفاده از حروف عربی ممنوع است.")
+
+    # حروف انگلیسی
+    if locks.get("english") and re.search(r"[A-Za-z]", low):
+        return await _delete_and_temp_warn(update, context, "🚫 استفاده از حروف انگلیسی ممنوع است.")
+
+    # کپشن
+    if locks.get("caption") and update.message.caption:
+        return await _delete_and_temp_warn(update, context, "🚫 کپشن‌گذاری ممنوع است.")
+
+    # ریپلای
+    if locks.get("reply") and update.message.reply_to_message:
+        return await _delete_and_temp_warn(update, context, "🚫 پاسخ دادن (ریپلای) ممنوع است.")
+
+    # فقط ایموجی (در صورتی که پیام فقط شامل emoji باشه)
+    if locks.get("emoji"):
+        emoji_pattern = re.compile(r'^[\U0001F000-\U0010FFFF\s]+$')
+        if emoji_pattern.match(text):
+            return await _delete_and_temp_warn(update, context, "🚫 ارسال فقط ایموجی مجاز نیست.")
+
+    # پیام متنی ممنوع (اگر قفل text فعال باشه و پیام حاوی مدیا نباشه)
+    if locks.get("text") and not any([update.message.photo, update.message.video, update.message.document]):
+        return await _delete_and_temp_warn(update, context, "🚫 ارسال پیام متنی ممنوع است.")
+
+# end of file
     # ==========================================================
 # 🧱 GROUP CONTROL SYSTEM — STEP 2
 # قفل گروه، بازکردن گروه، و قفل خودکار زمان‌بندی‌شده
