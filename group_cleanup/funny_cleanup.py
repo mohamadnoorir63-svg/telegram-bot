@@ -1,124 +1,135 @@
 import asyncio
+from collections import deque, defaultdict
+from typing import Deque, Tuple
+
 from telegram import Update
 from telegram.ext import ContextTypes, CommandHandler, MessageHandler, filters
 
-# ======================= 🧹 پاکسازی خنده‌دار =======================
-async def funny_cleanup(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """پاکسازی پیشرفته با سه حالت: کلی، عددی، و ریپلای 😄"""
-    chat = update.effective_chat
-    user = update.effective_user
-    text = (update.message.text or "").strip().lower()
-    args = context.args
+# =============== تنظیمات ===============
+DEFAULT_BULK = 300          # تعداد پیش‌فرض پاکسازی کلی
+MAX_BULK = 10000            # سقف حذف عددی
+TRACK_BUFFER = 600          # چند پیام آخر هر گروه برای حذف هدف‌دار (ریپلای) ذخیره شود
+SLEEP_EVERY = 100           # هر 100 حذف، کمی مکث کند تا Flood نشود
+SLEEP_SEC = 0.3
 
-    if chat.type not in ["group", "supergroup"]:
-        return await update.message.reply_text("😂 این دستور فقط در گروه‌ها کار می‌کنه!")
+# =============== بافر ردیابی پیام‌ها ===============
+# ساختار: track_map[chat_id] = deque[(message_id, from_user_id), ...]
+track_map: dict[int, Deque[Tuple[int, int]]] = defaultdict(lambda: deque(maxlen=TRACK_BUFFER))
 
-    # بررسی مدیر بودن
-    member = await context.bot.get_chat_member(chat.id, user.id)
-    if member.status not in ["creator", "administrator"]:
-        return await update.message.reply_text("😜 فقط مدیرای باحال می‌تونن پاکسازی کنن!")
+async def track_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """هر پیامِ دیده‌شده را برای حذف هدف‌دار (ریپلای) ثبت می‌کنیم."""
+    msg = update.effective_message
+    if not msg or not msg.from_user:
+        return
+    if update.effective_chat and update.effective_chat.type in ("group", "supergroup"):
+        track_map[update.effective_chat.id].append((msg.message_id, msg.from_user.id))
 
-    msg = await update.message.reply_text("🧼 خنگول داره آماده می‌شه...", parse_mode="HTML")
-    steps = [
-        "🧹 در حال جارو کشیدن گروه...",
-        "💨 گرد و خاک رفت هوا!",
-        "🪣 آب و صابون آماده شد...",
-        "🤖 خنگول دست به کار شد...",
-        "😎 پیام‌ها دارن پاک می‌شن..."
-    ]
-    for s in steps:
-        await asyncio.sleep(0.6)
+# =============== چک ادمین ===============
+async def _is_admin(context: ContextTypes.DEFAULT_TYPE, chat_id: int, user_id: int) -> bool:
+    try:
+        m = await context.bot.get_chat_member(chat_id, user_id)
+        return m.status in ("creator", "administrator")
+    except:
+        return False
+
+# =============== هسته حذف ===============
+async def _delete_last_n(context: ContextTypes.DEFAULT_TYPE, chat_id: int, last_msg_id: int, n: int) -> int:
+    """حذف n پیام اخیر با تلاش روی IDهای نزولی (ساده‌ترین روش بدون history)."""
+    deleted = 0
+    start = max(1, last_msg_id - n)  # حداقل 1
+    for mid in range(last_msg_id, start - 1, -1):
         try:
-            await msg.edit_text(s)
+            await context.bot.delete_message(chat_id, mid)
+            deleted += 1
+        except:
+            # ممکنه پیام متعلق به ربات نباشه/قدیمی باشه/اصلاً وجود نداشته باشه؛ رد می‌کنیم
+            pass
+        if deleted and deleted % SLEEP_EVERY == 0:
+            await asyncio.sleep(SLEEP_SEC)
+    return deleted
+
+async def _delete_by_user_from_buffer(context: ContextTypes.DEFAULT_TYPE, chat_id: int, user_id: int) -> int:
+    """حذف پیام‌های یک کاربر از پنجره‌ی اخیر (track_map)."""
+    deleted = 0
+    # روی کپی loop بزن تا حین حذف مشکل نداشته باشیم
+    snapshot = list(track_map.get(chat_id, []))
+    for mid, uid in reversed(snapshot):  # از جدید به قدیم
+        if uid != user_id:
+            continue
+        try:
+            await context.bot.delete_message(chat_id, mid)
+            deleted += 1
         except:
             pass
+        if deleted and deleted % SLEEP_EVERY == 0:
+            await asyncio.sleep(SLEEP_SEC)
+    return deleted
+
+# =============== فرمان پاکسازی ===============
+async def simple_cleanup(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """پاکسازی ساده:
+    - «پاکسازی» یا «clean» → حذف پیش‌فرض (DEFAULT_BULK)
+    - «حذف 123» یا «پاک 123» → حذف عددی
+    - ریپلای + «پاک»/«حذف» → حذف پیام‌های اخیر همین کاربر از بافر
+    """
+    chat = update.effective_chat
+    msg = update.effective_message
+    user = update.effective_user
+
+    if not chat or chat.type not in ("group", "supergroup"):
+        return await msg.reply_text("این دستور فقط داخل گروه کار می‌کند.")
+
+    if not await _is_admin(context, chat.id, user.id):
+        return await msg.reply_text("فقط مدیران می‌توانند پاکسازی انجام دهند.")
+
+    text = (msg.text or "").strip().lower()
+    args = context.args
 
     deleted = 0
 
-    # ======================= تابع حذف پیام‌ها =======================
-    async def delete_recent_messages(limit=100):
-        nonlocal deleted
-        async for m in context.bot.get_chat(chat.id).iter_messages(limit=limit):
-            try:
-                await context.bot.delete_message(chat.id, m.message_id)
-                deleted += 1
-                if deleted % 100 == 0:
-                    await asyncio.sleep(0.5)
-            except:
-                pass
+    # حالت ریپلای به یک کاربر: حذف پیام‌های او از بافر اخیر
+    if msg.reply_to_message and (text.startswith("پاک") or text.startswith("حذف")):
+        target = msg.reply_to_message.from_user
+        deleted = await _delete_by_user_from_buffer(context, chat.id, target.id)
+        return await msg.reply_text(f"حذف پیام‌های {target.first_name} انجام شد: {deleted} پیام.")
 
-    # چون PTB متد iter_messages نداره، ما از get_updates شبیه‌سازی می‌کنیم
-    async def get_last_messages(limit=100):
-        messages = []
-        async for i in range(limit):
-            yield i  # فقط جایگزین ظاهری
+    # حالت «حذف n» یا «پاک n»
+    if text.startswith("حذف") or text.startswith("پاک"):
+        # تلاش برای خواندن عدد از آرگومان یا متن
+        n = None
+        if args and args[0].isdigit():
+            n = int(args[0])
+        else:
+            parts = text.split()
+            if len(parts) >= 2 and parts[1].isdigit():
+                n = int(parts[1])
+        if not n:
+            n = DEFAULT_BULK
+        n = max(1, min(n, MAX_BULK))
+        deleted = await _delete_last_n(context, chat.id, msg.message_id, n)
+        return await msg.reply_text(f"حذف انجام شد: {deleted} پیام.")
 
-    # ======================= حالت ۱: پاکسازی کلی =======================
-    if text in ["پاکسازی", "clean", "پاک"]:
-        async for m in context.bot.get_chat_history(chat.id, limit=1):  # این خط دیگه وجود نداره ❌
-            pass
-        # ما به جای اون مستقیماً از حذف دسته‌ای استفاده می‌کنیم:
-        async for i in get_last_messages(5000):
-            try:
-                await context.bot.delete_message(chat.id, update.message.message_id - i)
-                deleted += 1
-                if deleted % 100 == 0:
-                    await asyncio.sleep(0.3)
-            except:
-                pass
+    # حالت «پاکسازی» یا «clean»: حذف پیش‌فرض
+    if text in ("پاکسازی", "clean"):
+        deleted = await _delete_last_n(context, chat.id, msg.message_id, DEFAULT_BULK)
+        return await msg.reply_text(f"پاکسازی انجام شد: {deleted} پیام.")
 
-    # ======================= حالت ۲: حذف عددی =======================
-    elif text.startswith("حذف") or text.startswith("پاک "):
-        try:
-            count = int(args[0]) if args else int(text.split()[1])
-        except:
-            count = 50
-        if count > 10000:
-            count = 10000
+    # اگر دستور تطبیق نشد، چیزی نگو
+    return
 
-        async for i in get_last_messages(count):
-            try:
-                await context.bot.delete_message(chat.id, update.message.message_id - i)
-                deleted += 1
-                if deleted % 100 == 0:
-                    await asyncio.sleep(0.3)
-            except:
-                pass
-
-    # ======================= حالت ۳: ریپلای به فرد =======================
-    elif update.message.reply_to_message:
-        target = update.message.reply_to_message.from_user
-        target_id = target.id
-        async for i in get_last_messages(3000):
-            try:
-                msg_id = update.message.message_id - i
-                m = await context.bot.get_message(chat.id, msg_id)
-                if m.from_user and m.from_user.id == target_id:
-                    await context.bot.delete_message(chat.id, msg_id)
-                    deleted += 1
-                    if deleted % 100 == 0:
-                        await asyncio.sleep(0.3)
-            except:
-                pass
-
-    # پیام نهایی
-    try:
-        await msg.edit_text(
-            f"✅ <b>پاکسازی انجام شد!</b>\n"
-            f"🧹 تعداد پیام‌های حذف‌شده: <b>{deleted}</b>\n"
-            f"😂 گروه تمیز شد توسط <b>{user.first_name}</b>!",
-            parse_mode="HTML"
-        )
-    except:
-        await update.message.reply_text(
-            f"✅ پاکسازی با موفقیت انجام شد!\nتعداد پیام‌های حذف‌شده: {deleted}",
-            parse_mode="HTML"
-        )
-
-# ======================= ⚙️ رجیستر هندلرها =======================
+# =============== رجیستر هندلرها ===============
 def register_cleanup_handlers(application):
-    """افزودن هندلرهای پاکسازی"""
-    application.add_handler(CommandHandler(["clean", "cleanup", "delete"], funny_cleanup))
+    # فرمان‌های /clean و معادل فارسی با اسلش انگلیسی فقط برای راحتی
+    application.add_handler(CommandHandler("clean", simple_cleanup))
+    # هندلر متنی برای فارسی/بدون اسلش
     application.add_handler(
-        MessageHandler(filters.Regex(r"^/?(پاکسازی|پاک|حذف)(\s+\d+)?$") & filters.TEXT, funny_cleanup)
+        MessageHandler(
+            (filters.TEXT & ~filters.COMMAND) &
+            filters.Regex(r"^(?:پاکسازی|پاک(?:\s+\d+)?|حذف(?:\s+\d+)?)$")
+            , simple_cleanup
+        )
+    )
+    # ردیابی همه پیام‌های متنی/مدیا برای بافر (جهت حذف هدف‌دار)
+    application.add_handler(
+        MessageHandler(filters.ALL & ~filters.COMMAND, track_message)
     )
