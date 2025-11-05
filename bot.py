@@ -360,7 +360,7 @@ from telegram.ext import ContextTypes
 
 async def detect_admin_movement(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """تشخیص ورود، خروج یا بازگشت سازنده خنگول در گروه‌ها (حتی اگر خوشامد خاموش باشد)"""
-    ADMIN_ID = int(os.getenv("ADMIN_ID", "7089376754"))
+    ADMIN_ID = int(os.getenv("ADMIN_ID", "8588347189"))
     chat = update.effective_chat
     message = update.message
 
