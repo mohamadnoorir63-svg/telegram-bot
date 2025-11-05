@@ -1683,10 +1683,6 @@ async def handle_sudo_commands(update: Update, context: ContextTypes.DEFAULT_TYP
 # 🧱 بخش ۱۲ — مرکز کنترل پیام‌ها و دستورات اصلی
 # ==========================================================
 
-async def handle_group_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """هندلر مرکزی برای بررسی و اجرای تمام سیستم‌ها"""
-    if not update.message:
-        return
         async def handle_group_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # ثبت تمام پیام‌ها برای قابلیت حذف و پاکسازی
     _log_message(update)
