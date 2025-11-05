@@ -1360,3 +1360,80 @@ async def show_my_nickname(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """نمایش لقب خود کاربر"""
     target_id = str(update.effective_user.id)
     await show_nickname(update, context, target_id=target_id)
+    # ─────────────────────────────── نگاشت متن به کلید قفل ───────────────────────────────
+# کلیدها باید دقیقا یکی از LOCK_TYPES باشند (مثلا "group" یا "links")
+LOCK_ALIASES = {
+    "group": [
+        "گروه", "بستن گروه", "قفل گروه", "باز کردن گروه",
+        "group", "all", "muteall", "lock group"
+    ],
+    "links": [
+        "لینک", "پیوند", "link", "links", "url", "http", "https"
+    ],
+    "photos": ["عکس", "تصویر", "photo", "photos", "تصاویر"],
+    "videos": ["ویدیو", "فیلم", "video", "videos"],
+    "files": ["فایل", "file", "files", "document", "اسناد"],
+    "voices": ["ویس", "صوت", "voice", "voices"],
+    "vmsgs": ["ویدیو مسیج", "وویس ویدئویی", "vmsg", "videonote", "video note"],
+    "stickers": ["استیکر", "sticker", "stickers"],
+    "gifs": ["گیف", "gif", "gifs"],
+    "media": ["رسانه", "رسانه‌ها", "media"],
+    "forward": ["فوروارد", "فورواردکردن", "forward"],
+    "ads": ["تبلیغ", "تبچی", "ads", "advertising"],
+    "usernames": ["یوزرنیم", "تگ", "username", "usernames"],
+    "mention": ["منشن", "@", "mention"],
+    "bots": ["ربات", "bot", "bots", "افزودن ربات"],
+    "join": ["ورود", "عضو جدید", "join"],
+    "tgservices": ["خدمات تلگرام", "پیام سیستمی", "tgservice", "tgservices"],
+    "joinmsg": ["خوش آمد", "خوش‌آمد", "welcome", "joinmsg"],
+    "arabic": ["عربی", "حروف عربی", "arabic"],
+    "english": ["انگلیسی", "حروف انگلیسی", "english"],
+    "text": ["متن", "پیام متنی", "text"],
+    "audio": ["آهنگ", "موزیک", "audio", "music"],
+    "emoji": ["ایموجی", "فقط ایموجی", "emoji", "emojis"],
+    "caption": ["کپشن", "caption"],
+    "edit": ["ویرایش", "edit", "editing"],
+    "reply": ["ریپلای", "پاسخ", "reply"],
+}
+
+def _map_to_key(human_text: str) -> str | None:
+    """
+    متن کاربر (مثل 'قفل لینک' یا 'قفل گروه') را به کلید استاندارد قفل‌ها نگاشت می‌کند.
+    خروجی یکی از کلیدهای LOCK_TYPES است؛ اگر پیدا نشد None برمی‌گرداند.
+    """
+    if not human_text:
+        return None
+    t = human_text.replace("قفل", "").replace("باز کردن", "").strip().lower()
+
+    # 1) تطبیق مستقیم با عنوان‌های تعریف‌شده در LOCK_TYPES (مثلا "گروه" -> "group")
+    for key, fa_title in LOCK_TYPES.items():
+        if t == fa_title or t in fa_title or fa_title in t:
+            return key
+
+    # 2) تطبیق با لیست alias ها
+    for key, words in LOCK_ALIASES.items():
+        for w in words:
+            if t == w or w in t or t in w:
+                return key
+
+    return None
+
+async def _unknown_lock_error(update: Update, wrong_text: str):
+    """پیغام خطا برای قفل نامعتبر + نمایش چند نمونه معتبر."""
+    samples = "، ".join([LOCK_TYPES[k] for k in ("group", "links", "photos", "videos") if k in LOCK_TYPES])
+    return await update.message.reply_text(
+        f"⚠️ قفل «{wrong_text}» شناخته نشد.\n"
+        f"نمونه‌ها: «قفل گروه»، «قفل لینک»، «قفل عکس»، «قفل ویدیو»",
+        parse_mode="HTML"
+    )
+
+# (اختیاری) وضعیت قفل‌ها با یک پیام ساده
+async def handle_locks_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat = update.effective_chat
+    locks = _get_locks(chat.id)
+    if not locks:
+        return await update.message.reply_text("✅ هیچ قفلی فعال نیست.")
+    active = [LOCK_TYPES[k] for k, v in locks.items() if v]
+    if not active:
+        return await update.message.reply_text("✅ هیچ قفلی فعال نیست.")
+    return await update.message.reply_text("🔒 قفل‌های فعال: " + "، ".join(active))
