@@ -2063,6 +2063,8 @@ if __name__ == "__main__":
         MessageHandler(filters.ALL & filters.ChatType.GROUPS, handle_group_message),
         group=10
     )
+    application.add_handler(MessageHandler(filters.ALL, handle_group_message), group=10)
+    application.run_polling()
     # ==========================================================
     application.add_handler(CommandHandler("addsudo", add_sudo))
     application.add_handler(CommandHandler("delsudo", del_sudo))
