@@ -1134,8 +1134,30 @@ async def handle_locks_with_alias(update: Update, context: ContextTypes.DEFAULT_
         update.message.text = new_cmd
         print(f"[ALIAS] {text} → {new_cmd}")
         return await handle_group_message(update, context)
+        # ─────────────────────────────── ابزار حذف و اخطار ───────────────────────────────
+import asyncio
 
+async def _del_msg(update: Update, warn_text: str = None):
+    """حذف پیام کاربر و نمایش هشدار موقت"""
+    try:
+        chat_id = update.effective_chat.id
+        msg_id = update.message.message_id
+        user = update.effective_user
 
+        # حذف پیام اصلی
+        await update.message.delete()
+
+        # اگر متن هشدار تعریف شده، بفرست و بعد از چند ثانیه پاک کن
+        if warn_text:
+            warn = await update.effective_chat.send_message(
+                f"{warn_text}\n👤 <a href='tg://user?id={user.id}'>{user.first_name}</a>",
+                parse_mode="HTML"
+            )
+            await asyncio.sleep(5)
+            await warn.delete()
+    except Exception as e:
+        print(f"[Lock Delete Error] {e}")
+        
 # ==========================================================
 # 🧱 تابع مرکزی گروه (نسخه اصلاح‌شده نهایی)
 # ==========================================================
