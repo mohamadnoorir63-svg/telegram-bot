@@ -2052,14 +2052,7 @@ if __name__ == "__main__":
         group=-10
     )
 
-    from group_control.group_control import handle_group_message
-
-    # هندلرهای دستورها (مثل پاکسازی و قفل)
-    register_cleanup_handlers(application)     # ← پاکسازی
-    # (اگه خواستی بعداً یه register_group_control_handlers هم برای قفل‌ها بذار)
-
-    # کنترل پیام‌ها (باید بعد از هندلرهای دستوری بیاد)
-    application.add_handler(MessageHandler(filters.ALL, handle_group_message))
+    
     # ==========================================================
     application.add_handler(CommandHandler("addsudo", add_sudo))
     application.add_handler(CommandHandler("delsudo", del_sudo))
