@@ -1135,49 +1135,44 @@ async def handle_locks_with_alias(update: Update, context: ContextTypes.DEFAULT_
         print(f"[ALIAS] {text} → {new_cmd}")
         return await handle_group_message(update, context)
 
-        
+
 # ==========================================================
-# 🧱 CENTRAL HANDLER — نسخه نهایی گروه کنترل
+# 🧱 تابع مرکزی گروه (نسخه اصلاح‌شده نهایی)
 # ==========================================================
-import asyncio
-import re
-from telegram import Update, ChatPermissions
+
+import asyncio, re
+from telegram import Update
 from telegram.ext import ContextTypes
 
-# ==========================================================
-# 🧱 تابع اصلی: کنترل پیام‌های گروه
-# ==========================================================
-
 async def handle_group_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """دستگاه مرکزی برای تمام پیام‌های گروه"""
+    """دستگاه مرکزی کنترل گروه — نسخه پایدار و نهایی"""
     if not update.message:
         return
 
-    # پشتیبانی از caption
+    # متن پیام (برای متن و کپشن)
     text = (update.message.text or update.message.caption or "").strip().lower()
     chat = update.effective_chat
     user = update.effective_user
 
-    # ─────────────────────────────── دستورات قفل ───────────────────────────────
-    
+    # ─────────────────────────────── دستورات قفل / بازکردن / وضعیت / پنل ───────────────────────────────
     if text in ["قفل گروه", "بستن گروه", "بستن"]:
         return await lock_group(update, context)
 
-    elif text in ["باز کردن گروه", "باز کردن", "گروه باز"]:
+    if text in ["باز کردن گروه", "باز کردن", "گروه باز"]:
         return await unlock_group(update, context)
 
-    elif text in ["وضعیت قفل‌ها", "وضعیت قفل", "locks"]:
+    if text in ["وضعیت قفل‌ها", "وضعیت قفل", "locks"]:
         return await handle_locks_status(update, context)
 
-    elif text in ["پنل قفل", "پنل قفل‌ها", "lock panel"]:
+    if text in ["پنل قفل", "پنل قفل‌ها", "lock panel"]:
         return await handle_lock_panel(update, context)
+
     # ─────────────── بررسی قفل‌های فعال ───────────────
     locks = _get_locks(chat.id)
-
     if any(locks.values()):
         is_admin = await _is_admin_or_sudo(context, chat.id, user.id)
 
-        # 🚫 قفل گروه (هیچ‌کس جز مدیر پیام نده)
+        # 🚫 قفل گروه
         if locks.get("group") and not is_admin:
             try:
                 await update.message.delete()
@@ -1186,17 +1181,11 @@ async def handle_group_message(update: Update, context: ContextTypes.DEFAULT_TYP
             return
 
         # 🚫 قفل لینک
-        if locks.get("links") and ("http" in text or "t.me" in text or "telegram.me" in text):
-            try:
-                await update.message.delete()
-            except:
-                pass
-            msg = await update.message.reply_text("🚫 ارسال لینک ممنوع است.", parse_mode="HTML")
-            await asyncio.sleep(5)
-            await msg.delete()
+        if locks.get("links") and any(x in text for x in ["http", "t.me", "telegram.me"]):
+            await _del_msg(update, "🚫 ارسال لینک ممنوع است.")
             return
 
-        # 🚫 قفل انواع رسانه
+        # 🚫 قفل رسانه‌ها
         if locks.get("photos") and update.message.photo:
             await _del_msg(update, "🚫 ارسال عکس ممنوع است.")
             return
@@ -1209,27 +1198,20 @@ async def handle_group_message(update: Update, context: ContextTypes.DEFAULT_TYP
         if locks.get("voices") and update.message.voice:
             await _del_msg(update, "🚫 ارسال ویس ممنوع است.")
             return
-        if locks.get("vmsgs") and update.message.video_note:
-            await _del_msg(update, "🚫 ارسال ویدیو مسیج ممنوع است.")
-            return
         if locks.get("stickers") and update.message.sticker:
             await _del_msg(update, "🚫 ارسال استیکر ممنوع است.")
             return
         if locks.get("gifs") and update.message.animation:
             await _del_msg(update, "🚫 ارسال گیف ممنوع است.")
             return
-
-        # 🚫 قفل فوروارد
         if locks.get("forward") and update.message.forward_date:
             await _del_msg(update, "🚫 فوروارد پیام ممنوع است.")
             return
-
-        # 🚫 قفل رسانه کلی
         if locks.get("media") and (update.message.photo or update.message.video or update.message.document or update.message.animation):
             await _del_msg(update, "🚫 ارسال رسانه ممنوع است.")
             return
 
-        # 🚫 قفل تگ / منشن
+        # 🚫 منشن / تگ
         if (locks.get("usernames") or locks.get("mention")) and "@" in text:
             await _del_msg(update, "🚫 استفاده از @ یا منشن ممنوع است.")
             return
@@ -1296,7 +1278,7 @@ async def handle_group_message(update: Update, context: ContextTypes.DEFAULT_TYP
     if text in ["لیست اخطار", "warns"]:
         return await list_warns(update, context)
 
-    # ─────────────────────────────── مدیران محلی / سودو ───────────────────────────────
+    # ─────────────────────────────── مدیریت مدیران و سودوها ───────────────────────────────
     if text in ["افزودن مدیر", "add admin"]:
         return await add_admin(update, context)
     if text in ["حذف مدیر", "remove admin"]:
@@ -1324,7 +1306,7 @@ async def handle_group_message(update: Update, context: ContextTypes.DEFAULT_TYP
     if text == "لقب من":
         return await show_my_nickname(update, context)
 
-    # ─────────────────────────────── تگ‌ها ───────────────────────────────
+    # ─────────────────────────────── تگ کاربران ───────────────────────────────
     if text == "تگ همه":
         return await tag_users(update, context, "all")
     if text == "تگ فعال":
@@ -1334,19 +1316,21 @@ async def handle_group_message(update: Update, context: ContextTypes.DEFAULT_TYP
     if text == "تگ مدیران":
         return await tag_users(update, context, "admins")
 
-    # ─────────────────────────────── پاکسازی ───────────────────────────────
+    # ─────────────────────────────── پاکسازی پیام‌ها ───────────────────────────────
     if text == "پاکسازی":
         return await purge_all(update, context)
     if text.startswith("حذف "):
         try:
             number = int(text.split(" ")[1])
             return await purge_count(update, context, number)
-        except Exception:
-            return await update.message.reply_text("⚠️ لطفاً عدد معتبر بنویس. مثال: حذف 50")
+        except:
+            return await update.message.reply_text("⚠️ مثال: حذف 50")
     if text == "حذف" and update.message.reply_to_message:
         return await purge_user(update, context)
+    if text in ["تا اینجا حذف", "پاکسازی بین"]:
+        return await purge_between(update, context)
 
-    # ─────────────────────────────── گزارش کامل گروه ───────────────────────────────
+    # ─────────────────────────────── گزارش کامل ───────────────────────────────
     if text in ["گزارش گروه", "وضعیت گروه", "report"]:
         return await handle_group_report(update, context)
 
@@ -1356,71 +1340,5 @@ async def handle_group_message(update: Update, context: ContextTypes.DEFAULT_TYP
     if text in ["لیست دستورها", "لیست alias"]:
         return await handle_list_aliases(update, context)
 
-# ==========================================================
-# 🧩 توابع پشتیبان
-# ==========================================================
-
-async def _del_msg(update: Update, text: str):
-    """حذف امن پیام با پیام هشدار موقت"""
-    try:
-        await update.message.delete()
-    except:
-        pass
-    try:
-        msg = await update.message.reply_text(text, parse_mode="HTML")
-        await asyncio.sleep(5)
-        await msg.delete()
-    except:
-        pass
-
-
-async def handle_locks_with_alias(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """در حال حاضر aliasها غیرفعال هستند."""
-    return
-
-
-async def show_my_original(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    target_id = str(update.effective_user.id)
-    return await show_origin(update, context, target_id=target_id)
-
-
-async def show_my_nickname(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    target_id = str(update.effective_user.id)
-    return await show_nickname(update, context, target_id=target_id)
-
-
-# ─────────────────────────────── نگاشت متن به کلید قفل ───────────────────────────────
-def _map_to_key(human_text: str) -> str | None:
-    if not human_text:
-        return None
-    t = human_text.replace("قفل", "").replace("باز کردن", "").strip().lower()
-
-    for key, fa_title in LOCK_TYPES.items():
-        if t == fa_title or t in fa_title or fa_title in t:
-            return key
-
-    for key, words in LOCK_ALIASES.items():
-        for w in words:
-            if t == w or w in t or t in w:
-                return key
-    return None
-
-
-async def _unknown_lock_error(update: Update, wrong_text: str):
-    samples = "، ".join([LOCK_TYPES[k] for k in ("group", "links", "photos", "videos") if k in LOCK_TYPES])
-    return await update.message.reply_text(
-        f"⚠️ قفل «{wrong_text}» شناخته نشد.\n"
-        f"نمونه‌ها: {samples}",
-        parse_mode="HTML"
-    )
-
-
-async def handle_locks_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    chat = update.effective_chat
-    locks = _get_locks(chat.id)
-    if not locks:
-        return await update.message.reply_text("✅ هیچ قفلی فعال نیست.")
-    active = [LOCK_TYPES[k] for k, v in locks.items() if v]
-    if not active:
-        return await update.message.reply_text("✅ هیچ قفلی فعال نیست.")
-    return await update.message.reply_text("🔒 قفل‌های فعال: " + "، ".join(active))
+    # ✅ در پایان — aliasها فقط بررسی می‌شن، نه return
+    await handle_locks_with_alias(update, context)
