@@ -716,121 +716,150 @@ async def tag_users(update: Update, context: ContextTypes.DEFAULT_TYPE, mode: st
     except Exception as e:
         await update.message.reply_text(f"⚠️ خطا در دریافت کاربران:\n<code>{e}</code>", parse_mode="HTML")
         # ==========================================================
-# 🧱 GROUP CONTROL SYSTEM — STEP 7
-# پاکسازی کامل، عددی و کاربر خاص
+
+            # ==========================================================
+# 🧹 STEP 13 — سیستم پاکسازی نهایی (Purge System v4)
+# کاملاً سازگار با PTB v20+ و بدون متد get_history
 # ==========================================================
-
-
-from telegram.error import BadRequest, RetryAfter
 import asyncio
 from datetime import datetime
+from telegram.error import BadRequest, RetryAfter
 
-# ─────────────────────────────── پاکسازی کامل گروه ───────────────────────────────
-async def purge_all(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    chat = update.effective_chat
-    user = update.effective_user
-
-    if not await _is_admin_or_sudo(context, chat.id, user.id):
-        return await update.message.reply_text("🚫 فقط مدیران یا سودوها می‌تونن گروه رو پاکسازی کنن.")
-
-    await update.message.reply_text("🧹 شروع پاکسازی کل گروه...\nلطفاً صبر کنید...")
-
-    deleted = 0
+# ─────────────────────────────── ابزار حذف امن ───────────────────────────────
+async def _safe_delete(context, chat_id, msg_id):
     try:
-        chat_obj = await context.bot.get_chat(chat.id)
-        async for msg in chat_obj.get_history(limit=1000):
-            try:
-                await context.bot.delete_message(chat.id, msg.message_id)
-                deleted += 1
-                await asyncio.sleep(0.05)
-            except RetryAfter as r:
-                await asyncio.sleep(r.retry_after + 2)
-            except BadRequest:
-                continue
-
-        now = datetime.now().strftime("%Y-%m-%d | %H:%M:%S")
-        await context.bot.send_message(
-            chat.id,
-            f"✅ پاکسازی کامل انجام شد.\n🧾 {deleted} پیام حذف شد.\n🕒 {now}",
-            parse_mode="HTML"
-        )
-    except Exception as e:
-        await update.message.reply_text(f"⚠️ خطا در پاکسازی:\n<code>{e}</code>", parse_mode="HTML")
+        await context.bot.delete_message(chat_id, msg_id)
+        await asyncio.sleep(0.05)
+        return True
+    except RetryAfter as r:
+        await asyncio.sleep(r.retry_after + 1)
+        return await _safe_delete(context, chat_id, msg_id)
+    except BadRequest as e:
+        if "message can't be deleted" in str(e).lower():
+            return False
+        return False
+    except:
+        return False
 
 
 # ─────────────────────────────── پاکسازی عددی ───────────────────────────────
 async def purge_count(update: Update, context: ContextTypes.DEFAULT_TYPE, count: int):
+    """🧹 حذف تعداد مشخصی از پیام‌ها"""
     chat = update.effective_chat
     user = update.effective_user
+    msg_id = update.message.message_id
 
     if not await _is_admin_or_sudo(context, chat.id, user.id):
-        return await update.message.reply_text("🚫 فقط مدیران یا سودوها مجازند.")
-
-    if count <= 0:
-        return await update.message.reply_text("⚠️ عدد باید بزرگ‌تر از صفر باشد.")
+        return await update.message.reply_text("🚫 فقط مدیران و سودوها مجازند.")
 
     deleted = 0
-    await update.message.reply_text(f"🧹 در حال حذف <b>{count}</b> پیام اخیر...", parse_mode="HTML")
+    await update.message.reply_text(f"🧹 در حال حذف {count} پیام اخیر...")
 
-    try:
-        chat_obj = await context.bot.get_chat(chat.id)
-        async for msg in chat_obj.get_history(limit=count):
-            try:
-                await context.bot.delete_message(chat.id, msg.message_id)
-                deleted += 1
-                await asyncio.sleep(0.05)
-            except RetryAfter as r:
-                await asyncio.sleep(r.retry_after + 2)
-            except:
-                continue
+    # از آخر به عقب
+    for mid in range(msg_id, msg_id - count, -1):
+        if mid <= 0:
+            break
+        if await _safe_delete(context, chat.id, mid):
+            deleted += 1
 
-        now = datetime.now().strftime("%Y-%m-%d | %H:%M:%S")
-        await context.bot.send_message(
-            chat.id,
-            f"✅ {deleted} پیام حذف شد.\n🕒 {now}\n👤 مدیر: <a href='tg://user?id={user.id}'>{user.first_name}</a>",
-            parse_mode="HTML"
-        )
-    except Exception as e:
-        await update.message.reply_text(f"⚠️ خطا در حذف پیام‌ها:\n<code>{e}</code>", parse_mode="HTML")
+    now = datetime.now().strftime("%Y-%m-%d | %H:%M:%S")
+    await context.bot.send_message(
+        chat.id,
+        f"✅ {deleted} پیام حذف شد.\n🕒 {now}\n👤 مدیر: <a href='tg://user?id={user.id}'>{user.first_name}</a>",
+        parse_mode="HTML"
+    )
 
 
-# ─────────────────────────────── حذف پیام‌های یک کاربر خاص ───────────────────────────────
+# ─────────────────────────────── حذف پیام‌های یک کاربر ───────────────────────────────
 async def purge_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """🧹 حذف پیام‌های اخیر یک کاربر خاص"""
     chat = update.effective_chat
     user = update.effective_user
     reply = update.message.reply_to_message
 
     if not await _is_admin_or_sudo(context, chat.id, user.id):
-        return await update.message.reply_text("🚫 فقط مدیران یا سودوها می‌تونن از این دستور استفاده کنن.")
-
+        return await update.message.reply_text("🚫 فقط مدیران یا سودوها مجازند.")
     if not reply:
-        return await update.message.reply_text("📎 روی پیام فردی ریپلای کن و بنویس: حذف")
+        return await update.message.reply_text("📎 روی پیام کاربر ریپلای کن و بنویس: حذف")
 
     target = reply.from_user
     deleted = 0
-    await update.message.reply_text(f"🧹 در حال پاکسازی پیام‌های {target.first_name} ...")
 
-    try:
-        chat_obj = await context.bot.get_chat(chat.id)
-        async for msg in chat_obj.get_history(limit=1000):
-            if msg.from_user and msg.from_user.id == target.id:
-                try:
-                    await context.bot.delete_message(chat.id, msg.message_id)
+    await update.message.reply_text(f"🧹 در حال حذف پیام‌های {target.first_name}...")
+
+    # فقط ۵۰۰ پیام اخیر چک می‌کنیم (محدودیت API)
+    for mid in range(update.message.message_id, update.message.message_id - 500, -1):
+        try:
+            msg = await context.bot.get_message(chat.id, mid)
+            if msg and msg.from_user and msg.from_user.id == target.id:
+                if await _safe_delete(context, chat.id, mid):
                     deleted += 1
-                    await asyncio.sleep(0.05)
-                except RetryAfter as r:
-                    await asyncio.sleep(r.retry_after + 2)
-                except:
-                    continue
+        except:
+            continue
 
-        now = datetime.now().strftime("%Y-%m-%d | %H:%M:%S")
-        await context.bot.send_message(
-            chat.id,
-            f"✅ {deleted} پیام از <b>{target.first_name}</b> حذف شد.\n🕒 {now}",
-            parse_mode="HTML"
-        )
-    except Exception as e:
-        await update.message.reply_text(f"⚠️ خطا در حذف پیام‌های کاربر:\n<code>{e}</code>", parse_mode="HTML")
+    now = datetime.now().strftime("%Y-%m-%d | %H:%M:%S")
+    await context.bot.send_message(
+        chat.id,
+        f"✅ {deleted} پیام از {target.first_name} حذف شد.\n🕒 {now}",
+        parse_mode="HTML"
+    )
+
+
+# ─────────────────────────────── پاکسازی بین دو پیام ───────────────────────────────
+async def purge_between(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """🧹 پاکسازی بین دو پیام (از ریپلای تا دستور فعلی)"""
+    chat = update.effective_chat
+    user = update.effective_user
+    reply = update.message.reply_to_message
+
+    if not await _is_admin_or_sudo(context, chat.id, user.id):
+        return await update.message.reply_text("🚫 فقط مدیران یا سودوها مجازند.")
+    if not reply:
+        return await update.message.reply_text("📎 روی پیام قدیمی ریپلای کن و بنویس: تا اینجا حذف")
+
+    start_id = reply.message_id
+    end_id = update.message.message_id
+    deleted = 0
+
+    for mid in range(end_id, start_id - 1, -1):
+        if await _safe_delete(context, chat.id, mid):
+            deleted += 1
+
+    now = datetime.now().strftime("%Y-%m-%d | %H:%M:%S")
+    await context.bot.send_message(
+        chat.id,
+        f"✅ {deleted} پیام بین دو نقطه حذف شد.\n🕒 {now}\n👤 مدیر: <a href='tg://user?id={user.id}'>{user.first_name}</a>",
+        parse_mode="HTML"
+    )
+
+
+# ─────────────────────────────── پاکسازی کل گروه (تا حد API) ───────────────────────────────
+async def purge_all(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """🧹 حذف کل پیام‌ها (حداکثر 10000 مورد)"""
+    chat = update.effective_chat
+    user = update.effective_user
+    msg_id = update.message.message_id
+
+    if not await _is_admin_or_sudo(context, chat.id, user.id):
+        return await update.message.reply_text("🚫 فقط مدیران یا سودوها مجازند.")
+
+    await update.message.reply_text("🧹 در حال پاکسازی کل گروه...\nلطفاً صبر کنید.")
+
+    deleted = 0
+    for mid in range(msg_id, msg_id - 10000, -1):
+        if mid <= 0:
+            break
+        if await _safe_delete(context, chat.id, mid):
+            deleted += 1
+        if mid % 200 == 0:
+            await asyncio.sleep(1)  # ضد flood
+
+    now = datetime.now().strftime("%Y-%m-%d | %H:%M:%S")
+    await context.bot.send_message(
+        chat.id,
+        f"✅ گروه تا حد مجاز پاکسازی شد.\n🧾 {deleted} پیام حذف شد.\n🕒 {now}",
+        parse_mode="HTML"
+                             )
  
         # ==========================================================
 # 🧱 GROUP CONTROL SYSTEM — STEP 8
@@ -1233,6 +1262,19 @@ async def handle_group_message(update: Update, context: ContextTypes.DEFAULT_TYP
         return await tag_users(update, context, "inactive")
     if text == "تگ مدیران":
         return await tag_users(update, context, "admins")
+        # ─────────────────────────────── پاکسازی پیام‌ها ───────────────────────────────
+    if text == "پاکسازی":
+        return await purge_all(update, context)
+    if text.startswith("حذف "):
+        try:
+            number = int(text.split(" ")[1])
+            return await purge_count(update, context, number)
+        except:
+            return await update.message.reply_text("⚠️ مثال درست: حذف 50")
+    if text == "حذف" and update.message.reply_to_message:
+        return await purge_user(update, context)
+    if text in ["تا اینجا حذف", "پاکسازی بین"]:
+        return await purge_between(update, context)
 
     # ─────────────────────────────── پاکسازی پیام‌ها ───────────────────────────────
     if text == "پاکسازی":
