@@ -1682,12 +1682,19 @@ async def handle_sudo_commands(update: Update, context: ContextTypes.DEFAULT_TYP
 # ==========================================================
 # 🧱 بخش ۱۲ — مرکز کنترل پیام‌ها و دستورات اصلی
 # ==========================================================
-
-        async def handle_group_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # ثبت تمام پیام‌ها برای قابلیت حذف و پاکسازی
+async def handle_group_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # ثبت همه پیام‌ها در لاگ برای قابلیت حذف و پاکسازی
     _log_message(update)
 
-    # ادامه‌ی کد اصلی...
+    # ادامه‌ی بقیه کدها...
+    if not update.message or not update.message.text:
+        return
+
+    text = update.message.text.strip().lower()
+    chat = update.effective_chat
+    user = update.effective_user
+    # ...
+        
 
     msg = update.message
     text = (msg.text or msg.caption or "").strip().lower()
