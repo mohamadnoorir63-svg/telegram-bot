@@ -1190,27 +1190,40 @@ MAX_DELETE = 1000  # حداکثر تعداد پیام قابل حذف در یک 
 DELETE_DELAY = 0.05  # تاخیر کوتاه بین حذف‌ها برای جلوگیری از Flood
 
 # ─────────────────────────────── حذف عددی ───────────────────────────────
-
-async def delete_last_messages(update: Update, context: ContextTypes.DEFAULT_TYPE, count: int):
-    """حذف آخرین n پیام از گروه"""
+async def delete_user_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """حذف پیام‌های اخیر یک کاربر خاص با ریپلای"""
     chat = update.effective_chat
     user = update.effective_user
+    msg = update.message
+
+    if not msg.reply_to_message:
+        return await msg.reply_text("📎 روی پیام کاربر مورد نظر ریپلای کن و بنویس: حذف")
 
     if not await _has_full_access(context, chat.id, user.id):
-        return await update.message.reply_text("🚫 فقط مدیران یا سودوها می‌تونن پاکسازی کنن.")
+        return await msg.reply_text("🚫 فقط مدیران یا سودوها می‌تونن پیام‌های دیگران رو حذف کنن.")
 
+    target = msg.reply_to_message.from_user
+    target_id = target.id
     deleted = 0
+
+    await msg.reply_text(f"🧹 در حال حذف پیام‌های اخیر <b>{target.first_name}</b>...", parse_mode="HTML")
+
     try:
-        async for msg in context.bot.get_chat_history(chat.id, limit=count + 1):
-            try:
-                await context.bot.delete_message(chat.id, msg.message_id)
-                deleted += 1
-                await asyncio.sleep(DELETE_DELAY)
-            except:
-                continue
-        await update.message.reply_text(f"🧹 {deleted} پیام با موفقیت حذف شد.", parse_mode="HTML")
+        # پیام‌ها رو از آخرین 1000 پیام گروه می‌گیریم
+        messages = await context.bot.get_chat(chat.id)
+        async for message in context.application.get_chat(chat.id).iter_messages(limit=1000):
+            if message.from_user and message.from_user.id == target_id:
+                try:
+                    await context.bot.delete_message(chat.id, message.message_id)
+                    deleted += 1
+                    await asyncio.sleep(0.05)
+                except:
+                    continue
+
+        await context.bot.send_message(chat.id, f"✅ پیام‌های <b>{target.first_name}</b> حذف شد ({deleted} پیام).", parse_mode="HTML")
+
     except Exception as e:
-        await update.message.reply_text(f"⚠️ خطا در حذف پیام‌ها:\n<code>{e}</code>", parse_mode="HTML")
+        await msg.reply_text(f"⚠️ خطا در حذف پیام‌های کاربر:\n<code>{e}</code>", parse_mode="HTML")
 
 # ─────────────────────────────── پاکسازی کل چت ───────────────────────────────
 
