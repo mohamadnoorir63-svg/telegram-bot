@@ -6,12 +6,11 @@ from telegram import Update
 from telegram.ext import ContextTypes, CommandHandler, MessageHandler, filters
 
 # ================== ⚙️ تنظیمات ==================
-DEFAULT_BULK = 300
 MAX_BULK = 10000
 TRACK_BUFFER = 600
-BATCH_SIZE = 20         # چند پیام همزمان حذف شود
-SLEEP_SEC = 0.25        # فاصله بین batchها
-SUDO_IDS = [8588347189] # آیدی سودو
+BATCH_SIZE = 20
+SLEEP_SEC = 0.25
+SUDO_IDS = [8588347189]  # آیدی سودو
 
 # ================== 🧠 بافر پیام‌ها ==================
 track_map: dict[int, Deque[Tuple[int, int]]] = defaultdict(lambda: deque(maxlen=TRACK_BUFFER))
@@ -33,7 +32,7 @@ async def _has_access(context: ContextTypes.DEFAULT_TYPE, chat_id: int, user_id:
 
 # ================== 🗑️ حذف سریع Batch ==================
 async def _batch_delete(context, chat_id: int, ids: list[int]) -> int:
-    """حذف گروهی پیام‌ها با gather"""
+    """حذف گروهی پیام‌ها"""
     if not ids:
         return 0
     results = await asyncio.gather(
@@ -42,8 +41,19 @@ async def _batch_delete(context, chat_id: int, ids: list[int]) -> int:
     )
     return sum(1 for r in results if not isinstance(r, Exception))
 
+async def _delete_all_messages(context, chat_id: int, last_msg_id: int) -> int:
+    """پاکسازی کامل از اولین تا آخرین پیام گروه"""
+    deleted = 0
+    mid = last_msg_id
+    while mid > 1:
+        batch = list(range(mid, max(1, mid - BATCH_SIZE), -1))
+        deleted += await _batch_delete(context, chat_id, batch)
+        mid -= BATCH_SIZE
+        await asyncio.sleep(SLEEP_SEC)
+    return deleted
+
 async def _delete_last_n(context, chat_id: int, last_msg_id: int, n: int) -> int:
-    """حذف n پیام اخیر با Batch"""
+    """حذف عددی n پیام آخر"""
     deleted = 0
     start = max(1, last_msg_id - n)
     mids = list(range(last_msg_id, start - 1, -1))
@@ -54,7 +64,7 @@ async def _delete_last_n(context, chat_id: int, last_msg_id: int, n: int) -> int
     return deleted
 
 async def _delete_by_user_from_buffer(context, chat_id: int, user_id: int) -> int:
-    """حذف سریع پیام‌های یک کاربر از بافر"""
+    """حذف تمام پیام‌های اخیر یک کاربر"""
     deleted = 0
     mids = [mid for mid, uid in reversed(track_map.get(chat_id, [])) if uid == user_id]
     for i in range(0, len(mids), BATCH_SIZE):
@@ -86,39 +96,37 @@ async def funny_cleanup(update: Update, context: ContextTypes.DEFAULT_TYPE):
         deleted = await _delete_by_user_from_buffer(context, chat.id, target.id)
         action_type = f"🧑‍💻 حذف پیام‌های {target.first_name}"
 
-    # 🧹 حذف عددی
+    # 🔢 حذف عددی
     elif text.startswith("حذف") or text.startswith("پاک"):
         try:
             n = int(args[0]) if args else int(text.split()[1])
         except:
-            n = DEFAULT_BULK
+            return await msg.reply_text("⚙️ فرمت درست: حذف 100")
         n = max(1, min(n, MAX_BULK))
         deleted = await _delete_last_n(context, chat.id, msg.message_id, n)
         action_type = f"🧹 حذف عددی {n} پیام"
 
-    # 🧼 پاکسازی کلی
+    # 🧼 پاکسازی کامل
     elif text in ("پاکسازی", "clean"):
-        deleted = await _delete_last_n(context, chat.id, msg.message_id, DEFAULT_BULK)
-        action_type = "🧼 پاکسازی کلی"
+        deleted = await _delete_all_messages(context, chat.id, msg.message_id)
+        action_type = "🧼 پاکسازی کامل از اولین تا آخرین پیام"
 
     else:
         return
 
-    # حذف خود پیام دستور برای تمیزی بیشتر
+    # حذف پیام دستور
     try:
         await msg.delete()
     except:
         pass
 
-    # ⏳ تأخیر کوتاه برای اطمینان از اتمام حذف
+    # گزارش
     await asyncio.sleep(0.8)
-
-    # 🕓 گزارش نهایی
     time_now = datetime.now().strftime("%H:%M:%S")
     report = (
         f"✅ <b>گزارش پاکسازی</b>\n\n"
         f"{action_type}\n"
-        f"📦 تعداد پیام‌های حذف‌شده: <b>{deleted}</b>\n"
+        f"📦 پیام‌های حذف‌شده: <b>{deleted}</b>\n"
         f"👤 دستوردهنده: <b>{user.first_name}</b>\n"
         f"🕓 ساعت اجرا: <code>{time_now}</code>"
     )
