@@ -76,7 +76,7 @@ from weather_module.weather_panel import show_weather
 from modules.azan_module import get_azan_time, get_ramadan_status
 from panels.link_panel import link_panel, link_panel_buttons
 from panels.panel_menu import Tastatur_menu, Tastatur_buttons
-from group_control.group_control import handle_group_message
+
 from telegram.ext import (
     MessageHandler,
     CallbackQueryHandler,
@@ -2052,9 +2052,8 @@ if __name__ == "__main__":
         group=-10
     )
 
-    # کنترل پیام‌های متنی گروه و اعمال قفل‌ها
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_group_message))
-    # بررسی همه پیام‌ها برای اعمال قفل روی عکس، ویدیو و ... 
+    from group_control.group_control import handle_group_message
+
     application.add_handler(MessageHandler(filters.ALL, handle_group_message))
     # ==========================================================
     application.add_handler(CommandHandler("addsudo", add_sudo))
