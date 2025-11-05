@@ -2038,19 +2038,31 @@ if __name__ == "__main__":
             text += f"{i}. <code>{sid}</code>\n"
         await update.message.reply_text(text, parse_mode="HTML")
     # ======================= 🧱 Group Control System (Central Handler) =======================
-    application.add_handler(
-    MessageHandler(filters.TEXT & filters.Regex(r"^(لینک|Link)$"), link_panel)
-    )
-
     from group_control.group_control import handle_group_message, handle_lock_panel_callback
+    from panels.link_panel import link_panel, link_panel_buttons  # 👈 اگه فایل جدا داری
     from telegram.ext import MessageHandler, CallbackQueryHandler, filters
 
-    # تمام پیام‌های متنی به ماژول کنترل گروه
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_group_message))
+    # 🟢 پنل لینک‌ها (در اولویت بالا)
+    application.add_handler(
+        MessageHandler(filters.TEXT & filters.Regex(r"^(?:لینک|Link)$"), link_panel),
+        group=-10
+    )
+    application.add_handler(
+        CallbackQueryHandler(link_panel_buttons, pattern="^link_"),
+        group=-10
+    )
 
-    # برای پنل دکمه‌ای قفل‌ها
-    application.add_handler(CallbackQueryHandler(handle_lock_panel_callback, pattern="^lock"))
-    
+    # 🧱 تمام پیام‌های متنی به ماژول کنترل گروه
+    application.add_handler(
+        MessageHandler(filters.TEXT & ~filters.COMMAND, handle_group_message),
+        group=0
+    )
+
+    # 🧱 برای پنل دکمه‌ای قفل‌ها
+    application.add_handler(
+        CallbackQueryHandler(handle_lock_panel_callback, pattern="^lock"),
+        group=1
+    )
     # ==========================================================
     application.add_handler(CommandHandler("addsudo", add_sudo))
     application.add_handler(CommandHandler("delsudo", del_sudo))
