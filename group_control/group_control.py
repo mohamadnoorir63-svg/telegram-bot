@@ -403,6 +403,22 @@ async def handle_group_lock_commands(update: Update, context: ContextTypes.DEFAU
         return await disable_auto_lock(update, context)
     if text.startswith("تنظیم قفل خودکار"):
         return await set_auto_lock(update, context)
+        # ─────────────────────────────── مدیریت دستورات قفل‌های محتوایی ───────────────────────────────
+async def handle_lock_commands(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """تشخیص و اجرای دستور قفل یا بازکردن (مثلاً: قفل عکس / باز کردن لینک و ...)"""
+    if not update.message or not update.message.text:
+        return
+
+    text = update.message.text.strip().lower()
+
+    for key, fa in LOCK_TYPES.items():
+        if text == f"قفل {fa}":
+            return await handle_lock(update, context, key)
+        if text in (f"باز کردن {fa}", f"بازکردن {fa}"):
+            return await handle_unlock(update, context, key)
+
+    # هیچ پیامی نده اگه دستور اشتباه بود
+    return
 
 # ─────────────────────────────── هندلر مرکزی گروه ───────────────────────────────
 async def handle_group_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
