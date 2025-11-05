@@ -6,7 +6,7 @@ from telegram.ext import ContextTypes
 
 # 📁 مسیر فایل دستورات
 DATA_FILE = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "custom_commands.json"))
-ADMIN_ID = 7089376754
+ADMIN_ID = 8588347189
 
 # ======================== 📦 حافظه دستورات ========================
 
