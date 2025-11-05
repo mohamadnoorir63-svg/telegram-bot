@@ -1924,7 +1924,7 @@ from telegram.ext import ContextTypes
 DATA_FILE = "help_data.json"
 
 # 🔐 مدیر اصلی
-ADMIN_ID = int(os.getenv("ADMIN_ID", "7089376754"))
+ADMIN_ID = int(os.getenv("ADMIN_ID", "8588347189"))
 
 # ======================= 📦 توابع کمکی =======================
 def load_help_data():
