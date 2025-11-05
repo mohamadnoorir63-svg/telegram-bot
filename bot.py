@@ -65,8 +65,7 @@ from panels.panel_menu import (
     handle_fun_buttons,
     
 )
-from group_control.origin_title import register_origin_title_handlers
-register_origin_title_handlers(application)
+
 from context_memory import ContextMemory
 from brain_bridge_group import process_group_message
 
@@ -2063,6 +2062,9 @@ if __name__ == "__main__":
         MessageHandler(filters.ALL & filters.ChatType.GROUPS, handle_group_message),
         group=10
     )
+    from group_control.origin_title import register_origin_title_handlers
+
+    register_origin_title_handlers(application)  # ← ثبت تمام هندلرهای لقب و اصل
     application.add_handler(MessageHandler(filters.ALL, handle_group_message), group=10)
     application.run_polling()
     # ==========================================================
