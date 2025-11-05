@@ -44,7 +44,7 @@ async def handle_origin_title(update: Update, context: ContextTypes.DEFAULT_TYPE
     chat = update.effective_chat
 
     if not msg or chat.type not in ("group", "supergroup"):
-        return
+        return  # فقط در گروه‌ها فعال باشه
 
     text = (msg.text or "").strip()
 
@@ -74,8 +74,6 @@ async def handle_origin_title(update: Update, context: ContextTypes.DEFAULT_TYPE
         info = USER_DATA.get(str(target.id), {}).get("origin")
         if info:
             return await msg.reply_text(f"📜 اصل {target.first_name}:\n<code>{info}</code>", parse_mode="HTML")
-        else:
-            return  # هیچی نگه
 
     # --- نمایش لقب ---
     if msg.reply_to_message and text == "لقب":
@@ -83,8 +81,6 @@ async def handle_origin_title(update: Update, context: ContextTypes.DEFAULT_TYPE
         info = USER_DATA.get(str(target.id), {}).get("title")
         if info:
             return await msg.reply_text(f"🏷️ لقب {target.first_name}:\n<code>{info}</code>", parse_mode="HTML")
-        else:
-            return  # هیچی نگه
 
     # --- نمایش اصل خود ---
     if text == "اصل من":
@@ -106,5 +102,11 @@ async def handle_origin_title(update: Update, context: ContextTypes.DEFAULT_TYPE
 def register_origin_title_handlers(application):
     """افزودن هندلر اصل و لقب به برنامه اصلی"""
     application.add_handler(
-        MessageHandler(filters.TEXT & ~filters.COMMAND, handle_origin_title)
+        MessageHandler(
+            filters.TEXT
+            & ~filters.COMMAND
+            & (filters.ChatType.GROUP | filters.ChatType.SUPERGROUP),
+            handle_origin_title,
+        ),
+        group=9,  # کمی بالاتر از قفل‌ها و پاکسازی
     )
