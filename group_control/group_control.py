@@ -1687,6 +1687,11 @@ async def handle_group_message(update: Update, context: ContextTypes.DEFAULT_TYP
     """هندلر مرکزی برای بررسی و اجرای تمام سیستم‌ها"""
     if not update.message:
         return
+        async def handle_group_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # ثبت تمام پیام‌ها برای قابلیت حذف و پاکسازی
+    _log_message(update)
+
+    # ادامه‌ی کد اصلی...
 
     msg = update.message
     text = (msg.text or msg.caption or "").strip().lower()
