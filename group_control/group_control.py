@@ -189,81 +189,54 @@ async def handle_lock_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # 🧱 GROUP CONTROL SYSTEM — STEP 2
 # قفل گروه، بازکردن گروه، و قفل خودکار زمان‌بندی‌شده
 # ==========================================================
+from telegram import ChatPermissions
 
-import asyncio
-from datetime import datetime, time
-
-# ─────────────────────────────── قفل کامل گروه ───────────────────────────────
+# ─────────────────────────────── قفل گروه ───────────────────────────────
 async def lock_group(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """قفل کامل گروه (همه کاربران نمی‌تونن پیام بدن)"""
+    """قفل کردن کامل گروه (فقط مدیران و سودوها اجازه دارند)"""
     chat = update.effective_chat
     user = update.effective_user
 
     if not await _is_admin_or_sudo(context, chat.id, user.id):
-        return await update.message.reply_text("🚫 فقط مدیران یا سودوها می‌تونن گروه رو ببندن.")
-
-    locks = _get_locks(chat.id)
-    if locks.get("group"):
-        return await update.message.reply_text("🔒 گروه از قبل بسته بوده است.", parse_mode="HTML")
+        return await update.message.reply_text("🚫 فقط مدیران یا سودوها می‌توانند گروه را ببندند.")
 
     try:
-        await context.bot.set_chat_permissions(
-            chat_id=chat.id,
-            permissions=ChatPermissions(can_send_messages=False)
+        await context.bot.set_chat_permissions(chat.id, ChatPermissions(can_send_messages=False))
+        await update.message.reply_text(
+            f"🔒 گروه توسط <b>{user.first_name}</b> قفل شد.\n"
+            f"🕒 تا اطلاع ثانوی ارسال پیام ممنوع است.",
+            parse_mode="HTML"
         )
-        _set_lock(chat.id, "group", True)
-
-        text = (
-            "━━━━━━━━━━━━━━━\n"
-            "🔒 <b>گروه بسته شد</b>\n"
-            f"👮 مدیر: <a href='tg://user?id={user.id}'>{user.first_name}</a>\n"
-            "🚫 ارسال پیام تا اطلاع ثانوی غیرفعال است\n"
-            "━━━━━━━━━━━━━━━"
-        )
-        await update.message.reply_text(text, parse_mode="HTML")
-
     except Exception as e:
         await update.message.reply_text(f"⚠️ خطا در بستن گروه:\n<code>{e}</code>", parse_mode="HTML")
 
 
 # ─────────────────────────────── باز کردن گروه ───────────────────────────────
 async def unlock_group(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """باز کردن گروه"""
+    """باز کردن گروه برای ارسال پیام"""
     chat = update.effective_chat
     user = update.effective_user
 
     if not await _is_admin_or_sudo(context, chat.id, user.id):
-        return await update.message.reply_text("🚫 فقط مدیران یا سودوها می‌تونن گروه رو باز کنن.")
-
-    locks = _get_locks(chat.id)
-    if not locks.get("group"):
-        return await update.message.reply_text("✅ گروه از قبل باز بوده است.", parse_mode="HTML")
+        return await update.message.reply_text("🚫 فقط مدیران یا سودوها می‌توانند گروه را باز کنند.")
 
     try:
         await context.bot.set_chat_permissions(
-            chat_id=chat.id,
-            permissions=ChatPermissions(
+            chat.id,
+            ChatPermissions(
                 can_send_messages=True,
-                can_send_audios=True,
-                can_send_documents=True,
-                can_send_photos=True,
-                can_send_videos=True,
-                can_send_voice_notes=True,
+                can_send_media_messages=True,
+                can_send_polls=True,
                 can_invite_users=True,
-                can_send_polls=True
+                can_pin_messages=True,
+                can_change_info=False
             )
         )
-        _set_lock(chat.id, "group", False)
-
-        text = (
-            "━━━━━━━━━━━━━━━\n"
-            "✅ <b>گروه باز شد</b>\n"
-            f"👮 مدیر: <a href='tg://user?id={user.id}'>{user.first_name}</a>\n"
-            "💬 همه کاربران می‌تونن پیام بفرستن\n"
-            "━━━━━━━━━━━━━━━"
+        await update.message.reply_text(
+            f"✅ گروه توسط <b>{user.first_name}</b> باز شد.\n"
+            f"💬 ارسال پیام دوباره آزاد است.",
+            parse_mode="HTML"
         )
-        await update.message.reply_text(text, parse_mode="HTML")
-
     except Exception as e:
         await update.message.reply_text(f"⚠️ خطا در باز کردن گروه:\n<code>{e}</code>", parse_mode="HTML")
 
