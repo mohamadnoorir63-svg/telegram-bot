@@ -1150,26 +1150,11 @@ async def handle_group_message(update: Update, context: ContextTypes.DEFAULT_TYP
     user = update.effective_user
 
     # ─────────────────────────────── دستورات قفل ───────────────────────────────
-    if text.startswith("قفل "):
-        key = text.replace("قفل", "").strip()
-        mapped = _map_to_key(key)
-        if not mapped:
-            return await _unknown_lock_error(update, key)
-        return await handle_lock(update, context, mapped)
-
-    if text.startswith("باز کردن "):
-        key = text.replace("باز کردن", "").strip()
-        mapped = _map_to_key(key)
-        if not mapped:
-            return await _unknown_lock_error(update, key)
-        return await handle_unlock(update, context, mapped)
-
     if text in ["قفل گروه", "بستن گروه", "بستن"]:
-        return await lock_group(update, context)
+    return await lock_group(update, context)
 
-    if text in ["باز کردن گروه", "باز کردن", "گروه باز"]:
-        return await unlock_group(update, context)
-
+if text in ["باز کردن گروه", "باز کردن", "گروه باز"]:
+    return await unlock_group(update, context)
     if text in ["وضعیت قفل‌ها", "وضعیت قفل", "locks"]:
         return await handle_locks_status(update, context)
 
