@@ -93,15 +93,21 @@ def _set_lock(chat_id: int, key: str, status: bool):
     LOCKS = _load_json(LOCK_FILE)
 
 # ─────────────────────────────── بررسی مدیر یا سودو ───────────────────────────────
+# ─────────────────────────────── بررسی دسترسی کامل ───────────────────────────────
 
-async def _is_admin_or_sudo(context, chat_id: int, user_id: int) -> bool:
-    if user_id in SUDO_IDS:
+async def _has_full_access(context, chat_id: int, user_id: int) -> bool:
+    """
+    بررسی اینکه آیا کاربر دسترسی کامل دارد یا نه:
+    ✅ شامل سودوها، مدیران، و کاربران ویژه
+    """
+    if _is_sudo(user_id):
         return True
-    try:
-        member = await context.bot.get_chat_member(chat_id, user_id)
-        return member.status in ("administrator", "creator")
-    except:
-        return False
+    if await _is_admin_or_sudo(context, chat_id, user_id):
+        return True
+    if _is_vip(chat_id, user_id):
+        return True
+    return False
+
 
 # ─────────────────────────────── حذف پیام ممنوع ───────────────────────────────
 
@@ -125,7 +131,7 @@ async def handle_lock(update: Update, context: ContextTypes.DEFAULT_TYPE, key: s
     chat = update.effective_chat
     user = update.effective_user
 
-    if not await _is_admin_or_sudo(context, chat.id, user.id):
+    if not await _has_full_access(context, chat.id, user.id):
         return await update.message.reply_text("🚫 فقط مدیران یا سودوها مجازند.")
 
     if key not in LOCK_TYPES:
@@ -260,7 +266,7 @@ async def lock_group(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat = update.effective_chat
     user = update.effective_user
 
-    if not await _is_admin_or_sudo(context, chat.id, user.id):
+    if not await _has_full_access(context, chat.id, user.id):
         return await update.message.reply_text("🚫 فقط مدیران یا سودوها می‌تونن گروه رو قفل کنن.")
 
     try:
@@ -283,7 +289,7 @@ async def unlock_group(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat = update.effective_chat
     user = update.effective_user
 
-    if not await _is_admin_or_sudo(context, chat.id, user.id):
+    if not await _has_full_access(context, chat.id, user.id):
         return await update.message.reply_text("🚫 فقط مدیران یا سودوها می‌تونن گروه رو باز کنن.")
 
     try:
@@ -316,7 +322,7 @@ async def set_auto_lock(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat = update.effective_chat
     user = update.effective_user
 
-    if not await _is_admin_or_sudo(context, chat.id, user.id):
+    if not await _has_full_access(context, chat.id, user.id):
         return await update.message.reply_text("🚫 فقط مدیران یا سودوها می‌تونن تنظیم کنن.")
 
     parts = update.message.text.split()
@@ -347,7 +353,7 @@ async def disable_auto_lock(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat = update.effective_chat
     user = update.effective_user
 
-    if not await _is_admin_or_sudo(context, chat.id, user.id):
+    if not await _has_full_access(context, chat.id, user.id):
         return await update.message.reply_text("🚫 فقط مدیران یا سودوها مجازند.")
 
     if str(chat.id) in AUTOLOCKS:
@@ -440,7 +446,7 @@ async def add_filter(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     text = (update.message.text or "").strip()
 
-    if not await _is_admin_or_sudo(context, chat.id, user.id):
+    if not await _has_full_access(context, chat.id, user.id):
         return await update.message.reply_text("🚫 فقط مدیران و سودوها مجازند.")
 
     parts = text.split("فیلتر", 1)
@@ -467,7 +473,7 @@ async def remove_filter(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     text = (update.message.text or "").strip()
 
-    if not await _is_admin_or_sudo(context, chat.id, user.id):
+    if not await _has_full_access(context, chat.id, user.id):
         return await update.message.reply_text("🚫 فقط مدیران و سودوها مجازند.")
 
     parts = text.split("حذف فیلتر", 1)
@@ -599,7 +605,7 @@ async def ban_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not reply:
         return await update.message.reply_text("📎 روی پیام کسی ریپلای کن و بن بنویس.")
 
-    if not await _is_admin_or_sudo(context, chat.id, user.id):
+    if not await _has_full_access(context, chat.id, user.id):
         return await update.message.reply_text("🚫 فقط مدیران یا سودوها می‌تونن بن کنن.")
 
     target = reply.from_user
@@ -627,7 +633,7 @@ async def unban_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not reply:
         return await update.message.reply_text("📎 روی پیام کاربر بن‌شده ریپلای کن و بن حذف کن.")
 
-    if not await _is_admin_or_sudo(context, chat.id, user.id):
+    if not await _has_full_access(context, chat.id, user.id):
         return await update.message.reply_text("🚫 فقط مدیران یا سودوها مجازند.")
 
     target = reply.from_user
@@ -651,7 +657,7 @@ async def mute_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not reply:
         return await update.message.reply_text("📎 روی پیام کسی ریپلای کن و سکوت بنویس.")
 
-    if not await _is_admin_or_sudo(context, chat.id, user.id):
+    if not await _has_full_access(context, chat.id, user.id):
         return await update.message.reply_text("🚫 فقط مدیران یا سودوها مجازند.")
 
     target = reply.from_user
@@ -681,7 +687,7 @@ async def unmute_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not reply:
         return await update.message.reply_text("📎 روی پیام کاربر سکوت‌شده ریپلای کن و حذف سکوت بنویس.")
 
-    if not await _is_admin_or_sudo(context, chat.id, user.id):
+    if not await _has_full_access(context, chat.id, user.id):
         return await update.message.reply_text("🚫 فقط مدیران یا سودوها مجازند.")
 
     target = reply.from_user
@@ -705,7 +711,7 @@ async def warn_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not reply:
         return await update.message.reply_text("📎 روی پیام کسی ریپلای کن و اخطار بنویس.")
 
-    if not await _is_admin_or_sudo(context, chat.id, user.id):
+    if not await _has_full_access(context, chat.id, user.id):
         return await update.message.reply_text("🚫 فقط مدیران یا سودوها مجازند.")
 
     target = reply.from_user
@@ -736,8 +742,7 @@ async def remove_warn(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if not reply:
         return await update.message.reply_text("📎 روی پیام کسی ریپلای کن و حذف اخطار بنویس.")
-
-    if not await _is_admin_or_sudo(context, chat.id, user.id):
+    if not await _has_full_access(context, chat.id, user.id):
         return await update.message.reply_text("🚫 فقط مدیران یا سودوها مجازند.")
 
     target = reply.from_user
@@ -822,7 +827,7 @@ async def set_origin(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = update.message
 
     # فقط مدیر یا سودو
-    if not await _is_admin_or_sudo(context, chat.id, user.id):
+    if not await _has_full_access(context, chat.id, user.id):
         return await msg.reply_text("🚫 فقط مدیران یا سودوها می‌تونن اصل ثبت کنن.")
 
     if not msg.reply_to_message:
@@ -918,7 +923,7 @@ async def set_nickname(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     msg = update.message
 
-    if not await _is_admin_or_sudo(context, chat.id, user.id):
+    if not await _has_full_access(context, chat.id, user.id):
         return await msg.reply_text("🚫 فقط مدیران یا سودوها می‌تونن لقب ثبت کنن.")
 
     if not msg.reply_to_message:
@@ -1016,7 +1021,7 @@ async def tag_all(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat = update.effective_chat
     user = update.effective_user
 
-    if not await _is_admin_or_sudo(context, chat.id, user.id):
+    if not await _has_full_access(context, chat.id, user.id):
         return await update.message.reply_text("🚫 فقط مدیران و سودوها می‌تونن از این دستور استفاده کنن.")
 
     await update.message.reply_text("📢 در حال تگ کردن همه کاربران... لطفاً صبر کنید.")
@@ -1053,7 +1058,7 @@ async def tag_admins(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat = update.effective_chat
     user = update.effective_user
 
-    if not await _is_admin_or_sudo(context, chat.id, user.id):
+    if not await _has_full_access(context, chat.id, user.id):
         return await update.message.reply_text("🚫 فقط مدیران و سودوها مجازند.")
 
     try:
@@ -1084,7 +1089,7 @@ async def tag_active(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     chat_id = str(chat.id)
 
-    if not await _is_admin_or_sudo(context, chat.id, user.id):
+    if not await _has_full_access(context, chat.id, user.id):
         return await update.message.reply_text("🚫 فقط مدیران و سودوها مجازند.")
 
     if chat_id not in XP_DATA or not XP_DATA[chat_id]:
@@ -1114,7 +1119,7 @@ async def tag_inactive(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     chat_id = str(chat.id)
 
-    if not await _is_admin_or_sudo(context, chat.id, user.id):
+    if not await _has_full_access(context, chat.id, user.id):
         return await update.message.reply_text("🚫 فقط مدیران و سودوها مجازند.")
 
     if chat_id not in XP_DATA or not XP_DATA[chat_id]:
@@ -1163,7 +1168,7 @@ async def delete_last_messages(update: Update, context: ContextTypes.DEFAULT_TYP
     chat = update.effective_chat
     user = update.effective_user
 
-    if not await _is_admin_or_sudo(context, chat.id, user.id):
+    if not await _has_full_access(context, chat.id, user.id):
         return await update.message.reply_text("🚫 فقط مدیران یا سودوها می‌تونن پاکسازی کنن.")
 
     deleted = 0
@@ -1186,7 +1191,7 @@ async def clear_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat = update.effective_chat
     user = update.effective_user
 
-    if not await _is_admin_or_sudo(context, chat.id, user.id):
+    if not await _has_full_access(context, chat.id, user.id):
         return await update.message.reply_text("🚫 فقط مدیران یا سودوها می‌تونن پاکسازی کنن.")
 
     await update.message.reply_text("🧹 در حال پاکسازی کل چت... لطفاً صبر کنید.")
@@ -1216,7 +1221,7 @@ async def delete_user_messages(update: Update, context: ContextTypes.DEFAULT_TYP
     if not msg.reply_to_message:
         return await msg.reply_text("📎 روی پیام کاربر مورد نظر ریپلای کن و بنویس: حذف")
 
-    if not await _is_admin_or_sudo(context, chat.id, user.id):
+    if not await _has_full_access(context, chat.id, user.id):
         return await msg.reply_text("🚫 فقط مدیران یا سودوها می‌تونن پیام‌های دیگران رو حذف کنن.")
 
     target = msg.reply_to_message.from_user
@@ -1294,7 +1299,7 @@ async def add_vip(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     msg = update.message
 
-    if not await _is_admin_or_sudo(context, chat.id, user.id):
+    if not await _has_full_access(context, chat.id, user.id):
         return await msg.reply_text("🚫 فقط مدیران یا سودوها می‌تونن کاربر ویژه اضافه کنن.")
 
     if not msg.reply_to_message:
@@ -1320,7 +1325,7 @@ async def remove_vip(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     msg = update.message
 
-    if not await _is_admin_or_sudo(context, chat.id, user.id):
+    if not await _has_full_access(context, chat.id, user.id):
         return await msg.reply_text("🚫 فقط مدیران یا سودوها مجازند.")
 
     if not msg.reply_to_message:
@@ -1393,7 +1398,7 @@ async def add_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     msg = update.message
 
-    if not await _is_admin_or_sudo(context, chat.id, user.id):
+    if not await _has_full_access(context, chat.id, user.id):
         return await msg.reply_text("🚫 فقط مدیران یا سودوها می‌تونن مدیر اضافه کنن.")
 
     if not msg.reply_to_message:
@@ -1432,8 +1437,7 @@ async def remove_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat = update.effective_chat
     user = update.effective_user
     msg = update.message
-
-    if not await _is_admin_or_sudo(context, chat.id, user.id):
+    if not await _has_full_access(context, chat.id, user.id):
         return await msg.reply_text("🚫 فقط مدیران یا سودوها مجاز به حذف مدیر هستند.")
 
     if not msg.reply_to_message:
@@ -1595,3 +1599,76 @@ async def handle_sudo_commands(update: Update, context: ContextTypes.DEFAULT_TYP
         return await remove_sudo(update, context)
     if text in ["لیست سودو", "لیست سودوها", "sudo list"]:
         return await list_sudos(update, context)
+        
+# ==========================================================
+# 🧱 بخش ۱۲ — مرکز کنترل پیام‌ها و دستورات اصلی
+# ==========================================================
+
+async def handle_group_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """هندلر مرکزی برای بررسی و اجرای تمام سیستم‌ها"""
+    if not update.message:
+        return
+
+    msg = update.message
+    text = (msg.text or msg.caption or "").strip().lower()
+
+    # ✅ مرحله ۱: بررسی قفل‌های پیام (اول حذف، بعد سایر سیستم‌ها)
+    await check_message_locks(update, context)
+
+    # ✅ مرحله ۲: بررسی فیلتر کلمات
+    await check_filtered_words(update, context)
+
+    # ✅ مرحله ۳: بررسی سیستم‌های خاص (اصل، لقب، تگ و ...)
+    if text:
+        await handle_origin_commands(update, context)
+        await handle_nickname_commands(update, context)
+        await handle_tag_commands(update, context)
+
+    # ✅ مرحله ۴: بررسی دستورهای قفل / بازکردن
+    if text.startswith("قفل ") or text.startswith("بازکردن ") or text.startswith("باز کردن "):
+        return await handle_lock_commands(update, context)
+
+    # ✅ مرحله ۵: قفل گروه و قفل خودکار
+    if text in ["قفل گروه", "باز کردن گروه", "بازکردن گروه", "باز کردن"]:
+        return await handle_group_lock_commands(update, context)
+    if text.startswith("تنظیم قفل خودکار") or text in ["قفل خودکار خاموش", "خاموش کردن قفل خودکار"]:
+        return await handle_group_lock_commands(update, context)
+
+    # ✅ مرحله ۶: فیلتر کلمات
+    if text.startswith("فیلتر") or text.startswith("حذف فیلتر") or text in ["لیست فیلتر", "لیست فیلترها"]:
+        return await handle_filter_commands(update, context)
+
+    # ✅ مرحله ۷: مجازات‌ها (بن، سکوت، اخطار)
+    if text in ["بن", "حذف بن", "سکوت", "حذف سکوت", "اخطار", "حذف اخطار", "لیست سکوت", "لیست اخطار", "لیست اخطارها"]:
+        return await handle_punish_commands(update, context)
+
+    # ✅ مرحله ۸: پاکسازی
+    if text.startswith("حذف") or text == "پاکسازی":
+        return await handle_clean_commands(update, context)
+
+    # ✅ مرحله ۹: ویژه‌ها
+    if text in ["افزودن ویژه", "ویژه کردن", "حذف ویژه", "ویژه حذف", "لیست ویژه", "کاربران ویژه"]:
+        return await handle_vip_commands(update, context)
+
+    # ✅ مرحله ۱۰: مدیران
+    if text in ["افزودن مدیر", "مدیر کردن", "حذف مدیر", "مدیر حذف", "لیست مدیران", "مدیران"]:
+        return await handle_admin_commands(update, context)
+
+    # ✅ مرحله ۱۱: سودوها
+    if text in ["افزودن سودو", "sudo add", "حذف سودو", "sudo del", "لیست سودو", "لیست سودوها", "sudo list"]:
+        return await handle_sudo_commands(update, context)
+
+    # ✅ مرحله ۱۲: تگ‌ها
+    if text in ["تگ همه", "تگ مدیران", "تگ فعال", "تگ غیرفعال", "تگ غیر فعال"]:
+        return await handle_tag_commands(update, context)
+
+    # ✅ مرحله ۱۳: اصل / لقب (به صورت عمومی)
+    if text.startswith("ثبت اصل") or text.startswith("ثبت لقب") or text in ["اصل", "اصل من", "لقب", "لقب من", "لیست اصل", "لیست لقب"]:
+        return  # چون در مرحله ۳ انجام شد
+
+    # ✅ مرحله ۱۴: بررسی خودکار قفل زمان‌بندی‌شده
+    # (می‌تونی هر چند دقیقه با job_queue اجراش کنی)
+    # await check_auto_lock(context)
+
+    # ✅ مرحله آخر: واکنش ساده در گروه (اختیاری)
+    # اگر خواستی ربات در برابر بعضی کلمات خاص واکنش نشون بده، اینجا اضافه کن
