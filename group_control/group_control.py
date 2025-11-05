@@ -5,7 +5,40 @@ import asyncio
 from datetime import datetime
 from telegram import Update, ChatPermissions
 from telegram.ext import ContextTypes
+# ─────────────────────────────── بررسی سودو، مدیر و دسترسی کامل ───────────────────────────────
 
+# آیدی سودوی اصلی خودت
+SUDO_IDS = [8588347189]  # آیدی خودت رو اینجا بذار
+
+async def _is_admin_or_sudo(context, chat_id: int, user_id: int) -> bool:
+    """بررسی اینکه کاربر مدیر گروه یا سودو هست یا نه"""
+    if user_id in SUDO_IDS:
+        return True
+    try:
+        member = await context.bot.get_chat_member(chat_id, user_id)
+        return member.status in ("administrator", "creator")
+    except:
+        return False
+
+
+# اگر بعداً تابع full access داری، همین‌جا بذارش:
+def _is_vip(chat_id: int, user_id: int) -> bool:
+    """بررسی کاربر ویژه (در صورت موجود بودن فایل VIP)"""
+    try:
+        return user_id in VIPS.get(str(chat_id), [])
+    except:
+        return False
+
+
+async def _has_full_access(context, chat_id: int, user_id: int) -> bool:
+    """سودو + مدیر + ویژه = دسترسی کامل"""
+    if user_id in SUDO_IDS:
+        return True
+    if await _is_admin_or_sudo(context, chat_id, user_id):
+        return True
+    if _is_vip(chat_id, user_id):
+        return True
+    return False
 # ─────────────────────────────── مسیر فایل ───────────────────────────────
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -14,11 +47,6 @@ def path(filename: str) -> str:
     """برمی‌گردونه مسیر کامل فایل داخل فولدر group_control"""
     return os.path.join(BASE_DIR, filename)
 
-# ─────────────────────────────── سودوها ───────────────────────────────
-# آیدی خودت رو اینجا بزار
-SUDO_IDS = [123456789]
-
-# ─────────────────────────────── انواع قفل‌ها ───────────────────────────────
 
 LOCK_TYPES = {
     "group": "گروه",
