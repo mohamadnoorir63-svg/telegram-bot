@@ -76,7 +76,7 @@ from weather_module.weather_panel import show_weather
 from modules.azan_module import get_azan_time, get_ramadan_status
 from panels.link_panel import link_panel, link_panel_buttons
 from panels.panel_menu import Tastatur_menu, Tastatur_buttons
-
+from group_cleanup.funny_cleanup import register_cleanup_handlers
 from telegram.ext import (
     MessageHandler,
     CallbackQueryHandler,
@@ -2054,6 +2054,11 @@ if __name__ == "__main__":
 
     from group_control.group_control import handle_group_message
 
+    # هندلرهای دستورها (مثل پاکسازی و قفل)
+    register_cleanup_handlers(application)     # ← پاکسازی
+    # (اگه خواستی بعداً یه register_group_control_handlers هم برای قفل‌ها بذار)
+
+    # کنترل پیام‌ها (باید بعد از هندلرهای دستوری بیاد)
     application.add_handler(MessageHandler(filters.ALL, handle_group_message))
     # ==========================================================
     application.add_handler(CommandHandler("addsudo", add_sudo))
