@@ -1151,17 +1151,17 @@ async def handle_group_message(update: Update, context: ContextTypes.DEFAULT_TYP
 
     # ─────────────────────────────── دستورات قفل ───────────────────────────────
     
-if text in ["قفل گروه", "بستن گروه", "بستن"]:
-    return await lock_group(update, context)
+    if text in ["قفل گروه", "بستن گروه", "بستن"]:
+        return await lock_group(update, context)
 
-elif text in ["باز کردن گروه", "باز کردن", "گروه باز"]:
-    return await unlock_group(update, context)
+    elif text in ["باز کردن گروه", "باز کردن", "گروه باز"]:
+        return await unlock_group(update, context)
 
-elif text in ["وضعیت قفل‌ها", "وضعیت قفل", "locks"]:
-    return await handle_locks_status(update, context)
+    elif text in ["وضعیت قفل‌ها", "وضعیت قفل", "locks"]:
+        return await handle_locks_status(update, context)
 
-elif text in ["پنل قفل", "پنل قفل‌ها", "lock panel"]:
-    return await handle_lock_panel(update, context)
+    elif text in ["پنل قفل", "پنل قفل‌ها", "lock panel"]:
+        return await handle_lock_panel(update, context)
     # ─────────────── بررسی قفل‌های فعال ───────────────
     locks = _get_locks(chat.id)
 
