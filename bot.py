@@ -2038,7 +2038,7 @@ if __name__ == "__main__":
             text += f"{i}. <code>{sid}</code>\n"
         await update.message.reply_text(text, parse_mode="HTML")
     # ======================= 🧱 Group Control System (Central Handler) =======================
-    from group_control.group_control import handle_group_message, handle_lock_panel_callback
+    from group_control.group_control import handle_group_message
     from panels.link_panel import link_panel, link_panel_buttons  # 👈 اگه فایل جدا داری
     from telegram.ext import MessageHandler, CallbackQueryHandler, filters
 
