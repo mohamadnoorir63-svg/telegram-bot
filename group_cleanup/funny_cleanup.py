@@ -74,6 +74,7 @@ async def _delete_by_user_from_buffer(context, chat_id: int, user_id: int) -> in
     return deleted
 
 # ================== 🧹 دستور اصلی ==================
+# ================== 🧹 دستور اصلی ==================
 async def funny_cleanup(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat = update.effective_chat
     msg = update.effective_message
@@ -90,8 +91,13 @@ async def funny_cleanup(update: Update, context: ContextTypes.DEFAULT_TYPE):
     deleted = 0
     action_type = "نامشخص"
 
+    # 🧼 پاکسازی کامل (باید قبل از پاک/حذف بیاد)
+    if text in ("پاکسازی", "clean"):
+        deleted = await _delete_all_messages(context, chat.id, msg.message_id)
+        action_type = "🧼 پاکسازی کامل از اولین تا آخرین پیام"
+
     # 🧑‍💻 ریپلای → حذف پیام‌های فرد خاص
-    if msg.reply_to_message and (text.startswith("پاک") or text.startswith("حذف")):
+    elif msg.reply_to_message and (text.startswith("پاک") or text.startswith("حذف")):
         target = msg.reply_to_message.from_user
         deleted = await _delete_by_user_from_buffer(context, chat.id, target.id)
         action_type = f"🧑‍💻 حذف پیام‌های {target.first_name}"
@@ -106,21 +112,15 @@ async def funny_cleanup(update: Update, context: ContextTypes.DEFAULT_TYPE):
         deleted = await _delete_last_n(context, chat.id, msg.message_id, n)
         action_type = f"🧹 حذف عددی {n} پیام"
 
-    # 🧼 پاکسازی کامل
-    elif text in ("پاکسازی", "clean"):
-        deleted = await _delete_all_messages(context, chat.id, msg.message_id)
-        action_type = "🧼 پاکسازی کامل از اولین تا آخرین پیام"
-
     else:
         return
 
-    # حذف پیام دستور
+    # حذف خود دستور
     try:
         await msg.delete()
     except:
         pass
 
-    # گزارش
     await asyncio.sleep(0.8)
     time_now = datetime.now().strftime("%H:%M:%S")
     report = (
