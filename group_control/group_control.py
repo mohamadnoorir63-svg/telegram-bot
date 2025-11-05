@@ -5,15 +5,7 @@ import asyncio
 from datetime import datetime
 from telegram import Update, ChatPermissions
 from telegram.ext import ContextTypes
-from collections import deque
 
-# لاگ پیام‌ها: برای هر چت یک صف محدود
-MESSAGE_LOG: dict[str, deque] = {}
-MAX_LOG_PER_CHAT = 2000  # حداکثر پیام‌هایی که برای هر چت نگه می‌داریم
-
-# تاخیرهای حذف
-MAX_DELETE = 1000
-DELETE_DELAY = 0.05
 # ─────────────────────────────── بررسی سودو، مدیر و دسترسی کامل ───────────────────────────────
 
 # آیدی سودوی اصلی خودت
@@ -1193,160 +1185,124 @@ async def handle_tag_commands(update: Update, context: ContextTypes.DEFAULT_TYPE
         return await tag_inactive(update, context)
         
 # ─────────────────────────────── ثبت پیام‌ها ───────────────────────────────
+import asyncio
+from collections import deque
+from telegram import Update
+from telegram.ext import ContextTypes
+
+# ─────────────────────────────── تنظیمات عمومی ───────────────────────────────
+MESSAGE_LOG: dict[str, deque] = {}  # ذخیره پیام‌ها در حافظه
+MAX_LOG_PER_CHAT = 2000             # حداکثر پیام‌های ذخیره‌شده برای هر گروه
+MAX_DELETE = 1000                   # بیشترین پیام‌هایی که پاک می‌کنیم
+DELETE_DELAY = 0.05                 # تاخیر بین حذف پیام‌ها
+
+# ─────────────────────────────── ثبت پیام‌ها ───────────────────────────────
 def _log_message(update: Update):
-    """ثبت پیام‌ها برای قابلیت پاکسازی (در حافظه)"""
+    """هر پیام را در حافظه لاگ می‌کند برای قابلیت پاکسازی بعداً"""
     if not update.message:
         return
+
     chat_id = str(update.effective_chat.id)
-    msg = update.message
-    entry = {
-        "message_id": msg.message_id,
-        "user_id": msg.from_user.id if msg.from_user else None,
-    }
+    msg_id = update.message.message_id
+    user_id = update.effective_user.id if update.effective_user else None
+
     if chat_id not in MESSAGE_LOG:
         MESSAGE_LOG[chat_id] = deque(maxlen=MAX_LOG_PER_CHAT)
-    MESSAGE_LOG[chat_id].append(entry)
 
-# در ابتدای handle_group_message این را اضافه کن:
-# _log_message(update)
+    MESSAGE_LOG[chat_id].append({
+        "msg_id": msg_id,
+        "user_id": user_id
+    })
 
-# ─────────────────────────────── حذف پیام‌های آخر ───────────────────────────────
-async def delete_last_messages(update: Update, context: ContextTypes.DEFAULT_TYPE, count: int):
-    """حذف n پیام آخر (بر اساس لاگ محلی)"""
-    chat = update.effective_chat
-    user = update.effective_user
-    chat_id = str(chat.id)
-
-    if not await _has_full_access(context, chat.id, user.id):
-        return await update.message.reply_text("🚫 فقط مدیران یا سودوها می‌تونن پاکسازی کنن.")
-
-    if count <= 0:
-        return await update.message.reply_text("⚠️ عدد باید مثبت باشد.")
-
-    entries = list(MESSAGE_LOG.get(chat_id, []))
-    if not entries:
-        return await update.message.reply_text("ℹ️ هیچ پیامی در لاگ موجود نیست.")
-
-    to_delete = [e["message_id"] for e in reversed(entries)][:count]
-
-    deleted = 0
-    for mid in to_delete:
-        try:
-            await context.bot.delete_message(chat.id, mid)
-            deleted += 1
-            await asyncio.sleep(DELETE_DELAY)
-        except Exception:
-            continue
-
-    if deleted:
-        kept = [e for e in MESSAGE_LOG[chat_id] if e["message_id"] not in set(to_delete)]
-        MESSAGE_LOG[chat_id] = deque(kept, maxlen=MAX_LOG_PER_CHAT)
-
-    await update.message.reply_text(f"🧹 {deleted} پیام حذف شد.", parse_mode="HTML")
+# ─────────────────────────────── بررسی دسترسی مدیر / سودو ───────────────────────────────
+async def _has_full_access(context, chat_id: int, user_id: int) -> bool:
+    """بررسی دسترسی مدیر، سودو یا کاربر ویژه"""
+    try:
+        member = await context.bot.get_chat_member(chat_id, user_id)
+        return member.status in ("administrator", "creator")
+    except:
+        return False
 
 # ─────────────────────────────── پاکسازی کل چت ───────────────────────────────
 async def clear_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """پاکسازی کل چت تا سقف پیام‌های ذخیره‌شده"""
+    """پاکسازی کل چت (فقط برای مدیران یا سودوها)"""
     chat = update.effective_chat
     user = update.effective_user
-    chat_id = str(chat.id)
 
     if not await _has_full_access(context, chat.id, user.id):
-        return await update.message.reply_text("🚫 فقط مدیران یا سودوها می‌تونن پاکسازی کنن.")
+        return await update.message.reply_text("🚫 فقط مدیران یا سودوها مجازند.")
 
     await update.message.reply_text("🧹 در حال پاکسازی کل چت...")
 
-    entries = list(MESSAGE_LOG.get(chat_id, []))
-    if not entries:
+    chat_id = str(chat.id)
+    deleted = 0
+
+    if chat_id not in MESSAGE_LOG or not MESSAGE_LOG[chat_id]:
         return await update.message.reply_text("ℹ️ چیزی برای حذف در لاگ وجود ندارد.")
 
-    to_delete = [e["message_id"] for e in reversed(entries)][:MAX_DELETE]
-
-    deleted = 0
-    for mid in to_delete:
+    for item in list(MESSAGE_LOG[chat_id])[-MAX_DELETE:]:
         try:
-            await context.bot.delete_message(chat.id, mid)
+            await context.bot.delete_message(chat.id, item["msg_id"])
             deleted += 1
             await asyncio.sleep(DELETE_DELAY)
-        except Exception:
+        except:
             continue
 
-    if deleted:
-        kept = [e for e in MESSAGE_LOG[chat_id] if e["message_id"] not in set(to_delete)]
-        MESSAGE_LOG[chat_id] = deque(kept, maxlen=MAX_LOG_PER_CHAT)
+    MESSAGE_LOG[chat_id].clear()
+    await update.message.reply_text(f"✅ پاکسازی انجام شد ({deleted} پیام حذف شد).")
 
-    await update.message.reply_text(f"✅ پاکسازی انجام شد ({deleted} پیام حذف شد).", parse_mode="HTML")
-
-# ─────────────────────────────── حذف پیام‌های کاربر خاص ───────────────────────────────
+# ─────────────────────────────── حذف پیام‌های یک کاربر ───────────────────────────────
 async def delete_user_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """حذف پیام‌های اخیر یک کاربر خاص (با ریپلای)"""
+    """حذف پیام‌های اخیر یک کاربر با ریپلای روی پیام او"""
     chat = update.effective_chat
     user = update.effective_user
     msg = update.message
-    chat_id = str(chat.id)
 
     if not msg.reply_to_message:
         return await msg.reply_text("📎 روی پیام کاربر مورد نظر ریپلای کن و بنویس: حذف")
 
     if not await _has_full_access(context, chat.id, user.id):
-        return await msg.reply_text("🚫 فقط مدیران یا سودوها می‌تونن پیام‌های دیگران رو حذف کنن.")
+        return await msg.reply_text("🚫 فقط مدیران یا سودوها می‌تونن پیام دیگران رو حذف کنن.")
 
     target = msg.reply_to_message.from_user
     target_id = target.id
-
-    entries = list(MESSAGE_LOG.get(chat_id, []))
-    if not entries:
-        return await msg.reply_text("ℹ️ هیچ پیام ثبت‌شده‌ای از این کاربر پیدا نشد.")
-
-    user_msgs = [e["message_id"] for e in reversed(entries) if e["user_id"] == target_id][:MAX_DELETE]
-    if not user_msgs:
-        return await msg.reply_text("ℹ️ پیام اخیر قابل حذفی از این کاربر در لاگ پیدا نشد.")
+    deleted = 0
+    chat_id = str(chat.id)
 
     await msg.reply_text(f"🧹 در حال حذف پیام‌های اخیر <b>{target.first_name}</b>...", parse_mode="HTML")
 
-    deleted = 0
-    for mid in user_msgs:
-        try:
-            await context.bot.delete_message(chat.id, mid)
-            deleted += 1
-            await asyncio.sleep(DELETE_DELAY)
-        except Exception:
-            continue
+    if chat_id not in MESSAGE_LOG or not MESSAGE_LOG[chat_id]:
+        return await msg.reply_text("ℹ️ هیچ پیام ثبت‌شده‌ای از این کاربر پیدا نشد.")
 
-    if deleted:
-        kept = [e for e in MESSAGE_LOG[chat_id] if e["message_id"] not in set(user_msgs)]
-        MESSAGE_LOG[chat_id] = deque(kept, maxlen=MAX_LOG_PER_CHAT)
+    for item in list(MESSAGE_LOG[chat_id]):
+        if item["user_id"] == target_id:
+            try:
+                await context.bot.delete_message(chat.id, item["msg_id"])
+                deleted += 1
+                await asyncio.sleep(DELETE_DELAY)
+            except:
+                continue
 
-    await context.bot.send_message(
-        chat.id,
-        f"✅ پیام‌های <b>{target.first_name}</b> حذف شد ({deleted} پیام).",
-        parse_mode="HTML"
-    )
+    await context.bot.send_message(chat.id, f"✅ پیام‌های <b>{target.first_name}</b> حذف شد ({deleted} پیام).", parse_mode="HTML")
 
-# ─────────────────────────────── کنترل دستورات ───────────────────────────────
+# ─────────────────────────────── تشخیص دستور پاکسازی ───────────────────────────────
 async def handle_clean_commands(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """تشخیص دستورات پاکسازی"""
+    """تشخیص دستورهای پاکسازی"""
     text = (update.message.text or "").strip().lower()
 
-    # پاکسازی کامل
     if text == "پاکسازی":
         return await clear_chat(update, context)
 
-    # حذف عددی
+    if text == "حذف" and update.message.reply_to_message:
+        return await delete_user_messages(update, context)
+
     if text.startswith("حذف "):
         try:
             count = int(text.split()[1])
-            if count <= 0:
-                return await update.message.reply_text("⚠️ عدد باید مثبت باشد.")
-            if count > MAX_DELETE:
-                count = MAX_DELETE
             return await delete_last_messages(update, context, count)
-        except (IndexError, ValueError):
+        except:
             return await update.message.reply_text("📘 مثال: <code>حذف 50</code>", parse_mode="HTML")
-
-    # حذف پیام‌های یک کاربر خاص (با ریپلای)
-    if text == "حذف" and update.message.reply_to_message:
-        return await delete_user_messages(update, context)
+    
 
         # ==========================================================
 # 🧱 بخش ۹ — سیستم کاربران ویژه (VIP System)
