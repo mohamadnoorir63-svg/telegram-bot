@@ -4,7 +4,7 @@ import os
 import random
 from datetime import datetime
 from urllib.parse import urlparse
-from telegram import Update, InputFile
+from telegram import Update
 from telegram.ext import ContextTypes
 
 # ========================= مسیرها و آماده‌سازی =========================
@@ -108,9 +108,9 @@ async def save_fortune(update: Update):
     except Exception as e:
         await update.message.reply_text(f"⚠️ خطا در ذخیره فال: {e}")
 
-
-# ========================= حذف فال =========================
+# ========================= حذف فال (هماهنگ با لیست و پیام‌های ربات) =========================
 async def delete_fortune(update: Update):
+    """با ریپلای روی فال موردنظر، آن را از فایل حذف می‌کند (پشتیبانی از متن، عکس، ویدیو، استیکر و پیام‌های ربات)."""
     reply = update.message.reply_to_message
     if not reply:
         return await update.message.reply_text("❗ لطفاً روی پیام فال ریپلای کن تا حذف شود.")
@@ -130,11 +130,8 @@ async def delete_fortune(update: Update):
                 save_fortunes(data)
                 val = _abs_media_path(deleted.get("value", ""))
                 if os.path.exists(val) and not _is_valid_url(val):
-                    try:
-                        os.remove(val)
-                    except Exception as e:
-                        print(f"[Delete Fortune Warning] حذف فایل شکست خورد: {e}")
-                return await update.message.reply_text(f"🗑️ فال شماره {num} حذف شد ✅")
+                    os.remove(val)
+                return await update.message.reply_text(f"🗑️ فال شماره {num} با موفقیت حذف شد ✅")
         except Exception as e:
             print(f"[Delete Fortune Error] {e}")
 
@@ -146,11 +143,8 @@ async def delete_fortune(update: Update):
                 save_fortunes(data)
                 val = _abs_media_path(deleted.get("value", ""))
                 if os.path.exists(val) and not _is_valid_url(val):
-                    try:
-                        os.remove(val)
-                    except Exception as e:
-                        print(f"[Delete Fortune Warning] حذف فایل شکست خورد: {e}")
-                return await update.message.reply_text(f"🗑️ فال شماره {num} حذف شد ✅")
+                    os.remove(val)
+                return await update.message.reply_text(f"🗑️ فال شماره {num} با موفقیت حذف شد ✅")
         except Exception as e:
             print(f"[Delete Fortune Error] {e}")
 
@@ -169,34 +163,28 @@ async def delete_fortune(update: Update):
     key_to_delete = None
     for k, v in data.items():
         if v.get("type") == delete_type:
-            val_path = _abs_media_path(v.get("value", ""))
-            if os.path.exists(val_path) and not _is_valid_url(val_path):
-                base_name = os.path.basename(val_path)
-                if any(match in base_name or match == v.get("value") for match in delete_match_values):
-                    key_to_delete = k
-                    break
+            if v.get("value") in delete_match_values:
+                key_to_delete = k
+                break
 
     if key_to_delete:
         deleted = data.pop(key_to_delete)
         save_fortunes(data)
         val = _abs_media_path(deleted.get("value", ""))
         if os.path.exists(val) and not _is_valid_url(val):
-            try:
-                os.remove(val)
-            except Exception as e:
-                print(f"[Delete Fortune Warning] حذف فایل شکست خورد: {e}")
+            os.remove(val)
         await update.message.reply_text("🗑️ فال با موفقیت حذف شد ✅")
     else:
         await update.message.reply_text("⚠️ فال موردنظر در فایل پیدا نشد.")
 
-
-# ========================= ارسال فال تصادفی =========================
+# ========================= ارسال فال تصادفی (بدون تکرار) =========================
 async def send_random_fortune(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data = load_fortunes()
     if not data:
         return await update.message.reply_text("📭 هنوز فالی ذخیره نشده 😔")
 
     sent_state_file = os.path.join(BASE_DIR, "sent_fortunes.json")
+
     if os.path.exists(sent_state_file):
         try:
             with open(sent_state_file, "r", encoding="utf-8") as f:
@@ -207,9 +195,10 @@ async def send_random_fortune(update: Update, context: ContextTypes.DEFAULT_TYPE
         sent_keys = []
 
     all_keys = list(data.keys())
+
     if len(sent_keys) >= len(all_keys):
         sent_keys = []
-        print("♻️ لیست ارسال فال‌ها ریست شد (همه ارسال شده بودند).")
+        print("♻️ لیست ارسال فال‌ها ریست شد.")
 
     remaining_keys = [k for k in all_keys if k not in sent_keys]
     if not remaining_keys:
@@ -218,6 +207,7 @@ async def send_random_fortune(update: Update, context: ContextTypes.DEFAULT_TYPE
     random.shuffle(remaining_keys)
     k = remaining_keys.pop()
     sent_keys.append(k)
+
     with open(sent_state_file, "w", encoding="utf-8") as f:
         json.dump(sent_keys, f, ensure_ascii=False, indent=2)
 
@@ -225,17 +215,13 @@ async def send_random_fortune(update: Update, context: ContextTypes.DEFAULT_TYPE
     t = v.get("type", "text").strip()
     raw = (v.get("value") or "").strip()
     if not raw:
-        return await update.message.reply_text("⚠️ فال نامعتبر یا خالی بود، مورد بعدی...")
+        return await update.message.reply_text("⚠️ فال نامعتبر یا خالی بود.")
 
     val = _abs_media_path(raw)
 
-    # ✅ بررسی وجود فایل محلی
-    if t in ("photo", "video", "sticker") and not _is_valid_url(val):
-        if not os.path.exists(val):
-            print(f"[Missing File] فال {k} پیدا نشد: {val}")
-            del data[k]
-            save_fortunes(data)
-            return await update.message.reply_text("⚠️ فایل فال پیدا نشد، مورد بعدی امتحان می‌شود.")
+    # ✅ مسیر مطلق برای فایل‌های لوکال
+    if not _is_valid_url(val) and not val.startswith("/"):
+        val = os.path.join(BASE_DIR, val)
 
     try:
         if t == "text":
@@ -251,7 +237,6 @@ async def send_random_fortune(update: Update, context: ContextTypes.DEFAULT_TYPE
     except Exception as e:
         print(f"[Fortune Error] id={k} type={t} err={e}")
         await update.message.reply_text("⚠️ خطا در ارسال فال. مورد بعدی امتحان می‌شود.")
-
 
 # ========================= لیست فال‌ها =========================
 async def list_fortunes(update: Update):
@@ -270,13 +255,9 @@ async def list_fortunes(update: Update):
         t = v.get("type", "text")
         val = _abs_media_path(v.get("value", ""))
 
-        # ✅ بررسی وجود فایل قبل از ارسال
-        if t in ("photo", "video", "sticker") and not _is_valid_url(val):
-            if not os.path.exists(val):
-                print(f"[List Missing File] فال {k} حذف شده: {val}")
-                del data[k]
-                save_fortunes(data)
-                continue
+        # ✅ مسیر مطلق برای فایل‌های لوکال
+        if not _is_valid_url(val) and not val.startswith("/"):
+            val = os.path.join(BASE_DIR, val)
 
         try:
             if t == "text":
@@ -296,7 +277,5 @@ async def list_fortunes(update: Update):
     if shown == 0:
         await update.message.reply_text("⚠️ هیچ فالی برای نمایش پیدا نشد (ممکنه فایل‌ها حذف شده باشن).")
     else:
-        await update.message.reply_text(
-            f"✅ {shown} فال آخر نمایش داده شد.\n\n"
-            "برای حذف، روی فال دلخواه ریپلای بزن و بنویس: حذف فال 🗑️"
-        )
+        await update.message.reply_text(f"✅ {shown} فال آخر نمایش داده شد.\n\n"
+                                        "برای حذف، روی فال دلخواه ریپلای بزن و بنویس: حذف فال 🗑️")
