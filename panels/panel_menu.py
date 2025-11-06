@@ -163,7 +163,6 @@ HELP_TEXTS = {
         "<code>تگ فعال</code>"
     ),
 }
-
 async def show_help_info(query):
     data = query.data  # مثلاً help_addadmin یا help_filter
     key = data.strip()
@@ -173,7 +172,7 @@ async def show_help_info(query):
 
     text = HELP_TEXTS[key]
     keyboard = [[InlineKeyboardButton("🔙 بازگشت", callback_data="Tastatur_settings")]]
-    await query.edit_message_text(
+    return await query.edit_message_text(  # ⬅️ حتماً return داشته باشه
         text, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(keyboard)
     )
 
