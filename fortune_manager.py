@@ -6,7 +6,7 @@ from datetime import datetime
 from urllib.parse import urlparse
 from telegram import Update
 from telegram.ext import ContextTypes
-
+from telegram import InputFile
 # ========================= مسیرها و آماده‌سازی =========================
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 FORTUNE_FILE = os.path.join(BASE_DIR, "fortunes.json")
@@ -177,7 +177,7 @@ async def delete_fortune(update: Update):
     else:
         await update.message.reply_text("⚠️ فال موردنظر در فایل پیدا نشد.")
    
-  from telegram import InputFile
+  
 
 # ========================= ارسال فال تصادفی (بدون تکرار) =========================
 async def send_random_fortune(update: Update, context: ContextTypes.DEFAULT_TYPE):
