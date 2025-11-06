@@ -165,13 +165,15 @@ HELP_TEXTS = {
 }
 
 async def show_help_info(query):
-    key = query.data
+    data = query.data  # مثلاً help_addadmin یا help_filter
+    key = data.strip()
+
     if key not in HELP_TEXTS:
-        return await query.answer("دستور یافت نشد ⚠️", show_alert=True)
+        return await query.answer("❌ هنوز برای این گزینه راهنما تعریف نشده", show_alert=True)
 
     text = HELP_TEXTS[key]
     keyboard = [[InlineKeyboardButton("🔙 بازگشت", callback_data="Tastatur_settings")]]
-    return await query.edit_message_text(
+    await query.edit_message_text(
         text, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(keyboard)
     )
 
