@@ -2080,6 +2080,10 @@ application.add_handler(
 from group_control.punishments import register_punishment_handlers
 register_punishment_handlers(application, group_number=11)
 
+# 📌 پن / حذف پن
+from group_control.pin_message import register_pin_handlers
+register_pin_handlers(application, group_number=11)
+
 # ==========================================================
 # 👑 مدیریت سودوها
 # ==========================================================
