@@ -1,4 +1,4 @@
-# ====================== 🌟 پنل مدیریت ربات (کامل و نهایی) ======================
+# ====================== 🌟 پنل مدیریت ربات (نهایی بدون ارسال دستور) ======================
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 from group_control.group_control import (
@@ -65,10 +65,6 @@ async def Tastatur_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # تنظیمات جزئی و راهنما
     if data.startswith("help_"):
         return await show_help_info(query)
-    if data.startswith("exec_"):
-        cmd = data.split("_", 1)[1]
-        await query.message.reply_text(cmd)
-        return
 
     # قفل‌ها
     if data == "Tastatur_locks":
@@ -183,25 +179,7 @@ async def show_help_info(query):
         return await query.answer("❌ هنوز برای این گزینه راهنما تعریف نشده", show_alert=True)
 
     text = HELP_TEXTS[data]
-
-    example_map = {
-        "help_addadmin": "افزودن مدیر",
-        "help_pin": "پن",
-        "help_filter": "فیلتر تست",
-        "help_clean": "پاکسازی 50",
-        "help_asl": "ثبت اصل من اهل صداقتم",
-        "help_laqab": "ثبت لقب قهرمان",
-        "help_tag": "تگ همه",
-    }
-    example = example_map.get(data, None)
-
-    buttons = [
-        [InlineKeyboardButton("🔙 بازگشت", callback_data="Tastatur_settings")]
-    ]
-    if example:
-        buttons.insert(0, [
-            InlineKeyboardButton("📎 ارسال دستور به گروه", callback_data=f"exec_{example}")
-        ])
+    buttons = [[InlineKeyboardButton("🔙 بازگشت", callback_data="Tastatur_settings")]]
 
     await query.edit_message_text(
         text, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(buttons)
