@@ -122,12 +122,10 @@ async def save_fortune(update: Update):
         else:
             return await update.message.reply_text("⚠️ فقط متن، عکس، ویدیو یا استیکر پشتیبانی می‌شود.")
 
-        # جلوگیری از تکراری بودن فال
         for v in data.values():
             if v.get("type") == entry["type"] and v.get("value") == entry["value"]:
                 return await update.message.reply_text("😅 این فال قبلاً ذخیره شده بود!")
 
-        # ذخیره با کلید یکتا
         key = get_next_fortune_key(data)
         data[key] = entry
         save_fortunes(data)
@@ -135,6 +133,52 @@ async def save_fortune(update: Update):
 
     except Exception as e:
         await update.message.reply_text(f"⚠️ خطا در ذخیره فال: {e}")
+
+# ========================= حذف فال =========================
+async def delete_fortune(update: Update):
+    reply = update.message.reply_to_message
+    if not reply:
+        return await update.message.reply_text("❗ لطفاً روی پیام فال ریپلای کن تا حذف شود.")
+
+    data = load_fortunes()
+    if not data:
+        return await update.message.reply_text("📂 هیچ فالی برای حذف وجود ندارد.")
+
+    delete_type = None
+    delete_match_value = None
+
+    if reply.text or reply.caption:
+        delete_type = "text"
+        delete_match_value = (reply.text or reply.caption).strip()
+    elif reply.photo:
+        delete_type = "photo"
+    elif reply.video:
+        delete_type = "video"
+    elif reply.sticker:
+        delete_type = "sticker"
+    else:
+        return await update.message.reply_text("⚠️ نوع فال قابل شناسایی نیست.")
+
+    key_to_delete = None
+    for k, v in data.items():
+        if v.get("type") == delete_type:
+            if delete_type == "text":
+                if v.get("value") == delete_match_value:
+                    key_to_delete = k
+                    break
+            else:
+                key_to_delete = k
+                break
+
+    if key_to_delete:
+        deleted = data.pop(key_to_delete)
+        save_fortunes(data)
+        val = _abs_media_path(deleted.get("value", ""))
+        if os.path.exists(val) and not _is_valid_url(val):
+            os.remove(val)
+        await update.message.reply_text("🗑️ فال با موفقیت حذف شد ✅")
+    else:
+        await update.message.reply_text("⚠️ فال موردنظر در فایل پیدا نشد.")
 
 # ========================= ارسال فال تصادفی بدون تکرار =========================
 async def send_random_fortune(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -201,5 +245,3 @@ async def list_fortunes(update: Update):
     else:
         await update.message.reply_text(
             f"✅ {shown} فال آخر نمایش داده شد.\n\n"
-            "برای حذف، روی فال دلخواه ریپلای بزن و بنویس: حذف فال 🗑️"
-        )
