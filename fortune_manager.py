@@ -176,8 +176,8 @@ async def delete_fortune(update: Update):
         await update.message.reply_text("🗑️ فال با موفقیت حذف شد ✅")
     else:
         await update.message.reply_text("⚠️ فال موردنظر در فایل پیدا نشد.")
-
-# ========================= ارسال فال تصادفی (بدون تکرار) =========================
+   
+  # ========================= ارسال فال تصادفی (بدون تکرار) =========================
 async def send_random_fortune(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data = load_fortunes()
     if not data:
@@ -220,23 +220,36 @@ async def send_random_fortune(update: Update, context: ContextTypes.DEFAULT_TYPE
     val = _abs_media_path(raw)
 
     # ✅ مسیر مطلق برای فایل‌های لوکال
-    if not _is_valid_url(val) and not val.startswith("/"):
+    if not _is_valid_url(val) and not os.path.isabs(val):
         val = os.path.join(BASE_DIR, val)
 
     try:
         if t == "text":
             await update.message.reply_text(f"🔮 {raw}")
         elif t == "photo":
-            await update.message.reply_photo(photo=val, caption=f"🔮 فال شماره {k}")
+            if _is_valid_url(val):
+                await update.message.reply_photo(photo=val, caption=f"🔮 فال شماره {k}")
+            else:
+                with open(val, "rb") as f:
+                    await update.message.reply_photo(photo=f, caption=f"🔮 فال شماره {k}")
         elif t == "video":
-            await update.message.reply_video(video=val, caption=f"🎥 فال شماره {k}")
+            if _is_valid_url(val):
+                await update.message.reply_video(video=val, caption=f"🎥 فال شماره {k}")
+            else:
+                with open(val, "rb") as f:
+                    await update.message.reply_video(video=f, caption=f"🎥 فال شماره {k}")
         elif t == "sticker":
-            await update.message.reply_sticker(sticker=val)
+            if _is_valid_url(val):
+                await update.message.reply_sticker(sticker=val)
+            else:
+                with open(val, "rb") as f:
+                    await update.message.reply_sticker(sticker=f)
         else:
             await update.message.reply_text("⚠️ نوع فایل پشتیبانی نمی‌شود.")
     except Exception as e:
         print(f"[Fortune Error] id={k} type={t} err={e}")
         await update.message.reply_text("⚠️ خطا در ارسال فال. مورد بعدی امتحان می‌شود.")
+
 
 # ========================= لیست فال‌ها =========================
 async def list_fortunes(update: Update):
@@ -256,19 +269,31 @@ async def list_fortunes(update: Update):
         val = _abs_media_path(v.get("value", ""))
 
         # ✅ مسیر مطلق برای فایل‌های لوکال
-        if not _is_valid_url(val) and not val.startswith("/"):
+        if not _is_valid_url(val) and not os.path.isabs(val):
             val = os.path.join(BASE_DIR, val)
 
         try:
             if t == "text":
                 await update.message.reply_text(f"🔮 فال شماره {k}\n{v.get('value')}")
             elif t == "photo":
-                await update.message.reply_photo(photo=val, caption=f"🔮 فال شماره {k}")
+                if _is_valid_url(val):
+                    await update.message.reply_photo(photo=val, caption=f"🔮 فال شماره {k}")
+                else:
+                    with open(val, "rb") as f:
+                        await update.message.reply_photo(photo=f, caption=f"🔮 فال شماره {k}")
             elif t == "video":
-                await update.message.reply_video(video=val, caption=f"🎥 فال شماره {k}")
+                if _is_valid_url(val):
+                    await update.message.reply_video(video=val, caption=f"🎥 فال شماره {k}")
+                else:
+                    with open(val, "rb") as f:
+                        await update.message.reply_video(video=f, caption=f"🎥 فال شماره {k}")
             elif t == "sticker":
                 await update.message.reply_text(f"🔮 فال شماره {k} (استیکر)")
-                await update.message.reply_sticker(sticker=val)
+                if _is_valid_url(val):
+                    await update.message.reply_sticker(sticker=val)
+                else:
+                    with open(val, "rb") as f:
+                        await update.message.reply_sticker(sticker=f)
             shown += 1
         except Exception as e:
             print(f"[Fortune List Error] id={k} err={e}")
@@ -279,3 +304,4 @@ async def list_fortunes(update: Update):
     else:
         await update.message.reply_text(f"✅ {shown} فال آخر نمایش داده شد.\n\n"
                                         "برای حذف، روی فال دلخواه ریپلای بزن و بنویس: حذف فال 🗑️")
+        
