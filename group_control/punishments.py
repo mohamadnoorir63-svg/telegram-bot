@@ -43,7 +43,7 @@ async def _has_access(context, chat_id: int, user_id: int) -> bool:
         return False
 
 
-# ================= 🚫 بن / 🤐 سکوت / ⚠️ اخطار =================
+# ================= ⚙️ مدیریت دستورات و تنبیه‌ها =================
 async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = update.effective_message
     user = update.effective_user
@@ -56,7 +56,11 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
     if not text:
         return
 
-    # ---- افزودن alias جدید ----
+    # بارگذاری فایل alias
+    aliases_all = _load_json(ALIAS_FILE)
+    aliases = aliases_all.get(str(chat.id), {})
+
+    # ---- افزودن دستور جدید ----
     if text.startswith("افزودن دستور"):
         if not await _has_access(context, chat.id, user.id):
             return await msg.reply_text("🚫 فقط مدیران یا سودوها می‌تونن دستور اضافه کنن.")
@@ -67,7 +71,7 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
                 "📘 فرمت درست:\n"
                 "<code>افزودن دستور [نام] [نوع دستور] [متن پاسخ]</code>\n\n"
                 "مثال:\n"
-                "<code>افزودن دستور سیک بن 😡 {name} از گروه اخراج شد!</code>",
+                "<code>افزودن دستور بپر بن 🚀 {name} از گروه پرت شد بیرون!</code>",
                 parse_mode="HTML"
             )
 
@@ -75,14 +79,44 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
         base_cmd = match.group(2).strip()
         response = match.group(3).strip()
 
-        data = _load_json(ALIAS_FILE)
-        data[name] = {"type": base_cmd, "text": response}
-        _save_json(ALIAS_FILE, data)
+        if name in aliases:
+            return await msg.reply_text("⚠️ این نام از قبل وجود دارد، ابتدا حذفش کن.")
 
-        return await msg.reply_text(f"✅ دستور جدید با نام <b>{name}</b> ساخته شد.", parse_mode="HTML")
+        aliases[name] = {"type": base_cmd, "text": response}
+        aliases_all[str(chat.id)] = aliases
+        _save_json(ALIAS_FILE, aliases_all)
+
+        return await msg.reply_text(f"✅ دستور جدید با نام <b>{name}</b> برای این گروه ساخته شد.", parse_mode="HTML")
+
+    # ---- حذف دستور ----
+    if text.startswith("حذف دستور"):
+        if not await _has_access(context, chat.id, user.id):
+            return await msg.reply_text("🚫 فقط مدیران یا سودوها مجازند.")
+
+        parts = text.split(" ", 2)
+        if len(parts) < 3:
+            return await msg.reply_text("📘 فرمت: <code>حذف دستور [نام]</code>", parse_mode="HTML")
+
+        name = parts[2].strip()
+        if name not in aliases:
+            return await msg.reply_text("❌ چنین دستوری در این گروه وجود ندارد.")
+
+        del aliases[name]
+        aliases_all[str(chat.id)] = aliases
+        _save_json(ALIAS_FILE, aliases_all)
+
+        return await msg.reply_text(f"🗑 دستور <b>{name}</b> حذف شد.", parse_mode="HTML")
+
+    # ---- لیست دستور ها ----
+    if text == "لیست دستور ها":
+        if not aliases:
+            return await msg.reply_text("ℹ️ هنوز هیچ دستوری در این گروه ساخته نشده.")
+        txt = "📜 <b>دستورات سفارشی این گروه:</b>\n\n"
+        for name, data in aliases.items():
+            txt += f"🔹 <b>{name}</b> → {data['type']}\n"
+        return await msg.reply_text(txt, parse_mode="HTML")
 
     # ---- اجرای alias ----
-    aliases = _load_json(ALIAS_FILE)
     if text in aliases:
         alias_info = aliases[text]
         cmd_type = alias_info["type"]
@@ -132,7 +166,7 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
         except Exception as e:
             return await msg.reply_text(f"⚠️ خطا در اجرای دستور: {e}")
 
-    # ---- دستورات پیش‌فرض ----
+    # ---- دستورات اصلی ----
     need_reply = ["بن", "حذف بن", "سکوت", "حذف سکوت", "اخطار", "حذف اخطار"]
     if text in need_reply and not msg.reply_to_message:
         return await msg.reply_text("⚠️ باید روی پیام کاربر ریپلای کنی.")
@@ -236,7 +270,7 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
 # ================= 🔧 ثبت هندلر =================
 def register_punishment_handlers(application, group_number: int = 12):
-    """ثبت هندلر دستورات تنبیه و سفارشی"""
+    """ثبت هندلر دستورات تنبیه و سفارشی (گروهی)"""
     application.add_handler(
         MessageHandler(
             filters.TEXT & ~filters.COMMAND & filters.ChatType.GROUPS,
