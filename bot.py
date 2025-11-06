@@ -2072,7 +2072,7 @@ if __name__ == "__main__":
         group=10
     )
     from group_control.punishments import register_punishment_handlers
-    register_punishment_handlers(application, group_number=10)
+    register_punishment_handlers(application, group_number=10)  # یا هر گروهی که می‌خوای
     # ==========================================================
     application.add_handler(CommandHandler("addsudo", add_sudo))
     application.add_handler(CommandHandler("delsudo", del_sudo))
