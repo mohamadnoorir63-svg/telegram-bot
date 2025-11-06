@@ -34,6 +34,7 @@ def _save_json(file, data):
 
 # ================= 🔐 بررسی ادمین / سودو =================
 async def _has_access(context, chat_id: int, user_id: int) -> bool:
+    """بررسی دسترسی مجری دستور"""
     if user_id in SUDO_IDS:
         return True
     try:
@@ -79,6 +80,22 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
             target_id = int(user_id_match.group(1))
             chat_member = await context.bot.get_chat_member(chat.id, target_id)
             target = chat_member.user
+        except:
+            pass
+
+    # ✅ جلوگیری از بن / سکوت / اخطار روی خود ربات، سودو یا مدیر گروه
+    if target:
+        # خود ربات
+        if target.id == context.bot.id:
+            return await msg.reply_text("😅 می‌خوای منو تنبیه کنی؟ من خودم خنگولم!")
+        # سودو
+        if target.id in SUDO_IDS:
+            return await msg.reply_text("👑 این کاربر جزو سودوهاست و مصون از تنبیهه!")
+        # مدیر یا سازنده گروه
+        try:
+            t_member = await context.bot.get_chat_member(chat.id, target.id)
+            if t_member.status in ("creator", "administrator"):
+                return await msg.reply_text("🛡 این کاربر مدیر گروهه، نمی‌تونی تنبیهش کنی!")
         except:
             pass
 
@@ -221,7 +238,7 @@ async def execute_punishment(context, chat, target, cmd_type):
 
 # ================= 🔧 ثبت هندلر =================
 def register_punishment_handlers(application, group_number: int = 12):
-    """ثبت هندلر دستورات تنبیه و سفارشی (با پشتیبانی @ و آیدی)"""
+    """ثبت هندلر دستورات تنبیه و سفارشی (با پشتیبانی @ و آیدی و تشخیص نقش‌ها)"""
     application.add_handler(
         MessageHandler(
             filters.TEXT & ~filters.COMMAND & filters.ChatType.GROUPS,
