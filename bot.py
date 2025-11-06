@@ -858,15 +858,24 @@ BACKUP_FOLDER = "backups"
 ADMIN_ID = int(os.getenv("ADMIN_ID", "8588347189"))
 
 # ======================= ⚙️ توابع اصلی =======================
-
 def _should_include_in_backup(path: str) -> bool:
     """فقط فایل‌های مهم داخل بک‌آپ بروند"""
     lowered = path.lower()
     skip_dirs = ["__pycache__", ".git", "venv", "restore_temp", BACKUP_FOLDER]
+    
+    # ۱. بررسی پوشه‌هایی که نباید شامل شوند
     if any(sd in lowered for sd in skip_dirs):
         return False
+    
+    # ۲. بررسی فایل‌های ZIP یا فایل‌های بک‌آپ خودکار
     if lowered.endswith(".zip") or os.path.basename(lowered).startswith("backup_"):
         return False
+    
+    # ۳. حتما فایل‌های دستورات ریپلی شامل شوند
+    if os.path.basename(path) in ["custom_commands.json", "custom_commands_backup"]:
+        return True
+    
+    # ۴. فایل‌های مهم دیگر بر اساس پسوند
     return lowered.endswith((".json", ".jpg", ".png", ".webp", ".mp3", ".ogg"))
 
 # ======================= ☁️ بک‌آپ خودکار =======================
