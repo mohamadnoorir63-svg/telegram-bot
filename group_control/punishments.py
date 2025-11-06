@@ -1,4 +1,5 @@
-import os, json
+import os
+import json
 from telegram import Update, ChatPermissions
 from telegram.ext import ContextTypes, MessageHandler, filters
 
@@ -6,12 +7,13 @@ from telegram.ext import ContextTypes, MessageHandler, filters
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 WARN_FILE = os.path.join(BASE_DIR, "warnings.json")
 
-SUDO_IDS = [8588347189]  # آیدی سودوها (دلخواهت رو اضافه کن)
+SUDO_IDS = [8588347189]  # آیدی سودوها (خودت + هرکس خواستی)
 
 # فایل اخطارها
 if not os.path.exists(WARN_FILE):
     with open(WARN_FILE, "w", encoding="utf-8") as f:
         json.dump({}, f, ensure_ascii=False, indent=2)
+
 
 def _load_warnings():
     try:
@@ -20,9 +22,11 @@ def _load_warnings():
     except:
         return {}
 
+
 def _save_warnings(data):
     with open(WARN_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
+
 
 # ================= 🔐 بررسی ادمین / سودو =================
 async def _has_access(context, chat_id: int, user_id: int) -> bool:
@@ -33,6 +37,7 @@ async def _has_access(context, chat_id: int, user_id: int) -> bool:
         return member.status in ("creator", "administrator")
     except:
         return False
+
 
 # ================= 🚫 بن / 🤐 سکوت / ⚠️ اخطار =================
 async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -50,7 +55,7 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
     if text in need_reply and not msg.reply_to_message:
         return await msg.reply_text("⚠️ باید روی پیام کاربر ریپلای کنی.")
 
-    # دسترسی
+    # دسترسی مدیر یا سودو
     if text in need_reply:
         if not await _has_access(context, chat.id, user.id):
             return await msg.reply_text("🚫 فقط مدیران یا سودوها مجازند.")
@@ -106,8 +111,7 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
         if count >= 3:
             try:
                 await context.bot.ban_chat_member(chat.id, target.id)
-                # می‌تونی بعد از بن، اخطارها را صفر کنی:
-                data[key] = 0
+                data[key] = 0  # ریست بعد از بن
                 _save_warnings(data)
                 return await msg.reply_text(f"🚫 {target.first_name} به‌دلیل ۳ اخطار بن شد.")
             except Exception as e:
@@ -134,8 +138,9 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
         cnt = data.get(key, 0)
         return await msg.reply_text(f"📌 اخطار شما: {cnt}/3")
 
+
 # ================= 🔧 ثبت هندلر =================
-def register_punishment_handlers(application, group_number: int = 10):
+def register_punishment_handlers(application, group_number: int = 11):
     """
     افزودن هندلر تنبیهات به برنامه اصلی.
     group_number را بر اساس نظم بقیه هندلرها تنظیم کن.
@@ -144,7 +149,7 @@ def register_punishment_handlers(application, group_number: int = 10):
         MessageHandler(
             filters.TEXT
             & ~filters.COMMAND
-            & (filters.ChatType.GROUP | filters.ChatType.SUPERGROUP),
+            & filters.ChatType.GROUPS,  # ✅ اصلاح‌شده برای گروه‌ها
             handle_punishments,
         ),
         group=group_number,
