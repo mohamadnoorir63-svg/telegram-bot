@@ -12,6 +12,7 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 FORTUNE_FILE = os.path.join(BASE_DIR, "fortunes.json")
 MEDIA_DIR = os.path.join(BASE_DIR, "fortunes_media")
 os.makedirs(MEDIA_DIR, exist_ok=True)
+SENT_MAPPING_FILE = os.path.join(BASE_DIR, "sent_fortunes.json")
 
 # ========================= ابزارهای کمکی =========================
 def _is_valid_url(val: str) -> bool:
@@ -23,22 +24,11 @@ def _is_valid_url(val: str) -> bool:
     return bool(u.scheme and u.netloc)
 
 def _abs_media_path(val: str) -> str:
-    """مسیر نهایی رسانه را پیدا می‌کند (URL یا لوکال)"""
     if not val:
         return val
     if _is_valid_url(val):
         return val
-    # مسیر مطلق از BASE_DIR
-    abs_path = val if os.path.isabs(val) else os.path.join(BASE_DIR, val)
-    if os.path.exists(abs_path):
-        return abs_path
-    # fallback به MEDIA_DIR
-    filename = os.path.basename(val)
-    fallback_path = os.path.join(MEDIA_DIR, filename)
-    if os.path.exists(fallback_path):
-        return fallback_path
-    # اگر باز هم پیدا نشد، مسیر اولیه را برمی‌گرداند
-    return abs_path
+    return val if os.path.isabs(val) else os.path.join(BASE_DIR, val)
 
 def _load_json(path: str, default):
     if not os.path.exists(path):
@@ -63,26 +53,28 @@ def save_fortunes(data):
 # ========================= ارسال مدیا ایمن =========================
 async def send_media(update: Update, media_type: str, val: str, k: str):
     val = _abs_media_path(val)
-    if media_type == "text":
-        return await update.message.reply_text(f"🔮 فال شماره {k}:\n\n{val}")
-
     if _is_valid_url(val):
         if media_type == "photo":
-            await update.message.reply_photo(photo=val, caption=f"🔮 فال شماره {k}")
+            msg = await update.message.reply_photo(photo=val, caption=f"🔮 فال شماره {k}")
         elif media_type == "video":
-            await update.message.reply_video(video=val, caption=f"🎥 فال شماره {k}")
+            msg = await update.message.reply_video(video=val, caption=f"🎥 فال شماره {k}")
         elif media_type == "sticker":
-            await update.message.reply_sticker(sticker=val)
+            msg = await update.message.reply_sticker(sticker=val)
+        else:
+            msg = await update.message.reply_text(f"⚠️ نوع مدیا نامعتبر: {media_type}")
     else:
         if not os.path.exists(val):
             return await update.message.reply_text(f"⚠️ فایل لوکال پیدا نشد: {val}")
         file = InputFile(val)
         if media_type == "photo":
-            await update.message.reply_photo(photo=file, caption=f"🔮 فال شماره {k}")
+            msg = await update.message.reply_photo(photo=file, caption=f"🔮 فال شماره {k}")
         elif media_type == "video":
-            await update.message.reply_video(video=file, caption=f"🎥 فال شماره {k}")
+            msg = await update.message.reply_video(video=file, caption=f"🎥 فال شماره {k}")
         elif media_type == "sticker":
-            await update.message.reply_sticker(sticker=file)
+            msg = await update.message.reply_sticker(sticker=file)
+        else:
+            msg = await update.message.reply_text(f"⚠️ نوع مدیا نامعتبر: {media_type}")
+    return msg
 
 # ========================= ثبت فال (ریپلای) =========================
 async def save_fortune(update: Update):
@@ -128,7 +120,6 @@ async def save_fortune(update: Update):
         else:
             return await update.message.reply_text("⚠️ فقط متن، عکس، ویدیو یا استیکر پشتیبانی می‌شود.")
 
-        # جلوگیری از تکراری شدن فال
         for v in data.values():
             if v.get("type") == entry["type"] and v.get("value") == entry["value"]:
                 return await update.message.reply_text("😅 این فال قبلاً ذخیره شده بود!")
@@ -140,50 +131,35 @@ async def save_fortune(update: Update):
     except Exception as e:
         await update.message.reply_text(f"⚠️ خطا در ذخیره فال: {e}")
 
-# ========================= حذف فال =========================
-async def delete_fortune(update: Update):
+# ========================= حذف پیشرفته فال با ریپلای =========================
+async def delete_sent_fortune(update: Update):
     reply = update.message.reply_to_message
     if not reply:
-        return await update.message.reply_text("❗ لطفاً روی پیام فال ریپلای کن تا حذف شود.")
+        return await update.message.reply_text("❗ لطفاً روی پیام فال ریپلای کن.")
 
+    sent_mapping = _load_json(SENT_MAPPING_FILE, {})
+
+    msg_id = str(reply.message_id)
+    if msg_id not in sent_mapping:
+        return await update.message.reply_text("⚠️ این پیام مربوط به فال نیست یا قبلاً حذف شده.")
+
+    k = sent_mapping.pop(msg_id)
     data = load_fortunes()
-    if not data:
-        return await update.message.reply_text("📂 هیچ فالی برای حذف وجود ندارد.")
+    deleted = data.pop(k, None)
+    save_fortunes(data)
 
-    delete_type = None
-    delete_match_values = []
-
-    if reply.text or reply.caption:
-        delete_type = "text"
-        delete_match_values.append((reply.text or reply.caption).strip())
-    elif reply.photo:
-        delete_type = "photo"
-    elif reply.video:
-        delete_type = "video"
-    elif reply.sticker:
-        delete_type = "sticker"
-    else:
-        return await update.message.reply_text("⚠️ نوع فال قابل شناسایی نیست.")
-
-    key_to_delete = None
-    for k, v in data.items():
-        if v.get("type") == delete_type:
-            if delete_type == "text" and v.get("value") in delete_match_values:
-                key_to_delete = k
-                break
-            else:
-                key_to_delete = k
-                break
-
-    if key_to_delete:
-        deleted = data.pop(key_to_delete)
-        save_fortunes(data)
+    # حذف رسانه
+    if deleted:
         val = _abs_media_path(deleted.get("value", ""))
-        if os.path.exists(val) and not _is_valid_url(val) and deleted.get("type") != "text":
+        if val and os.path.exists(val) and deleted.get("type") != "text":
             os.remove(val)
-        await update.message.reply_text("🗑️ فال با موفقیت حذف شد ✅")
-    else:
-        await update.message.reply_text("⚠️ فال موردنظر در فایل پیدا نشد.")
+
+    # ذخیره mapping به‌روز
+    save_fortunes(sent_mapping)  # برای اطمینان mapping هم ذخیره شود
+    with open(SENT_MAPPING_FILE, "w", encoding="utf-8") as f:
+        json.dump(sent_mapping, f, ensure_ascii=False, indent=2)
+
+    await update.message.reply_text("🗑️ فال با موفقیت حذف شد ✅")
 
 # ========================= ارسال فال تصادفی =========================
 async def send_random_fortune(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -191,68 +167,19 @@ async def send_random_fortune(update: Update, context: ContextTypes.DEFAULT_TYPE
     if not data:
         return await update.message.reply_text("📭 هنوز فالی ذخیره نشده 😔")
 
-    sent_state_file = os.path.join(BASE_DIR, "sent_fortunes.json")
-    sent_keys = []
-    if os.path.exists(sent_state_file):
-        try:
-            with open(sent_state_file, "r", encoding="utf-8") as f:
-                sent_keys = json.load(f)
-        except Exception:
-            sent_keys = []
-
+    # انتخاب فال تصادفی
     all_keys = list(data.keys())
-    if len(sent_keys) >= len(all_keys):
-        sent_keys = []
-
-    remaining_keys = [k for k in all_keys if k not in sent_keys]
-    if not remaining_keys:
-        remaining_keys = all_keys.copy()
-
-    random.shuffle(remaining_keys)
-    k = remaining_keys.pop()
-    sent_keys.append(k)
-
-    with open(sent_state_file, "w", encoding="utf-8") as f:
-        json.dump(sent_keys, f, ensure_ascii=False, indent=2)
-
-    v = data.get(k, {})
+    k = random.choice(all_keys)
+    v = data[k]
     t = v.get("type", "text").strip()
     raw = (v.get("value") or "").strip()
     if not raw:
         return await update.message.reply_text("⚠️ فال نامعتبر یا خالی بود.")
 
-    await send_media(update, t, raw, k)
+    sent_message = await send_media(update, t, raw, k)
 
-# ========================= لیست فال‌ها =========================
-async def list_fortunes(update: Update):
-    data = load_fortunes()
-    if not data:
-        return await update.message.reply_text("هنوز هیچ فالی ثبت نشده 😔")
-
-    await update.message.reply_text(
-        f"📜 تعداد کل فال‌ها: {len(data)}\n\n"
-        "برای حذف هر فال، روی پیام فال ریپلای بزن و بنویس: «حذف فال» 🗑️"
-    )
-
-    shown = 0
-    for k in sorted(data.keys(), key=lambda x: int(x))[-10:]:
-        v = data[k]
-        t = v.get("type", "text")
-        val = v.get("value", "")
-
-        # اصلاح مسیر برای رسانه‌ها
-        if t != "text":
-            val = _abs_media_path(val)
-
-        try:
-            await send_media(update, t, val, k)
-            shown += 1
-        except Exception as e:
-            print(f"[Fortune List Error] id={k} err={e}")
-            continue
-
-    if shown == 0:
-        await update.message.reply_text("⚠️ هیچ فالی برای نمایش پیدا نشد (ممکنه فایل‌ها حذف شده باشن).")
-    else:
-        await update.message.reply_text(f"✅ {shown} فال آخر نمایش داده شد.\n\n"
-                                        "برای حذف، روی فال دلخواه ریپلای بزن و بنویس: حذف فال 🗑️")
+    # ذخیره mapping پیام => کلید فال
+    sent_mapping = _load_json(SENT_MAPPING_FILE, {})
+    sent_mapping[str(sent_message.message_id)] = k
+    with open(SENT_MAPPING_FILE, "w", encoding="utf-8") as f:
+        json.dump(sent_mapping, f, ensure_ascii=False, indent=2)
