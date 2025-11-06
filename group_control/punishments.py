@@ -83,15 +83,10 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
         except:
             pass
 
-    # ✅ جلوگیری از بن / سکوت / اخطار روی خود ربات، سودو یا مدیر گروه
+    # ✅ جلوگیری از بن / سکوت / اخطار روی سودو یا مدیر گروه
     if target:
-        # خود ربات
-        if target.id == context.bot.id:
-            return await msg.reply_text("😅 می‌خوای منو تنبیه کنی؟ من خودم خنگولم!")
-        # سودو
         if target.id in SUDO_IDS:
             return await msg.reply_text("👑 این کاربر جزو سودوهاست و مصون از تنبیهه!")
-        # مدیر یا سازنده گروه
         try:
             t_member = await context.bot.get_chat_member(chat.id, target.id)
             if t_member.status in ("creator", "administrator"):
@@ -211,6 +206,9 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
                 return await msg.reply_text("ℹ️ این کاربر اخطاری نداشت.")
         except Exception as e:
             return await msg.reply_text(f"⚠️ خطا در اجرای دستور: {e}")
+
+    # 💤 اگر هیچ‌کدوم از دستورات بالا نبود → هیچ کاری نکن
+    return
 
 
 # ================= ⚙️ تابع مشترک اجرای مجازات =================
