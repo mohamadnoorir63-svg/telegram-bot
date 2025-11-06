@@ -1,4 +1,4 @@
-# ====================== 🌟 پنل مدیریت ربات (کامل و بدون باگ) ======================
+# ====================== 🌟 پنل مدیریت ربات (کامل و نهایی) ======================
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 from group_control.group_control import (
@@ -46,26 +46,39 @@ async def Tastatur_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data = query.data
     await query.answer()
 
+    # بازگشتی‌ها
     if data == "Tastatur_close":
         return await query.message.delete()
     if data == "Tastatur_back":
         return await Tastatur_menu(update, context)
+
+    # بخش‌های اصلی
     if data == "Tastatur_settings":
         return await show_settings_menu(query)
-    if data.startswith("help_"):
-        return await show_help_info(query)
     if data == "Tastatur_fun":
         return await show_fun_menu(query)
     if data == "Tastatur_admin":
         return await show_admin_menu(query)
     if data == "Tastatur_welcome":
         return await show_welcome_menu(query)
+
+    # تنظیمات جزئی و راهنما
+    if data.startswith("help_"):
+        return await show_help_info(query)
+    if data.startswith("exec_"):
+        cmd = data.split("_", 1)[1]
+        await query.message.reply_text(cmd)
+        return
+
+    # قفل‌ها
     if data == "Tastatur_locks":
         return await show_lock_page(query, 1)
     if data.startswith("toggle_lock:"):
         return await toggle_lock_button(update, context)
     if data.startswith("lock_page:"):
         return await handle_lock_page_switch(update, context)
+
+    # سرگرمی‌ها
     if data.startswith("fun_"):
         return await handle_fun_buttons(update, context)
 
@@ -136,7 +149,7 @@ HELP_TEXTS = {
     "help_asl": (
         "📜 <b>ثبت اصل</b>\n\n"
         "➕ ثبت:\n"
-        "<code>ثبت اصل من اهل صداقتم</code>\n\n"
+        "<code>ثبت اصل من اهل صداقتم</code> (روی پیام فرد ریپلای کن اگر برای دیگری می‌فرستی)\n\n"
         "👀 نمایش:\n"
         "<code>اصل من</code>\n\n"
         "❌ حذف:\n"
@@ -145,7 +158,7 @@ HELP_TEXTS = {
     "help_laqab": (
         "🏷 <b>ثبت لقب</b>\n\n"
         "➕ ثبت:\n"
-        "<code>ثبت لقب قهرمان</code>\n\n"
+        "<code>ثبت لقب قهرمان</code> (روی پیام فرد ریپلای کن اگر برای دیگری می‌فرستی)\n\n"
         "👀 نمایش:\n"
         "<code>لقب من</code>\n\n"
         "❌ حذف:\n"
@@ -163,17 +176,15 @@ HELP_TEXTS = {
         "<code>تگ فعال</code>"
     ),
 }
-async def show_help_info(query):
-    data = query.data  # مثلاً help_addadmin یا help_filter
-    key = data.strip()
 
-    if key not in HELP_TEXTS:
+async def show_help_info(query):
+    data = query.data.strip()
+    if data not in HELP_TEXTS:
         return await query.answer("❌ هنوز برای این گزینه راهنما تعریف نشده", show_alert=True)
 
-    text = HELP_TEXTS[key]
+    text = HELP_TEXTS[data]
 
-    # 🔹 دستور پیشنهادی برای اجرای سریع در گروه
-    EXAMPLE_COMMANDS = {
+    example_map = {
         "help_addadmin": "افزودن مدیر",
         "help_pin": "پن",
         "help_filter": "فیلتر تست",
@@ -182,21 +193,18 @@ async def show_help_info(query):
         "help_laqab": "ثبت لقب قهرمان",
         "help_tag": "تگ همه",
     }
-    example = EXAMPLE_COMMANDS.get(key)
+    example = example_map.get(data, None)
 
-    keyboard = []
+    buttons = [
+        [InlineKeyboardButton("🔙 بازگشت", callback_data="Tastatur_settings")]
+    ]
     if example:
-        keyboard.append([
-            InlineKeyboardButton(
-                "📎 اجرای دستور در گروه",
-                switch_inline_query_current_chat=example
-            )
+        buttons.insert(0, [
+            InlineKeyboardButton("📎 ارسال دستور به گروه", callback_data=f"exec_{example}")
         ])
-    keyboard.append([InlineKeyboardButton("🔙 بازگشت", callback_data="Tastatur_settings")])
 
-    # ⛔ نکته مهم: حتماً باید return await باشد
-    return await query.edit_message_text(
-        text, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(keyboard)
+    await query.edit_message_text(
+        text, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(buttons)
     )
 
 # ====================== 🔒 قفل‌ها ======================
