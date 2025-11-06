@@ -969,6 +969,7 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "fortunes.json",
             "aliases.json",                  # مسیر اصلی
             "group_control/aliases.json"     # مسیر داخل پوشه
+            "fortunes_media"  # ← پوشه رسانه فال‌ها
         ]
 
         moved_any = False
@@ -978,11 +979,26 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
             dest_dir = os.path.dirname(dest)
 
             if os.path.exists(src):
-                if dest_dir and not os.path.exists(dest_dir):
-                    os.makedirs(dest_dir, exist_ok=True)
-                shutil.move(src, dest)
-                moved_any = True
-                print(f"♻️ بازیابی فایل: {fname}")
+    if os.path.isdir(src):
+        # اگر src یک پوشه است، کل محتواش منتقل شود
+        if not os.path.exists(dest):
+            os.makedirs(dest, exist_ok=True)
+        for root, _, files in os.walk(src):
+            for file in files:
+                file_src = os.path.join(root, file)
+                rel_path = os.path.relpath(file_src, src)
+                file_dest = os.path.join(dest, rel_path)
+                os.makedirs(os.path.dirname(file_dest), exist_ok=True)
+                shutil.move(file_src, file_dest)
+        moved_any = True
+        print(f"♻️ بازیابی پوشه: {fname}")
+    else:
+        # اگر فایل معمولی است
+        if dest_dir and not os.path.exists(dest_dir):
+            os.makedirs(dest_dir, exist_ok=True)
+        shutil.move(src, dest)
+        moved_any = True
+        print(f"♻️ بازیابی فایل: {fname}")
 
         # 🔁 بازسازی حافظه‌ها
         from memory_manager import init_files
