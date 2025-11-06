@@ -23,11 +23,22 @@ def _is_valid_url(val: str) -> bool:
     return bool(u.scheme and u.netloc)
 
 def _abs_media_path(val: str) -> str:
+    """مسیر نهایی رسانه را پیدا می‌کند (URL یا لوکال)"""
     if not val:
         return val
     if _is_valid_url(val):
         return val
-    return val if os.path.isabs(val) else os.path.join(BASE_DIR, val)
+    # مسیر مطلق از BASE_DIR
+    abs_path = val if os.path.isabs(val) else os.path.join(BASE_DIR, val)
+    if os.path.exists(abs_path):
+        return abs_path
+    # fallback به MEDIA_DIR
+    filename = os.path.basename(val)
+    fallback_path = os.path.join(MEDIA_DIR, filename)
+    if os.path.exists(fallback_path):
+        return fallback_path
+    # اگر باز هم پیدا نشد، مسیر اولیه را برمی‌گرداند
+    return abs_path
 
 def _load_json(path: str, default):
     if not os.path.exists(path):
@@ -52,6 +63,9 @@ def save_fortunes(data):
 # ========================= ارسال مدیا ایمن =========================
 async def send_media(update: Update, media_type: str, val: str, k: str):
     val = _abs_media_path(val)
+    if media_type == "text":
+        return await update.message.reply_text(f"🔮 فال شماره {k}:\n\n{val}")
+
     if _is_valid_url(val):
         if media_type == "photo":
             await update.message.reply_photo(photo=val, caption=f"🔮 فال شماره {k}")
@@ -114,6 +128,7 @@ async def save_fortune(update: Update):
         else:
             return await update.message.reply_text("⚠️ فقط متن، عکس، ویدیو یا استیکر پشتیبانی می‌شود.")
 
+        # جلوگیری از تکراری شدن فال
         for v in data.values():
             if v.get("type") == entry["type"] and v.get("value") == entry["value"]:
                 return await update.message.reply_text("😅 این فال قبلاً ذخیره شده بود!")
@@ -164,7 +179,7 @@ async def delete_fortune(update: Update):
         deleted = data.pop(key_to_delete)
         save_fortunes(data)
         val = _abs_media_path(deleted.get("value", ""))
-        if os.path.exists(val) and not _is_valid_url(val):
+        if os.path.exists(val) and not _is_valid_url(val) and deleted.get("type") != "text":
             os.remove(val)
         await update.message.reply_text("🗑️ فال با موفقیت حذف شد ✅")
     else:
@@ -223,7 +238,11 @@ async def list_fortunes(update: Update):
     for k in sorted(data.keys(), key=lambda x: int(x))[-10:]:
         v = data[k]
         t = v.get("type", "text")
-        val = _abs_media_path(v.get("value", ""))
+        val = v.get("value", "")
+
+        # اصلاح مسیر برای رسانه‌ها
+        if t != "text":
+            val = _abs_media_path(val)
 
         try:
             await send_media(update, t, val, k)
