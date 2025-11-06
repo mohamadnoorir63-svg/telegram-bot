@@ -2,7 +2,7 @@ import os
 import json
 import re
 import asyncio
-from datetime import datetime, timedelta
+from datetime import datetime
 from telegram import Update
 from telegram.ext import ContextTypes, MessageHandler, filters
 
@@ -32,7 +32,6 @@ def _save_filters(data):
 
 
 def _time_left_str(expire_timestamp):
-    """تبدیل timestamp به مدت باقیمانده"""
     if not expire_timestamp:
         return "دائمی"
     remain = expire_timestamp - datetime.utcnow().timestamp()
@@ -74,18 +73,39 @@ async def handle_word_filter(update: Update, context: ContextTypes.DEFAULT_TYPE)
     data = _load_filters()
     chat_key = str(chat.id)
     if chat_key not in data:
-        data[chat_key] = {}
+        data[chat_key] = {"filters": {}, "enabled": True}  # بخش فیلتر + وضعیت روشن/خاموش
 
-    # فقط مدیران یا سودوها
-    if text.startswith("فیلتر") or text.startswith("حذف فیلتر") or text == "لیست فیلترها":
+    filters_for_chat = data[chat_key]["filters"]
+
+    # فقط مدیران یا سودوها مجاز به مدیریت فیلترها هستند
+    admin_cmds = ("فیلتر", "حذف فیلتر", "لیست فیلتر", "فیلتر روشن", "فیلتر خاموش")
+    if any(text.startswith(cmd) or text == cmd for cmd in admin_cmds):
         if not await _has_access(context, chat.id, user.id):
             return await msg.reply_text("🚫 فقط مدیران یا سودوها مجاز به مدیریت فیلترها هستند!")
 
-    # ========== ➕ افزودن فیلتر ==========
-    if text.startswith("فیلتر"):
+    # ================= ⚙️ فعال / غیرفعال کردن کل فیلتر =================
+    if text == "فیلتر خاموش":
+        if not data[chat_key]["enabled"]:
+            return await msg.reply_text("ℹ️ فیلتر کلمات از قبل غیرفعال بود.")
+        data[chat_key]["enabled"] = False
+        _save_filters(data)
+        return await msg.reply_text("🔕 فیلتر کلمات در این گروه غیرفعال شد.")
+
+    if text == "فیلتر روشن":
+        if data[chat_key]["enabled"]:
+            return await msg.reply_text("ℹ️ فیلتر کلمات از قبل فعال است.")
+        data[chat_key]["enabled"] = True
+        _save_filters(data)
+        return await msg.reply_text("✅ فیلتر کلمات در این گروه فعال شد.")
+
+    # ================= ➕ افزودن فیلتر =================
+    if text.startswith("فیلتر "):
         parts = text.split(maxsplit=2)
         if len(parts) < 2:
-            return await msg.reply_text("⚠️ لطفاً کلمه‌ای که باید فیلتر شود را بنویس. مثال:\n`فیلتر تست`", parse_mode="Markdown")
+            return await msg.reply_text(
+                "⚠️ لطفاً بنویس چه کلمه‌ای باید فیلتر بشه.\nمثلاً:\n`فیلتر تست`\nیا\n`فیلتر تست 2 ساعت`",
+                parse_mode="Markdown"
+            )
 
         word = parts[1].strip()
         duration = 0
@@ -102,7 +122,7 @@ async def handle_word_filter(update: Update, context: ContextTypes.DEFAULT_TYPE)
                 duration = num
 
         expire_time = datetime.utcnow().timestamp() + duration if duration > 0 else None
-        data[chat_key][word] = expire_time
+        filters_for_chat[word] = expire_time
         _save_filters(data)
 
         if duration > 0:
@@ -110,8 +130,8 @@ async def handle_word_filter(update: Update, context: ContextTypes.DEFAULT_TYPE)
             async def auto_unfilter():
                 await asyncio.sleep(duration)
                 filters_data = _load_filters()
-                if chat_key in filters_data and word in filters_data[chat_key]:
-                    del filters_data[chat_key][word]
+                if chat_key in filters_data and word in filters_data[chat_key]["filters"]:
+                    del filters_data[chat_key]["filters"][word]
                     _save_filters(filters_data)
                     try:
                         await context.bot.send_message(chat.id, f"⌛️ فیلتر «{word}» منقضی شد.")
@@ -121,47 +141,52 @@ async def handle_word_filter(update: Update, context: ContextTypes.DEFAULT_TYPE)
         else:
             await msg.reply_text(f"🚫 کلمه «{word}» به‌صورت دائمی فیلتر شد.")
 
-    # ========== ❌ حذف فیلتر ==========
+    # ================= ❌ حذف فیلتر =================
     elif text.startswith("حذف فیلتر"):
         parts = text.split(maxsplit=2)
         if len(parts) < 2:
-            return await msg.reply_text("⚠️ لطفاً کلمه‌ای که باید از فیلتر حذف شود را بنویس.")
+            return await msg.reply_text("⚠️ لطفاً بنویس کدوم کلمه از فیلتر حذف بشه.")
         word = parts[1].strip()
-        if word in data[chat_key]:
-            del data[chat_key][word]
+        if word in filters_for_chat:
+            del filters_for_chat[word]
             _save_filters(data)
             await msg.reply_text(f"✅ فیلتر «{word}» حذف شد.")
         else:
-            await msg.reply_text(f"ℹ️ کلمه «{word}» در فهرست فیلتر نیست.")
+            await msg.reply_text(f"ℹ️ کلمه «{word}» در لیست فیلتر نیست.")
 
-    # ========== 📋 لیست فیلترها ==========
-    elif text == "لیست فیلترها":
-        filters_for_chat = data.get(chat_key, {})
+    # ================= 📋 لیست فیلترها =================
+    elif text == "لیست فیلتر":
+        filters_for_chat = data[chat_key]["filters"]
+        status = "✅ فعال" if data[chat_key]["enabled"] else "🔕 غیرفعال"
         if not filters_for_chat:
-            return await msg.reply_text("ℹ️ هیچ فیلتری فعال نیست.")
-        lines = ["🚫 فهرست کلمات فیلترشده:"]
-        now = datetime.utcnow().timestamp()
+            return await msg.reply_text(f"ℹ️ هیچ فیلتری در این گروه وجود ندارد.\n🔧 وضعیت فیلتر: {status}")
+        lines = [f"🚫 فهرست فیلترهای فعال در گروه {chat.title or 'بدون‌نام'}:", f"🔧 وضعیت فیلتر: {status}\n"]
         for word, expire in filters_for_chat.items():
             lines.append(f"• <b>{word}</b> — {_time_left_str(expire)}")
         return await msg.reply_text("\n".join(lines), parse_mode="HTML")
 
-    # ========== 🔍 بررسی پیام‌های کاربران ==========
+    # ================= 🔍 بررسی پیام کاربران =================
     else:
-        if await _has_access(context, chat.id, user.id):
-            return  # مدیرها بررسی نمی‌شن
+        # اگر فیلتر خاموش است یا فرستنده مدیر است → کاری نکن
+        if not data[chat_key]["enabled"] or await _has_access(context, chat.id, user.id):
+            return
 
-        for word, expire_time in list(data.get(chat_key, {}).items()):
+        for word, expire_time in list(filters_for_chat.items()):
             # حذف خودکار فیلتر منقضی‌شده
             if expire_time and datetime.utcnow().timestamp() > expire_time:
-                del data[chat_key][word]
+                del filters_for_chat[word]
                 _save_filters(data)
                 continue
 
-            # بررسی وجود کلمه
-            if re.search(rf"\b{re.escape(word)}\b", text, re.IGNORECASE):
+            # بررسی وجود کلمه در هر نقطه از جمله (نه فقط جدا)
+            if word.lower() in text.lower():
                 try:
                     await msg.delete()
-                    await msg.reply_text(f"🚫 پیام حذف شد چون شامل کلمه فیلترشده «{word}» بود.", quote=True)
+                    await context.bot.send_message(
+                        chat_id=chat.id,
+                        text=f"🚫 پیام <b>{user.first_name}</b> حذف شد چون شامل کلمه‌ی فیلترشده «{word}» بود.\n⚙️ لطفاً از کلمات مناسب استفاده کنید.",
+                        parse_mode="HTML"
+                    )
                 except:
                     pass
                 break
