@@ -1,6 +1,6 @@
 import os
 import json
-from telegram import Update, ChatAdministratorRights
+from telegram import Update
 from telegram.ext import ContextTypes, MessageHandler, filters
 
 # ================= ⚙️ تنظیمات اولیه =================
@@ -69,19 +69,24 @@ async def handle_admin_management(update: Update, context: ContextTypes.DEFAULT_
         if target.id in SUDO_IDS:
             return await msg.reply_text("👑 این کاربر سودو است و نیازی به افزودن ندارد.")
 
+        me = await context.bot.get_chat_member(chat.id, context.bot.id)
+        if getattr(me, "can_promote_members", False) is not True and me.status != "creator":
+            return await msg.reply_text("🚫 من اجازه‌ی افزودن مدیر جدید را ندارم. لطفاً در تنظیمات گروه تیک «افزودن مدیران» را برای من فعال کن.")
+
         try:
             await context.bot.promote_chat_member(
                 chat_id=chat.id,
                 user_id=target.id,
-                privileges=ChatAdministratorRights(
-                    can_manage_chat=True,
-                    can_change_info=True,
-                    can_delete_messages=True,
-                    can_invite_users=True,
-                    can_pin_messages=True,
-                    can_manage_video_chats=True,
-                    is_anonymous=False
-                )
+                can_manage_chat=False,
+                can_delete_messages=True,
+                can_manage_video_chats=False,
+                can_restrict_members=True,
+                can_promote_members=False,
+                can_change_info=False,
+                can_invite_users=True,
+                can_pin_messages=True,
+                is_anonymous=False,
+                can_manage_topics=True
             )
             if target.id not in data[chat_key]:
                 data[chat_key].append(target.id)
@@ -99,19 +104,24 @@ async def handle_admin_management(update: Update, context: ContextTypes.DEFAULT_
         if target.id in SUDO_IDS:
             return await msg.reply_text("🚫 نمی‌توان سودو را حذف کرد!")
 
+        me = await context.bot.get_chat_member(chat.id, context.bot.id)
+        if getattr(me, "can_promote_members", False) is not True and me.status != "creator":
+            return await msg.reply_text("🚫 من اجازه‌ی تغییر مدیران را ندارم.")
+
         try:
             await context.bot.promote_chat_member(
                 chat_id=chat.id,
                 user_id=target.id,
-                privileges=ChatAdministratorRights(
-                    can_manage_chat=False,
-                    can_change_info=False,
-                    can_delete_messages=False,
-                    can_invite_users=False,
-                    can_pin_messages=False,
-                    can_manage_video_chats=False,
-                    is_anonymous=False
-                )
+                can_manage_chat=False,
+                can_delete_messages=False,
+                can_manage_video_chats=False,
+                can_restrict_members=False,
+                can_promote_members=False,
+                can_change_info=False,
+                can_invite_users=False,
+                can_pin_messages=False,
+                is_anonymous=False,
+                can_manage_topics=False
             )
             if target.id in data[chat_key]:
                 data[chat_key].remove(target.id)
