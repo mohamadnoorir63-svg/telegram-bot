@@ -1,33 +1,50 @@
 # ======================== ⚙️ command_manager.py ========================
-import os, json, random
+import os
+import json
+import random
+import shutil
 from datetime import datetime
 from telegram import Update
 from telegram.ext import ContextTypes
 
-# 📁 مسیر فایل دستورات کنار خود فایل command_manager.py
+# ======================== 📁 مسیر فایل دستورات ========================
+# فایل دستورها داخل پوشه auto_brain
 DATA_FILE = os.path.join(os.path.dirname(__file__), "custom_commands.json")
-
-# مطمئن شو فایل وجود داره، در غیر این صورت ایجاد کن
-if not os.path.exists(DATA_FILE):
-    with open(DATA_FILE, "w", encoding="utf-8") as f:
-        json.dump({}, f)
-
+BACKUP_FILE = os.path.join(os.path.dirname(__file__), "custom_commands_backup.json")
 ADMIN_ID = 8588347189
 
-# ======================== 📦 حافظه دستورات ========================
+# ======================== 🔧 اطمینان از وجود فایل ========================
+if not os.path.exists(DATA_FILE):
+    with open(DATA_FILE, "w", encoding="utf-8") as f:
+        json.dump({}, f, ensure_ascii=False, indent=2)
+    print(f"[DEBUG] فایل دستورها ساخته شد: {DATA_FILE}")
+else:
+    print(f"[DEBUG] فایل دستورها موجود است: {DATA_FILE}")
 
+# ======================== 📦 حافظه دستورات ========================
 def load_commands():
     """خواندن تمام دستورها از فایل JSON"""
+    if not os.path.exists(DATA_FILE):
+        with open(DATA_FILE, "w", encoding="utf-8") as f:
+            json.dump({}, f, ensure_ascii=False, indent=2)
     with open(DATA_FILE, "r", encoding="utf-8") as f:
         return json.load(f)
 
 def save_commands(data):
-    """ذخیره دستورها در فایل JSON"""
+    """ذخیره دستورها در فایل JSON با بکاپ"""
+    # بکاپ گرفتن قبل از ذخیره
+    if os.path.exists(DATA_FILE):
+        try:
+            shutil.copy2(DATA_FILE, BACKUP_FILE)
+            print(f"[DEBUG] بکاپ گرفته شد: {BACKUP_FILE}")
+        except Exception as e:
+            print(f"[WARN] بکاپ گرفته نشد: {e}")
+
     with open(DATA_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
+    print(f"[DEBUG] فایل دستورها ذخیره شد: {DATA_FILE}")
 
 # ======================== 📥 ذخیره دستور ========================
-
 async def save_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """ذخیره دستور جدید با /save <نام> (روی پیام ریپلای کن)"""
     user = update.effective_user
@@ -84,7 +101,6 @@ async def save_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 # ======================== 📤 اجرای دستور ========================
-
 async def handle_custom_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """اجرای دستور ذخیره‌شده"""
     if not update.message or not update.message.text:
@@ -120,14 +136,12 @@ async def handle_custom_command(update: Update, context: ContextTypes.DEFAULT_TY
         elif t == "sticker":
             await update.message.reply_sticker(d)
 
-        # جلوگیری از پاسخ اضافی ربات (reply اصلی)
         context.user_data["custom_handled"] = True
 
     except Exception as e:
         await update.message.reply_text(f"⚠️ خطا در اجرای دستور:\n{e}")
 
 # ======================== ❌ حذف دستور ========================
-
 async def delete_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """حذف دستور با /del <نام>"""
     user = update.effective_user
@@ -147,7 +161,6 @@ async def delete_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("⚠️ چنین دستوری وجود ندارد.")
 
 # ======================== 📜 لیست تمام دستورها ========================
-
 async def list_commands(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """نمایش لیست تمام دستورهای ذخیره‌شده"""
     user = update.effective_user
@@ -174,7 +187,6 @@ async def list_commands(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(text, parse_mode="HTML")
 
 # ======================== 🧹 پاکسازی دستورات گروه ========================
-
 def cleanup_group_commands(chat_id):
     """حذف دستورهای ساخته‌شده در گروه مشخص"""
     try:
@@ -186,7 +198,6 @@ def cleanup_group_commands(chat_id):
             group = info.get("group_id")
             owner = info.get("owner_id")
 
-            # فقط دستورهای همان گروه حذف شوند، دستورات ADMIN_ID باقی بمانند
             if group == chat_id and owner != ADMIN_ID:
                 removed += 1
                 continue
