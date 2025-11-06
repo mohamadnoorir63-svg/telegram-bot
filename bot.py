@@ -2078,7 +2078,7 @@ application.add_handler(
 # 🚫 بن / سکوت / اخطار
 # ==========================================================
 from group_control.punishments import register_punishment_handlers
-register_punishment_handlers(application, group_number=10)
+register_punishment_handlers(application, group_number=11)
 
 # ==========================================================
 # 👑 مدیریت سودوها
