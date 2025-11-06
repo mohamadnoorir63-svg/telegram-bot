@@ -4,9 +4,9 @@ import os
 import random
 from datetime import datetime
 from urllib.parse import urlparse
-from telegram import Update
+from telegram import Update, InputFile
 from telegram.ext import ContextTypes
-from telegram import InputFile
+
 # ========================= مسیرها و آماده‌سازی =========================
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 FORTUNE_FILE = os.path.join(BASE_DIR, "fortunes.json")
@@ -54,7 +54,6 @@ def save_fortunes(data):
 
 # ========================= ثبت فال (ریپلای) =========================
 async def save_fortune(update: Update):
-    """با ریپلای روی پیام: متن/عکس/ویدیو/استیکر را ذخیره می‌کند."""
     reply = update.message.reply_to_message
     if not reply:
         return await update.message.reply_text("❗ لطفاً روی پیام فال ریپلای کن.")
@@ -108,9 +107,8 @@ async def save_fortune(update: Update):
     except Exception as e:
         await update.message.reply_text(f"⚠️ خطا در ذخیره فال: {e}")
 
-# ========================= حذف فال (هماهنگ با لیست و پیام‌های ربات) =========================
+# ========================= حذف فال =========================
 async def delete_fortune(update: Update):
-    """با ریپلای روی فال موردنظر، آن را از فایل حذف می‌کند (پشتیبانی از متن، عکس، ویدیو، استیکر و پیام‌های ربات)."""
     reply = update.message.reply_to_message
     if not reply:
         return await update.message.reply_text("❗ لطفاً روی پیام فال ریپلای کن تا حذف شود.")
@@ -162,10 +160,9 @@ async def delete_fortune(update: Update):
 
     key_to_delete = None
     for k, v in data.items():
-        if v.get("type") == delete_type:
-            if v.get("value") in delete_match_values:
-                key_to_delete = k
-                break
+        if v.get("type") == delete_type and (v.get("value") in delete_match_values or not delete_match_values):
+            key_to_delete = k
+            break
 
     if key_to_delete:
         deleted = data.pop(key_to_delete)
@@ -176,16 +173,15 @@ async def delete_fortune(update: Update):
         await update.message.reply_text("🗑️ فال با موفقیت حذف شد ✅")
     else:
         await update.message.reply_text("⚠️ فال موردنظر در فایل پیدا نشد.")
-   
-  
 
-# ========================= ارسال فال تصادفی (بدون تکرار) =========================
+# ========================= ارسال فال تصادفی =========================
 async def send_random_fortune(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data = load_fortunes()
     if not data:
         return await update.message.reply_text("📭 هنوز فالی ذخیره نشده 😔")
 
     sent_state_file = os.path.join(BASE_DIR, "sent_fortunes.json")
+    sent_keys = []
 
     if os.path.exists(sent_state_file):
         try:
@@ -193,11 +189,8 @@ async def send_random_fortune(update: Update, context: ContextTypes.DEFAULT_TYPE
                 sent_keys = json.load(f)
         except Exception:
             sent_keys = []
-    else:
-        sent_keys = []
 
     all_keys = list(data.keys())
-
     if len(sent_keys) >= len(all_keys):
         sent_keys = []
         print("♻️ لیست ارسال فال‌ها ریست شد.")
@@ -220,8 +213,6 @@ async def send_random_fortune(update: Update, context: ContextTypes.DEFAULT_TYPE
         return await update.message.reply_text("⚠️ فال نامعتبر یا خالی بود.")
 
     val = _abs_media_path(raw)
-
-    # ✅ مسیر مطلق برای فایل‌های لوکال
     if not _is_valid_url(val) and not os.path.isabs(val):
         val = os.path.join(BASE_DIR, val)
 
@@ -249,7 +240,6 @@ async def send_random_fortune(update: Update, context: ContextTypes.DEFAULT_TYPE
         print(f"[Fortune Error] id={k} type={t} err={e}")
         await update.message.reply_text("⚠️ خطا در ارسال فال. مورد بعدی امتحان می‌شود.")
 
-
 # ========================= لیست فال‌ها =========================
 async def list_fortunes(update: Update):
     data = load_fortunes()
@@ -267,7 +257,6 @@ async def list_fortunes(update: Update):
         t = v.get("type", "text")
         val = _abs_media_path(v.get("value", ""))
 
-        # ✅ مسیر مطلق برای فایل‌های لوکال
         if not _is_valid_url(val) and not os.path.isabs(val):
             val = os.path.join(BASE_DIR, val)
 
