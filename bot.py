@@ -2084,6 +2084,10 @@ register_punishment_handlers(application, group_number=11)
 from group_control.pin_message import register_pin_handlers
 register_pin_handlers(application, group_number=12)
 
+# 🚫 فیلتر کلمات
+from group_control.word_filter import register_filter_handlers
+register_filter_handlers(application, group_number=13)
+
 # ==========================================================
 # 👑 مدیریت سودوها
 # ==========================================================
