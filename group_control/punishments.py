@@ -68,16 +68,17 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
         if "اخطار" in text:
             return await msg.reply_text("⚠️ من که همیشه مودبم، اخطار واسه من چرا؟")
         return
+# فقط اگه متن واقعاً دستور تنبیهی بود، نقشِ هدف رو چک کن ✅
+punish_keywords = ("بن", "رفع بن", "سکوت", "رفع سکوت", "اخطار", "حذف اخطار")
+if target and any(text.startswith(k) or text == k for k in punish_keywords):
+    target_member = await context.bot.get_chat_member(chat.id, target.id)
+    if target.id in SUDO_IDS:
+        return await msg.reply_text("👑 این کاربر جزو سودوهای ربات است، اجازه نداری تنبیهش کنی.")
+    if target_member.status == "creator":
+        return await msg.reply_text("👑 این کاربر سازنده‌ی گروه است.")
+    if target_member.status == "administrator":
+        return await msg.reply_text("🛡 این کاربر مدیر گروه است.")
 
-    # جلوگیری از تنبیه مدیر یا سودو
-    if target:
-        target_member = await context.bot.get_chat_member(chat.id, target.id)
-        if target.id in SUDO_IDS:
-            return await msg.reply_text("👑 این کاربر سودو است، نمی‌تونی بن یا سکوتش کنی.")
-        if target_member.status == "creator":
-            return await msg.reply_text("👑 این کاربر سازنده گروه است.")
-        if target_member.status == "administrator":
-            return await msg.reply_text("🛡 این کاربر مدیر گروه است.")
 
     # بررسی مجوز مجری
     if text in need_reply:
