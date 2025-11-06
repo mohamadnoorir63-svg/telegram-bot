@@ -16,6 +16,7 @@ MEDIA_DIR = os.path.join(BASE_DIR, "fortunes_media")
 os.makedirs(MEDIA_DIR, exist_ok=True)
 
 MAX_FORTUNES = 100  # حداکثر تعداد فال‌ها
+RECENT_AVOID_COUNT = 5  # جلوگیری از تکرار در ۵ فال آخر
 
 # ========================= ابزارهای کمکی =========================
 def _is_valid_url(val: str) -> bool:
@@ -118,21 +119,21 @@ async def save_fortune(update: Update):
         else:
             return await update.message.reply_text("⚠️ فقط متن، عکس، ویدیو یا استیکر پشتیبانی می‌شود.")
 
-        # جلوگیری از تکراری بودن شدید فال
+        # جلوگیری از تکرار شدید
         for v in data.values():
             if v.get("type") == entry["type"] and v.get("value") == entry["value"]:
                 return await update.message.reply_text("😅 این فال قبلاً ذخیره شده بود!")
 
-        # اگر بیش از MAX_FORTUNES فال داریم، قدیمی‌ترین را حذف کنیم
+        # حذف قدیمی‌ترین فال در صورت پر شدن حافظه
         if len(data) >= MAX_FORTUNES:
-            sorted_keys = sorted(data.keys(), key=lambda x: x)  # ترتیب قدیمی‌ترین به جدید
+            sorted_keys = sorted(data.keys(), key=lambda x: x)
             oldest_key = sorted_keys[0]
             old_val = _abs_media_path(data[oldest_key].get("value", ""))
             if os.path.exists(old_val) and not _is_valid_url(old_val):
                 os.remove(old_val)
             data.pop(oldest_key)
 
-        # کلید یکتا
+        # افزودن فال جدید
         new_key = str(uuid.uuid4())
         data[new_key] = entry
         save_fortunes(data)
@@ -141,7 +142,7 @@ async def save_fortune(update: Update):
     except Exception as e:
         await update.message.reply_text(f"⚠️ خطا در ذخیره فال: {e}")
 
-# ========================= حذف فال پیشرفته =========================
+# ========================= حذف فال =========================
 async def delete_fortune(update: Update):
     reply = update.message.reply_to_message
     if not reply:
@@ -187,38 +188,37 @@ async def delete_fortune(update: Update):
     else:
         await update.message.reply_text("⚠️ فال موردنظر در فایل پیدا نشد.")
 
-# ========================= ارسال فال تصادفی =========================
+# ========================= ارسال فال تصادفی بدون تکرار پشت سر هم و در ۵ فال آخر =========================
 async def send_random_fortune(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data = load_fortunes()
     if not data:
         return await update.message.reply_text("📭 هنوز فالی ذخیره نشده 😔")
 
     sent_state_file = os.path.join(BASE_DIR, "sent_fortunes.json")
-    sent_keys = []
-    if os.path.exists(sent_state_file):
-        try:
-            with open(sent_state_file, "r", encoding="utf-8") as f:
-                sent_keys = json.load(f)
-        except Exception:
-            sent_keys = []
+    sent_keys = _load_json(sent_state_file, [])
 
     all_keys = list(data.keys())
-    remaining_keys = [k for k in all_keys if k not in sent_keys]
+    if not all_keys:
+        return await update.message.reply_text("⚠️ هیچ فالی وجود ندارد.")
 
-    if not remaining_keys:  # همه فال‌ها ارسال شدند → ریست
-        sent_keys = []
-        remaining_keys = all_keys.copy()
+    # حذف فال‌های قدیمی‌تر از RECENT_AVOID_COUNT از لیست
+    if len(sent_keys) > RECENT_AVOID_COUNT:
+        sent_keys = sent_keys[-RECENT_AVOID_COUNT:]
 
-    # انتخاب رندوم بدون تکرار شدید
-    last_sent = sent_keys[-1] if sent_keys else None
-    choices = [k for k in remaining_keys if k != last_sent] or remaining_keys
-    k = random.choice(choices)
+    # فیلتر فال‌هایی که در ۵ فال اخیر نبوده‌اند
+    available_keys = [k for k in all_keys if k not in sent_keys]
+    if not available_keys:
+        available_keys = all_keys.copy()
+
+    # انتخاب فال تصادفی از بین فال‌های مجاز
+    k = random.choice(available_keys)
     sent_keys.append(k)
 
-    # ذخیره وضعیت فال‌های ارسال شده
+    # ذخیره وضعیت فال‌های اخیر
     with open(sent_state_file, "w", encoding="utf-8") as f:
-        json.dump(sent_keys, f, ensure_ascii=False, indent=2)
+        json.dump(sent_keys[-RECENT_AVOID_COUNT:], f, ensure_ascii=False, indent=2)
 
+    # ارسال فال انتخابی
     v = data.get(k, {})
     t = v.get("type", "text").strip()
     raw = (v.get("value") or "").strip()
@@ -239,7 +239,6 @@ async def list_fortunes(update: Update):
     )
 
     shown = 0
-    # نمایش 10 فال آخر
     for k in sorted(data.keys(), key=lambda x: x)[-10:]:
         v = data[k]
         t = v.get("type", "text")
