@@ -2071,9 +2071,6 @@ if __name__ == "__main__":
         MessageHandler(filters.ALL & filters.ChatType.GROUPS, handle_group_message),
         group=10
     )
-    # ==========================================================
-    # 🚫 بن / سکوت / اخطار
-    # ==========================================================
     from group_control.punishments import register_punishment_handlers
     register_punishment_handlers(application, group_number=10)
     # ==========================================================
