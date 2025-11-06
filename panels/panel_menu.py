@@ -1,4 +1,4 @@
-# ====================== 🌟 پنل مدیریت ربات (نهایی بدون ارسال دستور) ======================
+# ====================== 🌟 پنل مدیریت ربات (نسخه نهایی کامل با قفل گروه) ======================
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 from group_control.group_control import (
@@ -46,13 +46,11 @@ async def Tastatur_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data = query.data
     await query.answer()
 
-    # بازگشتی‌ها
     if data == "Tastatur_close":
         return await query.message.delete()
     if data == "Tastatur_back":
         return await Tastatur_menu(update, context)
 
-    # بخش‌های اصلی
     if data == "Tastatur_settings":
         return await show_settings_menu(query)
     if data == "Tastatur_fun":
@@ -62,11 +60,9 @@ async def Tastatur_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if data == "Tastatur_welcome":
         return await show_welcome_menu(query)
 
-    # تنظیمات جزئی و راهنما
     if data.startswith("help_"):
         return await show_help_info(query)
 
-    # قفل‌ها
     if data == "Tastatur_locks":
         return await show_lock_page(query, 1)
     if data.startswith("toggle_lock:"):
@@ -74,7 +70,6 @@ async def Tastatur_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if data.startswith("lock_page:"):
         return await handle_lock_page_switch(update, context)
 
-    # سرگرمی‌ها
     if data.startswith("fun_"):
         return await handle_fun_buttons(update, context)
 
@@ -97,14 +92,17 @@ async def show_settings_menu(query):
             InlineKeyboardButton("📜 اصل", callback_data="help_asl"),
             InlineKeyboardButton("🏷 لقب", callback_data="help_laqab"),
         ],
-        [InlineKeyboardButton("🔔 تگ کاربران", callback_data="help_tag")],
+        [
+            InlineKeyboardButton("🔒 قفل گروه", callback_data="help_grouplock"),
+            InlineKeyboardButton("🔔 تگ کاربران", callback_data="help_tag"),
+        ],
         [InlineKeyboardButton("🔙 بازگشت", callback_data="Tastatur_back")],
     ]
     return await query.edit_message_text(
         text, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(keyboard)
     )
 
-# ====================== 📘 توضیحات کامل ابزارها ======================
+# ====================== 📘 توضیحات ابزارها ======================
 HELP_TEXTS = {
     "help_addadmin": (
         "👑 <b>افزودن یا حذف مدیر گروه</b>\n\n"
@@ -170,6 +168,20 @@ HELP_TEXTS = {
         "<code>تگ غیره فعال</code>\n\n"
         "🔥 تگ فعال‌ها:\n"
         "<code>تگ فعال</code>"
+    ),
+    "help_grouplock": (
+        "🔒 <b>قفل گروه</b>\n\n"
+        "📌 با این ویژگی می‌تونی گروه رو به‌صورت کامل قفل یا باز کنی.\n\n"
+        "🕐 <b>حالت خودکار:</b>\n"
+        "با دستور <code>قفل خودکار روشن</code> قفل خودکار فعال میشه و در ساعت‌های مشخص، گروه قفل میشه.\n\n"
+        "🔓 <b>خاموش کردن:</b>\n"
+        "<code>قفل خودکار خاموش</code>\n\n"
+        "⚙️ <b>تنظیم ساعت قفل:</b>\n"
+        "مثلاً:\n"
+        "<code>تنظیم قفل 23:00 تا 07:00</code>\n"
+        "در این بازه گروه قفل و بعد از اون خودکار باز میشه.\n\n"
+        "💬 برای مشاهده وضعیت:\n"
+        "<code>وضعیت قفل</code>"
     ),
 }
 
