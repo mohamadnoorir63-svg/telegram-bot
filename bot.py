@@ -2150,6 +2150,11 @@ application.add_handler(
     CallbackQueryHandler(Tastatur_buttons, pattern="^Tastatur_"),
     group=-3
 )
+# ⚙️ دکمه‌های زیرمنوی تنظیمات
+application.add_handler(
+    CallbackQueryHandler(Tastatur_buttons, pattern=r"^help_"),
+    group=-3
+)
 
 # 🔐 قفل‌ها
 application.add_handler(
