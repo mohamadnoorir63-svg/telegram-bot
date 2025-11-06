@@ -10,7 +10,7 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 WARN_FILE = os.path.join(BASE_DIR, "warnings.json")
 ALIAS_FILE = os.path.join(BASE_DIR, "custom_cmds.json")
 
-SUDO_IDS = [8588347189]  # آیدی سودوها
+SUDO_IDS = [8588347189]  # آیدی سودوها (خودت و هرکس بخوای اضافه کن)
 
 # ساخت فایل‌ها در صورت نبود
 for f in (WARN_FILE, ALIAS_FILE):
@@ -56,51 +56,81 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
     if not text:
         return
 
-    # ---- اضافه کردن دستور سفارشی ----
+    # ---- افزودن alias جدید ----
     if text.startswith("افزودن دستور"):
         if not await _has_access(context, chat.id, user.id):
             return await msg.reply_text("🚫 فقط مدیران یا سودوها می‌تونن دستور اضافه کنن.")
 
-        parts = text.split(" ", 2)
-        if len(parts) < 3:
-            return await msg.reply_text("📘 فرمت درست:\n<code>افزودن دستور [نام] [متن پاسخ]</code>", parse_mode="HTML")
+        match = re.match(r"^افزودن دستور\s+(\S+)\s+(بن|سکوت|اخطار)\s+(.+)$", text)
+        if not match:
+            return await msg.reply_text(
+                "📘 فرمت درست:\n"
+                "<code>افزودن دستور [نام] [نوع دستور] [متن پاسخ]</code>\n\n"
+                "مثال:\n"
+                "<code>افزودن دستور سیک بن 😡 {name} از گروه اخراج شد!</code>",
+                parse_mode="HTML"
+            )
 
-        name = parts[1].strip()
-        response = parts[2].strip()
-
-        if name in ("بن", "سکوت", "اخطار", "حذف بن", "حذف سکوت", "حذف اخطار"):
-            return await msg.reply_text("⚠️ نمی‌تونی دستورهای اصلی رو بازنویسی کنی.")
+        name = match.group(1).strip()
+        base_cmd = match.group(2).strip()
+        response = match.group(3).strip()
 
         data = _load_json(ALIAS_FILE)
-        data[name] = response
+        data[name] = {"type": base_cmd, "text": response}
         _save_json(ALIAS_FILE, data)
-        return await msg.reply_text(f"✅ دستور جدید با نام <b>{name}</b> اضافه شد.", parse_mode="HTML")
 
-    # ---- اگر دستور جزو aliasها بود ----
+        return await msg.reply_text(f"✅ دستور جدید با نام <b>{name}</b> ساخته شد.", parse_mode="HTML")
+
+    # ---- اجرای alias ----
     aliases = _load_json(ALIAS_FILE)
     if text in aliases:
-        # فقط روی ریپلای مجازه
+        alias_info = aliases[text]
+        cmd_type = alias_info["type"]
+        response_text = alias_info["text"]
+
+        # باید روی پیام ریپلای بشه
         if not msg.reply_to_message:
             return await msg.reply_text("⚠️ باید روی پیام فرد ریپلای کنی.")
 
         target = msg.reply_to_message.from_user
 
-        # اگر هدف خود ربات بود
+        # محافظت از خود ربات و سودو
         if target.id == context.bot.id:
-            return await msg.reply_text("😅 با خودم شوخی داری؟ من که خودم خنگولم!")
+            return await msg.reply_text("😅 با خودم شوخی داری؟ من خنگولم!")
+        if target.id in SUDO_IDS:
+            return await msg.reply_text("👑 نمی‌تونی سودو رو تنبیه کنی.")
 
-        # بررسی مجوز
         if not await _has_access(context, chat.id, user.id):
             return await msg.reply_text("🚫 فقط مدیران یا سودوها مجازند.")
 
-        # عمل پیش‌فرض: حذف کاربر از گروه (kick)
         try:
-            await context.bot.ban_chat_member(chat.id, target.id)
-            await context.bot.unban_chat_member(chat.id, target.id)
-            txt = aliases[text].replace("{name}", target.first_name)
+            # اجرای نوع دستور
+            if cmd_type == "بن":
+                await context.bot.ban_chat_member(chat.id, target.id)
+                await context.bot.unban_chat_member(chat.id, target.id)
+            elif cmd_type == "سکوت":
+                until_date = datetime.utcnow() + timedelta(hours=1)
+                await context.bot.restrict_chat_member(
+                    chat.id,
+                    target.id,
+                    permissions=ChatPermissions(can_send_messages=False),
+                    until_date=until_date
+                )
+            elif cmd_type == "اخطار":
+                data = _load_json(WARN_FILE)
+                key = f"{chat.id}:{target.id}"
+                data[key] = data.get(key, 0) + 1
+                _save_json(WARN_FILE, data)
+                if data[key] >= 3:
+                    await context.bot.ban_chat_member(chat.id, target.id)
+                    data[key] = 0
+                    _save_json(WARN_FILE, data)
+
+            txt = response_text.replace("{name}", target.first_name)
             return await msg.reply_text(txt)
+
         except Exception as e:
-            return await msg.reply_text(f"⚠️ خطا در اجرای دستور سفارشی: {e}")
+            return await msg.reply_text(f"⚠️ خطا در اجرای دستور: {e}")
 
     # ---- دستورات پیش‌فرض ----
     need_reply = ["بن", "حذف بن", "سکوت", "حذف سکوت", "اخطار", "حذف اخطار"]
@@ -109,13 +139,14 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
     target = msg.reply_to_message.from_user if msg.reply_to_message else None
 
+    # شوخی با ربات
     if target and target.id == context.bot.id:
         if "بن" in text:
             return await msg.reply_text("😅 منو بن کنی کل گروه می‌پره!")
         if "سکوت" in text:
             return await msg.reply_text("🤐 خودم سکوت کنم؟ تو بامزه‌ای!")
         if "اخطار" in text:
-            return await msg.reply_text("⚠️ من که همیشه مودبم، اخطار واسه من چرا؟")
+            return await msg.reply_text("⚠️ من که همیشه مودبم!")
         return
 
     if text in need_reply:
