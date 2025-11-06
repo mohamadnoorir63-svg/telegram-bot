@@ -1746,10 +1746,10 @@ async def show_main_panel(update: Update, context: ContextTypes.DEFAULT_TYPE, ed
     keyboard = [
         [
             InlineKeyboardButton("💬 ارتباط با سازنده", url="https://t.me/NOORI_NOOR"),
-            InlineKeyboardButton("💭 گروه پشتیبانی", url="https://t.me/Poshtibahni")
+            InlineKeyboardButton("💭 گروه پشتیبانی", url="https://t.me/Khengool124")
         ],
         [
-            InlineKeyboardButton("➕ افزودن به گروه", url="https://t.me/Khenqol_bot?startgroup=true"),
+            InlineKeyboardButton("➕ افزودن به گروه", url="https://t.me/Khngool_bot?startgroup=true"),
             InlineKeyboardButton("🧩 قابلیت‌های ربات", callback_data="panel_features")
         ],
         [
