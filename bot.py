@@ -2040,211 +2040,210 @@ if __name__ == "__main__":
             text += f"{i}. <code>{sid}</code>\n"
         await update.message.reply_text(text, parse_mode="HTML")
     # ======================= 🧱 Group Control System (Central Handler) =======================
-    
-    from panels.link_panel import link_panel, link_panel_buttons  # 👈 اگه فایل جدا داری
-    
-
-    # 🟢 پنل لینک‌ها (در اولویت بالا)
-    application.add_handler(
-        MessageHandler(filters.TEXT & filters.Regex(r"^(?:لینک|Link)$"), link_panel),
-        group=-10
-    )
-    application.add_handler(
-        CallbackQueryHandler(link_panel_buttons, pattern="^link_"),
-        group=-10
-    )
-
-    # 📦 کنترل گروه‌ها
-    from group_control.group_control import handle_group_message
-
-    register_cleanup_handlers(application)
-
-    application.add_handler(
-        MessageHandler(filters.ALL & filters.ChatType.GROUPS, handle_group_message),
-        group=10
-    )
-     
-
-     # 💡 ثبت ماژول اصل و لقب (در اولویت بالا)
-    register_origin_title_handlers(application)
-    application.add_handler(
-        MessageHandler(filters.ALL & filters.ChatType.GROUPS, handle_group_message),
-        group=10
-    )
-    from group_control.punishments import register_punishment_handlers
-    register_punishment_handlers(application, group_number=10)  # یا هر گروهی که می‌خوای
     # ==========================================================
-    application.add_handler(CommandHandler("addsudo", add_sudo))
-    application.add_handler(CommandHandler("delsudo", del_sudo))
-    application.add_handler(CommandHandler("listsudo", list_sudos))
+# 🟢 پنل لینک‌ها (در اولویت بالا)
+# ==========================================================
+from panels.link_panel import link_panel, link_panel_buttons  # 👈 اگه فایل جدا داری
 
-    # ==========================================================
-    # 💾 دستورات شخصی (ذخیره، حذف، اجرای دستورها)
-    # ==========================================================
-    application.add_handler(CommandHandler("save", save_command))
-    application.add_handler(CommandHandler("del", delete_command))
-    application.add_handler(CommandHandler("listcmds", list_commands))
+application.add_handler(
+    MessageHandler(filters.TEXT & filters.Regex(r"^(?:لینک|Link)$"), link_panel),
+    group=-10
+)
+application.add_handler(
+    CallbackQueryHandler(link_panel_buttons, pattern="^link_"),
+    group=-10
+)
 
-    # ==========================================================
-    # 🧾 راهنمای قابل ویرایش (بازگردانده‌شده)
-    # ==========================================================
-    application.add_handler(CommandHandler("help", help_command), group=-6)
-    application.add_handler(MessageHandler(filters.Regex("^ثبت help$"), save_help), group=-6)
-    application.add_handler(MessageHandler(filters.Regex("^راهنما$"), show_custom_guide), group=-6)
-    application.add_handler(MessageHandler(filters.Regex("^ثبت راهنما$"), save_custom_guide), group=-6)
+# ==========================================================
+# 📦 کنترل گروه‌ها
+# ==========================================================
+from group_control.group_control import handle_group_message
+register_cleanup_handlers(application)
 
-    # ✉️ پیام‌های متنی غیر از کامند → هندلر دستورات ذخیره‌شده
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_custom_command), group=-4)
+application.add_handler(
+    MessageHandler(filters.ALL & filters.ChatType.GROUPS, handle_group_message),
+    group=10
+)
 
-    # ==========================================================
-    # 👑 مدیریت وضعیت ادمین (ورود و خروج)
-    # ==========================================================
-    application.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, detect_admin_movement))
-    application.add_handler(MessageHandler(filters.StatusUpdate.LEFT_CHAT_MEMBER, detect_admin_movement))
-    application.add_handler(MessageHandler(filters.StatusUpdate.LEFT_CHAT_MEMBER, handle_left_chat))
+# ==========================================================
+# 💡 ثبت ماژول اصل و لقب (در اولویت بالا)
+# ==========================================================
+register_origin_title_handlers(application)
+application.add_handler(
+    MessageHandler(filters.ALL & filters.ChatType.GROUPS, handle_group_message),
+    group=10
+)
 
-    application.add_handler(
+# ==========================================================
+# 🚫 بن / سکوت / اخطار
+# ==========================================================
+from group_control.punishments import register_punishment_handlers
+register_punishment_handlers(application, group_number=10)
+
+# ==========================================================
+# 👑 مدیریت سودوها
+# ==========================================================
+application.add_handler(CommandHandler("addsudo", add_sudo))
+application.add_handler(CommandHandler("delsudo", del_sudo))
+application.add_handler(CommandHandler("listsudo", list_sudos))
+
+# ==========================================================
+# 💾 دستورات شخصی (ذخیره، حذف، اجرای دستورها)
+# ==========================================================
+application.add_handler(CommandHandler("save", save_command))
+application.add_handler(CommandHandler("del", delete_command))
+application.add_handler(CommandHandler("listcmds", list_commands))
+
+# ==========================================================
+# 🧾 راهنمای قابل ویرایش (بازگردانده‌شده)
+# ==========================================================
+application.add_handler(CommandHandler("help", help_command), group=-6)
+application.add_handler(MessageHandler(filters.Regex("^ثبت help$"), save_help), group=-6)
+application.add_handler(MessageHandler(filters.Regex("^راهنما$"), show_custom_guide), group=-6)
+application.add_handler(MessageHandler(filters.Regex("^ثبت راهنما$"), save_custom_guide), group=-6)
+
+# ✉️ پیام‌های متنی غیر از کامند → هندلر دستورات ذخیره‌شده
+application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_custom_command), group=-4)
+
+# ==========================================================
+# 👑 مدیریت وضعیت ادمین (ورود و خروج)
+# ==========================================================
+application.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, detect_admin_movement))
+application.add_handler(MessageHandler(filters.StatusUpdate.LEFT_CHAT_MEMBER, detect_admin_movement))
+application.add_handler(MessageHandler(filters.StatusUpdate.LEFT_CHAT_MEMBER, handle_left_chat))
+
+application.add_handler(
     MessageHandler(filters.Regex("(?i)^ربات$"), sudo_bot_call),
     group=-8
-    )
-    # ==========================================================
+)
 
-    # 🔹 دستورات اصلی سیستم
-    # ==========================================================
-    application.add_handler(CommandHandler("start", start))
-    application.add_handler(CommandHandler("toggle", toggle))
-    application.add_handler(CommandHandler("welcome", toggle_welcome))
-    application.add_handler(CommandHandler("lock", lock_learning))
-    application.add_handler(CommandHandler("unlock", unlock_learning))
-    application.add_handler(CommandHandler("mode", mode_change))
-    # 🎮 پنل اصلی و دکمه‌ها
-    application.add_handler(
-        MessageHandler(filters.TEXT & filters.Regex(r"^پنل$"), Tastatur_menu),
-        group=-3
-    )
-    application.add_handler(
-        CallbackQueryHandler(Tastatur_buttons, pattern="^Tastatur_"),
-        group=-3
-    )
+# ==========================================================
+# 🔹 دستورات اصلی سیستم
+# ==========================================================
+application.add_handler(CommandHandler("start", start))
+application.add_handler(CommandHandler("toggle", toggle))
+application.add_handler(CommandHandler("welcome", toggle_welcome))
+application.add_handler(CommandHandler("lock", lock_learning))
+application.add_handler(CommandHandler("unlock", unlock_learning))
+application.add_handler(CommandHandler("mode", mode_change))
 
-    # 🔐 قفل‌ها
-    application.add_handler(
-        CallbackQueryHandler(toggle_lock_button, pattern=r"^toggle_lock:"),
-        group=-3
-    )
-    application.add_handler(
-        CallbackQueryHandler(handle_lock_page_switch, pattern=r"^lock_page:"),
-        group=-3
-    )
+# 🎮 پنل اصلی و دکمه‌ها
+application.add_handler(
+    MessageHandler(filters.TEXT & filters.Regex(r"^پنل$"), Tastatur_menu),
+    group=-3
+)
+application.add_handler(
+    CallbackQueryHandler(Tastatur_buttons, pattern="^Tastatur_"),
+    group=-3
+)
 
-    # 🎮 سرگرمی‌ها
-    application.add_handler(
-        CallbackQueryHandler(handle_fun_buttons, pattern=r"^fun_"),
-        group=-3
-    )
+# 🔐 قفل‌ها
+application.add_handler(
+    CallbackQueryHandler(toggle_lock_button, pattern=r"^toggle_lock:"),
+    group=-3
+)
+application.add_handler(
+    CallbackQueryHandler(handle_lock_page_switch, pattern=r"^lock_page:"),
+    group=-3
+)
 
-    
-    application.add_handler(CommandHandler("stats", stats))
-    application.add_handler(CommandHandler("fullstats", fullstats))
-    application.add_handler(CommandHandler("backup", backup))
-    application.add_handler(CommandHandler("selectivebackup", selective_backup_menu))
-    application.add_handler(CallbackQueryHandler(selective_backup_buttons, pattern="^selbk_"))
-    application.add_handler(CommandHandler("restore", restore))
-    application.add_handler(CommandHandler("reset", reset_memory))
-    application.add_handler(CommandHandler("reload", reload_memory))
-    application.add_handler(CommandHandler("broadcast", broadcast))
-    application.add_handler(CommandHandler("cloudsync", cloudsync))
-    application.add_handler(CommandHandler("leave", leave))
-    application.add_handler(CommandHandler("reply", toggle_reply_mode))
-    # ==========================================================
-    
-    # ==========================================================
-    # 🎨 فونت‌ساز خنگول
-    # ==========================================================
-    from telegram.ext import ConversationHandler
-    from font_maker import font_maker, receive_font_name, next_font, prev_font, ASK_NAME
+# 🎮 سرگرمی‌ها
+application.add_handler(
+    CallbackQueryHandler(handle_fun_buttons, pattern=r"^fun_"),
+    group=-3
+)
 
-    font_handler = ConversationHandler(
-        entry_points=[MessageHandler(filters.TEXT & filters.Regex(r"^فونت"), font_maker)],
-        states={ASK_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, receive_font_name)]},
-        fallbacks=[],
-    )
-    application.add_handler(font_handler)
-    application.add_handler(CallbackQueryHandler(next_font, pattern="^next_font"))
-    application.add_handler(CallbackQueryHandler(prev_font, pattern="^prev_font"))
-    application.add_handler(CallbackQueryHandler(feature_back, pattern="^feature_back$"))
+# ==========================================================
+# 📊 آمار، بک‌آپ و کنترل
+# ==========================================================
+application.add_handler(CommandHandler("stats", stats))
+application.add_handler(CommandHandler("fullstats", fullstats))
+application.add_handler(CommandHandler("backup", backup))
+application.add_handler(CommandHandler("selectivebackup", selective_backup_menu))
+application.add_handler(CallbackQueryHandler(selective_backup_buttons, pattern="^selbk_"))
+application.add_handler(CommandHandler("restore", restore))
+application.add_handler(CommandHandler("reset", reset_memory))
+application.add_handler(CommandHandler("reload", reload_memory))
+application.add_handler(CommandHandler("broadcast", broadcast))
+application.add_handler(CommandHandler("cloudsync", cloudsync))
+application.add_handler(CommandHandler("leave", leave))
+application.add_handler(CommandHandler("reply", toggle_reply_mode))
 
-    # ==========================================================
-    # 🤖 پنل ChatGPT هوش مصنوعی
-    # ==========================================================
-    from ai_chat.chatgpt_panel import show_ai_panel, chat, start_ai_chat, stop_ai_chat
-    application.add_handler(CallbackQueryHandler(show_ai_panel, pattern="^panel_chatgpt$"))
-    application.add_handler(CallbackQueryHandler(start_ai_chat, pattern="^start_ai_chat$"))
-    application.add_handler(MessageHandler(filters.Regex("^(خاموش|/خاموش)$"), stop_ai_chat))
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, chat), group=3)
+# ==========================================================
+# 🎨 فونت‌ساز خنگول
+# ==========================================================
+from telegram.ext import ConversationHandler
+from font_maker import font_maker, receive_font_name, next_font, prev_font, ASK_NAME
 
-    # ==========================================================
-    # 🕌 اذان و 🌦 آب‌وهوا (بازگردانده‌شده)
-    # ==========================================================
-    application.add_handler(MessageHandler(filters.Regex(r"^اذان"), get_azan_time))
-    application.add_handler(MessageHandler(filters.Regex(r"^رمضان"), get_ramadan_status))
-    application.add_handler(CallbackQueryHandler(show_weather, pattern="^panel_weather$"), group=-3)
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, show_weather), group=-3)
+font_handler = ConversationHandler(
+    entry_points=[MessageHandler(filters.TEXT & filters.Regex(r"^فونت"), font_maker)],
+    states={ASK_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, receive_font_name)]},
+    fallbacks=[],
+)
+application.add_handler(font_handler, group=2)
+application.add_handler(CallbackQueryHandler(next_font, pattern="^next_font"), group=2)
+application.add_handler(CallbackQueryHandler(prev_font, pattern="^prev_font"), group=2)
+application.add_handler(CallbackQueryHandler(feature_back, pattern="^feature_back$"), group=2)
 
-    # ==========================================================
-    # 📂 فایل‌ها و Callback کلی (بازگردانده‌شده)
-    # ==========================================================
-    application.add_handler(MessageHandler(filters.Document.ALL, handle_document), group=1)
-    application.add_handler(CallbackQueryHandler(panel_handler))
+# ==========================================================
+# 🤖 پنل ChatGPT هوش مصنوعی
+# ==========================================================
+from ai_chat.chatgpt_panel import show_ai_panel, chat, start_ai_chat, stop_ai_chat
+application.add_handler(CallbackQueryHandler(show_ai_panel, pattern="^panel_chatgpt$"), group=3)
+application.add_handler(CallbackQueryHandler(start_ai_chat, pattern="^start_ai_chat$"), group=3)
+application.add_handler(MessageHandler(filters.Regex("^(خاموش|/خاموش)$"), stop_ai_chat), group=3)
+application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, chat), group=3)
 
-    # ==========================================================
-    # 🎭 سخنگوی خنگول (پاسخ معمولی)
-    # ==========================================================
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, reply), group=5)
+# ==========================================================
+# 🕌 اذان و 🌙 رمضان + 🌦 آب‌وهوا (بازگردانده‌شده)
+# ==========================================================
+application.add_handler(MessageHandler(filters.Regex(r"^اذان"), get_azan_time), group=4)
+application.add_handler(MessageHandler(filters.Regex(r"^رمضان"), get_ramadan_status), group=4)
+application.add_handler(CallbackQueryHandler(show_weather, pattern="^panel_weather$"), group=4)
+application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, show_weather), group=4)
 
-    # ======================= 📊 سیستم آمار و آیدی خنگول فارسی =======================
+# ==========================================================
+# 📂 فایل‌ها و Callback کلی (بازگردانده‌شده)
+# ==========================================================
+application.add_handler(MessageHandler(filters.Document.ALL, handle_document), group=1)
+application.add_handler(CallbackQueryHandler(panel_handler), group=1)
 
-    # ✅ ثبت تمام پیام‌ها (متن، مدیا، استیکر و غیره)
-    # این باید قبل از آمار ثبت بشه ولی بعد از قفل‌ها
-    application.add_handler(
-        MessageHandler(filters.ALL & ~filters.COMMAND, record_message_activity),
-        group=-5
-    )
+# ==========================================================
+# 🎭 سخنگوی خنگول (پاسخ معمولی)
+# ==========================================================
+application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, reply), group=5)
 
-    # 👥 ثبت اعضای جدید
-    application.add_handler(
-        MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, record_new_members),
-        group=-5
-    )
+# ==========================================================
+# 📊 سیستم آمار و آیدی خنگول فارسی
+# ==========================================================
+application.add_handler(
+    MessageHandler(filters.ALL & ~filters.COMMAND, record_message_activity),
+    group=-5
+)
+application.add_handler(
+    MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, record_new_members),
+    group=-5
+)
+application.add_handler(
+    MessageHandler(filters.StatusUpdate.LEFT_CHAT_MEMBER, record_left_members),
+    group=-5
+)
+application.add_handler(
+    MessageHandler(
+        filters.Regex(r"^(?:آمار|آمار امروز|آیدی|id)$") & filters.TEXT & ~filters.COMMAND,
+        show_daily_stats
+    ),
+    group=20  # بالاتر از همه تا هیچ‌چیز بعدش پاک نشه
+)
 
-    # 🚪 ثبت اعضای لفت داده
-    application.add_handler(
-        MessageHandler(filters.StatusUpdate.LEFT_CHAT_MEMBER, record_left_members),
-        group=-5
-    )
-
-    # 📊 نمایش آمار روزانه و آیدی (هر دو در یک دستور)
-    # ⚙️ نکته: تابع show_daily_stats نباید پیام‌ها را حذف کند
-    # ⚙️ این هندلر در گروه بالا قرار می‌گیرد تا آخرین اجرا باشد و چیزی پاک نشود
-    application.add_handler(
-        MessageHandler(
-            filters.Regex(r"^(?:آمار|آمار امروز|آیدی|id)$") & filters.TEXT & ~filters.COMMAND,
-            show_daily_stats
-        ),
-    group=20  # 👈 بالاتر از همه تا هیچ‌چیز بعدش پاک نشه
-    )
-    # ==========================================================
-    # 🎉 خوشامد پویا و تنظیمات گروه
-    # ==========================================================
-    # 🎯 هندلرهای خوشامد جدید خنگول
-    application.add_handler(MessageHandler(filters.Regex("^خوشامد$"), open_welcome_panel), group=-1)
-    application.add_handler(CallbackQueryHandler(welcome_panel_buttons, pattern="^welcome_"), group=-1)
-    application.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome), group=-1)
-
-    # 🧠 هندلر ورودی هوشمند برای تنظیمات خوشامد
-    application.add_handler(MessageHandler(filters.TEXT | filters.PHOTO | filters.ANIMATION, welcome_input_handler), group=-1)
-    # ==========================================================
-
+# ==========================================================
+# 🎉 خوشامد پویا و تنظیمات گروه
+# ==========================================================
+application.add_handler(MessageHandler(filters.Regex("^خوشامد$"), open_welcome_panel), group=-1)
+application.add_handler(CallbackQueryHandler(welcome_panel_buttons, pattern="^welcome_"), group=-1)
+application.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome), group=-1)
+application.add_handler(MessageHandler(filters.TEXT | filters.PHOTO | filters.ANIMATION, welcome_input_handler), group=-1)
+         
 # ==========================================================
 from datetime import time, timezone, timedelta
 import asyncio
