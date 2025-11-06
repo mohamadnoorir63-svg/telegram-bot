@@ -31,6 +31,7 @@ def _save_warnings(data):
 
 # ================= 🔐 بررسی ادمین / سودو =================
 async def _has_access(context, chat_id: int, user_id: int) -> bool:
+    """بررسی اینکه کاربر اجازه اجرای دستور را دارد"""
     if user_id in SUDO_IDS:
         return True
     try:
@@ -50,13 +51,14 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
         return
 
     text = (msg.text or "").strip()
+    if not text:
+        return
 
     # فقط روی پیام ریپلای اعمال میشن
     need_reply = ["بن", "حذف بن", "سکوت", "حذف سکوت", "اخطار", "حذف اخطار"]
     if text in need_reply and not msg.reply_to_message:
         return await msg.reply_text("⚠️ باید روی پیام کاربر ریپلای کنی.")
 
-    # هدف
     target = msg.reply_to_message.from_user if msg.reply_to_message else None
 
     # 😅 شوخی اگر هدف خود ربات باشه
@@ -68,17 +70,17 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
         if "اخطار" in text:
             return await msg.reply_text("⚠️ من که همیشه مودبم، اخطار واسه من چرا؟")
         return
-# فقط اگه متن واقعاً دستور تنبیهی بود، نقشِ هدف رو چک کن ✅
-punish_keywords = ("بن", "رفع بن", "سکوت", "رفع سکوت", "اخطار", "حذف اخطار")
-if target and any(text.startswith(k) or text == k for k in punish_keywords):
-    target_member = await context.bot.get_chat_member(chat.id, target.id)
-    if target.id in SUDO_IDS:
-        return await msg.reply_text("👑 این کاربر جزو سودوهای ربات است، اجازه نداری تنبیهش کنی.")
-    if target_member.status == "creator":
-        return await msg.reply_text("👑 این کاربر سازنده‌ی گروه است.")
-    if target_member.status == "administrator":
-        return await msg.reply_text("🛡 این کاربر مدیر گروه است.")
 
+    # ✅ فقط اگر واقعاً دستور تنبیهی بود، نقش هدف رو چک کن
+    punish_keywords = ("بن", "حذف بن", "سکوت", "حذف سکوت", "اخطار", "حذف اخطار")
+    if target and any(text.startswith(k) or text == k for k in punish_keywords):
+        target_member = await context.bot.get_chat_member(chat.id, target.id)
+        if target.id in SUDO_IDS:
+            return await msg.reply_text("👑 این کاربر جزو سودوهای ربات است، اجازه نداری تنبیهش کنی.")
+        if target_member.status == "creator":
+            return await msg.reply_text("👑 این کاربر سازنده‌ی گروه است.")
+        if target_member.status == "administrator":
+            return await msg.reply_text("🛡 این کاربر مدیر گروه است.")
 
     # بررسی مجوز مجری
     if text in need_reply:
@@ -142,6 +144,7 @@ if target and any(text.startswith(k) or text == k for k in punish_keywords):
         data[key] = data.get(key, 0) + 1
         _save_warnings(data)
         count = data[key]
+
         if count >= 3:
             try:
                 await context.bot.ban_chat_member(chat.id, target.id)
@@ -166,7 +169,8 @@ if target and any(text.startswith(k) or text == k for k in punish_keywords):
 
 
 # ================= 🔧 ثبت هندلر =================
-def register_punishment_handlers(application, group_number: int = 11):
+def register_punishment_handlers(application, group_number: int = 12):
+    """ثبت هندلر دستورات تنبیه‌ها"""
     application.add_handler(
         MessageHandler(
             filters.TEXT
