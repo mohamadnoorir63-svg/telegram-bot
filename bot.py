@@ -2091,6 +2091,9 @@ register_filter_handlers(application, group_number=13)
 from group_control.tagger import register_tag_handlers
 register_tag_handlers(application, group_number=14)
 
+from group_control.admin_manager import register_admin_handlers
+register_admin_handlers(application, group_number=15)
+
 # ==========================================================
 # 👑 مدیریت سودوها
 # ==========================================================
