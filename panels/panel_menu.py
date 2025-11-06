@@ -1,4 +1,4 @@
-# ====================== 🌟 پنل مدیریت ربات (نسخه نهایی کامل با قفل گروه + رمضان + ساخت ریپلای) ======================
+# ====================== 🌟 پنل مدیریت ربات (نسخه نهایی کامل با قفل گروه + رمضان + ساخت ریپلای + سخنگوی خنگول) ======================
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
@@ -30,6 +30,9 @@ async def Tastatur_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
             InlineKeyboardButton("👮 مدیریت گروه", callback_data="Tastatur_admin"),
             InlineKeyboardButton("💐 خوشامد", callback_data="Tastatur_welcome"),
         ],
+        [
+            InlineKeyboardButton("🗣️ سخنگوی خنگول", callback_data="Tastatur_speaker"),
+        ],
         [InlineKeyboardButton("❌ بستن پنل", callback_data="Tastatur_close")],
     ]
 
@@ -60,6 +63,8 @@ async def Tastatur_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return await show_admin_menu(query)
     if data == "Tastatur_welcome":
         return await show_welcome_menu(query)
+    if data == "Tastatur_speaker":
+        return await show_speaker_menu(query)
 
     if data.startswith("help_"):
         return await show_help_info(query)
@@ -144,7 +149,7 @@ HELP_TEXTS = {
     "help_asl": (
         "📜 <b>ثبت اصل</b>\n\n"
         "➕ ثبت:\n"
-        "<code>ثبت اصل من اهل صداقتم</code> (روی پیام فرد ریپلای کن اگر برای دیگری می‌فرستی)\n\n"
+        "<code>ثبت اصل من اهل صداقتم</code>\n\n"
         "👀 نمایش:\n"
         "<code>اصل من</code>\n\n"
         "❌ حذف:\n"
@@ -153,7 +158,7 @@ HELP_TEXTS = {
     "help_laqab": (
         "🏷 <b>ثبت لقب</b>\n\n"
         "➕ ثبت:\n"
-        "<code>ثبت لقب قهرمان</code> (روی پیام فرد ریپلای کن اگر برای دیگری می‌فرستی)\n\n"
+        "<code>ثبت لقب قهرمان</code>\n\n"
         "👀 نمایش:\n"
         "<code>لقب من</code>\n\n"
         "❌ حذف:\n"
@@ -172,15 +177,11 @@ HELP_TEXTS = {
     ),
     "help_grouplock": (
         "🔒 <b>قفل گروه</b>\n\n"
-        "📌 با این ویژگی می‌تونی گروه رو به‌صورت کامل قفل یا باز کنی.\n\n"
-        "🕐 <b>حالت خودکار:</b>\n"
+        "📌 با این ویژگی می‌تونی گروه رو قفل یا باز کنی.\n\n"
+        "🕐 حالت خودکار:\n"
         "<code>قفل خودکار روشن</code>\n\n"
-        "🔓 <b>خاموش کردن:</b>\n"
-        "<code>قفل خودکار خاموش</code>\n\n"
-        "⚙️ <b>تنظیم ساعت قفل:</b>\n"
-        "<code>تنظیم قفل 23:00 تا 07:00</code>\n\n"
-        "💬 برای مشاهده وضعیت:\n"
-        "<code>وضعیت قفل</code>"
+        "🔓 خاموش:\n"
+        "<code>قفل خودکار خاموش</code>"
     ),
 }
 
@@ -188,13 +189,9 @@ async def show_help_info(query):
     data = query.data.strip()
     if data not in HELP_TEXTS:
         return await query.answer("❌ هنوز برای این گزینه راهنما تعریف نشده", show_alert=True)
-
     text = HELP_TEXTS[data]
     buttons = [[InlineKeyboardButton("🔙 بازگشت", callback_data="Tastatur_settings")]]
-
-    await query.edit_message_text(
-        text, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(buttons)
-    )
+    await query.edit_message_text(text, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(buttons))
 
 # ====================== 🔒 قفل‌ها ======================
 LOCK_PAGE_SIZE = 8
@@ -206,8 +203,8 @@ async def show_lock_page(query, page: int = 1):
     total_pages = (len(all_locks) + LOCK_PAGE_SIZE - 1) // LOCK_PAGE_SIZE
     start = (page - 1) * LOCK_PAGE_SIZE
     end = start + LOCK_PAGE_SIZE
-
     current_page_locks = all_locks[start:end]
+
     keyboard = []
     for key, label in current_page_locks:
         state = locks_data.get(key, False)
@@ -223,23 +220,18 @@ async def show_lock_page(query, page: int = 1):
         keyboard.append(nav)
 
     keyboard.append([InlineKeyboardButton("🔙 بازگشت", callback_data="Tastatur_admin")])
-
-    text = f"🔐 <b>مدیریت قفل‌ها</b>\nصفحه {page}/{total_pages}\n\nبرای تغییر وضعیت هر قفل روی آن بزنید 👇"
-    return await query.edit_message_text(
-        text, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(keyboard)
-    )
+    text = f"🔐 <b>مدیریت قفل‌ها</b>\nصفحه {page}/{total_pages}\n\nبرای تغییر وضعیت قفل‌ها کلیک کنید 👇"
+    return await query.edit_message_text(text, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(keyboard))
 
 async def toggle_lock_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     data = query.data
     chat_id = query.message.chat.id
     lock_key = data.split(":", 1)[1]
-
     locks_data = _get_locks(chat_id)
     new_state = not locks_data.get(lock_key, False)
     _set_lock(chat_id, lock_key, new_state)
     await query.answer(f"{LOCK_TYPES.get(lock_key)} {'🔒 فعال شد' if new_state else '🔓 غیرفعال شد'}", show_alert=False)
-
     index = list(LOCK_TYPES.keys()).index(lock_key)
     page_to_show = index // LOCK_PAGE_SIZE + 1
     return await show_lock_page(query, page_to_show)
@@ -268,7 +260,7 @@ FUN_TEXTS = {
 }
 
 async def show_fun_menu(query):
-    text = "🎮 <b>بخش سرگرمی‌ها و ابزارها</b>\n\nیکی از گزینه‌های زیر را انتخاب کنید 👇"
+    text = "🎮 <b>بخش سرگرمی‌ها و ابزارها</b>\n\nیکی از گزینه‌ها را انتخاب کنید 👇"
     keyboard = [
         [InlineKeyboardButton("😂 جوک", callback_data="fun_jok"), InlineKeyboardButton("🎯 فال", callback_data="fun_fal")],
         [InlineKeyboardButton("🧩 فونت", callback_data="fun_font"), InlineKeyboardButton("☁️ آب‌وهوا", callback_data="fun_weather")],
@@ -280,9 +272,7 @@ async def show_fun_menu(query):
 
 async def show_fun_info(query, title, desc):
     kb = [[InlineKeyboardButton("🔙 بازگشت", callback_data="Tastatur_fun")]]
-    return await query.edit_message_text(
-        f"{title}\n\n{desc}", parse_mode="HTML", reply_markup=InlineKeyboardMarkup(kb)
-    )
+    return await query.edit_message_text(f"{title}\n\n{desc}", parse_mode="HTML", reply_markup=InlineKeyboardMarkup(kb))
 
 async def handle_fun_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -292,6 +282,21 @@ async def handle_fun_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE)
         title, desc = FUN_TEXTS[key]
         return await show_fun_info(query, title, desc)
     return await query.answer("❌ گزینه نامعتبر است.", show_alert=False)
+
+# ====================== 🗣️ سخنگوی خنگول ======================
+async def show_speaker_menu(query):
+    text = (
+        "🗣️ <b>بخش سخنگوی خنگول</b>\n\n"
+        "برای <b>روشن یا خاموش کردن</b> این قابلیت:\n"
+        "<code>/reply</code>\n"
+        "را در گروه بنویسید.\n\n"
+        "📢 در این حالت، خنگول فقط به پیام‌هایی که ریپلای شده پاسخ می‌دهد.\n\n"
+        "اگر خنگول پاسخ نداد، بنویسید:\n"
+        "<code>خنگول کجایی</code>\n"
+        "و خنگول با پیام مخصوص خودش جواب می‌دهد 🤖💬"
+    )
+    keyboard = [[InlineKeyboardButton("🔙 بازگشت", callback_data="Tastatur_back")]]
+    return await query.edit_message_text(text, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(keyboard))
 
 # ====================== 👮 مدیریت گروه ======================
 async def show_admin_menu(query):
