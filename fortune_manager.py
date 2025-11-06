@@ -177,7 +177,9 @@ async def delete_fortune(update: Update):
     else:
         await update.message.reply_text("⚠️ فال موردنظر در فایل پیدا نشد.")
    
-  # ========================= ارسال فال تصادفی (بدون تکرار) =========================
+  from telegram import InputFile
+
+# ========================= ارسال فال تصادفی (بدون تکرار) =========================
 async def send_random_fortune(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data = load_fortunes()
     if not data:
@@ -230,20 +232,17 @@ async def send_random_fortune(update: Update, context: ContextTypes.DEFAULT_TYPE
             if _is_valid_url(val):
                 await update.message.reply_photo(photo=val, caption=f"🔮 فال شماره {k}")
             else:
-                with open(val, "rb") as f:
-                    await update.message.reply_photo(photo=f, caption=f"🔮 فال شماره {k}")
+                await update.message.reply_photo(photo=InputFile(val), caption=f"🔮 فال شماره {k}")
         elif t == "video":
             if _is_valid_url(val):
                 await update.message.reply_video(video=val, caption=f"🎥 فال شماره {k}")
             else:
-                with open(val, "rb") as f:
-                    await update.message.reply_video(video=f, caption=f"🎥 فال شماره {k}")
+                await update.message.reply_video(video=InputFile(val), caption=f"🎥 فال شماره {k}")
         elif t == "sticker":
             if _is_valid_url(val):
                 await update.message.reply_sticker(sticker=val)
             else:
-                with open(val, "rb") as f:
-                    await update.message.reply_sticker(sticker=f)
+                await update.message.reply_sticker(sticker=InputFile(val))
         else:
             await update.message.reply_text("⚠️ نوع فایل پشتیبانی نمی‌شود.")
     except Exception as e:
@@ -279,21 +278,18 @@ async def list_fortunes(update: Update):
                 if _is_valid_url(val):
                     await update.message.reply_photo(photo=val, caption=f"🔮 فال شماره {k}")
                 else:
-                    with open(val, "rb") as f:
-                        await update.message.reply_photo(photo=f, caption=f"🔮 فال شماره {k}")
+                    await update.message.reply_photo(photo=InputFile(val), caption=f"🔮 فال شماره {k}")
             elif t == "video":
                 if _is_valid_url(val):
                     await update.message.reply_video(video=val, caption=f"🎥 فال شماره {k}")
                 else:
-                    with open(val, "rb") as f:
-                        await update.message.reply_video(video=f, caption=f"🎥 فال شماره {k}")
+                    await update.message.reply_video(video=InputFile(val), caption=f"🎥 فال شماره {k}")
             elif t == "sticker":
                 await update.message.reply_text(f"🔮 فال شماره {k} (استیکر)")
                 if _is_valid_url(val):
                     await update.message.reply_sticker(sticker=val)
                 else:
-                    with open(val, "rb") as f:
-                        await update.message.reply_sticker(sticker=f)
+                    await update.message.reply_sticker(sticker=InputFile(val))
             shown += 1
         except Exception as e:
             print(f"[Fortune List Error] id={k} err={e}")
@@ -304,4 +300,3 @@ async def list_fortunes(update: Update):
     else:
         await update.message.reply_text(f"✅ {shown} فال آخر نمایش داده شد.\n\n"
                                         "برای حذف، روی فال دلخواه ریپلای بزن و بنویس: حذف فال 🗑️")
-        
