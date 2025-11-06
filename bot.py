@@ -969,6 +969,7 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "aliases.json",                  # مسیر اصلی
             "group_control/aliases.json",     # مسیر داخل پوشه
             "fortunes_media"                  # پوشه رسانه فال‌ها
+            "custom_commands.json",
         ]
 
         moved_any = False
