@@ -959,18 +959,18 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         with zipfile.ZipFile(restore_zip, "r") as zip_ref:
             zip_ref.extractall(restore_dir)
-
-        # 🧩 فایل‌ها و پوشه‌های مهم برای بازیابی
-        important_files = [
-            "memory.json",
-            "group_data.json",
-            "jokes.json",
-            "fortunes.json",
-            "aliases.json",                  # مسیر اصلی
-            "group_control/aliases.json",     # مسیر داخل پوشه
-            "fortunes_media"                  # پوشه رسانه فال‌ها
-            "custom_commands.json",
-        ]
+            
+            # 🧩 فایل‌ها و پوشه‌های مهم برای بازیابی
+important_files = [
+    "memory.json",
+    "group_data.json",
+    "jokes.json",
+    "fortunes.json",
+    "aliases.json",                  # مسیر اصلی
+    "group_control/aliases.json",    # مسیر داخل پوشه
+    "fortunes_media",                # پوشه رسانه فال‌ها
+    "custom_commands.json",          # دستورهای ذخیره شده
+]
 
         moved_any = False
         for fname in important_files:
