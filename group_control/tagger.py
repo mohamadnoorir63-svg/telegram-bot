@@ -10,7 +10,7 @@ from telegram.ext import ContextTypes, MessageHandler, filters
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ACTIVITY_FILE = os.path.join(BASE_DIR, "activity.json")
 
-SUDO_IDS = [8588347189]  # آیدی سودوها (مدیران کل ربات)
+SUDO_IDS = [8588347189]  # آیدی سودوها (ادمین‌های ربات)
 
 if not os.path.exists(ACTIVITY_FILE):
     with open(ACTIVITY_FILE, "w", encoding="utf-8") as f:
@@ -69,11 +69,16 @@ async def handle_tag_requests(update: Update, context: ContextTypes.DEFAULT_TYPE
     if chat.type not in ("group", "supergroup"):
         return
 
+    # ✅ فقط اگر متن یکی از دستورات تگ باشد ادامه بده
+    tag_commands = ["تگ همه", "تگ مدیران", "تگ فعال", "تگ غیرفعال", "تگ تصادفی"]
+    if not any(text.startswith(cmd) for cmd in tag_commands):
+        return  # پیام معمولی → کاری نکن
+
     # فقط مدیران یا سودوها مجاز
     if not await _has_access(context, chat.id, user.id):
         return await msg.reply_text("🚫 فقط مدیران یا سودوها مجاز به استفاده از این دستور هستند!")
 
-    # --- لود داده‌ها ---
+    # --- داده‌های فعالیت ---
     data = _load_activity()
     chat_key = str(chat.id)
     chat_data = data.get(chat_key, {})
@@ -116,7 +121,7 @@ async def handle_tag_requests(update: Update, context: ContextTypes.DEFAULT_TYPE
         except Exception as e:
             await msg.reply_text(f"⚠️ خطا در تگ مدیران: {e}")
 
-    # ================= 💬 تگ فعال‌ها =================
+    # ================= 💬 تگ فعال =================
     elif text == "تگ فعال":
         now = datetime.utcnow().timestamp()
         active_users = [uid for uid, t in chat_data.items() if now - t <= 24 * 3600]
@@ -136,7 +141,7 @@ async def handle_tag_requests(update: Update, context: ContextTypes.DEFAULT_TYPE
                 await msg.reply_text("💬 " + " ".join(mentions), parse_mode="Markdown")
             await asyncio.sleep(1)
 
-    # ================= 💤 تگ غیرفعال‌ها =================
+    # ================= 💤 تگ غیرفعال =================
     elif text == "تگ غیرفعال":
         now = datetime.utcnow().timestamp()
         inactive_users = [uid for uid, t in chat_data.items() if now - t > 24 * 3600]
@@ -160,9 +165,9 @@ async def handle_tag_requests(update: Update, context: ContextTypes.DEFAULT_TYPE
     elif text.startswith("تگ تصادفی"):
         try:
             count = 5  # پیش‌فرض ۵ نفر
-            match = text.split()
-            if len(match) > 2 and match[2].isdigit():
-                count = int(match[2])
+            parts = text.split()
+            if len(parts) > 2 and parts[2].isdigit():
+                count = int(parts[2])
 
             if not chat_data:
                 return await msg.reply_text("ℹ️ هیچ فعالیتی برای کاربران وجود ندارد.")
@@ -192,7 +197,7 @@ async def handle_tag_requests(update: Update, context: ContextTypes.DEFAULT_TYPE
 # ================= 🔧 ثبت هندلر =================
 def register_tag_handlers(application, group_number: int = 14):
     """ثبت هندلر تگ کاربران"""
-    # تگ‌ها
+    # هندلر دستورات تگ
     application.add_handler(
         MessageHandler(
             filters.TEXT & ~filters.COMMAND & filters.ChatType.GROUPS,
@@ -208,4 +213,4 @@ def register_tag_handlers(application, group_number: int = 14):
             record_user_activity,
         ),
         group=group_number + 1,
-    ) 
+    )
