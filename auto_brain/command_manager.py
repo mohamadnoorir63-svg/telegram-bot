@@ -4,17 +4,20 @@ from datetime import datetime
 from telegram import Update
 from telegram.ext import ContextTypes
 
-# 📁 مسیر فایل دستورات
-DATA_FILE = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "custom_commands.json"))
+# 📁 مسیر فایل دستورات کنار خود فایل command_manager.py
+DATA_FILE = os.path.join(os.path.dirname(__file__), "custom_commands.json")
+
+# مطمئن شو فایل وجود داره، در غیر این صورت ایجاد کن
+if not os.path.exists(DATA_FILE):
+    with open(DATA_FILE, "w", encoding="utf-8") as f:
+        json.dump({}, f)
+
 ADMIN_ID = 8588347189
 
 # ======================== 📦 حافظه دستورات ========================
 
 def load_commands():
     """خواندن تمام دستورها از فایل JSON"""
-    if not os.path.exists(DATA_FILE):
-        with open(DATA_FILE, "w", encoding="utf-8") as f:
-            json.dump({}, f)
     with open(DATA_FILE, "r", encoding="utf-8") as f:
         return json.load(f)
 
