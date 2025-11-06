@@ -109,10 +109,8 @@ async def save_fortune(update: Update):
         await update.message.reply_text(f"⚠️ خطا در ذخیره فال: {e}")
 
 
-
-# ========================= حذف فال (هماهنگ با لیست و پیام‌های ربات) =========================
+# ========================= حذف فال =========================
 async def delete_fortune(update: Update):
-    """با ریپلای روی فال موردنظر، آن را از فایل حذف می‌کند (پشتیبانی از متن، عکس، ویدیو، استیکر و پیام‌های ربات)."""
     reply = update.message.reply_to_message
     if not reply:
         return await update.message.reply_text("❗ لطفاً روی پیام فال ریپلای کن تا حذف شود.")
@@ -124,68 +122,47 @@ async def delete_fortune(update: Update):
     delete_type = None
     delete_match_values = []
 
-    # 🧩 حالت ۱: فال شماره X (در پیام‌های ربات)
     if reply.caption and "فال شماره" in reply.caption:
         try:
             num = "".join(ch for ch in reply.caption if ch.isdigit())
             if num and num in data:
                 deleted = data.pop(num)
                 save_fortunes(data)
-
-                # حذف فایل لوکال در صورت وجود
                 val = _abs_media_path(deleted.get("value", ""))
                 if os.path.exists(val) and not _is_valid_url(val):
                     try:
                         os.remove(val)
                     except Exception as e:
                         print(f"[Delete Fortune Warning] حذف فایل شکست خورد: {e}")
-
-                return await update.message.reply_text(f"🗑️ فال شماره {num} با موفقیت حذف شد ✅")
+                return await update.message.reply_text(f"🗑️ فال شماره {num} حذف شد ✅")
         except Exception as e:
-            print(f"[Delete Fortune Error] تشخیص شماره در کپشن شکست خورد: {e}")
+            print(f"[Delete Fortune Error] {e}")
 
-    # 🧩 حالت ۲: فال شماره X (در پیام متنی)
     if reply.text and "فال شماره" in reply.text:
         try:
             num = "".join(ch for ch in reply.text if ch.isdigit())
             if num and num in data:
                 deleted = data.pop(num)
                 save_fortunes(data)
-
                 val = _abs_media_path(deleted.get("value", ""))
                 if os.path.exists(val) and not _is_valid_url(val):
                     try:
                         os.remove(val)
                     except Exception as e:
                         print(f"[Delete Fortune Warning] حذف فایل شکست خورد: {e}")
-
-                return await update.message.reply_text(f"🗑️ فال شماره {num} با موفقیت حذف شد ✅")
+                return await update.message.reply_text(f"🗑️ فال شماره {num} حذف شد ✅")
         except Exception as e:
-            print(f"[Delete Fortune Error] تشخیص شماره در متن شکست خورد: {e}")
+            print(f"[Delete Fortune Error] {e}")
 
-    # 🧩 حالت ۳: حذف مستقیم بر اساس محتوای پیام (برای پیام‌های کاربر)
     if reply.text or reply.caption:
         delete_type = "text"
         delete_match_values.append((reply.text or reply.caption).strip())
-
     elif reply.photo:
         delete_type = "photo"
-        file = await reply.photo[-1].get_file()
-        delete_match_values.append(os.path.basename(file.file_path))
-        delete_match_values.append("photo")
-
     elif reply.video:
         delete_type = "video"
-        file = await reply.video.get_file()
-        delete_match_values.append(os.path.basename(file.file_path))
-        delete_match_values.append("video")
-
     elif reply.sticker:
         delete_type = "sticker"
-        file = await reply.sticker.get_file()
-        delete_match_values.append(os.path.basename(file.file_path))
-        delete_match_values.append("sticker")
-
     else:
         return await update.message.reply_text("⚠️ نوع فال قابل شناسایی نیست.")
 
@@ -193,40 +170,33 @@ async def delete_fortune(update: Update):
     for k, v in data.items():
         if v.get("type") == delete_type:
             val_path = _abs_media_path(v.get("value", ""))
-            base_name = os.path.basename(val_path)
+            if os.path.exists(val_path) and not _is_valid_url(val_path):
+                base_name = os.path.basename(val_path)
+                if any(match in base_name or match == v.get("value") for match in delete_match_values):
+                    key_to_delete = k
+                    break
 
-            # تطبیق بر اساس مقدار یا نام فایل
-            if any(match in base_name or match == v.get("value") for match in delete_match_values):
-                key_to_delete = k
-                break
-
-    # ⚙️ حذف نهایی
     if key_to_delete:
         deleted = data.pop(key_to_delete)
         save_fortunes(data)
-
         val = _abs_media_path(deleted.get("value", ""))
         if os.path.exists(val) and not _is_valid_url(val):
             try:
                 os.remove(val)
             except Exception as e:
                 print(f"[Delete Fortune Warning] حذف فایل شکست خورد: {e}")
-
         await update.message.reply_text("🗑️ فال با موفقیت حذف شد ✅")
     else:
         await update.message.reply_text("⚠️ فال موردنظر در فایل پیدا نشد.")
 
-# ========================= ارسال فال تصادفی (بدون تکرار تا اتمام کل مجموعه) =========================
+
+# ========================= ارسال فال تصادفی =========================
 async def send_random_fortune(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """ارسال فال تصادفی، بدون تکرار تا اتمام مجموعه (سپس بازتنظیم)"""
     data = load_fortunes()
     if not data:
         return await update.message.reply_text("📭 هنوز فالی ذخیره نشده 😔")
 
-    # مسیر حافظهٔ موقتی برای ذخیره کلیدهای ارسال‌شده
     sent_state_file = os.path.join(BASE_DIR, "sent_fortunes.json")
-
-    # بارگذاری وضعیت ارسال‌شده‌ها
     if os.path.exists(sent_state_file):
         try:
             with open(sent_state_file, "r", encoding="utf-8") as f:
@@ -236,59 +206,55 @@ async def send_random_fortune(update: Update, context: ContextTypes.DEFAULT_TYPE
     else:
         sent_keys = []
 
-    # بررسی اینکه همه فال‌ها فرستاده شدن یا نه
     all_keys = list(data.keys())
-
     if len(sent_keys) >= len(all_keys):
-        sent_keys = []  # همه ارسال شدن → ریست برای دور بعد
+        sent_keys = []
         print("♻️ لیست ارسال فال‌ها ریست شد (همه ارسال شده بودند).")
 
-    # پیدا کردن کلیدهای باقیمانده
     remaining_keys = [k for k in all_keys if k not in sent_keys]
     if not remaining_keys:
         remaining_keys = all_keys.copy()
 
-    # انتخاب تصادفی از باقی‌مانده‌ها
     random.shuffle(remaining_keys)
     k = remaining_keys.pop()
     sent_keys.append(k)
-
-    # ذخیره وضعیت جدید
     with open(sent_state_file, "w", encoding="utf-8") as f:
         json.dump(sent_keys, f, ensure_ascii=False, indent=2)
 
     v = data.get(k, {})
     t = v.get("type", "text").strip()
     raw = (v.get("value") or "").strip()
-
     if not raw:
         return await update.message.reply_text("⚠️ فال نامعتبر یا خالی بود، مورد بعدی...")
 
     val = _abs_media_path(raw)
 
+    # ✅ بررسی وجود فایل محلی
+    if t in ("photo", "video", "sticker") and not _is_valid_url(val):
+        if not os.path.exists(val):
+            print(f"[Missing File] فال {k} پیدا نشد: {val}")
+            del data[k]
+            save_fortunes(data)
+            return await update.message.reply_text("⚠️ فایل فال پیدا نشد، مورد بعدی امتحان می‌شود.")
+
     try:
         if t == "text":
             await update.message.reply_text(f"🔮 {raw}")
-
         elif t == "photo":
             await update.message.reply_photo(photo=val, caption=f"🔮 فال شماره {k}")
-
         elif t == "video":
             await update.message.reply_video(video=val, caption=f"🎥 فال شماره {k}")
-
         elif t == "sticker":
             await update.message.reply_sticker(sticker=val)
-
         else:
             await update.message.reply_text("⚠️ نوع فایل پشتیبانی نمی‌شود.")
-
     except Exception as e:
         print(f"[Fortune Error] id={k} type={t} err={e}")
         await update.message.reply_text("⚠️ خطا در ارسال فال. مورد بعدی امتحان می‌شود.")
 
-# ========================= لیست فال‌ها (شماره‌دار و قابل حذف با ریپلای) =========================
+
+# ========================= لیست فال‌ها =========================
 async def list_fortunes(update: Update):
-    """نمایش ۱۰ فال آخر با شماره و امکان حذف با ریپلای"""
     data = load_fortunes()
     if not data:
         return await update.message.reply_text("هنوز هیچ فالی ثبت نشده 😔")
@@ -299,28 +265,30 @@ async def list_fortunes(update: Update):
     )
 
     shown = 0
-    # آخرین ۱۰ فال
     for k in sorted(data.keys(), key=lambda x: int(x))[-10:]:
         v = data[k]
         t = v.get("type", "text")
         val = _abs_media_path(v.get("value", ""))
 
+        # ✅ بررسی وجود فایل قبل از ارسال
+        if t in ("photo", "video", "sticker") and not _is_valid_url(val):
+            if not os.path.exists(val):
+                print(f"[List Missing File] فال {k} حذف شده: {val}")
+                del data[k]
+                save_fortunes(data)
+                continue
+
         try:
             if t == "text":
-                # فال متنی با شماره
                 await update.message.reply_text(f"🔮 فال شماره {k}\n{v.get('value')}")
             elif t == "photo":
-                # فال تصویری با کپشن شماره‌دار
                 await update.message.reply_photo(photo=val, caption=f"🔮 فال شماره {k}")
             elif t == "video":
-                # فال ویدیویی با کپشن شماره‌دار
                 await update.message.reply_video(video=val, caption=f"🎥 فال شماره {k}")
             elif t == "sticker":
-                # فال استیکری با شماره
                 await update.message.reply_text(f"🔮 فال شماره {k} (استیکر)")
                 await update.message.reply_sticker(sticker=val)
             shown += 1
-
         except Exception as e:
             print(f"[Fortune List Error] id={k} err={e}")
             continue
@@ -328,5 +296,7 @@ async def list_fortunes(update: Update):
     if shown == 0:
         await update.message.reply_text("⚠️ هیچ فالی برای نمایش پیدا نشد (ممکنه فایل‌ها حذف شده باشن).")
     else:
-        await update.message.reply_text(f"✅ {shown} فال آخر نمایش داده شد.\n\n"
-                                        "برای حذف، روی فال دلخواه ریپلای بزن و بنویس: حذف فال 🗑️")
+        await update.message.reply_text(
+            f"✅ {shown} فال آخر نمایش داده شد.\n\n"
+            "برای حذف، روی فال دلخواه ریپلای بزن و بنویس: حذف فال 🗑️"
+        )
