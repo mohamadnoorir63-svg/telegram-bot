@@ -925,7 +925,6 @@ async def cloudsync(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await cloudsync_internal(context.bot, "Manual Cloud Backup")
 
 # ======================= 💾 بک‌آپ و بازیابی ZIP در چت =======================
-
 async def backup(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """بک‌آپ دستی و ارسال در چت"""
     await cloudsync_internal(context.bot, "Manual Backup")
@@ -961,44 +960,44 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
         with zipfile.ZipFile(restore_zip, "r") as zip_ref:
             zip_ref.extractall(restore_dir)
 
-        # 🧩 فایل‌های مهم برای بازیابی
+        # 🧩 فایل‌ها و پوشه‌های مهم برای بازیابی
         important_files = [
             "memory.json",
             "group_data.json",
             "jokes.json",
             "fortunes.json",
             "aliases.json",                  # مسیر اصلی
-            "group_control/aliases.json"     # مسیر داخل پوشه
-            "fortunes_media"  # ← پوشه رسانه فال‌ها
+            "group_control/aliases.json",     # مسیر داخل پوشه
+            "fortunes_media"                  # پوشه رسانه فال‌ها
         ]
 
         moved_any = False
         for fname in important_files:
             src = os.path.join(restore_dir, fname)
-            dest = fname  # مسیر مقصد
+            dest = fname
             dest_dir = os.path.dirname(dest)
 
             if os.path.exists(src):
-    if os.path.isdir(src):
-        # اگر src یک پوشه است، کل محتواش منتقل شود
-        if not os.path.exists(dest):
-            os.makedirs(dest, exist_ok=True)
-        for root, _, files in os.walk(src):
-            for file in files:
-                file_src = os.path.join(root, file)
-                rel_path = os.path.relpath(file_src, src)
-                file_dest = os.path.join(dest, rel_path)
-                os.makedirs(os.path.dirname(file_dest), exist_ok=True)
-                shutil.move(file_src, file_dest)
-        moved_any = True
-        print(f"♻️ بازیابی پوشه: {fname}")
-    else:
-        # اگر فایل معمولی است
-        if dest_dir and not os.path.exists(dest_dir):
-            os.makedirs(dest_dir, exist_ok=True)
-        shutil.move(src, dest)
-        moved_any = True
-        print(f"♻️ بازیابی فایل: {fname}")
+                if os.path.isdir(src):
+                    # اگر src یک پوشه است، کل محتواش منتقل شود
+                    if not os.path.exists(dest):
+                        os.makedirs(dest, exist_ok=True)
+                    for root, _, files in os.walk(src):
+                        for file in files:
+                            file_src = os.path.join(root, file)
+                            rel_path = os.path.relpath(file_src, src)
+                            file_dest = os.path.join(dest, rel_path)
+                            os.makedirs(os.path.dirname(file_dest), exist_ok=True)
+                            shutil.move(file_src, file_dest)
+                    moved_any = True
+                    print(f"♻️ بازیابی پوشه: {fname}")
+                else:
+                    # اگر فایل معمولی است
+                    if dest_dir and not os.path.exists(dest_dir):
+                        os.makedirs(dest_dir, exist_ok=True)
+                    shutil.move(src, dest)
+                    moved_any = True
+                    print(f"♻️ بازیابی فایل: {fname}")
 
         # 🔁 بازسازی حافظه‌ها
         from memory_manager import init_files
@@ -1018,6 +1017,7 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if os.path.exists(restore_dir):
             shutil.rmtree(restore_dir)
         context.user_data["await_restore"] = False
+ 
         
 # ======================= 💬 پاسخ و هوش مصنوعی =======================
 async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
