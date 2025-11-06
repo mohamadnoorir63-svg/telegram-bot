@@ -219,8 +219,8 @@ async def send_random_fortune(update: Update, context: ContextTypes.DEFAULT_TYPE
 async def list_fortunes(update: Update):
     data = load_fortunes()
     if not data:
-        return await update.message.reply_text("هنوز هیچ فالی ثبت نشده
-                                               😔")
+        return await update.message.reply_text("هنوز هیچ فالی ثبت نشده😔")
+
     await update.message.reply_text(
         f"📜 تعداد کل فال‌ها: {len(data)}\n\n"
         "برای حذف هر فال، روی پیام فال ریپلای بزن و بنویس: «حذف فال» 🗑️"
