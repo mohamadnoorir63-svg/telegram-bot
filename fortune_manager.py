@@ -71,6 +71,13 @@ async def send_media(update: Update, media_type: str, val: str, k: str):
         elif media_type == "sticker":
             await update.message.reply_sticker(sticker=file)
 
+# ========================= تولید کلید یکتا =========================
+def get_next_fortune_key(data):
+    if not data:
+        return "1"
+    keys = [int(k) for k in data.keys() if k.isdigit()]
+    return str(max(keys) + 1)
+
 # ========================= ثبت فال (ریپلای) =========================
 async def save_fortune(update: Update):
     reply = update.message.reply_to_message
@@ -120,66 +127,16 @@ async def save_fortune(update: Update):
             if v.get("type") == entry["type"] and v.get("value") == entry["value"]:
                 return await update.message.reply_text("😅 این فال قبلاً ذخیره شده بود!")
 
-        data[str(len(data) + 1)] = entry
+        # ذخیره با کلید یکتا
+        key = get_next_fortune_key(data)
+        data[key] = entry
         save_fortunes(data)
-        await update.message.reply_text("✅ فال با موفقیت ذخیره شد!")
+        await update.message.reply_text(f"✅ فال با موفقیت ذخیره شد! (کلید: {key})")
 
     except Exception as e:
         await update.message.reply_text(f"⚠️ خطا در ذخیره فال: {e}")
 
-# ========================= حذف فال پیشرفته =========================
-async def delete_fortune(update: Update):
-    reply = update.message.reply_to_message
-    if not reply:
-        return await update.message.reply_text("❗ لطفاً روی پیام فال ریپلای کن تا حذف شود.")
-
-    data = load_fortunes()
-    if not data:
-        return await update.message.reply_text("📂 هیچ فالی برای حذف وجود ندارد.")
-
-    # تشخیص نوع فال
-    delete_type = None
-    delete_match_value = None
-
-    if reply.text or reply.caption:
-        delete_type = "text"
-        delete_match_value = (reply.text or reply.caption).strip()
-    elif reply.photo:
-        delete_type = "photo"
-    elif reply.video:
-        delete_type = "video"
-    elif reply.sticker:
-        delete_type = "sticker"
-    else:
-        return await update.message.reply_text("⚠️ نوع فال قابل شناسایی نیست.")
-
-    # پیدا کردن فال از روی متن یا رسانه‌ای که ربات ارسال کرده
-    key_to_delete = None
-    for k, v in data.items():
-        if v.get("type") == delete_type:
-            if delete_type == "text":
-                if v.get("value") == delete_match_value:
-                    key_to_delete = k
-                    break
-            else:
-                # برای رسانه‌ها: بررسی مسیر فایل یا URL
-                val_path = _abs_media_path(v.get("value", ""))
-                if reply.photo or reply.video or reply.sticker:
-                    key_to_delete = k
-                    break
-
-    if key_to_delete:
-        deleted = data.pop(key_to_delete)
-        save_fortunes(data)
-        # حذف فایل رسانه لوکال
-        val = _abs_media_path(deleted.get("value", ""))
-        if os.path.exists(val) and not _is_valid_url(val):
-            os.remove(val)
-        await update.message.reply_text("🗑️ فال با موفقیت حذف شد ✅")
-    else:
-        await update.message.reply_text("⚠️ فال موردنظر در فایل پیدا نشد.")
-
-# ========================= ارسال فال تصادفی =========================
+# ========================= ارسال فال تصادفی بدون تکرار =========================
 async def send_random_fortune(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data = load_fortunes()
     if not data:
@@ -195,11 +152,9 @@ async def send_random_fortune(update: Update, context: ContextTypes.DEFAULT_TYPE
             sent_keys = []
 
     all_keys = list(data.keys())
-    if len(sent_keys) >= len(all_keys):
-        sent_keys = []
-
     remaining_keys = [k for k in all_keys if k not in sent_keys]
     if not remaining_keys:
+        sent_keys = []
         remaining_keys = all_keys.copy()
 
     random.shuffle(remaining_keys)
