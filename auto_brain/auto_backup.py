@@ -11,7 +11,6 @@ from telegram.ext import ContextTypes
 BACKUP_FOLDER = "backups"
 ADMIN_ID = int(os.getenv("ADMIN_ID", "7089376754"))
 
-
 # ======================= 🧠 توابع پایه =======================
 def _should_include_in_backup(path: str) -> bool:
     """فقط فایل‌های مهم داخل بک‌آپ بروند"""
@@ -23,14 +22,12 @@ def _should_include_in_backup(path: str) -> bool:
         return False
     return lowered.endswith((".json", ".jpg", ".png", ".webp", ".mp3", ".ogg"))
 
-
 # ======================= ☁️ بک‌آپ خودکار =======================
 async def auto_backup(bot):
     """بک‌آپ خودکار هر ۶ ساعت"""
     while True:
         await cloudsync_internal(bot, "Auto Backup")
         await asyncio.sleep(6 * 60 * 60)  # ⏰ هر ۶ ساعت
-
 
 # ======================= 💾 ساخت و ارسال بک‌آپ =======================
 async def cloudsync_internal(bot, reason="Manual Backup"):
@@ -42,15 +39,26 @@ async def cloudsync_internal(bot, reason="Manual Backup"):
         with zipfile.ZipFile(filename, "w", compression=zipfile.ZIP_DEFLATED) as zipf:
             # 🧩 افزودن مسیرهای مهم به‌صورت دستی
             important_files_extra = [
-                "group_control/aliases.json",  # aliasها
                 "memory.json",
+                "shadow_memory.json",
                 "group_data.json",
                 "fortunes.json",
-                "jokes.json"
+                "jokes.json",
+                "fortunes_media",          # پوشه مدیا کامل
+                "group_control/aliases.json",
+                "aliases.json"
             ]
             for imp in important_files_extra:
                 if os.path.exists(imp):
-                    zipf.write(imp)
+                    if os.path.isdir(imp):
+                        # اضافه کردن کل محتویات پوشه
+                        for root, _, files in os.walk(imp):
+                            for file in files:
+                                full_path = os.path.join(root, file)
+                                arcname = os.path.relpath(full_path, ".")
+                                zipf.write(full_path, arcname=arcname)
+                    else:
+                        zipf.write(imp)
                     print(f"📦 اضافه شد به بک‌آپ: {imp}")
 
             # 🔍 اسکن کل پروژه برای سایر فایل‌های مهم
@@ -85,7 +93,6 @@ async def cloudsync_internal(bot, reason="Manual Backup"):
         if os.path.exists(filename):
             os.remove(filename)
 
-
 # ======================= 💬 دستور /cloudsync برای سودو =======================
 async def cloudsync(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """اجرای دستی بک‌آپ ابری"""
@@ -93,19 +100,16 @@ async def cloudsync(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return await update.message.reply_text("⛔ فقط مدیر اصلی مجازه!")
     await cloudsync_internal(context.bot, "Manual Cloud Backup")
 
-
 # ======================= 💾 بک‌آپ و بازیابی ZIP در چت =======================
 async def backup(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """بک‌آپ دستی و ارسال در چت"""
     await cloudsync_internal(context.bot, "Manual Backup")
     await update.message.reply_text("✅ بک‌آپ کامل گرفته شد و ارسال شد!")
 
-
 async def restore(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """دریافت فایل ZIP برای بازیابی"""
     await update.message.reply_text("📂 فایل ZIP بک‌آپ را بفرست تا بازیابی شود.")
     context.user_data["await_restore"] = True
-
 
 async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """پردازش فایل ZIP و بازیابی ایمن"""
@@ -133,11 +137,13 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # 🧩 فایل‌های مهم برای بازیابی
         important_files = [
             "memory.json",
+            "shadow_memory.json",
             "group_data.json",
             "jokes.json",
             "fortunes.json",
-            "aliases.json",              # نسخه اصلی
-            "group_control/aliases.json" # اگر در پوشه group_control باشد
+            "fortunes_media",
+            "aliases.json",
+            "group_control/aliases.json"
         ]
 
         moved_any = False
@@ -147,9 +153,15 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
             dest_dir = os.path.dirname(dest)
 
             if os.path.exists(src):
-                if dest_dir and not os.path.exists(dest_dir):
-                    os.makedirs(dest_dir, exist_ok=True)
-                shutil.move(src, dest)
+                if os.path.isdir(src):
+                    # کپی کل محتویات پوشه مدیا
+                    if os.path.exists(dest):
+                        shutil.rmtree(dest)
+                    shutil.copytree(src, dest)
+                else:
+                    if dest_dir and not os.path.exists(dest_dir):
+                        os.makedirs(dest_dir, exist_ok=True)
+                    shutil.move(src, dest)
                 moved_any = True
                 print(f"♻️ بازیابی فایل: {fname}")
 
