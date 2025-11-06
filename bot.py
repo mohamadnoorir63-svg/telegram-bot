@@ -925,17 +925,16 @@ async def cloudsync(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await cloudsync_internal(context.bot, "Manual Cloud Backup")
 
 # ======================= 💾 بک‌آپ و بازیابی ZIP در چت =======================
+
 async def backup(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """بک‌آپ دستی و ارسال در چت"""
     await cloudsync_internal(context.bot, "Manual Backup")
     await update.message.reply_text("✅ بک‌آپ کامل گرفته شد و ارسال شد!")
 
-
 async def restore(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """دریافت فایل ZIP برای بازیابی"""
     await update.message.reply_text("📂 فایل ZIP بک‌آپ را بفرست تا بازیابی شود.")
     context.user_data["await_restore"] = True
-
 
 async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """پردازش فایل ZIP و بازیابی ایمن"""
@@ -959,18 +958,21 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         with zipfile.ZipFile(restore_zip, "r") as zip_ref:
             zip_ref.extractall(restore_dir)
-            
-            # 🧩 فایل‌ها و پوشه‌های مهم برای بازیابی
-important_files = [
-    "memory.json",
-    "group_data.json",
-    "jokes.json",
-    "fortunes.json",
-    "aliases.json",                  # مسیر اصلی
-    "group_control/aliases.json",    # مسیر داخل پوشه
-    "fortunes_media",                # پوشه رسانه فال‌ها
-    "custom_commands.json",          # دستورهای ذخیره شده
-]
+
+        # 🧩 فایل‌ها و پوشه‌های مهم برای بازیابی
+        important_files = [
+            "memory.json",
+            "group_data.json",
+            "jokes.json",
+            "fortunes.json",
+            "aliases.json",
+            # مسیر اصلی
+            "group_control/aliases.json",
+            # مسیر داخل پوشه
+            "fortunes_media",
+            # پوشه رسانه فال‌ها
+            "custom_commands.json",  # دستورهای ذخیره شده
+        ]
 
         moved_any = False
         for fname in important_files:
@@ -1018,7 +1020,6 @@ important_files = [
         if os.path.exists(restore_dir):
             shutil.rmtree(restore_dir)
         context.user_data["await_restore"] = False
- 
         
 # ======================= 💬 پاسخ و هوش مصنوعی =======================
 async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
