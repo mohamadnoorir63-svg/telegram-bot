@@ -9,7 +9,7 @@ from telegram.ext import ContextTypes
 
 # 🧩 تنظیمات پایه
 BACKUP_FOLDER = "backups"
-ADMIN_ID = int(os.getenv("ADMIN_ID", "8588347189)
+ADMIN_ID = int(os.getenv("ADMIN_ID", "8588347189"))
 
 # ======================= 🧠 توابع پایه =======================
 def _should_include_in_backup(path: str) -> bool:
