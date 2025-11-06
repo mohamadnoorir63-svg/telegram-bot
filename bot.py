@@ -2088,6 +2088,9 @@ register_pin_handlers(application, group_number=12)
 from group_control.word_filter import register_filter_handlers
 register_filter_handlers(application, group_number=13)
 
+from group_control.tagger import register_tag_handlers
+register_tag_handlers(application, group_number=14)
+
 # ==========================================================
 # 👑 مدیریت سودوها
 # ==========================================================
