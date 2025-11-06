@@ -47,6 +47,7 @@ async def cloudsync_internal(bot, reason="Manual Backup"):
                 "fortunes_media",          # پوشه مدیا کامل
                 "group_control/aliases.json",
                 "aliases.json"
+                "custom_commands.json",
             ]
             for imp in important_files_extra:
                 if os.path.exists(imp):
