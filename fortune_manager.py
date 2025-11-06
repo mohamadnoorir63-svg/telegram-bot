@@ -3,6 +3,7 @@
 import json
 import os
 import random
+import uuid
 from datetime import datetime
 from urllib.parse import urlparse
 from telegram import Update, InputFile
@@ -71,14 +72,7 @@ async def send_media(update: Update, media_type: str, val: str, k: str):
         elif media_type == "sticker":
             await update.message.reply_sticker(sticker=file)
 
-# ========================= تولید کلید یکتا =========================
-def get_next_fortune_key(data):
-    if not data:
-        return "1"
-    keys = [int(k) for k in data.keys() if k.isdigit()]
-    return str(max(keys) + 1)
-
-# ========================= ثبت فال (ریپلای) =========================
+# ========================= ثبت فال =========================
 async def save_fortune(update: Update):
     reply = update.message.reply_to_message
     if not reply:
@@ -122,19 +116,21 @@ async def save_fortune(update: Update):
         else:
             return await update.message.reply_text("⚠️ فقط متن، عکس، ویدیو یا استیکر پشتیبانی می‌شود.")
 
+        # جلوگیری از تکراری بودن فال
         for v in data.values():
             if v.get("type") == entry["type"] and v.get("value") == entry["value"]:
                 return await update.message.reply_text("😅 این فال قبلاً ذخیره شده بود!")
 
-        key = get_next_fortune_key(data)
-        data[key] = entry
+        # کلید یکتا با uuid
+        new_key = str(uuid.uuid4())
+        data[new_key] = entry
         save_fortunes(data)
-        await update.message.reply_text(f"✅ فال با موفقیت ذخیره شد! (کلید: {key})")
+        await update.message.reply_text("✅ فال با موفقیت ذخیره شد!")
 
     except Exception as e:
         await update.message.reply_text(f"⚠️ خطا در ذخیره فال: {e}")
 
-# ========================= حذف فال =========================
+# ========================= حذف فال پیشرفته =========================
 async def delete_fortune(update: Update):
     reply = update.message.reply_to_message
     if not reply:
@@ -167,6 +163,7 @@ async def delete_fortune(update: Update):
                     key_to_delete = k
                     break
             else:
+                # برای رسانه‌ها: بررسی مسیر فایل یا URL
                 key_to_delete = k
                 break
 
@@ -180,7 +177,7 @@ async def delete_fortune(update: Update):
     else:
         await update.message.reply_text("⚠️ فال موردنظر در فایل پیدا نشد.")
 
-# ========================= ارسال فال تصادفی بدون تکرار =========================
+# ========================= ارسال فال تصادفی =========================
 async def send_random_fortune(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data = load_fortunes()
     if not data:
@@ -197,12 +194,12 @@ async def send_random_fortune(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     all_keys = list(data.keys())
     remaining_keys = [k for k in all_keys if k not in sent_keys]
-    if not remaining_keys:
+
+    if not remaining_keys:  # اگر همه فال‌ها ارسال شده بودند
         sent_keys = []
         remaining_keys = all_keys.copy()
 
-    random.shuffle(remaining_keys)
-    k = remaining_keys.pop()
+    k = random.choice(remaining_keys)
     sent_keys.append(k)
 
     with open(sent_state_file, "w", encoding="utf-8") as f:
@@ -228,7 +225,7 @@ async def list_fortunes(update: Update):
     )
 
     shown = 0
-    for k in sorted(data.keys(), key=lambda x: int(x))[-10:]:
+    for k in sorted(data.keys())[-10:]:  # آخرین ۱۰ فال
         v = data[k]
         t = v.get("type", "text")
         val = _abs_media_path(v.get("value", ""))
@@ -245,3 +242,5 @@ async def list_fortunes(update: Update):
     else:
         await update.message.reply_text(
             f"✅ {shown} فال آخر نمایش داده شد.\n\n"
+            "برای حذف، روی فال دلخواه ریپلای بزن و بنویس: حذف فال 🗑️"
+        )
