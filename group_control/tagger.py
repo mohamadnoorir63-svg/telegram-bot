@@ -1,7 +1,8 @@
 import os
 import json
 import asyncio
-from datetime import datetime, timedelta
+import random
+from datetime import datetime
 from telegram import Update
 from telegram.ext import ContextTypes, MessageHandler, filters
 
@@ -16,6 +17,7 @@ if not os.path.exists(ACTIVITY_FILE):
         json.dump({}, f, ensure_ascii=False, indent=2)
 
 
+# ================= 📁 توابع کمکی =================
 def _load_activity():
     try:
         with open(ACTIVITY_FILE, "r", encoding="utf-8") as f:
@@ -57,7 +59,7 @@ async def record_user_activity(update: Update, context: ContextTypes.DEFAULT_TYP
     _save_activity(data)
 
 
-# ================= 👥 هندل تگ کاربران =================
+# ================= 👥 تگ کاربران =================
 async def handle_tag_requests(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = update.effective_message
     user = update.effective_user
@@ -71,29 +73,20 @@ async def handle_tag_requests(update: Update, context: ContextTypes.DEFAULT_TYPE
     if not await _has_access(context, chat.id, user.id):
         return await msg.reply_text("🚫 فقط مدیران یا سودوها مجاز به استفاده از این دستور هستند!")
 
-    # --- لود فعالیت ---
+    # --- لود داده‌ها ---
     data = _load_activity()
     chat_key = str(chat.id)
     chat_data = data.get(chat_key, {})
 
     # ================= 📢 تگ همه =================
     if text == "تگ همه":
-        members = await context.bot.get_chat_administrators(chat.id)
-        mention_list = []
-        async for member in context.bot.get_chat_administrators(chat.id):
-            pass  # فقط برای تأخیر امنیتی
         try:
-            all_members = await context.bot.get_chat_member_count(chat.id)
-        except:
-            all_members = None
-
-        try:
-            # فقط افرادی که فعالیت ثبت شده دارند
             if not chat_data:
-                return await msg.reply_text("ℹ️ هیچ فعالیتی برای کاربران ثبت نشده است.")
+                return await msg.reply_text("ℹ️ هنوز فعالیتی از کاربران در این گروه ثبت نشده است.")
 
             user_ids = list(chat_data.keys())
             chunks = [user_ids[i:i + 20] for i in range(0, len(user_ids), 20)]
+
             for chunk in chunks:
                 mentions = []
                 for uid in chunk:
@@ -107,7 +100,7 @@ async def handle_tag_requests(update: Update, context: ContextTypes.DEFAULT_TYPE
                     await msg.reply_text("👥 " + " ".join(mentions), parse_mode="Markdown")
                 await asyncio.sleep(1)
         except Exception as e:
-            await msg.reply_text(f"⚠️ خطا در تگ کاربران: {e}")
+            await msg.reply_text(f"⚠️ خطا در تگ همه: {e}")
 
     # ================= 👑 تگ مدیران =================
     elif text == "تگ مدیران":
@@ -128,7 +121,7 @@ async def handle_tag_requests(update: Update, context: ContextTypes.DEFAULT_TYPE
         now = datetime.utcnow().timestamp()
         active_users = [uid for uid, t in chat_data.items() if now - t <= 24 * 3600]
         if not active_users:
-            return await msg.reply_text("ℹ️ کاربر فعالی در ۲۴ ساعت گذشته وجود ندارد.")
+            return await msg.reply_text("ℹ️ هیچ کاربر فعالی در ۲۴ ساعت گذشته وجود ندارد.")
         chunks = [active_users[i:i + 20] for i in range(0, len(active_users), 20)]
         for chunk in chunks:
             mentions = []
@@ -148,7 +141,7 @@ async def handle_tag_requests(update: Update, context: ContextTypes.DEFAULT_TYPE
         now = datetime.utcnow().timestamp()
         inactive_users = [uid for uid, t in chat_data.items() if now - t > 24 * 3600]
         if not inactive_users:
-            return await msg.reply_text("ℹ️ کاربر غیرفعالی در ۲۴ ساعت گذشته وجود ندارد.")
+            return await msg.reply_text("ℹ️ همه کاربران در ۲۴ ساعت گذشته فعال بوده‌اند.")
         chunks = [inactive_users[i:i + 20] for i in range(0, len(inactive_users), 20)]
         for chunk in chunks:
             mentions = []
@@ -163,10 +156,43 @@ async def handle_tag_requests(update: Update, context: ContextTypes.DEFAULT_TYPE
                 await msg.reply_text("😴 " + " ".join(mentions), parse_mode="Markdown")
             await asyncio.sleep(1)
 
+    # ================= 🎲 تگ تصادفی =================
+    elif text.startswith("تگ تصادفی"):
+        try:
+            count = 5  # پیش‌فرض ۵ نفر
+            match = text.split()
+            if len(match) > 2 and match[2].isdigit():
+                count = int(match[2])
+
+            if not chat_data:
+                return await msg.reply_text("ℹ️ هیچ فعالیتی برای کاربران وجود ندارد.")
+
+            user_ids = [uid for uid in chat_data.keys()]
+            if not user_ids:
+                return await msg.reply_text("ℹ️ هیچ کاربری برای تگ تصادفی پیدا نشد.")
+
+            sample = random.sample(user_ids, min(count, len(user_ids)))
+            mentions = []
+            for uid in sample:
+                try:
+                    member = await context.bot.get_chat_member(chat.id, int(uid))
+                    if not member.user.is_bot:
+                        mentions.append(f"[{member.user.first_name}](tg://user?id={uid})")
+                except:
+                    continue
+
+            if mentions:
+                await msg.reply_text("🎲 تگ تصادفی:\n" + " ".join(mentions), parse_mode="Markdown")
+            else:
+                await msg.reply_text("ℹ️ هیچ کاربر مناسبی برای تگ تصادفی وجود ندارد.")
+        except Exception as e:
+            await msg.reply_text(f"⚠️ خطا در تگ تصادفی: {e}")
+
 
 # ================= 🔧 ثبت هندلر =================
 def register_tag_handlers(application, group_number: int = 14):
     """ثبت هندلر تگ کاربران"""
+    # تگ‌ها
     application.add_handler(
         MessageHandler(
             filters.TEXT & ~filters.COMMAND & filters.ChatType.GROUPS,
@@ -175,11 +201,11 @@ def register_tag_handlers(application, group_number: int = 14):
         group=group_number,
     )
 
-    # هندلر ثبت فعالیت کاربران (در اولویت پایین‌تر)
+    # ثبت فعالیت کاربران
     application.add_handler(
         MessageHandler(
             filters.ALL & filters.ChatType.GROUPS,
             record_user_activity,
         ),
         group=group_number + 1,
-    )
+    ) 
