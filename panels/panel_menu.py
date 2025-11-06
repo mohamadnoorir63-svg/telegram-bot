@@ -1,4 +1,4 @@
-# ====================== 🌟 پنل مدیریت ربات (نسخه راهنمای تنظیمات) ======================
+# ====================== 🌟 پنل مدیریت ربات (نسخه با زیرمنوی تنظیمات) ======================
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 from group_control.group_control import (
@@ -51,15 +51,17 @@ async def Tastatur_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if data == "Tastatur_back":
         return await Tastatur_menu(update, context)
     if data == "Tastatur_settings":
-        return await show_settings_help(query)
+        return await show_settings_menu(query)
+    if data.startswith("help_"):
+        return await show_help_info(query)
     if data == "Tastatur_fun":
         return await show_fun_menu(query)
-    if data == "Tastatur_locks":
-        return await show_lock_page(query, 1)
     if data == "Tastatur_admin":
         return await show_admin_menu(query)
     if data == "Tastatur_welcome":
         return await show_welcome_menu(query)
+    if data == "Tastatur_locks":
+        return await show_lock_page(query, 1)
     if data.startswith("toggle_lock:"):
         return await toggle_lock_button(update, context)
     if data.startswith("lock_page:"):
@@ -67,88 +69,119 @@ async def Tastatur_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if data.startswith("fun_"):
         return await handle_fun_buttons(update, context)
 
-    return await query.answer("این دکمه هنوز پیکربندی نشده ⚙️", show_alert=False)
-
-# ====================== ⚙️ راهنمای تنظیمات ======================
-async def show_settings_help(query):
+# ====================== ⚙️ زیرمنوی تنظیمات ======================
+async def show_settings_menu(query):
     text = (
-        "⚙️ <b>راهنمای تنظیمات ربات</b>\n\n"
-        "در این بخش می‌تونی با دستورات زیر تنظیمات گروهت رو تغییر بدی:\n\n"
-        "🔒 <b>قفل‌ها</b> — کنترل محتوای مجاز:\n"
-        "   قفل لینک، قفل عکس، قفل ویدیو، قفل ربات و ...\n"
-        "   📝 مثال: <code>قفل لینک</code> یا <code>باز کردن استیکر</code>\n\n"
-        "🚫 <b>فیلتر کلمات</b> — حذف پیام‌های دارای کلمه خاص:\n"
-        "   <code>فیلتر [کلمه]</code> — <code>حذف فیلتر [کلمه]</code>\n"
-        "   <code>لیست فیلتر</code>\n\n"
-        "🕒 <b>قفل خودکار</b> — بستن گروه در ساعات مشخص:\n"
-        "   <code>قفل خودکار 23:00 07:00</code>\n"
-        "   <code>حذف قفل خودکار</code>\n\n"
-        "💬 <b>خوشامدگویی</b> — فعالسازی خوشامد و تنظیم پیام:\n"
-        "   <code>خوشامد فعال</code> / <code>خوشامد غیرفعال</code>\n"
-        "   <code>تنظیم خوشامد سلام به {name}</code>\n\n"
-        "👑 <b>مدیریت مدیران</b> — افزودن / حذف مدیر گروه:\n"
-        "   <code>افزودن مدیر</code> / <code>حذف مدیر</code>\n\n"
-        "⚠️ <b>تنبیهات</b> — بن، سکوت، اخطار و حذف اخطار:\n"
-        "   <code>بن</code> / <code>سکوت 5 دقیقه</code> / <code>اخطار</code>\n\n"
-        "🔙 برای بازگشت از دکمه زیر استفاده کن 👇"
+        "⚙️ <b>بخش تنظیمات و ابزارها</b>\n\n"
+        "یکی از گزینه‌های زیر را برای مشاهده راهنما انتخاب کنید 👇"
     )
-    keyboard = [[InlineKeyboardButton("🔙 بازگشت", callback_data="Tastatur_back")]]
+    keyboard = [
+        [
+            InlineKeyboardButton("👑 افزودن مدیر", callback_data="help_addadmin"),
+            InlineKeyboardButton("📌 پن پیام", callback_data="help_pin"),
+        ],
+        [
+            InlineKeyboardButton("🚫 فیلتر کلمات", callback_data="help_filter"),
+            InlineKeyboardButton("🧹 پاکسازی", callback_data="help_clean"),
+        ],
+        [
+            InlineKeyboardButton("📜 اصل", callback_data="help_asl"),
+            InlineKeyboardButton("🏷 لقب", callback_data="help_laqab"),
+        ],
+        [InlineKeyboardButton("🔔 تگ کاربران", callback_data="help_tag")],
+        [InlineKeyboardButton("🔙 بازگشت", callback_data="Tastatur_back")],
+    ]
     return await query.edit_message_text(
         text, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(keyboard)
     )
 
-# ====================== 🔒 قفل‌ها ======================
-LOCK_PAGE_SIZE = 8
+# ====================== 📘 توضیحات کامل ابزارها ======================
+HELP_TEXTS = {
+    "help_addadmin": (
+        "👑 <b>افزودن یا حذف مدیر گروه</b>\n\n"
+        "برای مدیریت مدیران از دستورات زیر استفاده کن:\n\n"
+        "➕ افزودن مدیر:\n"
+        "<code>افزودن مدیر</code> (روی پیام فرد ریپلای کن)\n\n"
+        "➖ حذف مدیر:\n"
+        "<code>حذف مدیر</code> (ریپلای روی همان فرد)\n\n"
+        "📋 نمایش مدیران:\n"
+        "<code>لیست مدیران</code>"
+    ),
+    "help_pin": (
+        "📌 <b>پن یا حذف پن پیام</b>\n\n"
+        "برای سنجاق یا حذف سنجاق از دستورات زیر استفاده کن:\n\n"
+        "📍 پن پیام:\n"
+        "<code>پن</code> (روی پیام مورد نظر ریپلای کن)\n\n"
+        "❌ حذف پن:\n"
+        "<code>حذف پن</code>\n"
+        "یا اگر ریپلای نباشد، تمام پن‌ها حذف می‌شوند.\n\n"
+        "⏰ برای سنجاق موقت:\n"
+        "<code>پن 2 دقیقه</code> / <code>پن 5 ثانیه</code>"
+    ),
+    "help_filter": (
+        "🚫 <b>فیلتر کلمات</b>\n\n"
+        "برای جلوگیری از ارسال کلمات خاص:\n\n"
+        "➕ افزودن فیلتر:\n"
+        "<code>فیلتر تست</code>\n"
+        "⏰ موقت:\n"
+        "<code>فیلتر تست 2 ساعت</code>\n\n"
+        "➖ حذف فیلتر:\n"
+        "<code>حذف فیلتر تست</code>\n\n"
+        "📋 لیست فیلترها:\n"
+        "<code>لیست فیلتر</code>"
+    ),
+    "help_clean": (
+        "🧹 <b>پاکسازی پیام‌ها</b>\n\n"
+        "برای پاک کردن پیام‌های اخیر:\n\n"
+        "🧾 دستور:\n"
+        "<code>پاکسازی 50</code>\n"
+        "→ ۵۰ پیام اخیر حذف می‌شوند.\n\n"
+        "⚠️ فقط برای مدیران یا سودوها مجاز است."
+    ),
+    "help_asl": (
+        "📜 <b>ثبت اصل</b>\n\n"
+        "اصل برای نمایش متن دلخواه در پروفایل گروه:\n\n"
+        "➕ ثبت اصل:\n"
+        "<code>ثبت اصل من اهل صداقتم</code>\n\n"
+        "👀 مشاهده اصل:\n"
+        "<code>اصل من</code>\n\n"
+        "❌ حذف اصل:\n"
+        "<code>حذف اصل</code>"
+    ),
+    "help_laqab": (
+        "🏷 <b>ثبت لقب</b>\n\n"
+        "برای گذاشتن نام مستعار یا لقب:\n\n"
+        "➕ ثبت لقب:\n"
+        "<code>ثبت لقب قهرمان</code>\n\n"
+        "👀 دیدن لقب:\n"
+        "<code>لقب من</code>\n\n"
+        "❌ حذف لقب:\n"
+        "<code>حذف لقب</code>"
+    ),
+    "help_tag": (
+        "🔔 <b>تگ کاربران گروه</b>\n\n"
+        "برای منشن هم‌زمان اعضا:\n\n"
+        "👥 تگ همه:\n"
+        "<code>تگ همه</code>\n\n"
+        "👮 تگ مدیران:\n"
+        "<code>تگ مدیران</code>\n\n"
+        "💤 تگ غیرفعال‌ها:\n"
+        "<code>تگ غیره فعال</code>\n\n"
+        "🔥 تگ فعال‌ها:\n"
+        "<code>تگ فعال</code>"
+    ),
+}
 
-async def show_lock_page(query, page: int = 1):
-    chat_id = query.message.chat.id
-    locks_data = _get_locks(chat_id)
-    all_locks = list(LOCK_TYPES.items())
-    total_pages = (len(all_locks) + LOCK_PAGE_SIZE - 1) // LOCK_PAGE_SIZE
-    start = (page - 1) * LOCK_PAGE_SIZE
-    end = start + LOCK_PAGE_SIZE
+async def show_help_info(query):
+    key = query.data
+    if key not in HELP_TEXTS:
+        return await query.answer("دستور یافت نشد ⚠️", show_alert=True)
 
-    current_page_locks = all_locks[start:end]
-    keyboard = []
-    for key, label in current_page_locks:
-        state = locks_data.get(key, False)
-        icon = "✅ فعال" if state else "❌ غیرفعال"
-        keyboard.append([InlineKeyboardButton(f"{label} | {icon}", callback_data=f"toggle_lock:{key}")])
-
-    nav = []
-    if page > 1:
-        nav.append(InlineKeyboardButton("⬅️ قبل", callback_data=f"lock_page:{page-1}"))
-    if page < total_pages:
-        nav.append(InlineKeyboardButton("بعد ➡️", callback_data=f"lock_page:{page+1}"))
-    if nav:
-        keyboard.append(nav)
-
-    keyboard.append([InlineKeyboardButton("🔙 بازگشت", callback_data="Tastatur_admin")])
-
-    text = f"🔐 <b>مدیریت قفل‌ها</b>\nصفحه {page}/{total_pages}\n\nبرای تغییر وضعیت هر قفل روی آن بزنید 👇"
+    text = HELP_TEXTS[key]
+    keyboard = [[InlineKeyboardButton("🔙 بازگشت", callback_data="Tastatur_settings")]]
     return await query.edit_message_text(
         text, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(keyboard)
     )
-
-async def toggle_lock_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    data = query.data
-    chat_id = query.message.chat.id
-    lock_key = data.split(":", 1)[1]
-
-    locks_data = _get_locks(chat_id)
-    new_state = not locks_data.get(lock_key, False)
-    _set_lock(chat_id, lock_key, new_state)
-    await query.answer(f"{LOCK_TYPES.get(lock_key)} {'🔒 فعال شد' if new_state else '🔓 غیرفعال شد'}", show_alert=False)
-
-    index = list(LOCK_TYPES.keys()).index(lock_key)
-    page_to_show = index // LOCK_PAGE_SIZE + 1
-    return await show_lock_page(query, page_to_show)
-
-async def handle_lock_page_switch(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    page = int(query.data.split(":", 1)[1])
-    return await show_lock_page(query, page)
 
 # ====================== 🎮 سرگرمی‌ها ======================
 FUN_TEXTS = {
