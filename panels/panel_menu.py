@@ -1,9 +1,12 @@
-# ====================== 🌟 پنل مدیریت ربات (بروز شده) ======================
+# panels/panel_menu.py
+# ====================== 🌟 پنل مدیریت ربات (آپدیت‌شده) ======================
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
-from group_control.group_control import _get_locks, _set_lock, _save_json, LOCK_TYPES, LOCK_FILE, _load_json
+from group_control.group_control import (
+    _get_locks, _set_lock, _save_json, _load_json,
+    LOCK_TYPES, LOCK_FILE
+)
 
-# ───────────────────────────── عنوان اصلی ─────────────────────────────
 MAIN_TITLE = (
     "🌟 <b>پنل مدیریت گروه</b>\n\n"
     "از منوی زیر یکی از بخش‌ها را انتخاب کنید 👇"
@@ -65,13 +68,15 @@ async def Tastatur_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if data == "Tastatur_welcome":
         return await show_welcome_menu(query)
 
-    # تغییر قفل
     if data.startswith("toggle_lock:"):
         return await toggle_lock_button(update, context)
 
-    # جابجایی صفحات قفل
     if data.startswith("lock_page:"):
         return await handle_lock_page_switch(update, context)
+
+    # دکمه‌های سرگرمی
+    if data.startswith("fun_"):
+        return await handle_fun_buttons(update, context)
 
     return await query.answer("این دکمه هنوز پیکربندی نشده ⚙️", show_alert=False)
 
@@ -85,14 +90,14 @@ async def show_settings_menu(query):
     return await query.edit_message_text(text, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(keyboard))
 
 # ====================== 🔐 قفل‌ها ======================
-LOCK_PAGE_SIZE = 8  # چند قفل در هر صفحه نمایش داده شود
+LOCK_PAGE_SIZE = 8  # تعداد قفل در هر صفحه
 
 async def show_lock_page(query, page: int = 1):
     chat_id = query.message.chat.id
     locks_data = _get_locks(chat_id)
 
     all_locks = list(LOCK_TYPES.items())
-    total_pages = (len(all_locks) + LOCK_PAGE_SIZE - 1) // LOCK_PAGE_SIZE
+    total_pages = max(1, (len(all_locks) + LOCK_PAGE_SIZE - 1) // LOCK_PAGE_SIZE)
     page = max(1, min(page, total_pages))
     start = (page - 1) * LOCK_PAGE_SIZE
     end = start + LOCK_PAGE_SIZE
@@ -133,19 +138,27 @@ async def toggle_lock_button(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
     await query.answer(f"{LOCK_TYPES.get(lock_key)} {'🔒 فعال شد' if new_state else '🔓 غیرفعال شد'}", show_alert=False)
 
-    # بروزرسانی صفحه
-    locks_reload = _load_json(LOCK_FILE, {})
-    page_to_show = 1
+    # محاسبه صفحه فعلی بر اساس ایندکس کلید
     index = list(LOCK_TYPES.keys()).index(lock_key)
     page_to_show = index // LOCK_PAGE_SIZE + 1
     return await show_lock_page(query, page_to_show)
 
 async def handle_lock_page_switch(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    page = int(query.data.split(":")[1])
+    try:
+        page = int(query.data.split(":", 1)[1])
+    except (IndexError, ValueError):
+        return await query.answer("صفحه نامعتبر است ⚠️", show_alert=True)
     return await show_lock_page(query, page)
 
-# ====================== 🎮 سرگرمی‌ها (بدون تغییر) ======================
+# ====================== 🎮 سرگرمی‌ها ======================
+FUN_TEXTS = {
+    "fun_fal": ("🎯 فال", "با دستور «فال» می‌تونی فال روزانه بگیری 🌟"),
+    "fun_laqab": ("🏷 لقب", "با «ثبت لقب [متن] / لقب / حذف لقب» کار کن 😎"),
+    "fun_asl": ("📜 اصل", "با «ثبت اصل [متن] / اصل / حذف اصل»"),
+    "fun_jok": ("😂 جوک", "با «جوک» یه لطیفهٔ جدید بگیر 🤣"),
+}
+
 async def show_fun_menu(query):
     text = (
         "🎮 بخش سرگرمی‌ها و ابزارهای خنگول\n\n"
@@ -160,6 +173,21 @@ async def show_fun_menu(query):
     ]
     return await query.edit_message_text(text, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(keyboard))
 
+async def show_fun_info(query, title, desc):
+    kb = [[InlineKeyboardButton("🔙 بازگشت", callback_data="Tastatur_fun")]]
+    return await query.edit_message_text(
+        f"{title}\n\n{desc}", parse_mode="HTML", reply_markup=InlineKeyboardMarkup(kb)
+    )
+
+async def handle_fun_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    key = query.data
+    await query.answer()
+    if key in FUN_TEXTS:
+        title, desc = FUN_TEXTS[key]
+        return await show_fun_info(query, title, desc)
+    return await query.answer("نامعتبر است.", show_alert=False)
+
 # ====================== 👮 مدیریت گروه ======================
 async def show_admin_menu(query):
     text = (
@@ -167,9 +195,7 @@ async def show_admin_menu(query):
         "از گزینه‌های زیر استفاده کن برای کنترل گروه 👇"
     )
     keyboard = [
-        [InlineKeyboardButton("🔒 قفل/باز گروه", callback_data="Tastatur_admin_lockgroup")],
-        [InlineKeyboardButton("🚫 بن / سکوت / اخطار", callback_data="Tastatur_admin_punish")],
-        [InlineKeyboardButton("📌 پین / حذف پین", callback_data="Tastatur_admin_pin")],
+        [InlineKeyboardButton("🔒 قفل/باز گروه", callback_data="Tastatur_locks")],
         [InlineKeyboardButton("🔙 بازگشت", callback_data="Tastatur_back")],
     ]
     return await query.edit_message_text(text, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(keyboard))
