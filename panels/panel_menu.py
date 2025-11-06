@@ -1,4 +1,4 @@
-# ====================== 🌟 پنل مدیریت ربات (نسخه نهایی کامل با قفل گروه + رمضان + ساخت ریپلای + سخنگوی خنگول) ======================
+# ====================== 🌟 پنل مدیریت ربات (نسخه نهایی کامل با قفل گروه + رمضان + ساخت ریپلای + سخنگوی خنگول + افزودن دستور سفارشی) ======================
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
@@ -31,6 +31,7 @@ async def Tastatur_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
             InlineKeyboardButton("💐 خوشامد", callback_data="Tastatur_welcome"),
         ],
         [
+            InlineKeyboardButton("🧩 افزودن دستور سفارشی", callback_data="Tastatur_alias"),
             InlineKeyboardButton("🗣️ سخنگوی خنگول", callback_data="Tastatur_speaker"),
         ],
         [InlineKeyboardButton("❌ بستن پنل", callback_data="Tastatur_close")],
@@ -65,6 +66,8 @@ async def Tastatur_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return await show_welcome_menu(query)
     if data == "Tastatur_speaker":
         return await show_speaker_menu(query)
+    if data == "Tastatur_alias":
+        return await show_alias_menu(query)
 
     if data.startswith("help_"):
         return await show_help_info(query)
@@ -193,6 +196,29 @@ async def show_help_info(query):
     buttons = [[InlineKeyboardButton("🔙 بازگشت", callback_data="Tastatur_settings")]]
     await query.edit_message_text(text, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(buttons))
 
+# ====================== 🧩 افزودن دستور سفارشی ======================
+async def show_alias_menu(query):
+    text = (
+        "🧩 <b>افزودن دستور سفارشی</b>\n\n"
+        "با این قابلیت می‌تونی دستورهای مخصوص گروه خودت بسازی 💡\n\n"
+        "📘 فرمت ساخت:\n"
+        "<code>افزودن دستور [نام] [نوع دستور] [متن پاسخ]</code>\n\n"
+        "📋 انواع دستورها:\n"
+        "• بن — اخراج کاربر\n"
+        "• سکوت — محدود کردن ارسال پیام\n"
+        "• اخطار — افزایش اخطار و در اخطار سوم بن\n\n"
+        "📍 مثال‌ها:\n"
+        "<code>افزودن دستور بپر بن 🚀 {name} از گروه پرت شد بیرون!</code>\n"
+        "<code>افزودن دستور بخواب سکوت 🤫 {name} تا اطلاع ثانوی ساکت شد!</code>\n\n"
+        "💬 برای حذف دستور:\n"
+        "<code>حذف دستور بپر</code>\n\n"
+        "📜 برای دیدن همه دستورها:\n"
+        "<code>لیست دستورها</code>\n\n"
+        "هر گروه دستورهای مخصوص خودش رو داره 🔐"
+    )
+    keyboard = [[InlineKeyboardButton("🔙 بازگشت", callback_data="Tastatur_back")]]
+    await query.edit_message_text(text, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(keyboard))
+
 # ====================== 🔒 قفل‌ها ======================
 LOCK_PAGE_SIZE = 8
 
@@ -313,7 +339,6 @@ async def show_admin_menu(query):
         [InlineKeyboardButton("🔙 بازگشت", callback_data="Tastatur_back")],
     ]
     return await query.edit_message_text(text, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(keyboard))
-
 # ====================== 💐 خوشامد ======================
 async def show_welcome_menu(query):
     text = (
