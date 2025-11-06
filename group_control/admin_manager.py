@@ -7,7 +7,7 @@ from telegram.ext import ContextTypes, MessageHandler, filters
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ADMINS_FILE = os.path.join(BASE_DIR, "group_admins.json")
 
-SUDO_IDS = [8588347189]  # آیدی سودوها (صاحبان ربات)
+SUDO_IDS = [8588347189]  # آیدی سودوها (سودوهای ربات)
 
 if not os.path.exists(ADMINS_FILE):
     with open(ADMINS_FILE, "w", encoding="utf-8") as f:
@@ -29,7 +29,7 @@ def _save_admins(data):
 
 
 async def _has_access(context, chat_id, user_id):
-    """بررسی اینکه کاربر دسترسی لازم برای افزودن/حذف مدیر دارد"""
+    """بررسی دسترسی فرد اجراکننده"""
     if user_id in SUDO_IDS:
         return True
     try:
@@ -39,7 +39,7 @@ async def _has_access(context, chat_id, user_id):
         return False
 
 
-# ================= ⚙️ مدیریت مدیران گروه =================
+# ================= 🧰 مدیریت مدیران =================
 async def handle_admin_management(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = update.effective_message
     chat = update.effective_chat
@@ -54,24 +54,23 @@ async def handle_admin_management(update: Update, context: ContextTypes.DEFAULT_
     if chat_key not in data:
         data[chat_key] = []
 
-    # فقط مدیر یا سودو اجازه دارد
+    # فقط مدیران یا سودوها
     if text.startswith("افزودن مدیر") or text.startswith("حذف مدیر") or text == "لیست مدیران":
         if not await _has_access(context, chat.id, user.id):
-            return await msg.reply_text("🚫 فقط مدیران یا سودوها مجازند!")
+            return await msg.reply_text("🚫 فقط مدیران یا سودوها مجاز به اجرای این دستور هستند.")
 
     # ========== ➕ افزودن مدیر ==========
     if text.startswith("افزودن مدیر"):
         if not msg.reply_to_message:
-            return await msg.reply_text("⚠️ باید روی پیام فردی که می‌خواهی مدیر شود ریپلای کنی.")
+            return await msg.reply_text("⚠️ لطفاً روی پیام فرد موردنظر ریپلای کن.")
         target = msg.reply_to_message.from_user
 
-        # اگه از قبل مدیر است
         if target.id in SUDO_IDS:
             return await msg.reply_text("👑 این کاربر سودو است و نیازی به افزودن ندارد.")
 
         me = await context.bot.get_chat_member(chat.id, context.bot.id)
         if getattr(me, "can_promote_members", False) is not True and me.status != "creator":
-            return await msg.reply_text("🚫 من اجازه‌ی افزودن مدیر جدید را ندارم. لطفاً در تنظیمات گروه تیک «افزودن مدیران» را برای من فعال کن.")
+            return await msg.reply_text("🚫 من اجازه‌ی افزودن مدیر جدید را ندارم. لطفاً تیک مربوطه را فعال کن.")
 
         try:
             await context.bot.promote_chat_member(
@@ -91,18 +90,23 @@ async def handle_admin_management(update: Update, context: ContextTypes.DEFAULT_
             if target.id not in data[chat_key]:
                 data[chat_key].append(target.id)
                 _save_admins(data)
-            await msg.reply_text(f"✅ {target.first_name} به‌عنوان مدیر گروه اضافه شد.")
+
+            # ✨ پیام زیبا و رسمی
+            await msg.reply_text(
+                f"👑 {target.first_name} توسط {user.first_name} به‌عنوان <b>مدیر گروه</b> منصوب شد.",
+                parse_mode="HTML"
+            )
         except Exception as e:
             await msg.reply_text(f"⚠️ خطا در افزودن مدیر: {e}")
 
     # ========== ❌ حذف مدیر ==========
     elif text.startswith("حذف مدیر"):
         if not msg.reply_to_message:
-            return await msg.reply_text("⚠️ باید روی پیام فردی که می‌خواهی از مدیریت حذف شود ریپلای کنی.")
+            return await msg.reply_text("⚠️ لطفاً روی پیام مدیر موردنظر ریپلای کن.")
         target = msg.reply_to_message.from_user
 
         if target.id in SUDO_IDS:
-            return await msg.reply_text("🚫 نمی‌توان سودو را حذف کرد!")
+            return await msg.reply_text("🚫 نمی‌توان سودو را از مدیریت حذف کرد!")
 
         me = await context.bot.get_chat_member(chat.id, context.bot.id)
         if getattr(me, "can_promote_members", False) is not True and me.status != "creator":
@@ -126,7 +130,12 @@ async def handle_admin_management(update: Update, context: ContextTypes.DEFAULT_
             if target.id in data[chat_key]:
                 data[chat_key].remove(target.id)
                 _save_admins(data)
-            await msg.reply_text(f"❌ {target.first_name} از مدیران حذف شد.")
+
+            # ✨ پیام زیبا و رسمی
+            await msg.reply_text(
+                f"⚙️ {target.first_name} توسط {user.first_name} از فهرست <b>مدیران گروه</b> کنار گذاشته شد.",
+                parse_mode="HTML"
+            )
         except Exception as e:
             await msg.reply_text(f"⚠️ خطا در حذف مدیر: {e}")
 
@@ -139,9 +148,12 @@ async def handle_admin_management(update: Update, context: ContextTypes.DEFAULT_
                 if not admin.user.is_bot:
                     lines.append(f"• {admin.user.first_name}")
             if lines:
-                await msg.reply_text("👑 مدیران فعلی گروه:\n" + "\n".join(lines))
+                await msg.reply_text(
+                    "👑 <b>فهرست مدیران فعلی گروه:</b>\n" + "\n".join(lines),
+                    parse_mode="HTML"
+                )
             else:
-                await msg.reply_text("ℹ️ هیچ مدیری در گروه یافت نشد.")
+                await msg.reply_text("ℹ️ در حال حاضر هیچ مدیری در گروه یافت نشد.")
         except Exception as e:
             await msg.reply_text(f"⚠️ خطا در دریافت لیست مدیران: {e}")
 
