@@ -2103,11 +2103,11 @@ application.add_handler(
     MessageHandler(filters.ALL & filters.ChatType.GROUPS, handle_group_message),
     group=10
 )
-
+register_whisper_handler(application)
 # ==========================================================
 # 🚫 بن / سکوت / اخطار
 # ==========================================================
-register_whisper_handler(application)
+
 from group_control.punishments import register_punishment_handlers
 register_punishment_handlers(application, group_number=11)
 
