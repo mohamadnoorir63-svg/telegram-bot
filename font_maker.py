@@ -90,6 +90,18 @@ def generate_english_fonts(name):
         lambda t: f"⋆｡° {t} °｡⋆", lambda t: f"⋆✦ {t} ✦⋆", lambda t: f"꧁༺ {t} ༻꧂",
         lambda t: f"♡﹏﹏﹏ {t} ﹏﹏﹏♡", lambda t: f"✿♡✿ {t} ✿♡✿",
         lambda t: f"꧁༒☬ {t} ☬༒꧂", lambda t: f"✧˚༺ {t} ༻˚✧", lambda t: f"💫 {t} 💫",
+                      "𝓐𝓑𝓒𝓓𝓔𝓕𝓖𝓗𝓘𝓙𝓚𝓛𝓜𝓝𝓞𝓟𝓠𝓡𝓢𝓣𝓤𝓥𝓦𝓧𝓨𝓩𝓪𝓫𝓬𝓭𝓮𝓯𝓰𝓱𝓲𝓳𝓴𝓵𝓶𝓷𝓸𝓹𝓺𝓻𝓼𝓽𝓾𝓿𝔀𝔁𝔂𝔃"),
+        str.maketrans("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz",
+                      "𝔄𝔅ℭ𝔇𝔈𝔉𝔊ℌℑ𝔍𝔎𝔏𝔐𝔑𝔒𝔓𝔔ℜ𝔖𝔗𝔘𝔙𝔚𝔛𝔜ℨ𝔞𝔟𝔠𝔡𝔢𝔣𝔤𝔥𝔦𝔧𝔨𝔩𝔪𝔫𝔬𝔭𝔮𝔯𝔰𝔱𝔲𝔳𝔴𝔵𝔶𝔷"),
+        str.maketrans("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz",
+                      "𝐀𝐁𝐂𝐃𝐄𝐅𝐆𝐇𝐈𝐉𝐊𝐋𝐌𝐍𝐎𝐏𝐐𝐑𝐒𝐓𝐔𝐕𝐖𝐗𝐘𝐙𝐚𝐛𝐜𝐝𝐞𝐟𝐠𝐡𝐢𝐣𝐤𝐥𝐦𝐧𝐨𝐩𝐪𝐫𝐬𝐭𝐮𝐯𝐰𝐱𝐲𝐳"),
+        str.maketrans("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz",
+                      "ⓜⓞⓗⓐⓜⓜⓐⓓ", "⒨⒪⒣⒜⒨⒨⒜⒟", "мσнαммα∂", "𝐌𝐎𝐇𝐀𝐌𝐌𝐀𝐃",
+                      "𝑴𝑶𝑯𝑨𝑴𝑴𝑨𝑫", "𝑀𝑂𝐻𝐴𝑀𝑀𝐴𝐷", "𝗠𝗢𝗛𝗔𝗠𝗠𝗔𝗗", "𝖬𝖮𝖧𝖠𝖬𝖬𝖠𝖣",
+                      "𝕸𝕺𝕳𝕬𝕸𝕸𝕬𝕯", "𝔐𝔒ℌ𝔄𝔐𝔐𝔄𝔇", "𝙈𝙊𝙃𝘼𝙈𝙈𝘼𝘿", "𝘔𝘖𝘏𝘈𝘔𝘔𝘈𝘿",
+                      "M‌‌O‌‌H‌‌A‌‌M‌‌M‌‌A‌‌D", "M0H4MM4D", "🅼🅾🅷🅰🅼🅼🅰🅳", "𝐌𝐎𝐇𝐀𝐌𝐌𝐀𝐃"
+                      "🅰️🅱️🅲️🅳️🅴️🅵️🅶️🅷️🅸️🅹️🅺️🅻️🅼️🅽️🅾️🅿️🆀️🆁️🆂️🆃️🆄️🆅️🆆️🆇️🆈️🆉️🅰️🅱️🅲️🅳️🅴️🅵️🅶️🅷️🅸️🅹️🅺️🅻️🅼️🅽️🅾️🅿️🆀️🆁️🆂️🆃️🆄️🆅️🆆️🆇️🆈️🆉️"),
+    ]
         lambda t: f"⋆˙⟡♡⟡˙⋆ {t} ⋆˙⟡♡⟡˙⋆", lambda t: f"⟡✧ {t} ✧⟡"
     ]
     fonts = [frame(name) for frame in frames]
