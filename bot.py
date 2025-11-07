@@ -2054,8 +2054,6 @@ if __name__ == "__main__":
     # 🧹 پاکسازی داده‌های گروه وقتی ربات حذف یا بیرون انداخته می‌شود
     # ==========================================================
     from telegram.ext import ChatMemberHandler
-    
-    register_whisper_handler(application)
 
     
 
@@ -2125,6 +2123,8 @@ register_tag_handlers(application, group_number=14)
 
 from group_control.admin_manager import register_admin_handlers
 register_admin_handlers(application, group_number=16)
+
+register_whisper_handler(application, group_number=17)
 
 # ==========================================================
 # 👑 مدیریت سودوها
