@@ -2,7 +2,7 @@ import json
 import os
 import asyncio
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import ContextTypes, CommandHandler, CallbackQueryHandler, ApplicationBuilder
+from telegram.ext import ContextTypes, MessageHandler, CallbackQueryHandler, ApplicationBuilder, filters
 from cryptography.fernet import Fernet
 import re
 
@@ -37,20 +37,22 @@ def save_whispers(data):
     with open(WHISPER_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
-async def whisper_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """دستور /Najwa @username متن"""
+async def whisper_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """پردازش پیام PV بدون /"""
     message_text = update.message.text
 
-    # بررسی فرمت: /Najwa @username متن
-    match = re.match(r'^/Najwa\s+@?(\w+)\s+(.+)', message_text)
+    # بررسی فرمت: Najwa @username متن
+    match = re.match(r'^Najwa\s+@?([A-Za-z0-9_]+)\s+(.+)', message_text)
     if not match:
-        await update.message.reply_text("❌ فرمت درست: /Najwa @username متن")
-        return
+        return  # نادیده گرفتن پیام‌هایی که با Najwa شروع نمی‌شوند
 
     target_username = match.group(1)
     text = match.group(2)
     sender = update.effective_user
     chat_id = update.effective_chat.id
+
+    # حذف پیام فرستنده تا در گروه دیده نشود
+    await update.message.delete()
 
     # پیدا کردن کاربر هدف
     target_user = None
@@ -64,7 +66,7 @@ async def whisper_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         pass
 
     if not target_user:
-        await update.message.reply_text("⚠️ کاربر مورد نظر در گروه پیدا نشد.")
+        # اگر کاربر پیدا نشد، می‌توان اعلان داد (اختیاری)
         return
 
     # رمزگذاری متن
@@ -87,8 +89,9 @@ async def whisper_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     button = InlineKeyboardMarkup.from_button(
         InlineKeyboardButton(f"📩 مشاهده نجوا برای {target_user.first_name}", callback_data=f"whisper:{whisper_id}")
     )
-    await update.message.reply_html(
-        f"🤫 <b>{target_user.first_name}</b> شما یک نجوا از طرف <b>{sender.first_name}</b> دارید!",
+    await context.bot.send_message(
+        chat_id=chat_id,
+        text=f"🤫 {target_user.first_name} شما یک نجوا از طرف {sender.first_name} دارید!",
         reply_markup=button
     )
 
@@ -124,5 +127,7 @@ async def open_whisper(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 def register_whisper_handler(application):
-    application.add_handler(CommandHandler("Najwa", whisper_command))
+    # پیام‌هایی که با "Najwa " شروع می‌شوند
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, whisper_message))
+    # دکمه باز کردن نجوا
     application.add_handler(CallbackQueryHandler(open_whisper, pattern=r"^whisper:"))
