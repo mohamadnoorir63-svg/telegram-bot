@@ -37,7 +37,7 @@ def save_whispers(data):
     with open(WHISPER_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
-async def whisper_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def whisper_message(update: Update, context: ContextTypes.DEFAULT_TYPE, auto_delete_seconds: int):
     """پردازش پیام PV بدون / و ارسال اعلان عمومی"""
     message_text = update.message.text
 
@@ -94,9 +94,9 @@ async def whisper_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=button
     )
 
-    # حذف خودکار بعد ۵ دقیقه
+    # حذف خودکار بعد از مدت مشخص شده
     async def auto_delete():
-        await asyncio.sleep(300)
+        await asyncio.sleep(auto_delete_seconds)
         data = load_whispers()
         if whisper_id in data:
             del data[whisper_id]
@@ -119,7 +119,6 @@ async def open_whisper(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.answer("🚫 این نجوا برای شما نیست!", show_alert=True)
         return
 
-    # رمزگشایی متن
     decrypted_text = fernet.decrypt(whisper["text"].encode()).decode()
 
     # نمایش popup فقط برای گیرنده
@@ -128,8 +127,12 @@ async def open_whisper(update: Update, context: ContextTypes.DEFAULT_TYPE):
         show_alert=True
     )
 
-def register_whisper_handler(application):
+def register_whisper_handler(application, auto_delete_seconds: int = 300):
+    """ثبت تمام handlerهای نجوا روی Application اصلی"""
     # پیام‌هایی که با "Najwa " شروع می‌شوند
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, whisper_message))
+    application.add_handler(MessageHandler(
+        filters.TEXT & ~filters.COMMAND,
+        lambda update, context: whisper_message(update, context, auto_delete_seconds)
+    ))
     # دکمه باز کردن نجوا
     application.add_handler(CallbackQueryHandler(open_whisper, pattern=r"^whisper:"))
