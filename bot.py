@@ -2107,6 +2107,7 @@ application.add_handler(
 # ==========================================================
 # 🚫 بن / سکوت / اخطار
 # ==========================================================
+register_whisper_handler(application)
 from group_control.punishments import register_punishment_handlers
 register_punishment_handlers(application, group_number=11)
 
@@ -2123,11 +2124,6 @@ register_tag_handlers(application, group_number=14)
 
 from group_control.admin_manager import register_admin_handlers
 register_admin_handlers(application, group_number=16)
-
-
-register_whisper_handler(application)
-register_other_handlers(application)
-
 
 # ==========================================================
 # 👑 مدیریت سودوها
