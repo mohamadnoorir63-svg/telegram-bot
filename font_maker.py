@@ -163,6 +163,10 @@ def get_luxury_styles(name):
         str.maketrans("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz",
                       "𝐀𝐁𝐂𝐃𝐄𝐅𝐆𝐇𝐈𝐉𝐊𝐋𝐌𝐍𝐎𝐏𝐐𝐑𝐒𝐓𝐔𝐕𝐖𝐗𝐘𝐙𝐚𝐛𝐜𝐝𝐞𝐟𝐠𝐡𝐢𝐣𝐤𝐥𝐦𝐧𝐨𝐩𝐪𝐫𝐬𝐭𝐮𝐯𝐰𝐱𝐲𝐳"),
         str.maketrans("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz",
+                      "ⓜⓞⓗⓐⓜⓜⓐⓓ", "⒨⒪⒣⒜⒨⒨⒜⒟", "мσнαммα∂", "𝐌𝐎𝐇𝐀𝐌𝐌𝐀𝐃",
+                      "𝑴𝑶𝑯𝑨𝑴𝑴𝑨𝑫", "𝑀𝑂𝐻𝐴𝑀𝑀𝐴𝐷", "𝗠𝗢𝗛𝗔𝗠𝗠𝗔𝗗", "𝖬𝖮𝖧𝖠𝖬𝖬𝖠𝖣",
+                      "𝕸𝕺𝕳𝕬𝕸𝕸𝕬𝕯", "𝔐𝔒ℌ𝔄𝔐𝔐𝔄𝔇", "𝙈𝙊𝙃𝘼𝙈𝙈𝘼𝘿", "𝘔𝘖𝘏𝘈𝘔𝘔𝘈𝘿",
+                      "M‌‌O‌‌H‌‌A‌‌M‌‌M‌‌A‌‌D", "M0H4MM4D", "🅼🅾🅷🅰🅼🅼🅰🅳", "𝐌𝐎𝐇𝐀𝐌𝐌𝐀𝐃"
                       "🅰️🅱️🅲️🅳️🅴️🅵️🅶️🅷️🅸️🅹️🅺️🅻️🅼️🅽️🅾️🅿️🆀️🆁️🆂️🆃️🆄️🆅️🆆️🆇️🆈️🆉️🅰️🅱️🅲️🅳️🅴️🅵️🅶️🅷️🅸️🅹️🅺️🅻️🅼️🅽️🅾️🅿️🆀️🆁️🆂️🆃️🆄️🆅️🆆️🆇️🆈️🆉️"),
     ]
 
