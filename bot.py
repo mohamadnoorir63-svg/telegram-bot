@@ -1030,9 +1030,17 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
 # ======================= 💬 پاسخ و هوش مصنوعی =======================
 async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
     """پاسخ‌دهی اصلی هوش مصنوعی و سیستم یادگیری"""
-    
+
+    # 🚫 جلوگیری از پاسخ هوشمند در صورت اجرای دستور سفارشی
+    if context.user_data.get("custom_handled"):
+        context.user_data["custom_handled"] = False
+        return
+
+    # 🧩 اطمینان از اینکه پیام معتبره
+    if not update.message or not update.message.text:
+        return
+
     # 🧠 تعریف اولیه متغیرها (برای جلوگیری از خطای متغیر ناشناخته)
     uid = update.effective_user.id
     chat_id = update.effective_chat.id
@@ -1040,13 +1048,6 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # 🧩 پردازش پیام گروهی (الان دیگه متغیرها مقدار دارند)
     reply_text = process_group_message(uid, chat_id, text)
-
-    # اگر پاسخی موجود نیست، یک پاسخ ساختگی از چیزایی که یاد گرفته بساز
-    if not reply_text:
-        # گرفتن چند پیام اخیر کاربر
-        recent_context = context_memory.get_context(uid) or []
-        # ترکیب چند پیام آخر برای ساخت پاسخ
-        reply_text = " ".join(recent_context[-3:]) if recent_context else "من چیزی یاد گرفتم، اما الان نمی‌تونم جواب بدم 😅"
 
     # 🧠 فعال‌سازی حافظهٔ کوتاه‌مدت گفتگو
     context_memory.add_message(uid, text)
@@ -1062,6 +1063,23 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_chat.type == "private" and lower_text not in ["جوک", "فال"]:
         return
 
+    # ✅ جلوگیری از پاسخ به دستورات خاص (مثل راهنما، خوشامد، ربات و غیره)
+    protected_words = [
+        "راهنما", "ثبت راهنما", "خوشامد", "ثبت خوشامد",
+        "ربات", "save", "del", "panel", "backup", "cloudsync", "leave"
+    ]
+    if any(lower_text.startswith(word) for word in protected_words):
+        return
+
+    # 🚫 جلوگیری از پاسخ به پیام‌های مدیریتی و دستوری
+    command_keywords = [
+        "قفل", "باز", "بازکردن", "پنل", "خوشامد",
+        "عکس خوشامد", "فیلتر", "سکوت", "بن", "اخطار",
+        "لقب", "اصل", "تگ", "پاکسازی", "گروه", "مدیر", "سودو"
+    ]
+    if any(lower_text.startswith(word) for word in command_keywords):
+        return
+
     # 🧠 بررسی حالت ریپلی مود گروهی
     if await handle_group_reply_mode(update, context):
         return
@@ -1070,15 +1088,14 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await register_user(update.effective_user)
     register_group_activity(chat_id, uid)
 
+    # 🧠 یادگیری خودکار از متن کاربر
     if not status["locked"]:
         auto_learn_from_text(text)
 
+    # 🧠 یادگیری سایه‌ای در صورت غیر فعال بودن سیستم اصلی
     if not status["active"]:
         shadow_learn(text, "")
         return
-
-    # 📨 ارسال پاسخ امن به کاربر
-    await update.message.reply_text(reply_text)
         
 
     # ✅ درصد هوش منطقی
