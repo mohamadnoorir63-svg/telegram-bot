@@ -53,98 +53,91 @@ async def send_fonts(update, context, name):
     return ConversationHandler.END
 
 # ======================= 🎭 فونت فارسی مرتب و جذاب =======================
-def generate_persian_fonts(name):
-    styles = [
-        f"♡﹏﹏﹏ {name} ﹏﹏﹏♡",
-        f"╭──❀──╮ {name} ╰──❀──╯",
-        f"♡•́‿•̀♡ {name} ♡•́‿•̀♡",
-        f"💞 {name} 💞",
-        f"❣️ {name} ❣️",
-        f"꧁༺♥༻꧂ {name} ꧁༺♥༻꧂",
-        f"💋 {name} 💋",
-        f"✿♡✿ {name} ✿♡✿",
-        f"🌸 {name} 🌸",
-        f"⋆˙⟡♡⟡˙⋆ {name} ⋆˙⟡♡⟡˙⋆",
-        f"╭────────╮\n{name}\n╰────────╯",
-        f"✧˚༺ {name} ༻˚✧",
-        f"♡₊˚ {name} ˚₊♡",
-        f"❀❀ {name} ❀❀",
-        f"⟡♡ {name} ♡⟡",
-        f"✿•₊˚ {name} ˚₊•✿",
-        f"⊹✿⊹ {name} ⊹✿⊹"
+       def generate_all_fancy_fonts(name):
+    """
+    تولید فونت‌های تزئینی برای اسم فارسی یا انگلیسی
+    شامل فونت‌های فارسی و انگلیسی Unicode با نمادها
+    """
+    # ---------------- فونت‌های فارسی ----------------
+    fancy_farsi_styles = [
+        "{}َِــَِ{}َِ",
+        "ۘۘ{}ـ ۘۘ{}ـ ۘۘ{}",
+        "{}ـــ{}ـــ{}ّ",
+        "{}ـ﹏ـ{}ـ﹏ـ{}",
+        "{}ـ෴ِْ{}ـ෴ِْ{}",
+        "{}ـًٍʘًٍʘـ{}ـًٍʘًٍʘـ{}ََ",
+        "{}ـ•̛{}•̛ـ{}",
+        "{}⋆✧{}✧⋆{}",
+        "✿{}✿{}✿{}",
+        "♡{}♡{}♡{}",
+        "⟡{}⟡{}⟡{}",
+        "{}༺{}༻{}",
+        "{}ღ{}ღ{}",
+        "{}❖{}❖{}",
+        "⚡{}⚡{}⚡{}",
+        "🔥{}🔥{}🔥{}",
+        "🌸{}🌸{}🌸{}",
+        "✦{}✦{}✦{}",
+        "{}⋆{}⋆{}",
+        "{}✿{}✿{}",
+        "{}•{}•{}",
+        "✧{}✧{}✧",
+        "{}⸙{}⸙{}",
+        "✪{}✪{}✪",
+        "{}✺{}✺{}",
+        "{}✰{}✰{}",
+        "{}❀{}❀{}",
+        "❣️{}❣️{}",
+        "{}❋{}❋{}",
+        "{}⸼{}⸼{}",
+        "{}☾{}☽{}",
+        "{}☆{}☆{}",
     ]
-    return make_pages(name, styles)
 
-# ======================= ✨ فونت انگلیسی واقعی Fancy و چندصفحه‌ای =======================
-def generate_english_fonts(name):
-    # لیست سبک‌های Unicode برای حروف انگلیسی
-    fancy_styles = [
-        str.maketrans("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz",
-                      "𝐀𝐁𝐂𝐃𝐄𝐅𝐆𝐇𝐈𝐉𝐊𝐋𝐌𝐍𝐎𝐏𝐐𝐑𝐒𝐓𝐔𝐕𝐖𝐗𝐘𝐙𝐚𝐛𝐜𝐝𝐞𝐟𝐠𝐡𝐢𝐣𝐤𝐥𝐦𝐧𝐨𝐩𝐪𝐫𝐬𝐭𝐮𝐯𝐰𝐱𝐲𝐳"),
-        str.maketrans("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz",
-                      "𝓐𝓑𝓒𝓓𝓔𝓕𝓖𝓗𝓘𝓙𝓚𝓛𝓜𝓝𝓞𝓟𝓠𝓡𝓢𝓣𝓤𝓥𝓦𝓧𝓨𝓩𝓪𝓫𝓬𝓭𝓮𝓯𝓰𝓱𝓲𝓳𝓴𝓵𝓶𝓷𝓸𝓹𝓺𝓻𝓼𝓽𝓾𝓿𝔀𝔁𝔂𝔃"),
-        str.maketrans("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz",
-                      "𝑨𝑩𝑪𝑫𝑬𝑭𝑮𝑯𝑰𝑱𝑲𝑳𝑴𝑵𝑶𝑷𝑸𝑹𝑺𝑻𝑼𝑽𝑾𝑿𝒀𝒁𝒂𝒃𝒄𝒅𝒆𝒇𝒈𝒉𝒊𝒋𝒌𝒍𝒎𝒏𝒐𝒑𝒒𝒓𝒔𝒕𝒖𝒗𝒘𝒙𝒚𝒛")
+    farsi_fonts = []
+    for style in fancy_farsi_styles:
+        count = style.count("{}")
+        farsi_fonts.append(style.format(*([name]*count)))
+
+    # ---------------- فونت‌های انگلیسی ----------------
+    english_translations = [
+        str.maketrans(
+            "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz",
+            "𝐀𝐁𝐂𝐃𝐄𝐅𝐆𝐇𝐈𝐉𝐊𝐋𝐌𝐍𝐎𝐏𝐐𝐑𝐒𝐓𝐔𝐕𝐖𝐗𝐘𝐙abcdefghijklmnopqrstuvwxyz"
+        ),
+        str.maketrans(
+            "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz",
+            "𝓐𝓑𝓒𝓓𝓔𝓕𝓖𝓗𝓘𝓙𝓚𝓛𝓜𝓝𝓞𝓟𝓠𝓡𝓢𝓣𝓤𝓥𝓦𝓧𝓨𝓩𝓪𝓫𝓬𝓭𝓮𝓯𝓰𝓱𝓲𝓳𝓴𝓵𝓶𝓷𝓸𝓹𝓺𝓻𝓼𝓽𝓾𝓿𝔀𝔁𝔂𝔃"
+        ),
+        str.maketrans(
+            "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz",
+            "𝑨𝑩𝑪𝑫𝑬𝑭𝑮𝑯𝑰𝑱𝑲𝑳𝑴𝑵𝑶𝑷𝑸𝑹𝑺𝑻𝑼𝑽𝑾𝑿𝒀𝒁𝒂𝒃𝒄𝒅𝒆𝒇𝒈𝒉𝒊𝒋𝒌𝒍𝒎𝒏𝒐𝒑𝒒𝒓𝒔𝒕𝒖𝒗𝒘𝒙𝒚𝒛"
+        ),
+        str.maketrans(
+            "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz",
+            "𝔄𝔅ℭ𝔇𝔈𝔉𝔊ℌℑ𝔍𝔎𝔏𝔐𝔑𝔒𝔓𝔔ℜ𝔖𝔗𝔘𝔙𝔚𝔛𝔜ℨ𝔞𝔟𝔠𝔡𝔢𝔣𝔤𝔥𝔦𝔧𝔨𝔩𝔪𝔫𝔬𝔭𝔮𝔯𝔰𝔱𝔲𝔳𝔴𝔵𝔶𝔷"
+        ),
     ]
 
-    symbols = ["•", "✦", "⋆", "✿", "♡", "☾", "❖", "⟡", "❋", "⊰", "✧", "⚡", "🔥", "💫", "✨"]
+    symbols = ["•", "✦", "⋆", "✿", "♡", "☾", "❖", "⟡", "❋", "⊰", "✧", "⚡", "🔥", "💫", "✨", "☆", "✪", "✰", "❀", "❣️"]
 
-    styles = []
-    for trans in fancy_styles:
-        styled_name = name.translate(trans)  # تبدیل اسم ورودی به سبک Unicode
-        for s in symbols:
-            styles.append(f"{s} {styled_name} {s}")
-        styles.append(f"{styled_name}")  # نسخه خالص بدون علامت
+    english_fonts = []
+    for trans in english_translations:
+        translated = name.translate(trans)
+        for sym in symbols:
+            english_fonts.append(f"{sym} {translated} {sym}")
+            english_fonts.append(f"{translated} {sym}")
+            english_fonts.append(f"{sym}{translated}{sym}")
+            english_fonts.append(f"{translated}")
 
-    return make_pages(name, styles)
+    # ---------------- ترکیب همه فونت‌ها ----------------
+    all_fonts = farsi_fonts + english_fonts
+    return all_fonts
 
-# ======================= 📄 تقسیم فونت‌ها به صفحات =======================
-def make_pages(name, all_fonts, page_size=10):
-    pages = []
-    chunks = [all_fonts[i:i + page_size] for i in range(0, len(all_fonts), page_size)]
+# ---------- مثال استفاده ----------
+name = "محمد"  # یا اسم انگلیسی مثل "Mohammad"
+all_fonts = generate_all_fancy_fonts(name)
 
-    for idx, chunk in enumerate(chunks):
-        text = f"<b>🎨 فونت‌های خاص و تزئینی برای:</b> <i>{name}</i>\n\n"
-        for i, style in enumerate(chunk, start=1):
-            text += f"{i}. <code>{style}</code>\n"
-        text += f"\n📄 صفحه {idx + 1} از {len(chunks)}"
-
-        nav_buttons = []
-        if idx > 0:
-            nav_buttons.append(InlineKeyboardButton("⬅️ قبلی", callback_data=f"prev_font:{idx - 1}"))
-        if idx < len(chunks) - 1:
-            nav_buttons.append(InlineKeyboardButton("➡️ بعدی", callback_data=f"next_font:{idx + 1}"))
-
-        pages.append({
-            "text": text,
-            "keyboard": InlineKeyboardMarkup([
-                nav_buttons,
-                [InlineKeyboardButton("🔙 بازگشت به منوی اصلی", callback_data="feature_back")]
-            ])
-        })
-    return pages
-
-# ======================= 🔁 کنترل صفحات فونت =======================
-async def next_font(update, context):
-    query = update.callback_query
-    await query.answer()
-    index = int(query.data.split(":")[1])
-    fonts = context.user_data.get("font_pages", [])
-    if 0 <= index < len(fonts):
-        await query.edit_message_text(
-            fonts[index]["text"],
-            parse_mode="HTML",
-            reply_markup=fonts[index]["keyboard"]
-        )
-
-async def prev_font(update, context):
-    query = update.callback_query
-    await query.answer()
-    index = int(query.data.split(":")[1])
-    fonts = context.user_data.get("font_pages", [])
-    if 0 <= index < len(fonts):
-        await query.edit_message_text(
-            fonts[index]["text"],
-            parse_mode="HTML",
-            reply_markup=fonts[index]["keyboard"]
-        )
+# چاپ 50 فونت اول
+for i, f in enumerate(all_fonts[:50], 1):
+    print(f"{i}. {f}") 
