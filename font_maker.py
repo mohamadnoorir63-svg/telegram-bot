@@ -34,7 +34,6 @@ async def font_maker(update, context: ContextTypes.DEFAULT_TYPE):
 
     return ConversationHandler.END
 
-
 # 🌸 مرحله‌ی بعد: کاربر اسم رو وارد کرد
 async def receive_font_name(update, context: ContextTypes.DEFAULT_TYPE):
     name = update.message.text.strip()
@@ -43,7 +42,6 @@ async def receive_font_name(update, context: ContextTypes.DEFAULT_TYPE):
         return ASK_NAME
 
     return await send_fonts(update, context, name)
-
 
 # 💎 تابع ارسال فونت‌ها
 async def send_fonts(update, context, name):
@@ -59,7 +57,6 @@ async def send_fonts(update, context, name):
     context.user_data["font_pages"] = fonts
     context.user_data["font_index"] = 0
     return ConversationHandler.END
-
 
 # ======================= 🎭 تولید فونت فارسی (جدید، زیبا و عشقی) =======================
 def generate_persian_fonts(name):
@@ -80,33 +77,21 @@ def generate_persian_fonts(name):
     ]
     return make_pages(name, styles)
 
-
-# ======================= ✨ تولید فونت انگلیسی (زیبا و متنوع‌تر) =======================
+# ======================= ✨ تولید فونت انگلیسی چندصفحه‌ای و جذاب =======================
 def generate_english_fonts(name):
     frames = [
         lambda t: f"• {t} •", lambda t: f"✦ {t} ✦", lambda t: f"⋆ {t} ⋆", lambda t: f"✿ {t} ✿",
         lambda t: f"♡ {t} ♡", lambda t: f"☾ {t} ☽", lambda t: f"❖ {t} ❖", lambda t: f"⟡ {t} ⟡",
         lambda t: f"❋ {t} ❋", lambda t: f"⊰ {t} ⊱", lambda t: f"˗ˏˋ {t} ˎˊ˗", lambda t: f"✧ {t} ✧",
         lambda t: f"⋆｡° {t} °｡⋆", lambda t: f"⋆✦ {t} ✦⋆", lambda t: f"꧁༺ {t} ༻꧂",
-        lambda t: f"♡﹏﹏﹏ {t} ﹏﹏﹏♡", lambda t: f"✿♡✿ {t} ✿♡✿",
-        lambda t: f"꧁༒☬ {t} ☬༒꧂", lambda t: f"✧˚༺ {t} ༻˚✧", lambda t: f"💫 {t} 💫",
-                      "𝓐𝓑𝓒𝓓𝓔𝓕𝓖𝓗𝓘𝓙𝓚𝓛𝓜𝓝𝓞𝓟𝓠𝓡𝓢𝓣𝓤𝓥𝓦𝓧𝓨𝓩𝓪𝓫𝓬𝓭𝓮𝓯𝓰𝓱𝓲𝓳𝓴𝓵𝓶𝓷𝓸𝓹𝓺𝓻𝓼𝓽𝓾𝓿𝔀𝔁𝔂𝔃"),
-        str.maketrans("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz",
-                      "𝔄𝔅ℭ𝔇𝔈𝔉𝔊ℌℑ𝔍𝔎𝔏𝔐𝔑𝔒𝔓𝔔ℜ𝔖𝔗𝔘𝔙𝔚𝔛𝔜ℨ𝔞𝔟𝔠𝔡𝔢𝔣𝔤𝔥𝔦𝔧𝔨𝔩𝔪𝔫𝔬𝔭𝔮𝔯𝔰𝔱𝔲𝔳𝔴𝔵𝔶𝔷"),
-        str.maketrans("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz",
-                      "𝐀𝐁𝐂𝐃𝐄𝐅𝐆𝐇𝐈𝐉𝐊𝐋𝐌𝐍𝐎𝐏𝐐𝐑𝐒𝐓𝐔𝐕𝐖𝐗𝐘𝐙𝐚𝐛𝐜𝐝𝐞𝐟𝐠𝐡𝐢𝐣𝐤𝐥𝐦𝐧𝐨𝐩𝐪𝐫𝐬𝐭𝐮𝐯𝐰𝐱𝐲𝐳"),
-        str.maketrans("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz",
-                      "ⓜⓞⓗⓐⓜⓜⓐⓓ", "⒨⒪⒣⒜⒨⒨⒜⒟", "мσнαммα∂", "𝐌𝐎𝐇𝐀𝐌𝐌𝐀𝐃",
-                      "𝑴𝑶𝑯𝑨𝑴𝑴𝑨𝑫", "𝑀𝑂𝐻𝐴𝑀𝑀𝐴𝐷", "𝗠𝗢𝗛𝗔𝗠𝗠𝗔𝗗", "𝖬𝖮𝖧𝖠𝖬𝖬𝖠𝖣",
-                      "𝕸𝕺𝕳𝕬𝕸𝕸𝕬𝕯", "𝔐𝔒ℌ𝔄𝔐𝔐𝔄𝔇", "𝙈𝙊𝙃𝘼𝙈𝙈𝘼𝘿", "𝘔𝘖𝘏𝘈𝘔𝘔𝘈𝘿",
-                      "M‌‌O‌‌H‌‌A‌‌M‌‌M‌‌A‌‌D", "M0H4MM4D", "🅼🅾🅷🅰🅼🅼🅰🅳", "𝐌𝐎𝐇𝐀𝐌𝐌𝐀𝐃"
-                      "🅰️🅱️🅲️🅳️🅴️🅵️🅶️🅷️🅸️🅹️🅺️🅻️🅼️🅽️🅾️🅿️🆀️🆁️🆂️🆃️🆄️🆅️🆆️🆇️🆈️🆉️🅰️🅱️🅲️🅳️🅴️🅵️🅶️🅷️🅸️🅹️🅺️🅻️🅼️🅽️🅾️🅿️🆀️🆁️🆂️🆃️🆄️🆅️🆆️🆇️🆈️🆉️"),
-    ]
-        lambda t: f"⋆˙⟡♡⟡˙⋆ {t} ⋆˙⟡♡⟡˙⋆", lambda t: f"⟡✧ {t} ✧⟡"
+        lambda t: f"♡﹏﹏﹏ {t} ﹏﹏﹏♡", lambda t: f"✿♡✿ {t} ✿♡✿", lambda t: f"꧁༒☬ {t} ☬༒꧂",
+        lambda t: f"✧˚༺ {t} ༻˚✧", lambda t: f"💫 {t} 💫", lambda t: f"⋆˙⟡♡⟡˙⋆ {t} ⋆˙⟡♡⟡˙⋆", lambda t: f"⟡✧ {t} ✧⟡",
+        lambda t: f"⚡ {t} ⚡", lambda t: f"🔥 {t} 🔥", lambda t: f"🌟 {t} 🌟", lambda t: f"💥 {t} 💥",
+        lambda t: f"✨ {t} ✨", lambda t: f"🎯 {t} 🎯", lambda t: f"🌀 {t} 🌀", lambda t: f"♛ {t} ♛",
+        lambda t: f"♚ {t} ♚", lambda t: f"❂ {t} ❂", lambda t: f"❃ {t} ❃", lambda t: f"✪ {t} ✪"
     ]
     fonts = [frame(name) for frame in frames]
     return make_pages(name, fonts)
-
 
 # ======================= 📄 تقسیم فونت‌ها به صفحات =======================
 def make_pages(name, all_fonts, page_size=25):
@@ -134,7 +119,6 @@ def make_pages(name, all_fonts, page_size=25):
         })
     return pages
 
-
 # ======================= 🔁 کنترل صفحات فونت =======================
 async def next_font(update, context):
     query = update.callback_query
@@ -158,28 +142,28 @@ async def prev_font(update, context):
             fonts[index]["text"],
             parse_mode="HTML",
             reply_markup=fonts[index]["keyboard"]
-        )# ======================= 💎 فونت‌های لاکچری پرمیوم (انگلیسی و فارسی) =======================
+        )
 
+# ======================= 💎 فونت‌های لاکچری پرمیوم (انگلیسی و فارسی) =======================
 def generate_premium_fonts(name):
     """فونت‌های ترکیبی خاص و لاکچری برای حالت ویژه"""
     return make_pages(name, get_luxury_styles(name))
 
-
 def get_luxury_styles(name):
     # فونت انگلیسی خاص با چند نوع تبدیل حروف
     fancy_sets = [
-        str.maketrans("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz",
-                      "𝓐𝓑𝓒𝓓𝓔𝓕𝓖𝓗𝓘𝓙𝓚𝓛𝓜𝓝𝓞𝓟𝓠𝓡𝓢𝓣𝓤𝓥𝓦𝓧𝓨𝓩𝓪𝓫𝓬𝓭𝓮𝓯𝓰𝓱𝓲𝓳𝓴𝓵𝓶𝓷𝓸𝓹𝓺𝓻𝓼𝓽𝓾𝓿𝔀𝔁𝔂𝔃"),
-        str.maketrans("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz",
-                      "𝔄𝔅ℭ𝔇𝔈𝔉𝔊ℌℑ𝔍𝔎𝔏𝔐𝔑𝔒𝔓𝔔ℜ𝔖𝔗𝔘𝔙𝔚𝔛𝔜ℨ𝔞𝔟𝔠𝔡𝔢𝔣𝔤𝔥𝔦𝔧𝔨𝔩𝔪𝔫𝔬𝔭𝔮𝔯𝔰𝔱𝔲𝔳𝔴𝔵𝔶𝔷"),
-        str.maketrans("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz",
-                      "𝐀𝐁𝐂𝐃𝐄𝐅𝐆𝐇𝐈𝐉𝐊𝐋𝐌𝐍𝐎𝐏𝐐𝐑𝐒𝐓𝐔𝐕𝐖𝐗𝐘𝐙𝐚𝐛𝐜𝐝𝐞𝐟𝐠𝐡𝐢𝐣𝐤𝐥𝐦𝐧𝐨𝐩𝐪𝐫𝐬𝐭𝐮𝐯𝐰𝐱𝐲𝐳"),
-        str.maketrans("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz",
-                      "ⓜⓞⓗⓐⓜⓜⓐⓓ", "⒨⒪⒣⒜⒨⒨⒜⒟", "мσнαммα∂", "𝐌𝐎𝐇𝐀𝐌𝐌𝐀𝐃",
-                      "𝑴𝑶𝑯𝑨𝑴𝑴𝑨𝑫", "𝑀𝑂𝐻𝐴𝑀𝑀𝐴𝐷", "𝗠𝗢𝗛𝗔𝗠𝗠𝗔𝗗", "𝖬𝖮𝖧𝖠𝖬𝖬𝖠𝖣",
-                      "𝕸𝕺𝕳𝕬𝕸𝕸𝕬𝕯", "𝔐𝔒ℌ𝔄𝔐𝔐𝔄𝔇", "𝙈𝙊𝙃𝘼𝙈𝙈𝘼𝘿", "𝘔𝘖𝘏𝘈𝘔𝘔𝘈𝘿",
-                      "M‌‌O‌‌H‌‌A‌‌M‌‌M‌‌A‌‌D", "M0H4MM4D", "🅼🅾🅷🅰🅼🅼🅰🅳", "𝐌𝐎𝐇𝐀𝐌𝐌𝐀𝐃"
-                      "🅰️🅱️🅲️🅳️🅴️🅵️🅶️🅷️🅸️🅹️🅺️🅻️🅼️🅽️🅾️🅿️🆀️🆁️🆂️🆃️🆄️🆅️🆆️🆇️🆈️🆉️🅰️🅱️🅲️🅳️🅴️🅵️🅶️🅷️🅸️🅹️🅺️🅻️🅼️🅽️🅾️🅿️🆀️🆁️🆂️🆃️🆄️🆅️🆆️🆇️🆈️🆉️"),
+        str.maketrans(
+            "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz",
+            "𝓐𝓑𝓒𝓓𝓔𝓕𝓖𝓗𝓘𝓙𝓚𝓛𝓜𝓝𝓞𝓟𝓠𝓡𝓢𝓣𝓤𝓥𝓦𝓧𝓨𝓩𝓪𝓫𝓬𝓭𝓮𝓯𝓰𝓱𝓲𝓳𝓴𝓵𝓶𝓷𝓸𝓹𝓺𝓻𝓼𝓽𝓾𝓿𝔀𝔁𝔂𝔃"
+        ),
+        str.maketrans(
+            "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz",
+            "𝔄𝔅ℭ𝔇𝔈𝔉𝔊ℌℑ𝔍𝔎𝔏𝔐𝔑𝔒𝔓𝔔ℜ𝔖𝔗𝔘𝔙𝔚𝔛𝔜ℨ𝔞𝔟𝔠𝔡𝔢𝔣𝔤𝔥𝔦𝔧𝔨𝔩𝔪𝔫𝔬𝔭𝔮𝔯𝔰𝔱𝔲𝔳𝔴𝔵𝔶𝔷"
+        ),
+        str.maketrans(
+            "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz",
+            "𝐀𝐁𝐂𝐃𝐄𝐅𝐆𝐇𝐈𝐉𝐊𝐋𝐌𝐍𝐎𝐏𝐐𝐑𝐒𝐓𝐔𝐕𝐖𝐗𝐘𝐙𝐚𝐛𝐜𝐝𝐞𝐟𝐠𝐡𝐢𝐣𝐤𝐥𝐦𝐧𝐨𝐩𝐪𝐫𝐬𝐭𝐮𝐯𝐰𝐱𝐲𝐳"
+        ),
     ]
 
     luxury = []
@@ -215,4 +199,4 @@ def get_luxury_styles(name):
     ]
 
     luxury.extend(persian_styles)
-    return luxury
+    return make_pages(name, luxury)
