@@ -38,13 +38,13 @@ def save_whispers(data):
         json.dump(data, f, ensure_ascii=False, indent=2)
 
 async def whisper_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """دستور /نجوا @username متن"""
+    """دستور /Najwa @username متن"""
     message_text = update.message.text
 
-    # بررسی فرمت: /نجوا @username متن
-    match = re.match(r'^/نجوا\s+@?(\w+)\s+(.+)', message_text)
+    # بررسی فرمت: /Najwa @username متن
+    match = re.match(r'^/Najwa\s+@?(\w+)\s+(.+)', message_text)
     if not match:
-        await update.message.reply_text("❌ فرمت درست: /نجوا @username متن")
+        await update.message.reply_text("❌ فرمت درست: /Najwa @username متن")
         return
 
     target_username = match.group(1)
@@ -124,5 +124,5 @@ async def open_whisper(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 def register_whisper_handler(application):
-    application.add_handler(CommandHandler("نجوا", whisper_command))
+    application.add_handler(CommandHandler("Najwa", whisper_command))
     application.add_handler(CallbackQueryHandler(open_whisper, pattern=r"^whisper:"))
