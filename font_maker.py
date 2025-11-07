@@ -1,5 +1,5 @@
 import asyncio
-import re
+import random
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, ConversationHandler
 
@@ -41,7 +41,7 @@ async def receive_font_name(update, context: ContextTypes.DEFAULT_TYPE):
 
 # ======================= 💎 ارسال فونت‌ها =======================
 async def send_fonts(update, context, name):
-    fonts = generate_digi_fonts(name)
+    fonts = generate_rainbow_fonts(name)
 
     await update.message.reply_text(
         fonts[0]["text"],
@@ -52,18 +52,23 @@ async def send_fonts(update, context, name):
     context.user_data["font_index"] = 0
     return ConversationHandler.END
 
-# ======================= 🎭 تولید فونت شبیه DIGI ANTI =======================
-def generate_digi_fonts(name):
-    # ---------------- فونت‌های فارسی ----------------
+# ======================= 🎭 تولید فونت رنگین‌کمانی و زیبا =======================
+def generate_rainbow_fonts(name):
+    colors = ["🟥", "🟧", "🟨", "🟩", "🟦", "🟪", "⬛", "⬜"]  # می‌توان شکل‌های رنگی اضافه کرد
+
+    def rainbow_text(text):
+        return "".join(f"{random.choice(colors)}{c}" for c in text)
+
+    # ---------------- فونت‌های فارسی زیبا ----------------
     farsi_styles = [
         "{}َِــَِ{}", "{}ۘـ{}ۘـ{}", "{}ـــ{}ـــ{}", "{}ـ﹏ـ{}ـ﹏ـ{}", "{}ـ෴ِْ{}ـ෴ِْ{}",
         "{}ـًٍʘًٍʘـ{}ـًٍʘًٍʘـ{}", "{}⋆✧{}✧⋆{}", "✿{}✿{}", "♡{}♡{}", "{}༺{}༻{}",
-        "{}ღ{}ღ{}", "{}❖{}❖{}", "⚡{}⚡{}", "🔥{}🔥{}", "🌸{}🌸{}", "{}⋆{}⋆{}", "{}✿{}✿{}", "{}•{}•{}", "✧{}✧{}✧", "{}⸙{}⸙{}",
         "نَِ{}و", "نـ{}مـ{}", "نـ{}وـ{}", "نـ{}هـ", "نُ{}وٌ", "نِ{}وِ", "نْ{}وْ"
     ]
     farsi_fonts = [style.format(*([name]*style.count("{}"))) for style in farsi_styles]
+    farsi_fonts = [rainbow_text(f) for f in farsi_fonts]
 
-    # ---------------- فونت‌های انگلیسی با نماد ----------------
+    # ---------------- فونت انگلیسی با نماد ----------------
     english_translations = [
         str.maketrans(
             "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz",
@@ -80,32 +85,30 @@ def generate_digi_fonts(name):
     for trans in english_translations:
         translated = name.translate(trans)
         for sym in symbols:
-            english_fonts.append(f"{sym}{translated}{sym}")
-            english_fonts.append(f"{translated}{sym}")
-        english_fonts.append(translated)
+            english_fonts.append(rainbow_text(f"{sym}{translated}{sym}"))
+            english_fonts.append(rainbow_text(f"{translated}{sym}"))
+        english_fonts.append(rainbow_text(translated))
 
     # ---------------- فونت‌های Unicode خاص ----------------
     spaced_flag = " ".join(c for c in name.upper() if c.isalpha())
-    english_fonts.append(spaced_flag)  # شبیه 🇹 🇪 🇸 🇹
+    english_fonts.append(rainbow_text(spaced_flag))  # 🇹 🇪 🇸 🇹 شبیه سازی با حروف کاربر
 
     en_circle = "".join({
         "A":"Ⓐ","B":"Ⓑ","C":"Ⓒ","D":"Ⓓ","E":"Ⓔ","F":"Ⓕ","G":"Ⓖ","H":"Ⓗ","I":"Ⓘ","J":"Ⓙ",
         "K":"Ⓚ","L":"Ⓛ","M":"Ⓜ","N":"Ⓝ","O":"Ⓞ","P":"Ⓟ","Q":"Ⓠ","R":"Ⓡ","S":"Ⓢ","T":"Ⓣ",
         "U":"Ⓤ","V":"Ⓥ","W":"Ⓦ","X":"Ⓧ","Y":"Ⓨ","Z":"Ⓩ"
     }.get(c,c) for c in name.upper())
-    english_fonts.append(en_circle)
+    english_fonts.append(rainbow_text(en_circle))
 
     en_square = "".join({
         "A":"🄰","B":"🄱","C":"🄲","D":"🄳","E":"🄴","F":"🄵","G":"🄶","H":"🄷","I":"🄸","J":"🄹",
         "K":"🄺","L":"🄻","M":"🄼","N":"🄽","O":"🄾","P":"🄿","Q":"🅀","R":"🅁","S":"🅂","T":"🅃",
         "U":"🅄","V":"🅅","W":"🅆","X":"🅇","Y":"🅈","Z":"🅉"
     }.get(c,c) for c in name.upper())
-    english_fonts.append(en_square)
+    english_fonts.append(rainbow_text(en_square))
 
-    # ---------------- ترکیب همه فونت‌ها ----------------
     all_fonts = farsi_fonts + english_fonts
 
-    # ---------------- محدود کردن به ۱۰ صفحه ----------------
     return make_pages(name, all_fonts, page_size=10, max_pages=10)
 
 # ======================= 📄 تقسیم فونت‌ها به صفحات =======================
