@@ -68,15 +68,15 @@ async def handle_admin_management(update: Update, context: ContextTypes.DEFAULT_
         if not await _has_access(context, chat.id, user.id):
             return await msg.reply_text("🚫 فقط مدیران یا سودوها مجاز به افزودن دستور هستند.")
 
-        # فرمت: دستور جدید [نام دستور] [افزودن‌مدیر|حذف‌مدیر] [متن پاسخ]
+        # فرمت: دستور جدید [نام دستور] [افزودن‌ مدیر|حذف‌ مدیر] [متن پاسخ]
         import re
-        match = re.match(r"^دستور جدید\s+(\S+)\s+(افزودن‌مدیر|حذف‌مدیر)\s+(.+)$", text)
+        match = re.match(r"^دستور جدید\s+(\S+)\s+(افزودن‌ مدیر|حذف‌ مدیر)\s+(.+)$", text)
         if not match:
             return await msg.reply_text(
                 "📘 فرمت درست:\n"
-                "<code>دستور جدید [نام دستور] [افزودن‌مدیر|حذف‌مدیر] [متن پاسخ]</code>\n"
+                "<code>دستور جدید [نام دستور] [افزودن‌ مدیر|حذف‌ مدیر] [متن پاسخ]</code>\n"
                 "مثال:\n"
-                "<code>دستور جدید ارتقا مدیر افزودن‌مدیر {name} به عنوان مدیر منصوب شد!</code>",
+                "<code>دستور جدید ارتقا مدیر افزودن‌ مدیر {name} به عنوان مدیر منصوب شد!</code>",
                 parse_mode="HTML"
             )
 
