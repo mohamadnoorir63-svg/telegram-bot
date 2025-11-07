@@ -41,17 +41,16 @@ async def whisper_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """پردازش پیام PV بدون / و ارسال اعلان عمومی"""
     message_text = update.message.text
 
-    # بررسی فرمت: Najwa @username متن
     match = re.match(r'^Najwa\s+@?([A-Za-z0-9_]+)\s+(.+)', message_text)
     if not match:
-        return  # نادیده گرفتن پیام‌هایی که با Najwa شروع نمی‌شوند
+        return
 
     target_username = match.group(1)
     text = match.group(2)
     sender = update.effective_user
     chat_id = update.effective_chat.id
 
-    # حذف پیام فرستنده تا در گروه دیده نشود
+    # حذف پیام فرستنده
     await update.message.delete()
 
     # پیدا کردن کاربر هدف
@@ -119,17 +118,26 @@ async def open_whisper(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.answer("🚫 این نجوا برای شما نیست!", show_alert=True)
         return
 
-    # رمزگشایی متن
     decrypted_text = fernet.decrypt(whisper["text"].encode()).decode()
 
-    # نمایش popup فقط برای گیرنده
     await query.answer(
         text=f"💌 نجوا از طرف {whisper['from_name']}:\n\n{decrypted_text}",
         show_alert=True
     )
 
-def register_whisper_handler(application):
-    # پیام‌هایی که با "Najwa " شروع می‌شوند
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, whisper_message))
+def register_whisper_handler(application, group_number=None):
+    """
+    ثبت هندلر Whisper با امکان تعیین شماره گروه (اختیاری)
+    """
+    if group_number is not None:
+        # فیلتر فقط برای گروه مشخص
+        group_filter = filters.Chat(chat_id=group_number)
+        application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND & group_filter, whisper_message))
+    else:
+        # هندلر برای همه گروه‌ها
+        application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, whisper_message))
+
     # دکمه باز کردن نجوا
     application.add_handler(CallbackQueryHandler(open_whisper, pattern=r"^whisper:"))
+
+    print(f"✅ Whisper handler ثبت شد{' برای گروه شماره ' + str(group_number) if group_number else ' برای همه گروه‌ها'}")
