@@ -10,11 +10,11 @@ ALIAS_FILE = os.path.join(BASE_DIR, "custom_cmds.json")
 
 SUDO_IDS = [8588347189]  # آیدی سودوها (سودوهای ربات)
 
+# ایجاد فایل‌ها در صورت نبود
 for f in (ADMINS_FILE, ALIAS_FILE):
     if not os.path.exists(f):
         with open(f, "w", encoding="utf-8") as x:
             json.dump({}, x, ensure_ascii=False, indent=2)
-
 
 # ================= 📁 توابع کمکی =================
 def _load_json(path):
@@ -24,11 +24,9 @@ def _load_json(path):
     except:
         return {}
 
-
 def _save_json(path, data):
     with open(path, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
-
 
 async def _has_access(context, chat_id, user_id):
     """بررسی دسترسی فرد اجراکننده"""
@@ -39,7 +37,6 @@ async def _has_access(context, chat_id, user_id):
         return member.status in ("creator", "administrator")
     except:
         return False
-
 
 # ================= 🧰 مدیریت مدیران با alias =================
 async def handle_admin_management(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -60,7 +57,33 @@ async def handle_admin_management(update: Update, context: ContextTypes.DEFAULT_
     aliases_all = _load_json(ALIAS_FILE)
     aliases = aliases_all.get(chat_key, {})
 
-    # بررسی alias‌ها برای افزودن یا حذف مدیر
+    # ================= ➕ افزودن دستور شخصی =================
+    if text.startswith("افزودن دستور"):
+        if not await _has_access(context, chat.id, user.id):
+            return await msg.reply_text("🚫 فقط مدیران یا سودوها می‌توانند دستور بسازند.")
+
+        # فرمت: افزودن دستور [نام دستور] [افزودن‌مدیر/حذف‌مدیر] [متن پیام]
+        parts = text.split(" ", 3)
+        if len(parts) < 4:
+            return await msg.reply_text(
+                "📘 فرمت درست:\n"
+                "افزودن دستور [نام دستور] [افزودن‌مدیر/حذف‌مدیر] [متن پیام]\n"
+                "مثال: افزودن دستور عشق افزودن‌مدیر 💖 {name} به عشق گروه منصوب شد!"
+            )
+
+        name, cmd_type, response = parts[1], parts[2], parts[3]
+
+        if cmd_type not in ("افزودن‌مدیر", "حذف‌مدیر"):
+            return await msg.reply_text("⚠️ نوع دستور باید `افزودن‌مدیر` یا `حذف‌مدیر` باشد.")
+
+        # ثبت دستور در alias
+        aliases[name] = {"type": cmd_type, "text": response}
+        aliases_all[chat_key] = aliases
+        _save_json(ALIAS_FILE, aliases_all)
+
+        return await msg.reply_text(f"✅ دستور <b>{name}</b> ثبت شد.", parse_mode="HTML")
+
+    # ================= بررسی aliasها =================
     for cmd_name, cmd_info in aliases.items():
         if text == cmd_name:
             cmd_type = cmd_info.get("type")
@@ -115,7 +138,7 @@ async def handle_admin_management(update: Update, context: ContextTypes.DEFAULT_
                 except Exception as e:
                     return await msg.reply_text(f"⚠️ خطا در اجرای دستور: {e}")
 
-    # ========== ➕ افزودن مدیر ==========
+    # ================= ➕ افزودن مدیر =================
     if text.startswith("افزودن مدیر"):
         if not await _has_access(context, chat.id, user.id):
             return await msg.reply_text("🚫 فقط مدیران یا سودوها مجاز به اجرای این دستور هستند.")
@@ -145,7 +168,7 @@ async def handle_admin_management(update: Update, context: ContextTypes.DEFAULT_
         except Exception as e:
             await msg.reply_text(f"⚠️ خطا در افزودن مدیر: {e}")
 
-    # ========== ❌ حذف مدیر ==========
+    # ================= ❌ حذف مدیر =================
     elif text.startswith("حذف مدیر"):
         if not await _has_access(context, chat.id, user.id):
             return await msg.reply_text("🚫 فقط مدیران یا سودوها مجازند.")
@@ -179,7 +202,7 @@ async def handle_admin_management(update: Update, context: ContextTypes.DEFAULT_
         except Exception as e:
             await msg.reply_text(f"⚠️ خطا در حذف مدیر: {e}")
 
-    # ========== 📋 لیست مدیران ==========
+    # ================= 📋 لیست مدیران =================
     elif text == "لیست مدیران":
         try:
             current_admins = await context.bot.get_chat_administrators(chat.id)
@@ -190,7 +213,6 @@ async def handle_admin_management(update: Update, context: ContextTypes.DEFAULT_
                 await msg.reply_text("ℹ️ هیچ مدیری در گروه یافت نشد.")
         except Exception as e:
             await msg.reply_text(f"⚠️ خطا در دریافت لیست مدیران: {e}")
-
 
 # ================= 🔧 ثبت هندلر =================
 def register_admin_handlers(application, group_number: int = 15):
