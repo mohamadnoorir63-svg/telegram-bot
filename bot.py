@@ -84,6 +84,7 @@ from telegram.ext import (
     CallbackQueryHandler,
     filters
 )
+from modules.whisper import register_whisper_handler
 # ======================= ⚙️ تنظیمات پایه و سودوها =======================
 from telegram import Update
 from telegram.ext import ContextTypes
@@ -2081,7 +2082,7 @@ application.add_handler(
     CallbackQueryHandler(link_panel_buttons, pattern="^link_"),
     group=-10
 )
-
+register_whisper_handler(application)
 # ==========================================================
 # 📦 کنترل گروه‌ها
 # ==========================================================
