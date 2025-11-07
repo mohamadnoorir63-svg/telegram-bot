@@ -1045,29 +1045,6 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     uid = update.effective_user.id
     chat_id = update.effective_chat.id
     text = update.message.text.strip()
-    # ======== جای مناسب برای درخواست HTTP ========
-import httpx
-client: httpx.AsyncClient = context.application.bot_data.get("httpx_client")
-if not client:
-    client = httpx.AsyncClient(timeout=30.0)
-    close_after = True
-else:
-    close_after = False
-
-try:
-    resp = await client.get("https://example.com/api/...")  # URL خودت را جایگزین کن
-    resp.raise_for_status()
-    data = resp.text
-except httpx.ReadError as e:
-    print("ReadError:", e)
-    data = None
-except httpx.HTTPStatusError as e:
-    print("HTTPStatusError:", e)
-    data = None
-finally:
-    if close_after:
-        await client.aclose()
-# =================================================
 
     # 🧩 پردازش پیام گروهی (الان دیگه متغیرها مقدار دارند)
     reply_text = process_group_message(uid, chat_id, text)
