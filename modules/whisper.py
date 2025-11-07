@@ -2,7 +2,7 @@ import json
 import os
 import asyncio
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import ContextTypes, MessageHandler, CallbackQueryHandler, ApplicationBuilder, filters
+from telegram.ext import ContextTypes, MessageHandler, CallbackQueryHandler, filters
 from cryptography.fernet import Fernet
 import re
 
@@ -38,7 +38,7 @@ def save_whispers(data):
         json.dump(data, f, ensure_ascii=False, indent=2)
 
 async def whisper_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """پردازش پیام PV بدون /"""
+    """پردازش پیام PV بدون / و ارسال اعلان عمومی"""
     message_text = update.message.text
 
     # بررسی فرمت: Najwa @username متن
@@ -66,7 +66,6 @@ async def whisper_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         pass
 
     if not target_user:
-        # اگر کاربر پیدا نشد، می‌توان اعلان داد (اختیاری)
         return
 
     # رمزگذاری متن
@@ -85,7 +84,7 @@ async def whisper_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     }
     save_whispers(whispers)
 
-    # ارسال اعلان عمومی با دکمه
+    # ارسال اعلان عمومی با دکمه در گروه
     button = InlineKeyboardMarkup.from_button(
         InlineKeyboardButton(f"📩 مشاهده نجوا برای {target_user.first_name}", callback_data=f"whisper:{whisper_id}")
     )
@@ -106,24 +105,27 @@ async def whisper_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     asyncio.create_task(auto_delete())
 
 async def open_whisper(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """باز کردن نجوا فقط برای گیرنده"""
+    """نمایش popup فقط برای گیرنده"""
     query = update.callback_query
-    await query.answer()
     whisper_id = query.data.split(":")[1]
     whispers = load_whispers()
     whisper = whispers.get(whisper_id)
 
     if not whisper:
-        return await query.message.reply_text("⚠️ این نجوا منقضی شده یا حذف شده.")
+        await query.answer("⚠️ این نجوا منقضی شده یا حذف شده.", show_alert=True)
+        return
 
     if query.from_user.id != whisper["to_id"]:
-        return await query.message.reply_text("🚫 این نجوا برای شما نیست!")
+        await query.answer("🚫 این نجوا برای شما نیست!", show_alert=True)
+        return
 
+    # رمزگشایی متن
     decrypted_text = fernet.decrypt(whisper["text"].encode()).decode()
 
-    await query.message.reply_html(
-        f"💌 <b>نجوا از طرف:</b> {whisper['from_name']}\n\n"
-        f"<b>متن:</b> {decrypted_text}"
+    # نمایش popup فقط برای گیرنده
+    await query.answer(
+        text=f"💌 نجوا از طرف {whisper['from_name']}:\n\n{decrypted_text}",
+        show_alert=True
     )
 
 def register_whisper_handler(application):
