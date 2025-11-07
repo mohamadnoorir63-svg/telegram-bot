@@ -2082,7 +2082,7 @@ application.add_handler(
     CallbackQueryHandler(link_panel_buttons, pattern="^link_"),
     group=-10
 )
-register_whisper_handler(application)
+#register_whisper_handler(application)
 # ==========================================================
 # 📦 کنترل گروه‌ها
 # ==========================================================
