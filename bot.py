@@ -186,9 +186,7 @@ def is_valid_message(update):
         return False
         # 🚫 جلوگیری از پاسخ سخنگو به پیام‌های دستوری
 
-        if any(text.startswith(word) for word in command_keywords):
-            return False  # ⛔ این پیام یه دستوره، نباید سخنگو جواب بده
-
+        
     text = msg.text or msg.caption or ""
     if not text.strip():
         return False
@@ -1033,15 +1031,7 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ======================= 💬 پاسخ و هوش مصنوعی =======================
 async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """پاسخ‌دهی اصلی هوش مصنوعی و سیستم یادگیری"""
-
-    # 🚫 جلوگیری از پاسخ هوشمند در صورت اجرای دستور سفارشی
-    if context.user_data.get("custom_handled"):
-        context.user_data["custom_handled"] = False
-        return
-
-    # 🧩 اطمینان از اینکه پیام معتبره
-    if not update.message or not update.message.text:
-        return
+    
 
     # 🧠 تعریف اولیه متغیرها (برای جلوگیری از خطای متغیر ناشناخته)
     uid = update.effective_user.id
@@ -1063,23 +1053,6 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # 🚫 جلوگیری از پاسخ در پیوی (فقط جوک و فال مجازند)
     if update.effective_chat.type == "private" and lower_text not in ["جوک", "فال"]:
-        return
-
-    # ✅ جلوگیری از پاسخ به دستورات خاص (مثل راهنما، خوشامد، ربات و غیره)
-    protected_words = [
-        "راهنما", "ثبت راهنما", "خوشامد", "ثبت خوشامد",
-        "ربات", "save", "del", "panel", "backup", "cloudsync", "leave"
-    ]
-    if any(lower_text.startswith(word) for word in protected_words):
-        return
-
-    # 🚫 جلوگیری از پاسخ به پیام‌های مدیریتی و دستوری
-    command_keywords = [
-        "قفل", "باز", "بازکردن", "پنل", "خوشامد",
-        "عکس خوشامد", "فیلتر", "سکوت", "بن", "اخطار",
-        "لقب", "اصل", "تگ", "پاکسازی", "گروه", "مدیر", "سودو"
-    ]
-    if any(lower_text.startswith(word) for word in command_keywords):
         return
 
     # 🧠 بررسی حالت ریپلی مود گروهی
