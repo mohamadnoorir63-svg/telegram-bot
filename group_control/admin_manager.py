@@ -10,7 +10,6 @@ ALIAS_FILE = os.path.join(BASE_DIR, "custom_cmds.json")
 
 SUDO_IDS = [8588347189]  # آیدی سودوها (سودوهای ربات)
 
-# ایجاد فایل‌ها در صورت نبود
 for f in (ADMINS_FILE, ALIAS_FILE):
     if not os.path.exists(f):
         with open(f, "w", encoding="utf-8") as x:
@@ -38,6 +37,14 @@ async def _has_access(context, chat_id, user_id):
     except:
         return False
 
+async def _bot_can_promote(context, chat_id):
+    """بررسی اینکه ربات اجازه ارتقا به مدیر را دارد یا خیر"""
+    try:
+        me = await context.bot.get_chat_member(chat_id, context.bot.id)
+        return me.status == "creator" or getattr(me, "can_promote_members", False)
+    except:
+        return False
+
 # ================= 🧰 مدیریت مدیران با alias =================
 async def handle_admin_management(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = update.effective_message
@@ -57,33 +64,7 @@ async def handle_admin_management(update: Update, context: ContextTypes.DEFAULT_
     aliases_all = _load_json(ALIAS_FILE)
     aliases = aliases_all.get(chat_key, {})
 
-    # ================= ➕ افزودن دستور شخصی =================
-    if text.startswith("افزودن دستور"):
-        if not await _has_access(context, chat.id, user.id):
-            return await msg.reply_text("🚫 فقط مدیران یا سودوها می‌توانند دستور بسازند.")
-
-        # فرمت: افزودن دستور [نام دستور] [افزودن‌مدیر/حذف‌مدیر] [متن پیام]
-        parts = text.split(" ", 3)
-        if len(parts) < 4:
-            return await msg.reply_text(
-                "📘 فرمت درست:\n"
-                "افزودن دستور [نام دستور] [افزودن‌مدیر/حذف‌مدیر] [متن پیام]\n"
-                "مثال: افزودن دستور عشق افزودن‌مدیر 💖 {name} به عشق گروه منصوب شد!"
-            )
-
-        name, cmd_type, response = parts[1], parts[2], parts[3]
-
-        if cmd_type not in ("افزودن‌مدیر", "حذف‌مدیر"):
-            return await msg.reply_text("⚠️ نوع دستور باید `افزودن‌مدیر` یا `حذف‌مدیر` باشد.")
-
-        # ثبت دستور در alias
-        aliases[name] = {"type": cmd_type, "text": response}
-        aliases_all[chat_key] = aliases
-        _save_json(ALIAS_FILE, aliases_all)
-
-        return await msg.reply_text(f"✅ دستور <b>{name}</b> ثبت شد.", parse_mode="HTML")
-
-    # ================= بررسی aliasها =================
+    # بررسی alias‌ها برای افزودن یا حذف مدیر
     for cmd_name, cmd_info in aliases.items():
         if text == cmd_name:
             cmd_type = cmd_info.get("type")
@@ -94,12 +75,14 @@ async def handle_admin_management(update: Update, context: ContextTypes.DEFAULT_
                     return await msg.reply_text("⚠️ باید روی پیام کاربر ریپلای کنی.")
                 target = msg.reply_to_message.from_user
 
+                # جلوگیری از تغییر ربات یا سودو
+                if target.id == context.bot.id:
+                    return await msg.reply_text("😅 نمی‌توانم خودم را مدیر کنم!")
                 if target.id in SUDO_IDS:
                     return await msg.reply_text("👑 این کاربر سودو است و تغییر نمی‌کند.")
 
-                me = await context.bot.get_chat_member(chat.id, context.bot.id)
-                if getattr(me, "can_promote_members", False) is not True and me.status != "creator":
-                    return await msg.reply_text("🚫 من اجازه‌ی تغییر مدیران را ندارم.")
+                if not await _bot_can_promote(context, chat.id):
+                    return await msg.reply_text("🚫 من اجازه‌ی تغییر مدیران را ندارم. لطفاً ربات را ادمین کنید و دسترسی Promote Members بدهید.")
 
                 try:
                     if cmd_type == "افزودن‌مدیر":
@@ -138,15 +121,20 @@ async def handle_admin_management(update: Update, context: ContextTypes.DEFAULT_
                 except Exception as e:
                     return await msg.reply_text(f"⚠️ خطا در اجرای دستور: {e}")
 
-    # ================= ➕ افزودن مدیر =================
+    # ========== ➕ افزودن مدیر ==========
     if text.startswith("افزودن مدیر"):
         if not await _has_access(context, chat.id, user.id):
             return await msg.reply_text("🚫 فقط مدیران یا سودوها مجاز به اجرای این دستور هستند.")
         if not msg.reply_to_message:
             return await msg.reply_text("⚠️ لطفاً روی پیام فرد موردنظر ریپلای کن.")
         target = msg.reply_to_message.from_user
+
+        if target.id == context.bot.id:
+            return await msg.reply_text("😅 نمی‌توانم خودم را مدیر کنم!")
         if target.id in SUDO_IDS:
             return await msg.reply_text("👑 این کاربر سودو است و نیازی به افزودن ندارد.")
+        if not await _bot_can_promote(context, chat.id):
+            return await msg.reply_text("🚫 من اجازه‌ی تغییر مدیران را ندارم. لطفاً ربات را ادمین کنید و دسترسی Promote Members بدهید.")
 
         try:
             await context.bot.promote_chat_member(
@@ -168,15 +156,20 @@ async def handle_admin_management(update: Update, context: ContextTypes.DEFAULT_
         except Exception as e:
             await msg.reply_text(f"⚠️ خطا در افزودن مدیر: {e}")
 
-    # ================= ❌ حذف مدیر =================
+    # ========== ❌ حذف مدیر ==========
     elif text.startswith("حذف مدیر"):
         if not await _has_access(context, chat.id, user.id):
             return await msg.reply_text("🚫 فقط مدیران یا سودوها مجازند.")
         if not msg.reply_to_message:
             return await msg.reply_text("⚠️ لطفاً روی پیام مدیر موردنظر ریپلای کن.")
         target = msg.reply_to_message.from_user
+
+        if target.id == context.bot.id:
+            return await msg.reply_text("😅 نمی‌توانم خودم را حذف کنم!")
         if target.id in SUDO_IDS:
             return await msg.reply_text("🚫 نمی‌توان سودو را از مدیریت حذف کرد!")
+        if not await _bot_can_promote(context, chat.id):
+            return await msg.reply_text("🚫 من اجازه‌ی تغییر مدیران را ندارم. لطفاً ربات را ادمین کنید و دسترسی Promote Members بدهید.")
 
         try:
             await context.bot.promote_chat_member(
@@ -202,7 +195,7 @@ async def handle_admin_management(update: Update, context: ContextTypes.DEFAULT_
         except Exception as e:
             await msg.reply_text(f"⚠️ خطا در حذف مدیر: {e}")
 
-    # ================= 📋 لیست مدیران =================
+    # ========== 📋 لیست مدیران ==========
     elif text == "لیست مدیران":
         try:
             current_admins = await context.bot.get_chat_administrators(chat.id)
