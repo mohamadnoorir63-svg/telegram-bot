@@ -2082,7 +2082,7 @@ application.add_handler(
     CallbackQueryHandler(link_panel_buttons, pattern="^link_"),
     group=-10
 )
-#register_whisper_handler(application)
+
 # ==========================================================
 # 📦 کنترل گروه‌ها
 # ==========================================================
@@ -2291,7 +2291,7 @@ application.add_handler(MessageHandler(filters.Regex("^خوشامد$"), open_wel
 application.add_handler(CallbackQueryHandler(welcome_panel_buttons, pattern="^welcome_"), group=-1)
 application.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome), group=-1)
 application.add_handler(MessageHandler(filters.TEXT | filters.PHOTO | filters.ANIMATION, welcome_input_handler), group=-1)
-         
+register_whisper_handler(application)
 # ==========================================================
 from datetime import time, timezone, timedelta
 import asyncio
