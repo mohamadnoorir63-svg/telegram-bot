@@ -113,7 +113,7 @@ async def handle_admin_management(update: Update, context: ContextTypes.DEFAULT_
             await msg.reply_text("⚠️ لطفاً روی پیام کاربر ریپلای کنید یا یوزرنیم/آیدی وارد کنید.")
             return
 
-        # 🔹 شرایط ویژه فقط یک بار پیام بده
+        # 🔹 ارسال پیام یکبار
         if target.id == context.bot.id:
             await msg.reply_text("😅 نمی‌توانم خودم را مدیر کنم!")
             return
@@ -162,12 +162,11 @@ async def handle_admin_management(update: Update, context: ContextTypes.DEFAULT_
             await msg.reply_text(f"⚠️ خطا در اجرای دستور: {e}")
         return  # 🔹 مهم: بعد از alias ادامه کد اجرا نشود
 
-    # ================= ➕ افزودن مدیر =================
-    if text.startswith("افزودن مدیر"):
-        target = await _get_target_user(update, context, text)
-        if not target:
-            await msg.reply_text("⚠️ لطفاً روی پیام کاربر ریپلای کنید یا یوزرنیم/آیدی وارد کنید.")
-            return
+    # ================= بررسی دستورات اصلی =================
+    command_executed = False
+    target = await _get_target_user(update, context, text)
+
+    if text.startswith("افزودن مدیر") and target:
         if not await _has_access(context, chat.id, user.id):
             await msg.reply_text("🚫 فقط مدیران یا سودوها مجازند.")
             return
@@ -194,16 +193,12 @@ async def handle_admin_management(update: Update, context: ContextTypes.DEFAULT_
                 data[chat_key].append(target.id)
                 _save_json(ADMINS_FILE, data)
             await msg.reply_text(f"👑 {target.first_name} به‌عنوان مدیر گروه منصوب شد.")
+            command_executed = True
         except Exception as e:
             await msg.reply_text(f"⚠️ خطا در افزودن مدیر: {e}")
         return
 
-    # ================= ❌ حذف مدیر =================
-    if text.startswith("حذف مدیر"):
-        target = await _get_target_user(update, context, text)
-        if not target:
-            await msg.reply_text("⚠️ لطفاً روی پیام کاربر ریپلای کنید یا یوزرنیم/آیدی وارد کنید.")
-            return
+    if text.startswith("حذف مدیر") and target:
         if not await _has_access(context, chat.id, user.id):
             await msg.reply_text("🚫 فقط مدیران یا سودوها مجازند.")
             return
@@ -234,11 +229,11 @@ async def handle_admin_management(update: Update, context: ContextTypes.DEFAULT_
                 data[chat_key].remove(target.id)
                 _save_json(ADMINS_FILE, data)
             await msg.reply_text(f"⚙️ {target.first_name} از فهرست مدیران گروه حذف شد.")
+            command_executed = True
         except Exception as e:
             await msg.reply_text(f"⚠️ خطا در حذف مدیر: {e}")
         return
 
-    # ================= 📋 لیست مدیران =================
     if text == "لیست مدیران":
         try:
             current_admins = await context.bot.get_chat_administrators(chat.id)
