@@ -61,54 +61,35 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
     aliases_all = _load_json(ALIAS_FILE)
     aliases = aliases_all.get(str(chat.id), {})
 
-    # لیست دستورات پایه (برای تشخیص اینکه آیا این یک "دستور" هست)
+    # لیست دستورات پایه
     base_cmds = ["بن", "حذف بن", "سکوت", "حذف سکوت", "اخطار", "حذف اخطار"]
-    # دستورات مدیریتی متنی که نیاز به پردازش ویژه دارن
+    # دستورات مدیریتی خاص
     special_cmds_prefixes = ("افزودن دستور", "حذف دستور", "لیست دستورها", "لیست دستور ها")
 
-    # ---- ابتدا بررسی کنیم آیا پیام یک دستور واقعی هست یا نه ----
+    # ---- تشخیص اینکه آیا پیام دستور هست یا نه ----
     is_command = False
-
-    # اگر شروع با افزودن/حذف/لیست دستورات باشه => دستور مدیریتی (نیاز به پردازش)
     if any(text.startswith(p) for p in special_cmds_prefixes):
         is_command = True
-    # اگر دقیقا یکی از لیست‌دستورات باشه
     if text in ("لیست دستورها", "لیست دستور ها"):
         is_command = True
-    # اگر متن شروع یکی از دستورات پایه باشه
     if any(text.startswith(c) for c in base_cmds):
         is_command = True
-    # اگر متن با یکی از aliasها شروع شود => دستور سفارشی
     for alias_name in aliases.keys():
         if text.startswith(alias_name):
             is_command = True
             break
 
-    # اگر پیام دستور نیست → هیچ کاری نکن (جواب نمیده)
     if not is_command:
         return
 
-    # --- از اینجا به بعد: پیام قطعا یک دستور است؛ سپس هدف را تعیین و بررسی می‌کنیم ---
     # ---- استخراج هدف (از ریپلای، @، یا آیدی عددی) ----
     target = None
-    mentioned_username = re.search(r"@([A-Za-z0-9_]{5,32})", text)  # username تلگرام
+    mentioned_username = re.search(r"@([A-Za-z0-9_]{5,32})", text)
     user_id_match = re.search(r"\b(\d{6,15})\b", text)
 
     if msg.reply_to_message:
         target = msg.reply_to_message.from_user
-    elif mentioned_username:
-        username = mentioned_username.group(1)
-        # توجه: get_chat_member با username معمولاً نیاز به "user_id" داره؛
-        # برخی API ها اجازه میدن با "@username" تماس بگیرن ولی اگر خطا شد، نادیده می‌گیریم.
-        try:
-            # تلاش میکنیم با قالب @username یا username
-            try:
-                chat_member = await context.bot.get_chat_member(chat.id, username)
-            except:
-                chat_member = await context.bot.get_chat_member(chat.id, f"@{username}")
-            target = chat_member.user
-        except Exception:
-            target = None
+
     elif user_id_match:
         try:
             target_id = int(user_id_match.group(1))
@@ -117,7 +98,13 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
         except Exception:
             target = None
 
-    # حالا پردازش هر نوع دستور:
+    elif mentioned_username:
+        username = mentioned_username.group(1)
+        try:
+            user_obj = await context.bot.get_chat(username)
+            target = user_obj
+        except Exception:
+            target = None
 
     # ---- افزودن دستور جدید ----
     if text.startswith("افزودن دستور"):
@@ -172,15 +159,12 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
             cmd_type = alias_info["type"]
             response_text = alias_info["text"]
 
-            # اجرای alias نیاز به هدف دارد
             if not target:
                 return await msg.reply_text("⚠️ باید ریپلای کنی یا @/آیدی فرد را بنویسی.")
-
-            # فقط مدیران یا سودوها اجازه دارن
             if not await _has_access(context, chat.id, user.id):
                 return await msg.reply_text("🚫 فقط مدیران یا سودوها مجازند.")
 
-            # محافظت از ربات و سودو و مدیران — اکنون فقط بعد از اینکه واقعا دستور بود اعلام می‌شه
+            # محافظت از ربات و مدیران
             if target.id == context.bot.id:
                 return await msg.reply_text("😅 نمی‌تونم خودم رو تنبیه کنم.")
             if target.id in SUDO_IDS:
@@ -190,7 +174,6 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
                 if t_member.status in ("creator", "administrator"):
                     return await msg.reply_text("🛡 این کاربر مدیر گروهه، نمی‌تونی تنبیهش کنی!")
             except:
-                # اگر نتوانستیم مشخص کنیم، ادامه میدیم و اجازه محافظت را اعمال نمیکنیم
                 pass
 
             try:
@@ -200,16 +183,12 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
                 return await msg.reply_text(f"⚠️ خطا در اجرای دستور سفارشی: {e}")
 
     # ---- دستورات اصلی ----
-    # این بلوک فقط وقتی اجرا می‌شود که متن یک دستور پایه باشد (is_command قبلاً True شد)
     if any(text.startswith(c) for c in base_cmds):
-        # بسیاری از دستورات نیاز به هدف دارند (به جز شاید برخی موارد)
-        # اگر دستورهایی مثل "حذف بن" یا "حذف سکوت" هم نیاز به هدف دارند.
         if not target:
             return await msg.reply_text("⚠️ باید ریپلای کنی یا @/آیدی فرد را بنویسی.")
         if not await _has_access(context, chat.id, user.id):
             return await msg.reply_text("🚫 فقط مدیران یا سودوها مجازند.")
 
-        # محافظت از ربات / سودو / مدیران — فقط وقتی واقعا داریم مجازات انجام میدیم
         if target.id == context.bot.id:
             return await msg.reply_text("😅 نمی‌تونم خودم رو تنبیه کنم.")
         if target.id in SUDO_IDS:
@@ -229,14 +208,13 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
                 await context.bot.unban_chat_member(chat.id, target.id)
                 return await msg.reply_text(f"✅ {target.first_name} از بن خارج شد.")
             elif text.startswith("سکوت"):
-                # پشتیبانی از زمان در دستور سکوت
                 m = re.search(r"سکوت\s*(\d+)\s*(ثانیه|دقیقه|ساعت)?", text)
                 if m:
                     num = int(m.group(1))
                     unit = m.group(2)
                     seconds = num * 3600 if unit == "ساعت" else (num * 60 if unit == "دقیقه" else num)
                 else:
-                    seconds = 3600  # پیش‌فرض 1 ساعت
+                    seconds = 3600
                 until_date = datetime.utcnow() + timedelta(seconds=seconds)
                 await context.bot.restrict_chat_member(
                     chat.id, target.id,
@@ -273,7 +251,6 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
         except Exception as e:
             return await msg.reply_text(f"⚠️ خطا در اجرای دستور: {e}")
 
-    # اگر به این جا رسیدیم و هیچ مسیر بالا اجرا نشده (احتمالا دستور نامعتبر) → هیچ کاری نکن
     return
 
 
