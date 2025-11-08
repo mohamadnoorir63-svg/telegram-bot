@@ -18,7 +18,6 @@ for f in (WARN_FILE, CUSTOM_CMD_FILE):
         with open(f, "w", encoding="utf-8") as x:
             json.dump({}, x, ensure_ascii=False, indent=2)
 
-
 # ================= 🔧 JSON helpers =================
 def _load_json(file):
     try:
@@ -27,11 +26,9 @@ def _load_json(file):
     except:
         return {}
 
-
 def _save_json(file, data):
     with open(file, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
-
 
 # ================= 🔐 بررسی دسترسی =================
 async def _has_access(context, chat_id: int, user_id: int) -> bool:
@@ -42,7 +39,6 @@ async def _has_access(context, chat_id: int, user_id: int) -> bool:
         return member.status in ("creator", "administrator")
     except:
         return False
-
 
 # ================= 🔧 استخراج هدف امن =================
 async def _resolve_target(msg, context, chat_id):
@@ -87,12 +83,10 @@ async def _resolve_target(msg, context, chat_id):
 
     return None, None
 
-
 # ================= 📦 پیام‌های موقت =================
 async def _send_temp(msg, text, context, delete_after=10):
     sent = await msg.reply_text(text)
     asyncio.create_task(_delete_after(sent, delete_after, context))
-
 
 async def _delete_after(message, delay, context):
     await asyncio.sleep(delay)
@@ -100,7 +94,6 @@ async def _delete_after(message, delay, context):
         await context.bot.delete_message(message.chat.id, message.message_id)
     except:
         pass
-
 
 # ================= 🔧 هندلر اصلی =================
 async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -190,14 +183,14 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
             return
         return
 
-    # ---------------- دستورات بن/سکوت/اخطار با alias ----------------
+    # ---------------- دستورات بن/سکوت/اخطار فقط فارسی ----------------
     COMMAND_PATTERNS = {
-        "ban": [r"^بن(?:\s+|$)", r"^اخراج(?:\s+|$)", r"^kick(?:\s+|$)"],
-        "unban": [r"^حذف\s*بن(?:\s+|$)", r"^unban(?:\s+|$)"],
-        "mute": [r"^سکوت(?:\s+|$)", r"^بی‌صدا(?:\s+|$)", r"^mute(?:\s+|$)"],
-        "unmute": [r"^حذف\s*سکوت(?:\s+|$)", r"^unmute(?:\s+|$)"],
-        "warn": [r"^اخطار(?:\s+|$)", r"^هشدار(?:\s+|$)", r"^warn(?:\s+|$)"],
-        "delwarn": [r"^حذف\s*اخطار(?:\s+|$)", r"^delwarn(?:\s+|$)"]
+        "ban": [r"^بن(?:\s+|$)"],
+        "unban": [r"^حذف\s*بن(?:\s+|$)"],
+        "mute": [r"^سکوت(?:\s+|$)"],
+        "unmute": [r"^حذف\s*سکوت(?:\s+|$)"],
+        "warn": [r"^اخطار(?:\s+|$)"],
+        "delwarn": [r"^حذف\s*اخطار(?:\s+|$)"]
     }
 
     cmd_type = None
@@ -290,7 +283,6 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
                 await msg.reply_text(f"✅ اخطارهای {target.first_name} حذف شد.")
     except:
         return
-
 
 # ================= 🔧 ثبت هندلر =================
 def register_punishment_handlers(application, group_number: int = 12):
