@@ -10,14 +10,16 @@ from datetime import timedelta, datetime
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 WARN_FILE = os.path.join(BASE_DIR, "warnings.json")
 CUSTOM_CMD_FILE = os.path.join(BASE_DIR, "custom_commands.json")
-SUDO_IDS = [8588347189]
+SUDO_IDS = [8588347189]  # آیدی سودوها
 
+# ایجاد فایل‌ها در صورت عدم وجود
 for f in (WARN_FILE, CUSTOM_CMD_FILE):
     if not os.path.exists(f):
         with open(f, "w", encoding="utf-8") as x:
             json.dump({}, x, ensure_ascii=False, indent=2)
 
 
+# ================= 🔧 JSON helpers =================
 def _load_json(file):
     try:
         with open(file, "r", encoding="utf-8") as f:
@@ -44,7 +46,6 @@ async def _has_access(context, chat_id: int, user_id: int) -> bool:
 
 # ================= 🔧 استخراج هدف امن =================
 async def _resolve_target(msg, context, chat_id):
-    # ریپلای
     if msg.reply_to_message:
         return msg.reply_to_message.from_user, None
 
@@ -66,7 +67,6 @@ async def _resolve_target(msg, context, chat_id):
         except:
             continue
 
-    # plain @username
     plain_mention = re.search(r"@([A-Za-z0-9_]{5,32})", text)
     if plain_mention:
         username = plain_mention.group(1)
@@ -76,7 +76,6 @@ async def _resolve_target(msg, context, chat_id):
         except:
             return None, username
 
-    # آیدی عددی
     m = re.search(r"\b(\d{6,15})\b", text)
     if m:
         try:
@@ -103,7 +102,7 @@ async def _delete_after(message, delay, context):
         pass
 
 
-# ================= 🔧 هندلر بن/سکوت/اخطار و افزودن دستور =================
+# ================= 🔧 هندلر اصلی =================
 async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = update.effective_message
     user = update.effective_user
@@ -116,15 +115,19 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
     if not text:
         return
 
-    # ---- بررسی افزودن دستور جدید ----
+    # ---------------- افزودن دستور جدید ----------------
     if text.startswith("دستور جدید") or text.startswith("افزودن دستور"):
         if not await _has_access(context, chat.id, user.id):
             return  # ساکت
-        match = re.match(r"^(?:دستور جدید|افزودن دستور)\s+(.+?)\s+(افزودن‌مدیر|حذف‌مدیر)\s+(.+)$", text)
+        match = re.match(
+            r"^(?:دستور جدید|افزودن دستور)\s+(.+?)\s+(افزودن‌مدیر|حذف‌مدیر)\s+(.+)$", text
+        )
         if not match:
-            await _send_temp(msg,
-                             "📘 فرمت درست:\n<code>افزودن دستور [نام دستور] [افزودن‌مدیر|حذف‌مدیر] [متن پاسخ]</code>",
-                             context)
+            await _send_temp(
+                msg,
+                "📘 فرمت درست:\n<code>افزودن دستور [نام دستور] [افزودن‌مدیر|حذف‌مدیر] [متن پاسخ]</code>",
+                context,
+            )
             return
         name, cmd_type, response = match.groups()
         custom_all = _load_json(CUSTOM_CMD_FILE)
@@ -139,7 +142,7 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
         await _send_temp(msg, f"✅ دستور جدید <b>{name}</b> ثبت شد.", context)
         return
 
-    # ---- بررسی اجرای دستور سفارشی ----
+    # ---------------- اجرای دستور سفارشی ----------------
     custom_all = _load_json(CUSTOM_CMD_FILE)
     chat_key = str(chat.id)
     custom_cmds = custom_all.get(chat_key, {})
@@ -160,46 +163,55 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
             return
         try:
             if cmd_info["type"] == "افزودن‌مدیر":
-                await context.bot.promote_chat_member(chat.id, target.id,
-                                                      can_delete_messages=True,
-                                                      can_restrict_members=True,
-                                                      can_invite_users=True,
-                                                      can_pin_messages=True,
-                                                      can_manage_topics=True)
+                await context.bot.promote_chat_member(
+                    chat.id, target.id,
+                    can_delete_messages=True,
+                    can_restrict_members=True,
+                    can_invite_users=True,
+                    can_pin_messages=True,
+                    can_manage_topics=True
+                )
             elif cmd_info["type"] == "حذف‌مدیر":
-                await context.bot.promote_chat_member(chat.id, target.id,
-                                                      can_manage_chat=False,
-                                                      can_delete_messages=False,
-                                                      can_manage_video_chats=False,
-                                                      can_restrict_members=False,
-                                                      can_promote_members=False,
-                                                      can_change_info=False,
-                                                      can_invite_users=False,
-                                                      can_pin_messages=False,
-                                                      can_manage_topics=False)
+                await context.bot.promote_chat_member(
+                    chat.id, target.id,
+                    can_manage_chat=False,
+                    can_delete_messages=False,
+                    can_manage_video_chats=False,
+                    can_restrict_members=False,
+                    can_promote_members=False,
+                    can_change_info=False,
+                    can_invite_users=False,
+                    can_pin_messages=False,
+                    can_manage_topics=False
+                )
             text_out = cmd_info.get("text", "").replace("{name}", target.first_name)
             await _send_temp(msg, text_out or "✅ عملیات انجام شد.", context)
         except:
             return
         return
 
-    # ---- دستورات بن/سکوت/اخطار ----
+    # ---------------- دستورات بن/سکوت/اخطار با alias ----------------
     COMMAND_PATTERNS = {
-        "ban": r"^بن(?:\s+|$)",
-        "unban": r"^حذف\s*بن(?:\s+|$)",
-        "mute": r"^سکوت(?:\s+|$)",
-        "unmute": r"^حذف\s*سکوت(?:\s+|$)",
-        "warn": r"^اخطار(?:\s+|$)",
-        "delwarn": r"^حذف\s*اخطار(?:\s+|$)",
+        "ban": [r"^بن(?:\s+|$)", r"^اخراج(?:\s+|$)", r"^kick(?:\s+|$)"],
+        "unban": [r"^حذف\s*بن(?:\s+|$)", r"^unban(?:\s+|$)"],
+        "mute": [r"^سکوت(?:\s+|$)", r"^بی‌صدا(?:\s+|$)", r"^mute(?:\s+|$)"],
+        "unmute": [r"^حذف\s*سکوت(?:\s+|$)", r"^unmute(?:\s+|$)"],
+        "warn": [r"^اخطار(?:\s+|$)", r"^هشدار(?:\s+|$)", r"^warn(?:\s+|$)"],
+        "delwarn": [r"^حذف\s*اخطار(?:\s+|$)", r"^delwarn(?:\s+|$)"]
     }
 
     cmd_type = None
-    for cmd, pattern in COMMAND_PATTERNS.items():
-        if re.match(pattern, text):
-            cmd_type = cmd
+    for cmd, patterns in COMMAND_PATTERNS.items():
+        for pattern in patterns:
+            if re.match(pattern, text):
+                cmd_type = cmd
+                break
+        if cmd_type:
             break
+
     if not cmd_type:
-        return  # دستور واقعی نیست
+        return
+
     if not await _has_access(context, chat.id, user.id):
         return
 
@@ -221,6 +233,7 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
     except:
         pass
 
+    # اجرای دستور اصلی
     try:
         if cmd_type == "ban":
             await context.bot.ban_chat_member(chat.id, target.id)
@@ -244,13 +257,17 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
             else:
                 seconds = 3600
             until_date = datetime.utcnow() + timedelta(seconds=seconds)
-            await context.bot.restrict_chat_member(chat.id, target.id,
-                                                   permissions=ChatPermissions(can_send_messages=False),
-                                                   until_date=until_date)
+            await context.bot.restrict_chat_member(
+                chat.id, target.id,
+                permissions=ChatPermissions(can_send_messages=False),
+                until_date=until_date
+            )
             await msg.reply_text(f"🤐 {target.first_name} برای {seconds} ثانیه سکوت شد.")
         elif cmd_type == "unmute":
-            await context.bot.restrict_chat_member(chat.id, target.id,
-                                                   permissions=ChatPermissions(can_send_messages=True))
+            await context.bot.restrict_chat_member(
+                chat.id, target.id,
+                permissions=ChatPermissions(can_send_messages=True)
+            )
             await msg.reply_text(f"🔊 {target.first_name} از سکوت خارج شد.")
         elif cmd_type == "warn":
             warns = _load_json(WARN_FILE)
