@@ -101,16 +101,41 @@ def clean_shadow_memory():
 def reinforce_shadow_memory():
     shadow = load_data("shadow_memory.json")
     data = shadow.get("data", {})
-    mem = load_data("memory.json")
-    main_data = mem.get("data", {})
-
     moved = 0
     for phrase, responses in data.items():
         for resp in responses:
             learn(phrase, resp)
             moved += 1
-
     # پاکسازی حافظه سایه پس از انتقال
     shadow["data"] = {}
     save_data("shadow_memory.json", shadow)
     return moved
+
+# ================================
+# 🧹 پاکسازی داده‌های تکراری حافظه اصلی
+# ================================
+def clean_duplicates():
+    """پاکسازی خودکار داده‌های تکراری و غیرمعتبر در حافظه اصلی"""
+    mem = load_data("memory.json")
+    data = mem.get("data", {})
+    if not data:
+        return 0
+    changed = 0
+    for phrase, responses in list(data.items()):
+        if not isinstance(responses, list):
+            continue
+        cleaned_texts = []
+        new_responses = []
+        for r in responses:
+            text = r.get("text", "").strip() if isinstance(r, dict) else str(r).strip()
+            if len(text) < 2 or text in cleaned_texts:
+                continue
+            cleaned_texts.append(text)
+            new_responses.append({"text": text, "weight": r.get("weight", 1) if isinstance(r, dict) else 1})
+        if len(new_responses) != len(responses):
+            data[phrase] = new_responses
+            changed += 1
+    if changed:
+        mem["data"] = data
+        save_data("memory.json", mem)
+    return changed
