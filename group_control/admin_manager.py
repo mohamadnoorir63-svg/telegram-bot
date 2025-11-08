@@ -4,7 +4,6 @@ import re
 from telegram import Update
 from telegram.ext import ContextTypes, MessageHandler, filters
 
-# ================= ⚙️ تنظیمات اولیه =================
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ADMINS_FILE = os.path.join(BASE_DIR, "group_admins.json")
 ALIAS_FILE = os.path.join(BASE_DIR, "custom_cmds.json")
@@ -16,7 +15,6 @@ for f in (ADMINS_FILE, ALIAS_FILE):
         with open(f, "w", encoding="utf-8") as x:
             json.dump({}, x, ensure_ascii=False, indent=2)
 
-# ================= 📁 توابع کمکی =================
 def _load_json(path):
     try:
         with open(path, "r", encoding="utf-8") as f:
@@ -45,7 +43,6 @@ async def _bot_can_promote(context, chat_id):
         return False
 
 async def _get_target_user(update: Update, context, text: str):
-    """بررسی هدف: ریپلای یا یوزرنیم/آیدی"""
     msg = update.effective_message
     if msg.reply_to_message:
         return msg.reply_to_message.from_user
@@ -67,14 +64,11 @@ async def _get_target_user(update: Update, context, text: str):
                 return None
     return None
 
-# ================= 🧰 مدیریت مدیران و alias =================
 async def handle_admin_management(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = update.effective_message
     chat = update.effective_chat
     user = update.effective_user
     text = (msg.text or "").strip()
-    handled = False  # 🔹 برای جلوگیری از ارسال دوباره پیام
-
     if chat.type not in ("group", "supergroup") or not text:
         return
 
@@ -111,15 +105,15 @@ async def handle_admin_management(update: Update, context: ContextTypes.DEFAULT_
         await msg.reply_text(f"✅ دستور جدید <b>{name}</b> ثبت شد.", parse_mode="HTML")
         return
 
-    # ================= بررسی aliasها =================
+    # ================= بررسی alias =================
     if text in aliases:
         cmd_info = aliases[text]
-        cmd_type = cmd_info.get("type")
         target = await _get_target_user(update, context, text)
         if not target:
             await msg.reply_text("⚠️ لطفاً روی پیام کاربر ریپلای کنید یا یوزرنیم/آیدی وارد کنید.")
             return
-        # 🔹 بررسی شرایط خاص: خود ربات یا سودو
+
+        # 🔹 شرایط ویژه فقط یک بار پیام بده
         if target.id == context.bot.id:
             await msg.reply_text("😅 نمی‌توانم خودم را مدیر کنم!")
             return
@@ -129,8 +123,9 @@ async def handle_admin_management(update: Update, context: ContextTypes.DEFAULT_
         if not await _bot_can_promote(context, chat.id):
             await msg.reply_text("🚫 من اجازه‌ی تغییر مدیران را ندارم. لطفاً ربات را ادمین کنید و دسترسی Promote Members بدهید.")
             return
+
         try:
-            if cmd_type == "افزودن‌مدیر":
+            if cmd_info["type"] == "افزودن‌مدیر":
                 await context.bot.promote_chat_member(
                     chat_id=chat.id,
                     user_id=target.id,
@@ -143,7 +138,7 @@ async def handle_admin_management(update: Update, context: ContextTypes.DEFAULT_
                 if target.id not in data[chat_key]:
                     data[chat_key].append(target.id)
                     _save_json(ADMINS_FILE, data)
-            elif cmd_type == "حذف‌مدیر":
+            elif cmd_info["type"] == "حذف‌مدیر":
                 await context.bot.promote_chat_member(
                     chat_id=chat.id,
                     user_id=target.id,
@@ -160,15 +155,12 @@ async def handle_admin_management(update: Update, context: ContextTypes.DEFAULT_
                 if target.id in data[chat_key]:
                     data[chat_key].remove(target.id)
                     _save_json(ADMINS_FILE, data)
+
             text_out = cmd_info.get("text", "").replace("{name}", target.first_name)
             await msg.reply_text(text_out or "✅ عملیات انجام شد.")
-            handled = True
         except Exception as e:
             await msg.reply_text(f"⚠️ خطا در اجرای دستور: {e}")
-            handled = True
-
-    if handled:  # 🔹 اگر alias اجرا شد، دیگر ادامه نده
-        return
+        return  # 🔹 مهم: بعد از alias ادامه کد اجرا نشود
 
     # ================= ➕ افزودن مدیر =================
     if text.startswith("افزودن مدیر"):
@@ -204,9 +196,10 @@ async def handle_admin_management(update: Update, context: ContextTypes.DEFAULT_
             await msg.reply_text(f"👑 {target.first_name} به‌عنوان مدیر گروه منصوب شد.")
         except Exception as e:
             await msg.reply_text(f"⚠️ خطا در افزودن مدیر: {e}")
+        return
 
     # ================= ❌ حذف مدیر =================
-    elif text.startswith("حذف مدیر"):
+    if text.startswith("حذف مدیر"):
         target = await _get_target_user(update, context, text)
         if not target:
             await msg.reply_text("⚠️ لطفاً روی پیام کاربر ریپلای کنید یا یوزرنیم/آیدی وارد کنید.")
@@ -243,9 +236,10 @@ async def handle_admin_management(update: Update, context: ContextTypes.DEFAULT_
             await msg.reply_text(f"⚙️ {target.first_name} از فهرست مدیران گروه حذف شد.")
         except Exception as e:
             await msg.reply_text(f"⚠️ خطا در حذف مدیر: {e}")
+        return
 
     # ================= 📋 لیست مدیران =================
-    elif text == "لیست مدیران":
+    if text == "لیست مدیران":
         try:
             current_admins = await context.bot.get_chat_administrators(chat.id)
             lines = [f"• {a.user.first_name}" for a in current_admins if not a.user.is_bot]
@@ -256,7 +250,6 @@ async def handle_admin_management(update: Update, context: ContextTypes.DEFAULT_
         except Exception as e:
             await msg.reply_text(f"⚠️ خطا در دریافت لیست مدیران: {e}")
 
-# ================= 🔧 ثبت هندلر =================
 def register_admin_handlers(application, group_number: int = 15):
     application.add_handler(
         MessageHandler(
