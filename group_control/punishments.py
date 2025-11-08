@@ -9,9 +9,8 @@ from datetime import timedelta, datetime
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 WARN_FILE = os.path.join(BASE_DIR, "warnings.json")
 
-SUDO_IDS = [8588347189]  # آی‌دی سودوها
+SUDO_IDS = [8588347189]  # آیدی سودوها
 
-# ساخت فایل در صورت نبود
 if not os.path.exists(WARN_FILE):
     with open(WARN_FILE, "w", encoding="utf-8") as f:
         json.dump({}, f, ensure_ascii=False, indent=2)
@@ -58,8 +57,7 @@ async def _resolve_target(msg, context, chat_id):
             if ent.type == MessageEntity.MENTION:
                 start = ent.offset
                 length = ent.length
-                mention_text = text[start:start + length]
-                username = mention_text.lstrip("@")
+                username = text[start:start + length].lstrip("@")
                 try:
                     cm = await context.bot.get_chat_member(chat_id, username)
                     return cm.user
@@ -94,32 +92,38 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
     if not text:
         return
 
-    # استخراج هدف امن
-    target = await _resolve_target(msg, context, chat.id)
+    # regex دستورات معتبر (فقط ابتدای پیام)
+    COMMAND_PATTERNS = {
+        "ban": r"^بن(?:\s+|$)",
+        "unban": r"^حذف\s*بن(?:\s+|$)",
+        "mute": r"^سکوت(?:\s+|$)",
+        "unmute": r"^حذف\s*سکوت(?:\s+|$)",
+        "warn": r"^اخطار(?:\s+|$)",
+        "delwarn": r"^حذف\s*اخطار(?:\s+|$)",
+    }
 
-    # اگر هدف مشخص نیست، هیچ کاری نکن
-    if not target:
-        return  # پیام دستور واقعی نیست
+    cmd_type = None
+    for cmd, pattern in COMMAND_PATTERNS.items():
+        if re.match(pattern, text):
+            cmd_type = cmd
+            break
 
-    # شناسایی دقیق دستور بر اساس ابتدای پیام
-    if re.match(r"^بن(?:\s+|$)", text):
-        cmd_type = "ban"
-    elif re.match(r"^حذف\s*بن(?:\s+|$)", text):
-        cmd_type = "unban"
-    elif re.match(r"^سکوت(?:\s+|$)", text):
-        cmd_type = "mute"
-    elif re.match(r"^حذف\s*سکوت(?:\s+|$)", text):
-        cmd_type = "unmute"
-    elif re.match(r"^اخطار(?:\s+|$)", text):
-        cmd_type = "warn"
-    elif re.match(r"^حذف\s*اخطار(?:\s+|$)", text):
-        cmd_type = "delwarn"
-    else:
+    if not cmd_type:
         return  # پیام دستور واقعی نیست
 
     # بررسی دسترسی اجراکننده
     if not await _has_access(context, chat.id, user.id):
         return await msg.reply_text("🚫 فقط مدیران یا سودوها مجازند.")
+
+    # استخراج هدف امن
+    target = await _resolve_target(msg, context, chat.id)
+    if not target:
+        return await msg.reply_text(
+            "⚠️ هدف مشخص نیست.\n"
+            "• ریپلای روی پیام کاربر\n"
+            "• @username (عضو گروه)\n"
+            "• آیدی عددی"
+        )
 
     # محافظت‌ها
     if target.id == context.bot.id:
