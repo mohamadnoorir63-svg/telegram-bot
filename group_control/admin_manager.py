@@ -1,6 +1,7 @@
 import os
 import json
 import re
+import asyncio
 from telegram import Update
 from telegram.ext import ContextTypes, MessageHandler, filters
 
@@ -64,16 +65,15 @@ async def _get_target_user(update: Update, context, text: str):
                 return None
     return None
 
-async def _send_temp_message(msg, text):
+# ================= 📦 پیام‌های موقت =================
+async def _send_temp_message(msg, text, context):
     sent = await msg.reply_text(text)
-    # حذف پیام بعد از 10 ثانیه
-    msg.bot.loop.create_task(_delete_after(sent, 10))
+    asyncio.create_task(_delete_after(sent, 10, context))
 
-async def _delete_after(message, delay):
-    import asyncio
+async def _delete_after(message, delay, context):
     await asyncio.sleep(delay)
     try:
-        await message.delete()
+        await context.bot.delete_message(message.chat.id, message.message_id)
     except:
         pass
 
@@ -96,23 +96,24 @@ async def handle_admin_management(update: Update, context: ContextTypes.DEFAULT_
 
     if text.startswith("دستور جدید"):
         if not await _has_access(context, chat.id, user.id):
-            await _send_temp_message(msg, "🚫 فقط مدیران یا سودوها می‌توانند دستور جدید بسازند.")
+            await _send_temp_message(msg, "🚫 فقط مدیران یا سودوها می‌توانند دستور جدید بسازند.", context)
             return
         match = re.match(r"^دستور جدید\s+(.+?)\s+(افزودن‌مدیر|حذف‌مدیر)\s+(.+)$", text)
         if not match:
             await _send_temp_message(
                 msg,
-                "📘 فرمت درست:\n<code>دستور جدید [نام دستور] [افزودن‌مدیر|حذف‌مدیر] [متن پاسخ]</code>"
+                "📘 فرمت درست:\n<code>دستور جدید [نام دستور] [افزودن‌مدیر|حذف‌مدیر] [متن پاسخ]</code>",
+                context
             )
             return
         name, cmd_type, response = match.groups()
         if name in custom_cmds:
-            await _send_temp_message(msg, "⚠️ این نام قبلاً تعریف شده.")
+            await _send_temp_message(msg, "⚠️ این نام قبلاً تعریف شده.", context)
             return
         custom_cmds[name] = {"type": cmd_type, "text": response}
         custom_all[chat_key] = custom_cmds
         _save_json(CUSTOM_CMD_FILE, custom_all)
-        await _send_temp_message(msg, f"✅ دستور جدید <b>{name}</b> ثبت شد.")
+        await _send_temp_message(msg, f"✅ دستور جدید <b>{name}</b> ثبت شد.", context)
         return
 
     # ================= اجرای دستورات سفارشی =================
@@ -120,17 +121,17 @@ async def handle_admin_management(update: Update, context: ContextTypes.DEFAULT_
         cmd_info = custom_cmds[text]
         target = await _get_target_user(update, context, text)
         if not target:
-            await _send_temp_message(msg, "⚠️ لطفاً روی پیام کاربر ریپلای کنید یا یوزرنیم/آیدی وارد کنید.")
+            await _send_temp_message(msg, "⚠️ لطفاً روی پیام کاربر ریپلای کنید یا یوزرنیم/آیدی وارد کنید.", context)
             return
 
         if target.id == context.bot.id:
-            await _send_temp_message(msg, "😅 نمی‌توانم خودم را مدیر کنم!")
+            await _send_temp_message(msg, "😅 نمی‌توانم خودم را مدیر کنم!", context)
             return
         if target.id in SUDO_IDS:
-            await _send_temp_message(msg, "👑 این کاربر جزو سودوهاست و تغییر نمی‌شود.")
+            await _send_temp_message(msg, "👑 این کاربر جزو سودوهاست و تغییر نمی‌شود.", context)
             return
         if not await _bot_can_promote(context, chat.id):
-            await _send_temp_message(msg, "🚫 من اجازه‌ی تغییر مدیران را ندارم. لطفاً ربات را ادمین کنید.")
+            await _send_temp_message(msg, "🚫 من اجازه‌ی تغییر مدیران را ندارم. لطفاً ربات را ادمین کنید.", context)
             return
 
         try:
@@ -158,26 +159,26 @@ async def handle_admin_management(update: Update, context: ContextTypes.DEFAULT_
                     _save_json(ADMINS_FILE, data)
 
             text_out = cmd_info.get("text", "").replace("{name}", target.first_name)
-            await _send_temp_message(msg, text_out or "✅ عملیات انجام شد.")
+            await _send_temp_message(msg, text_out or "✅ عملیات انجام شد.", context)
         except Exception as e:
-            await _send_temp_message(msg, f"⚠️ خطا در اجرای دستور: {e}")
-        return  # مهم: ادامه کد اجرا نشود
+            await _send_temp_message(msg, f"⚠️ خطا در اجرای دستور: {e}", context)
+        return  # ادامه کد اجرا نشود
 
     # ================= دستورات اصلی =================
     target = await _get_target_user(update, context, text)
 
     if text.startswith("افزودن مدیر") and target:
         if not await _has_access(context, chat.id, user.id):
-            await _send_temp_message(msg, "🚫 فقط مدیران یا سودوها مجازند.")
+            await _send_temp_message(msg, "🚫 فقط مدیران یا سودوها مجازند.", context)
             return
         if target.id == context.bot.id:
-            await _send_temp_message(msg, "😅 نمی‌توانم خودم را مدیر کنم!")
+            await _send_temp_message(msg, "😅 نمی‌توانم خودم را مدیر کنم!", context)
             return
         if target.id in SUDO_IDS:
-            await _send_temp_message(msg, "👑 این کاربر جزو سودوهاست و تغییر نمی‌شود.")
+            await _send_temp_message(msg, "👑 این کاربر جزو سودوهاست و تغییر نمی‌شود.", context)
             return
         if not await _bot_can_promote(context, chat.id):
-            await _send_temp_message(msg, "🚫 من اجازه‌ی تغییر مدیران را ندارم.")
+            await _send_temp_message(msg, "🚫 من اجازه‌ی تغییر مدیران را ندارم.", context)
             return
         try:
             await context.bot.promote_chat_member(
@@ -189,23 +190,23 @@ async def handle_admin_management(update: Update, context: ContextTypes.DEFAULT_
             if target.id not in data[chat_key]:
                 data[chat_key].append(target.id)
                 _save_json(ADMINS_FILE, data)
-            await _send_temp_message(msg, f"👑 {target.first_name} به‌عنوان مدیر گروه منصوب شد.")
+            await _send_temp_message(msg, f"👑 {target.first_name} به‌عنوان مدیر گروه منصوب شد.", context)
         except Exception as e:
-            await _send_temp_message(msg, f"⚠️ خطا در افزودن مدیر: {e}")
+            await _send_temp_message(msg, f"⚠️ خطا در افزودن مدیر: {e}", context)
         return
 
     if text.startswith("حذف مدیر") and target:
         if not await _has_access(context, chat.id, user.id):
-            await _send_temp_message(msg, "🚫 فقط مدیران یا سودوها مجازند.")
+            await _send_temp_message(msg, "🚫 فقط مدیران یا سودوها مجازند.", context)
             return
         if target.id == context.bot.id:
-            await _send_temp_message(msg, "😅 نمی‌توانم خودم را حذف کنم!")
+            await _send_temp_message(msg, "😅 نمی‌توانم خودم را حذف کنم!", context)
             return
         if target.id in SUDO_IDS:
-            await _send_temp_message(msg, "👑 این کاربر جزو سودوهاست و تغییر نمی‌شود.")
+            await _send_temp_message(msg, "👑 این کاربر جزو سودوهاست و تغییر نمی‌شود.", context)
             return
         if not await _bot_can_promote(context, chat.id):
-            await _send_temp_message(msg, "🚫 من اجازه‌ی تغییر مدیران را ندارم.")
+            await _send_temp_message(msg, "🚫 من اجازه‌ی تغییر مدیران را ندارم.", context)
             return
         try:
             await context.bot.promote_chat_member(
@@ -219,9 +220,9 @@ async def handle_admin_management(update: Update, context: ContextTypes.DEFAULT_
             if target.id in data[chat_key]:
                 data[chat_key].remove(target.id)
                 _save_json(ADMINS_FILE, data)
-            await _send_temp_message(msg, f"⚙️ {target.first_name} از فهرست مدیران گروه حذف شد.")
+            await _send_temp_message(msg, f"⚙️ {target.first_name} از فهرست مدیران حذف شد.", context)
         except Exception as e:
-            await _send_temp_message(msg, f"⚠️ خطا در حذف مدیر: {e}")
+            await _send_temp_message(msg, f"⚠️ خطا در حذف مدیر: {e}", context)
         return
 
     if text == "لیست مدیران":
@@ -229,11 +230,11 @@ async def handle_admin_management(update: Update, context: ContextTypes.DEFAULT_
             current_admins = await context.bot.get_chat_administrators(chat.id)
             lines = [f"• {a.user.first_name}" for a in current_admins if not a.user.is_bot]
             if lines:
-                await _send_temp_message(msg, "👑 مدیران فعلی گروه:\n" + "\n".join(lines))
+                await _send_temp_message(msg, "👑 مدیران فعلی گروه:\n" + "\n".join(lines), context)
             else:
-                await _send_temp_message(msg, "ℹ️ هیچ مدیری در گروه یافت نشد.")
+                await _send_temp_message(msg, "ℹ️ هیچ مدیری در گروه یافت نشد.", context)
         except Exception as e:
-            await _send_temp_message(msg, f"⚠️ خطا در دریافت لیست مدیران: {e}")
+            await _send_temp_message(msg, f"⚠️ خطا در دریافت لیست مدیران: {e}", context)
 
 def register_admin_handlers(application, group_number: int = 15):
     application.add_handler(
