@@ -45,30 +45,34 @@ async def _bot_can_promote(context, chat_id):
 
 async def _get_target_user(update: Update, context, text: str):
     msg = update.effective_message
+    chat_id = update.effective_chat.id
+
+    # ریپلای
     if msg.reply_to_message:
-        return msg.reply_to_message.from_user
+        return msg.reply_to_message.from_user, None
+
     parts = text.split()
     if len(parts) >= 2:
         identifier = parts[1]
         if identifier.startswith("@"):
             try:
-                user = await context.bot.get_chat_member(update.effective_chat.id, identifier)
-                return user.user
+                user = await context.bot.get_chat_member(chat_id, identifier)
+                return user.user, None
             except:
-                return None
+                return None, identifier  # mention اشتباه
         else:
             try:
                 user_id = int(identifier)
-                user = await context.bot.get_chat_member(update.effective_chat.id, user_id)
-                return user.user
+                user = await context.bot.get_chat_member(chat_id, user_id)
+                return user.user, None
             except:
-                return None
-    return None
+                return None, None
+    return None, None
 
 # ================= 📦 پیام‌های موقت =================
-async def _send_temp_message(msg, text, context):
+async def _send_temp_message(msg, text, context, delete_after=10):
     sent = await msg.reply_text(text)
-    asyncio.create_task(_delete_after(sent, 10, context))
+    asyncio.create_task(_delete_after(sent, delete_after, context))
 
 async def _delete_after(message, delay, context):
     await asyncio.sleep(delay)
@@ -77,11 +81,13 @@ async def _delete_after(message, delay, context):
     except:
         pass
 
+# ================= 🔧 هندلر =================
 async def handle_admin_management(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = update.effective_message
     chat = update.effective_chat
     user = update.effective_user
     text = (msg.text or "").strip()
+
     if chat.type not in ("group", "supergroup") or not text:
         return
 
@@ -90,14 +96,13 @@ async def handle_admin_management(update: Update, context: ContextTypes.DEFAULT_
     if chat_key not in data:
         data[chat_key] = []
 
-    # ================= 📌 دستورات سفارشی امن =================
     custom_all = _load_json(CUSTOM_CMD_FILE)
     custom_cmds = custom_all.get(chat_key, {})
 
+    # ====== ثبت دستور جدید ======
     if text.startswith("دستور جدید"):
         if not await _has_access(context, chat.id, user.id):
-            await _send_temp_message(msg, "🚫 فقط مدیران یا سودوها می‌توانند دستور جدید بسازند.", context)
-            return
+            return  # ساکت بماند
         match = re.match(r"^دستور جدید\s+(.+?)\s+(افزودن‌مدیر|حذف‌مدیر)\s+(.+)$", text)
         if not match:
             await _send_temp_message(
@@ -116,14 +121,16 @@ async def handle_admin_management(update: Update, context: ContextTypes.DEFAULT_
         await _send_temp_message(msg, f"✅ دستور جدید <b>{name}</b> ثبت شد.", context)
         return
 
-    # ================= اجرای دستورات سفارشی =================
+    # ====== اجرای دستورات سفارشی ======
     if text in custom_cmds:
         cmd_info = custom_cmds[text]
-        target = await _get_target_user(update, context, text)
-        if not target:
-            await _send_temp_message(msg, "⚠️ لطفاً روی پیام کاربر ریپلای کنید یا یوزرنیم/آیدی وارد کنید.", context)
+        target, mention_failed = await _get_target_user(update, context, text)
+
+        # اگر mention اشتباه باشد یا هدف نبود → ساکت
+        if mention_failed or not target:
             return
 
+        # محافظت‌ها
         if target.id == context.bot.id:
             await _send_temp_message(msg, "😅 نمی‌توانم خودم را مدیر کنم!", context)
             return
@@ -160,16 +167,17 @@ async def handle_admin_management(update: Update, context: ContextTypes.DEFAULT_
 
             text_out = cmd_info.get("text", "").replace("{name}", target.first_name)
             await _send_temp_message(msg, text_out or "✅ عملیات انجام شد.", context)
-        except Exception as e:
-            await _send_temp_message(msg, f"⚠️ خطا در اجرای دستور: {e}", context)
-        return  # ادامه کد اجرا نشود
+        except:
+            pass
+        return
 
-    # ================= دستورات اصلی =================
-    target = await _get_target_user(update, context, text)
+    # ====== دستورات اصلی ======
+    target, mention_failed = await _get_target_user(update, context, text)
+    if mention_failed or not target:
+        return  # ساکت بماند
 
-    if text.startswith("افزودن مدیر") and target:
+    if text.startswith("افزودن مدیر"):
         if not await _has_access(context, chat.id, user.id):
-            await _send_temp_message(msg, "🚫 فقط مدیران یا سودوها مجازند.", context)
             return
         if target.id == context.bot.id:
             await _send_temp_message(msg, "😅 نمی‌توانم خودم را مدیر کنم!", context)
@@ -191,13 +199,12 @@ async def handle_admin_management(update: Update, context: ContextTypes.DEFAULT_
                 data[chat_key].append(target.id)
                 _save_json(ADMINS_FILE, data)
             await _send_temp_message(msg, f"👑 {target.first_name} به‌عنوان مدیر گروه منصوب شد.", context)
-        except Exception as e:
-            await _send_temp_message(msg, f"⚠️ خطا در افزودن مدیر: {e}", context)
+        except:
+            pass
         return
 
-    if text.startswith("حذف مدیر") and target:
+    if text.startswith("حذف مدیر"):
         if not await _has_access(context, chat.id, user.id):
-            await _send_temp_message(msg, "🚫 فقط مدیران یا سودوها مجازند.", context)
             return
         if target.id == context.bot.id:
             await _send_temp_message(msg, "😅 نمی‌توانم خودم را حذف کنم!", context)
@@ -221,20 +228,17 @@ async def handle_admin_management(update: Update, context: ContextTypes.DEFAULT_
                 data[chat_key].remove(target.id)
                 _save_json(ADMINS_FILE, data)
             await _send_temp_message(msg, f"⚙️ {target.first_name} از فهرست مدیران حذف شد.", context)
-        except Exception as e:
-            await _send_temp_message(msg, f"⚠️ خطا در حذف مدیر: {e}", context)
+        except:
+            pass
         return
 
     if text == "لیست مدیران":
         try:
             current_admins = await context.bot.get_chat_administrators(chat.id)
             lines = [f"• {a.user.first_name}" for a in current_admins if not a.user.is_bot]
-            if lines:
-                await _send_temp_message(msg, "👑 مدیران فعلی گروه:\n" + "\n".join(lines), context)
-            else:
-                await _send_temp_message(msg, "ℹ️ هیچ مدیری در گروه یافت نشد.", context)
-        except Exception as e:
-            await _send_temp_message(msg, f"⚠️ خطا در دریافت لیست مدیران: {e}", context)
+            await _send_temp_message(msg, "👑 مدیران فعلی گروه:\n" + "\n".join(lines) if lines else "ℹ️ هیچ مدیری در گروه یافت نشد.", context)
+        except:
+            pass
 
 def register_admin_handlers(application, group_number: int = 15):
     application.add_handler(
