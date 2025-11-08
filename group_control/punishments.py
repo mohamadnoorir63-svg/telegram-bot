@@ -9,7 +9,7 @@ from datetime import timedelta, datetime
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 WARN_FILE = os.path.join(BASE_DIR, "warnings.json")
 
-SUDO_IDS = [8588347189]  # آیدی سودوها
+SUDO_IDS = [8588347189]  # آی‌دی سودوها
 
 # ساخت فایل در صورت نبود
 if not os.path.exists(WARN_FILE):
@@ -32,6 +32,7 @@ def _save_json(file, data):
 
 # ================= 🔐 بررسی ادمین / سودو =================
 async def _has_access(context, chat_id: int, user_id: int) -> bool:
+    """بررسی این‌که آیا کاربر مجوز اجرای دستور را دارد"""
     if user_id in SUDO_IDS:
         return True
     try:
@@ -43,31 +44,46 @@ async def _has_access(context, chat_id: int, user_id: int) -> bool:
 
 # ================= 🔧 استخراج هدف امن =================
 async def _resolve_target(msg, context, chat_id):
+    """
+    سعی می‌کند هدف را از پیام استخراج کند (ایمن):
+    اولویت‌ها:
+      1) reply_to_message.from_user
+      2) text_mention entity (شامل user object)
+      3) mention entity (@username) — فقط در صورتی که آن username عضو گروه باشد
+      4) آیدی عددی دقیقاً بعد از دستور (مثلاً 'بن 12345') — فقط اگر عضو گروه باشد
+    در غیر این صورت None برمی‌گرداند.
+    """
+    # 1) ریپلای
     if msg.reply_to_message:
         return msg.reply_to_message.from_user
 
     text = msg.text or ""
     entities = msg.entities or []
 
-    # اولویت: text_mention
+    # 2) بررسی entities برای text_mention یا mention
     for ent in entities:
         try:
             if ent.type == MessageEntity.TEXT_MENTION:
+                # این entity شامل شیء user است
                 return ent.user
             if ent.type == MessageEntity.MENTION:
+                # استخراج username از متن
                 start = ent.offset
                 length = ent.length
-                username = text[start:start+length].lstrip("@")
+                mention_text = text[start:start + length]  # شامل @
+                username = mention_text.lstrip("@")
+                # تلاش برای گرفتن عضو گروه با username (فقط در صورتی که عضو گروه باشد)
                 try:
                     cm = await context.bot.get_chat_member(chat_id, username)
                     return cm.user
                 except:
+                    # اگر username در گروه نبود، نادیده می‌گیریم
                     continue
-        except:
+        except Exception:
             continue
 
-    # آیدی عددی بعد از دستور
-    m = re.search(r"^(بن|حذف\s*بن|سکوت|حذف\s*سکوت|اخطار|حذف\s*اخطار)\s+(\d{6,15})", text)
+    # 3) آیدی عددی دقیقاً بعد از دستور (فرمت: "بن 123456")
+    m = re.search(r"^(بن|حذف\s*بن|سکوت|حذف\s*سکوت|اخطار|حذف\s*اخطار)\s+(\d{6,15})\b", text)
     if m:
         try:
             target_id = int(m.group(2))
@@ -75,6 +91,7 @@ async def _resolve_target(msg, context, chat_id):
             return cm.user
         except:
             return None
+
     return None
 
 
@@ -91,7 +108,7 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
     if not text:
         return
 
-    # regex دستورات معتبر — فقط ابتدای پیام و بعدش فاصله یا انتهای پیام
+    # تعریف الگوهای دستورات — فقط ابتدای پیام بررسی می‌شود و بعدش یا فاصله یا پایان پیام باید باشد
     COMMAND_PATTERNS = {
         "ban": r"^بن(?:\s+|$)",
         "unban": r"^حذف\s*بن(?:\s+|$)",
@@ -101,37 +118,37 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
         "delwarn": r"^حذف\s*اخطار(?:\s+|$)",
     }
 
-    is_command = False
+    # پیدا کردن اینکه آیا پیام یک دستور واقعی است (فقط وقتی ابتدای پیام)
     cmd_type = None
     for cmd, pattern in COMMAND_PATTERNS.items():
         if re.match(pattern, text):
-            is_command = True
             cmd_type = cmd
             break
 
-    if not is_command:
-        return  # پیام معمولی است و نادیده گرفته می‌شود
+    if not cmd_type:
+        return  # پیام دستور واقعی نیست — نادیده گرفته می‌شود
 
-    # دسترسی اجرا کننده
+    # بررسی دسترسی اجراکننده
     if not await _has_access(context, chat.id, user.id):
         return await msg.reply_text("🚫 فقط مدیران یا سودوها مجازند.")
 
-    # استخراج هدف امن
+    # استخراج هدف به صورت امن
     target = await _resolve_target(msg, context, chat.id)
 
+    # اگر دستور نیاز به هدف دارد ولی هدف مشخص نیست => پیام راهنما و خروج
     if cmd_type in ("ban", "unban", "mute", "unmute", "warn", "delwarn") and not target:
         return await msg.reply_text(
-            "⚠️ هدف مشخص نیست.\n"
-            "• ریپلای روی پیام کاربر\n"
-            "• @username (عضو گروه)\n"
-            "• آیدی عددی"
+            "⚠️ هدف مشخص نیست — دستور اجرا نشد.\n\n"
+            "برای مشخص کردن هدف از یکی از روش‌ها استفاده کنید:\n"
+            "• ریپلای روی پیام کاربر و نوشتن دستور (مثلاً: بن)\n"
+            "• نوشتن @username (کاربر باید قبلاً در گروه فعال بوده باشد)\n"
+            "• یا نوشتن آیدی عددی بعد از دستور (مثلاً: بن 123456789)\n"
         )
 
-    # محافظت از خود ربات
+    # محافظت‌ها
     if target and target.id == context.bot.id:
         return await msg.reply_text("😅 نمی‌تونم خودم رو تنبیه کنم.")
 
-    # محافظت از سودوها و مدیران
     if target:
         if target.id in SUDO_IDS:
             return await msg.reply_text("🚫 امکان اجرای دستور روی این کاربر وجود ندارد.")
@@ -140,9 +157,10 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
             if t_member.status in ("creator", "administrator"):
                 return await msg.reply_text("🛡 امکان اجرای دستور روی این کاربر وجود ندارد.")
         except:
+            # اگر نتوانستیم وضعیت را بگیریم، بی‌خیال شده و اجازه می‌دهیم تلاش ادامه یابد
             pass
 
-    # ---- اجرای دستور ----
+    # ---- اجرای دستورها ----
     try:
         if cmd_type == "ban":
             await context.bot.ban_chat_member(chat.id, target.id)
@@ -153,6 +171,7 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
             return await msg.reply_text(f"✅ {target.first_name} از بن خارج شد.")
 
         if cmd_type == "mute":
+            # پشتیبانی از فرمت‌های: "سکوت", "سکوت 1 دقیقه", "سکوت 1دقیقه", "سکوت 1ساعت", "سکوت 10"
             m = re.search(r"سکوت\s*(\d+)?\s*(ثانیه|دقیقه|ساعت)?", text)
             if m and m.group(1):
                 num = int(m.group(1))
@@ -164,7 +183,8 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
                 elif unit == "ثانیه":
                     seconds = num
                 else:
-                    seconds = num * 60  # پیش‌فرض دقیقه
+                    # اگر واحد داده شده نبود، فرض می‌کنیم دقیقه است (قابل تغییر)
+                    seconds = num * 60
             else:
                 seconds = 3600  # پیش‌فرض 1 ساعت
             until_date = datetime.utcnow() + timedelta(seconds=seconds)
@@ -205,6 +225,7 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
             return await msg.reply_text("ℹ️ این کاربر اخطاری نداشت.")
 
     except Exception as e:
+        # خطا را به مدیر گزارش بده (بدون افشای چیز حساس)
         return await msg.reply_text(f"⚠️ خطا در اجرای دستور: {e}")
 
 
