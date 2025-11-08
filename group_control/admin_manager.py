@@ -73,6 +73,7 @@ async def handle_admin_management(update: Update, context: ContextTypes.DEFAULT_
     chat = update.effective_chat
     user = update.effective_user
     text = (msg.text or "").strip()
+    handled = False  # 🔹 برای جلوگیری از ارسال دوباره پیام
 
     if chat.type not in ("group", "supergroup") or not text:
         return
@@ -88,23 +89,27 @@ async def handle_admin_management(update: Update, context: ContextTypes.DEFAULT_
     # ================= 📌 ایجاد دستور جدید =================
     if text.startswith("دستور جدید"):
         if not await _has_access(context, chat.id, user.id):
-            return await msg.reply_text("🚫 فقط مدیران یا سودوها می‌توانند دستور جدید بسازند.")
+            await msg.reply_text("🚫 فقط مدیران یا سودوها می‌توانند دستور جدید بسازند.")
+            return
         match = re.match(r"^دستور جدید\s+(.+?)\s+(افزودن‌مدیر|حذف‌مدیر)\s+(.+)$", text)
         if not match:
-            return await msg.reply_text(
+            await msg.reply_text(
                 "📘 فرمت درست:\n"
                 "<code>دستور جدید [نام دستور] [افزودن‌مدیر|حذف‌مدیر] [متن پاسخ]</code>\n"
                 "مثال:\n"
                 "<code>دستور جدید ارتقا مدیر افزودن‌مدیر {name} به عنوان مدیر گروه منصوب شد!</code>",
                 parse_mode="HTML"
             )
+            return
         name, cmd_type, response = match.groups()
         if name in aliases:
-            return await msg.reply_text("⚠️ این نام قبلاً تعریف شده.")
+            await msg.reply_text("⚠️ این نام قبلاً تعریف شده.")
+            return
         aliases[name] = {"type": cmd_type, "text": response}
         aliases_all[chat_key] = aliases
         _save_json(ALIAS_FILE, aliases_all)
-        return await msg.reply_text(f"✅ دستور جدید <b>{name}</b> ثبت شد.", parse_mode="HTML")
+        await msg.reply_text(f"✅ دستور جدید <b>{name}</b> ثبت شد.", parse_mode="HTML")
+        return
 
     # ================= بررسی aliasها =================
     if text in aliases:
@@ -112,13 +117,18 @@ async def handle_admin_management(update: Update, context: ContextTypes.DEFAULT_
         cmd_type = cmd_info.get("type")
         target = await _get_target_user(update, context, text)
         if not target:
-            return await msg.reply_text("⚠️ لطفاً روی پیام کاربر ریپلای کنید یا یوزرنیم/آیدی وارد کنید.")
+            await msg.reply_text("⚠️ لطفاً روی پیام کاربر ریپلای کنید یا یوزرنیم/آیدی وارد کنید.")
+            return
+        # 🔹 بررسی شرایط خاص: خود ربات یا سودو
         if target.id == context.bot.id:
-            return await msg.reply_text("😅 نمی‌توانم خودم را مدیر کنم!")
+            await msg.reply_text("😅 نمی‌توانم خودم را مدیر کنم!")
+            return
         if target.id in SUDO_IDS:
-            return await msg.reply_text("👑 این کاربر جزو سودوهاست و تغییر نمی‌کند.")
+            await msg.reply_text("👑 این کاربر جزو سودوهاست و تغییر نمی‌کند.")
+            return
         if not await _bot_can_promote(context, chat.id):
-            return await msg.reply_text("🚫 من اجازه‌ی تغییر مدیران را ندارم. لطفاً ربات را ادمین کنید و دسترسی Promote Members بدهید.")
+            await msg.reply_text("🚫 من اجازه‌ی تغییر مدیران را ندارم. لطفاً ربات را ادمین کنید و دسترسی Promote Members بدهید.")
+            return
         try:
             if cmd_type == "افزودن‌مدیر":
                 await context.bot.promote_chat_member(
@@ -151,24 +161,33 @@ async def handle_admin_management(update: Update, context: ContextTypes.DEFAULT_
                     data[chat_key].remove(target.id)
                     _save_json(ADMINS_FILE, data)
             text_out = cmd_info.get("text", "").replace("{name}", target.first_name)
-            return await msg.reply_text(text_out or "✅ عملیات انجام شد.")
+            await msg.reply_text(text_out or "✅ عملیات انجام شد.")
+            handled = True
         except Exception as e:
-            return await msg.reply_text(f"⚠️ خطا در اجرای دستور: {e}")
-        return  # 🔴 جلوگیری از اجرای دستورات اصلی بعد از alias
+            await msg.reply_text(f"⚠️ خطا در اجرای دستور: {e}")
+            handled = True
+
+    if handled:  # 🔹 اگر alias اجرا شد، دیگر ادامه نده
+        return
 
     # ================= ➕ افزودن مدیر =================
-    elif text.startswith("افزودن مدیر"):
+    if text.startswith("افزودن مدیر"):
         target = await _get_target_user(update, context, text)
         if not target:
-            return await msg.reply_text("⚠️ لطفاً روی پیام کاربر ریپلای کنید یا یوزرنیم/آیدی وارد کنید.")
+            await msg.reply_text("⚠️ لطفاً روی پیام کاربر ریپلای کنید یا یوزرنیم/آیدی وارد کنید.")
+            return
         if not await _has_access(context, chat.id, user.id):
-            return await msg.reply_text("🚫 فقط مدیران یا سودوها مجازند.")
+            await msg.reply_text("🚫 فقط مدیران یا سودوها مجازند.")
+            return
         if target.id == context.bot.id:
-            return await msg.reply_text("😅 نمی‌توانم خودم را مدیر کنم!")
+            await msg.reply_text("😅 نمی‌توانم خودم را مدیر کنم!")
+            return
         if target.id in SUDO_IDS:
-            return await msg.reply_text("👑 این کاربر جزو سودوهاست و تغییر نمی‌کند.")
+            await msg.reply_text("👑 این کاربر جزو سودوهاست و تغییر نمی‌کند.")
+            return
         if not await _bot_can_promote(context, chat.id):
-            return await msg.reply_text("🚫 من اجازه‌ی تغییر مدیران را ندارم. لطفاً ربات را ادمین کنید و دسترسی Promote Members بدهید.")
+            await msg.reply_text("🚫 من اجازه‌ی تغییر مدیران را ندارم. لطفاً ربات را ادمین کنید و دسترسی Promote Members بدهید.")
+            return
         try:
             await context.bot.promote_chat_member(
                 chat_id=chat.id,
@@ -190,15 +209,20 @@ async def handle_admin_management(update: Update, context: ContextTypes.DEFAULT_
     elif text.startswith("حذف مدیر"):
         target = await _get_target_user(update, context, text)
         if not target:
-            return await msg.reply_text("⚠️ لطفاً روی پیام کاربر ریپلای کنید یا یوزرنیم/آیدی وارد کنید.")
+            await msg.reply_text("⚠️ لطفاً روی پیام کاربر ریپلای کنید یا یوزرنیم/آیدی وارد کنید.")
+            return
         if not await _has_access(context, chat.id, user.id):
-            return await msg.reply_text("🚫 فقط مدیران یا سودوها مجازند.")
+            await msg.reply_text("🚫 فقط مدیران یا سودوها مجازند.")
+            return
         if target.id == context.bot.id:
-            return await msg.reply_text("😅 نمی‌توانم خودم را حذف کنم!")
+            await msg.reply_text("😅 نمی‌توانم خودم را حذف کنم!")
+            return
         if target.id in SUDO_IDS:
-            return await msg.reply_text("👑 این کاربر جزو سودوهاست و تغییر نمی‌کند.")
+            await msg.reply_text("👑 این کاربر جزو سودوهاست و تغییر نمی‌کند.")
+            return
         if not await _bot_can_promote(context, chat.id):
-            return await msg.reply_text("🚫 من اجازه‌ی تغییر مدیران را ندارم. لطفاً ربات را ادمین کنید و دسترسی Promote Members بدهید.")
+            await msg.reply_text("🚫 من اجازه‌ی تغییر مدیران را ندارم. لطفاً ربات را ادمین کنید و دسترسی Promote Members بدهید.")
+            return
         try:
             await context.bot.promote_chat_member(
                 chat_id=chat.id,
