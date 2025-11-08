@@ -42,64 +42,41 @@ async def _has_access(context, chat_id: int, user_id: int) -> bool:
 
 # ================= 🔧 استخراج هدف امن =================
 async def _resolve_target(msg, context, chat_id):
-    """
-    بازمی‌گرداند: (target_user_or_None, mention_present_but_not_found_or_None)
-    - اگر ریپلای باشد -> target و None
-    - اگر text_mention باشد -> target و None
-    - اگر mention (entity) باشد و عضو گروه باشد -> target و None
-    - اگر mention (متن) باشد و عضو گروه نباشد -> (None, username)  # تا پیام راهنما داده شود
-    - اگر آیدی عددی بعد از دستور باشد و عضو گروه باشد -> target و None
-    - در غیر این صورت -> (None, None)
-    """
     # 1) ریپلای
     if msg.reply_to_message:
-        return msg.reply_to_message.from_user, None
+        return msg.reply_to_message.from_user
 
     text = msg.text or ""
     entities = msg.entities or []
 
-    # 2) entities: text_mention یا mention
+    # 2) بررسی entities برای @username و text_mention
     for ent in entities:
         try:
             if ent.type == MessageEntity.TEXT_MENTION:
-                return ent.user, None
+                return ent.user
             if ent.type == MessageEntity.MENTION:
                 start = ent.offset
                 length = ent.length
-                mention_text = text[start:start + length]  # شامل '@'
-                username = mention_text.lstrip("@")
-                # فقط اگر username عضو گروه باشد قبول می‌کنیم
+                username = text[start:start + length].lstrip("@")
                 try:
                     cm = await context.bot.get_chat_member(chat_id, username)
-                    return cm.user, None
+                    return cm.user
                 except:
-                    # mention وجود داره ولی کاربر عضو گروه نیست یا پیدا نشد
-                    return None, username
-        except Exception:
+                    continue
+        except:
             continue
 
-    # 3) بررسی وجود @username به صورت متن (بدون entity) — مثال: "بن @username" ولی entity توسط تلگرام ساخته نشده
-    # regex برای گرفتن اولین @username در متن
-    plain_mention = re.search(r"@([A-Za-z0-9_]{5,32})", text)
-    if plain_mention:
-        username = plain_mention.group(1)
-        try:
-            cm = await context.bot.get_chat_member(chat_id, username)
-            return cm.user, None
-        except:
-            return None, username
-
-    # 4) آیدی عددی دقیقاً بعد از دستور
+    # 3) آیدی عددی بعد از دستور
     m = re.search(r"^(بن|حذف\s*بن|سکوت|حذف\s*سکوت|اخطار|حذف\s*اخطار)\s+(\d{6,15})\b", text)
     if m:
         try:
             target_id = int(m.group(2))
             cm = await context.bot.get_chat_member(chat_id, target_id)
-            return cm.user, None
+            return cm.user
         except:
-            return None, None
+            return None
 
-    return None, None
+    return None
 
 
 # ================= 🔧 هندلر دستورات =================
@@ -115,7 +92,7 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
     if not text:
         return
 
-    # الگوهای دستورات (ابتدای پیام)
+    # regex دستورات معتبر
     COMMAND_PATTERNS = {
         "ban": r"^بن(?:\s+|$)",
         "unban": r"^حذف\s*بن(?:\s+|$)",
@@ -125,7 +102,6 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
         "delwarn": r"^حذف\s*اخطار(?:\s+|$)",
     }
 
-    # تعیین نوع دستور (فقط بر اساس ابتدای پیام)
     cmd_type = None
     for cmd, pattern in COMMAND_PATTERNS.items():
         if re.match(pattern, text):
@@ -133,43 +109,26 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
             break
 
     if not cmd_type:
-        return  # پیام دستور نیست
+        return  # پیام دستور واقعی نیست
 
     # بررسی دسترسی اجراکننده
     if not await _has_access(context, chat.id, user.id):
-        return await msg.reply_text("🚫 فقط مدیران یا سودوها مجازند.")
+        return  # ساکت بماند
 
-    # استخراج هدف — همراه با پرچم mention_failed
-    target, mention_failed = await _resolve_target(msg, context, chat.id)
-
-    # اگر mention وجود داشته و اما پیدا نشده -> راهنمایی کنیم و دستور اجرا نشه
-    if mention_failed:
-        return await msg.reply_text(
-            f"⚠️ کاربری با یوزرنیم @{mention_failed} در گروه یافت نشد.\n"
-            "برای اجرای دستور یکی از روش‌ها را انجام دهید:\n"
-            "• روی پیامِ کاربر ریپلای کنید و دستور را بفرستید.\n"
-            "• آیدی عددی کاربر را بعد از دستور وارد کنید (مثال: بن 123456789)."
-        )
-
-    # اگر هدف مشخص نیست -> پیام عمومی راهنما
+    # استخراج هدف امن
+    target = await _resolve_target(msg, context, chat.id)
     if not target:
-        return await msg.reply_text(
-            "⚠️ هدف مشخص نیست — دستور اجرا نشد.\n"
-            "برای مشخص کردن هدف یکی از روش‌ها را انجام دهید:\n"
-            "• ریپلای روی پیام کاربر و نوشتن دستور (مثلاً: بن)\n"
-            "• نوشتن @username (کاربر باید قبلاً در گروه فعال بوده باشد)\n"
-            "• یا نوشتن آیدی عددی بعد از دستور (مثلاً: بن 123456789)"
-        )
+        return  # هدف مشخص نیست → ساکت می‌ماند
 
     # محافظت‌ها
     if target.id == context.bot.id:
-        return await msg.reply_text("😅 نمی‌تونم خودم رو تنبیه کنم.")
+        return
     if target.id in SUDO_IDS:
-        return await msg.reply_text("🚫 امکان اجرای دستور روی این کاربر وجود ندارد.")
+        return
     try:
         t_member = await context.bot.get_chat_member(chat.id, target.id)
         if t_member.status in ("creator", "administrator"):
-            return await msg.reply_text("🛡 امکان اجرای دستور روی این کاربر وجود ندارد.")
+            return
     except:
         pass
 
@@ -177,13 +136,13 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
     try:
         if cmd_type == "ban":
             await context.bot.ban_chat_member(chat.id, target.id)
-            return await msg.reply_text(f"🚫 {target.first_name} از گروه بن شد.")
+            await msg.reply_text(f"🚫 {target.first_name} از گروه بن شد.")
 
-        if cmd_type == "unban":
+        elif cmd_type == "unban":
             await context.bot.unban_chat_member(chat.id, target.id)
-            return await msg.reply_text(f"✅ {target.first_name} از بن خارج شد.")
+            await msg.reply_text(f"✅ {target.first_name} از بن خارج شد.")
 
-        if cmd_type == "mute":
+        elif cmd_type == "mute":
             m = re.search(r"سکوت\s*(\d+)?\s*(ثانیه|دقیقه|ساعت)?", text)
             if m and m.group(1):
                 num = int(m.group(1))
@@ -204,16 +163,16 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
                 permissions=ChatPermissions(can_send_messages=False),
                 until_date=until_date
             )
-            return await msg.reply_text(f"🤐 {target.first_name} برای {seconds} ثانیه سکوت شد.")
+            await msg.reply_text(f"🤐 {target.first_name} برای {seconds} ثانیه سکوت شد.")
 
-        if cmd_type == "unmute":
+        elif cmd_type == "unmute":
             await context.bot.restrict_chat_member(
                 chat.id, target.id,
                 permissions=ChatPermissions(can_send_messages=True)
             )
-            return await msg.reply_text(f"🔊 {target.first_name} از سکوت خارج شد.")
+            await msg.reply_text(f"🔊 {target.first_name} از سکوت خارج شد.")
 
-        if cmd_type == "warn":
+        elif cmd_type == "warn":
             warns = _load_json(WARN_FILE)
             key = f"{chat.id}:{target.id}"
             warns[key] = warns.get(key, 0) + 1
@@ -222,21 +181,20 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
                 await context.bot.ban_chat_member(chat.id, target.id)
                 warns[key] = 0
                 _save_json(WARN_FILE, warns)
-                return await msg.reply_text(f"🚫 {target.first_name} به‌دلیل ۳ اخطار بن شد.")
+                await msg.reply_text(f"🚫 {target.first_name} به‌دلیل ۳ اخطار بن شد.")
             else:
-                return await msg.reply_text(f"⚠️ {target.first_name} اخطار {warns[key]}/3 گرفت.")
+                await msg.reply_text(f"⚠️ {target.first_name} اخطار {warns[key]}/3 گرفت.")
 
-        if cmd_type == "delwarn":
+        elif cmd_type == "delwarn":
             warns = _load_json(WARN_FILE)
             key = f"{chat.id}:{target.id}"
             if key in warns:
                 del warns[key]
                 _save_json(WARN_FILE, warns)
-                return await msg.reply_text(f"✅ اخطارهای {target.first_name} حذف شد.")
-            return await msg.reply_text("ℹ️ این کاربر اخطاری نداشت.")
+                await msg.reply_text(f"✅ اخطارهای {target.first_name} حذف شد.")
 
-    except Exception as e:
-        return await msg.reply_text(f"⚠️ خطا در اجرای دستور: {e}")
+    except Exception:
+        pass  # هر خطایی → ساکت بماند
 
 
 # ================= 🔧 ثبت هندلر =================
