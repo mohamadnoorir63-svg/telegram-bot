@@ -1,9 +1,9 @@
 import os
 import json
 import re
+from datetime import datetime, timedelta
 from telegram import Update, ChatPermissions, MessageEntity
 from telegram.ext import ContextTypes, MessageHandler, filters
-from datetime import timedelta, datetime
 
 # ================= ⚙️ تنظیمات اولیه =================
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -80,7 +80,6 @@ async def _resolve_target(msg, context, chat_id):
 
 
 # ================= 🔧 هندلر دستورات =================
-        # ================= 🔧 هندلر دستورات =================
 async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = update.effective_message
     user = update.effective_user
@@ -202,3 +201,14 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
     except Exception as e:
         return await msg.reply_text(f"⚠️ خطا در اجرای دستور: {e}")
+
+
+# ================= 🔧 ثبت هندلر =================
+def register_punishment_handlers(application, group_number: int = 12):
+    application.add_handler(
+        MessageHandler(
+            filters.TEXT & ~filters.COMMAND & filters.ChatType.GROUPS,
+            handle_punishments,
+        ),
+        group=group_number,
+    )
