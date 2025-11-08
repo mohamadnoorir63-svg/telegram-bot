@@ -10,15 +10,15 @@ from datetime import timedelta, datetime
 BASIS_VERZEICHNIS = os.path.dirname(os.path.abspath(__file__))
 WARN_DATEI = os.path.join(BASIS_VERZEICHNIS, "warnings.json")
 BENUTZERDEFINIERTE_BEFEHLE_DATEI = os.path.join(BASIS_VERZEICHNIS, "custom_commands.json")
-SUDO_IDS = [8588347189]
+SUDO_IDS = [8588347189]  # Admin-IDs
 
-# Erstelle Dateien falls sie nicht existieren
-for datei in (WARN_DATEI, BENUTZERDEFINIERTE_BEFEHLE_DATEI):
-    if not os.path.exists(datei):
-        with open(datei, "w", encoding="utf-8") as f:
-            json.dump({}, f, ensure_ascii=False, indent=2)
+# Dateien erstellen, falls nicht vorhanden
+for f in (WARN_DATEI, BENUTZERDEFINIERTE_BEFEHLE_DATEI):
+    if not os.path.exists(f):
+        with open(f, "w", encoding="utf-8") as x:
+            json.dump({}, x, ensure_ascii=False, indent=2)
 
-# ================= 🔧 JSON-Helfer =================
+# ================= 🔧 JSON Helfer =================
 def lade_json(datei):
     try:
         with open(datei, "r", encoding="utf-8") as f:
@@ -30,7 +30,7 @@ def speichere_json(datei, daten):
     with open(datei, "w", encoding="utf-8") as f:
         json.dump(daten, f, ensure_ascii=False, indent=2)
 
-# ================= 🔐 Zugriff prüfen =================
+# ================= 🔐 Zugriffsprüfung =================
 async def hat_zugriff(context, chat_id: int, user_id: int) -> bool:
     if user_id in SUDO_IDS:
         return True
@@ -40,7 +40,7 @@ async def hat_zugriff(context, chat_id: int, user_id: int) -> bool:
     except:
         return False
 
-# ================= 🔧 Ziel auflösen =================
+# ================= 🔧 Sicheren Zielbenutzer extrahieren =================
 async def loese_ziel(msg, context, chat_id):
     if msg.reply_to_message:
         return msg.reply_to_message.from_user, None
@@ -53,8 +53,8 @@ async def loese_ziel(msg, context, chat_id):
             if ent.type == MessageEntity.TEXT_MENTION:
                 return ent.user, None
             if ent.type == MessageEntity.MENTION:
-                start, laenge = ent.offset, ent.length
-                username = text[start:start + laenge].lstrip("@")
+                start, length = ent.offset, ent.length
+                username = text[start:start + length].lstrip("@")
                 try:
                     cm = await context.bot.get_chat_member(chat_id, username)
                     return cm.user, None
@@ -75,8 +75,8 @@ async def loese_ziel(msg, context, chat_id):
     m = re.search(r"\b(\d{6,15})\b", text)
     if m:
         try:
-            ziel_id = int(m.group(1))
-            cm = await context.bot.get_chat_member(chat_id, ziel_id)
+            target_id = int(m.group(1))
+            cm = await context.bot.get_chat_member(chat_id, target_id)
             return cm.user, None
         except:
             return None, None
@@ -84,89 +84,89 @@ async def loese_ziel(msg, context, chat_id):
     return None, None
 
 # ================= 📦 Temporäre Nachrichten =================
-async def sende_temp(msg, text, context, loesche_nach=10):
+async def sende_temp(msg, text, context, loeschen_nach=10):
     gesendet = await msg.reply_text(text)
-    asyncio.create_task(loesche_nach_zeit(gesendet, loesche_nach, context))
+    asyncio.create_task(loesche_nach(gesendet, loeschen_nach, context))
 
-async def loesche_nach_zeit(nachricht, sekunden, context):
-    await asyncio.sleep(sekunden)
+async def loesche_nach(message, verzogerung, context):
+    await asyncio.sleep(verzogerung)
     try:
-        await context.bot.delete_message(nachricht.chat.id, nachricht.message_id)
+        await context.bot.delete_message(message.chat.id, message.message_id)
     except:
         pass
 
 # ================= 🔧 Haupt-Handler =================
-async def bestrafen_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    nachricht = update.effective_message
-    benutzer = update.effective_user
+async def registriere_bestrafen_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    msg = update.effective_message
+    user = update.effective_user
     chat = update.effective_chat
 
-    if not nachricht or chat.type not in ("group", "supergroup"):
+    if not msg or chat.type not in ("group", "supergroup"):
         return
 
-    text = (nachricht.text or "").strip()
+    text = (msg.text or "").strip()
     if not text:
         return
 
-    # ---------------- Benutzerdefinierten Befehl hinzufügen ----------------
+    # ---------------- Neue Befehle hinzufügen ----------------
     if text.startswith("دستور جدید") or text.startswith("افزودن دستور"):
-        if not await hat_zugriff(context, chat.id, benutzer.id):
+        if not await hat_zugriff(context, chat.id, user.id):
             return
         match = re.match(
             r"^(?:دستور جدید|افزودن دستور)\s+(.+?)\s+(افزودن‌مدیر|حذف‌مدیر)\s+(.+)$", text
         )
         if not match:
             await sende_temp(
-                nachricht,
+                msg,
                 "📘 فرمت درست:\n<code>افزودن دستور [نام دستور] [افزودن‌مدیر|حذف‌مدیر] [متن پاسخ]</code>",
                 context,
             )
             return
-        name, befehl_typ, antwort = match.groups()
+        name, cmd_type, response = match.groups()
         alle_befehle = lade_json(BENUTZERDEFINIERTE_BEFEHLE_DATEI)
-        chat_schluessel = str(chat.id)
-        chat_befehle = alle_befehle.get(chat_schluessel, {})
-        if name in chat_befehle:
-            await sende_temp(nachricht, "⚠️ این نام قبلاً تعریف شده.", context)
+        chat_key = str(chat.id)
+        benutzerbefehle = alle_befehle.get(chat_key, {})
+        if name in benutzerbefehle:
+            await sende_temp(msg, "⚠️ این نام قبلاً تعریف شده.", context)
             return
-        chat_befehle[name] = {"typ": befehl_typ, "text": antwort}
-        alle_befehle[chat_schluessel] = chat_befehle
+        benutzerbefehle[name] = {"type": cmd_type, "text": response}
+        alle_befehle[chat_key] = benutzerbefehle
         speichere_json(BENUTZERDEFINIERTE_BEFEHLE_DATEI, alle_befehle)
-        await sende_temp(nachricht, f"✅ دستور جدید <b>{name}</b> ثبت شد.", context)
+        await sende_temp(msg, f"✅ دستور جدید <b>{name}</b> ثبت شد.", context)
         return
 
-    # ---------------- Benutzerdefinierten Befehl ausführen ----------------
+    # ---------------- Benutzerdefinierte Befehle ausführen ----------------
     alle_befehle = lade_json(BENUTZERDEFINIERTE_BEFEHLE_DATEI)
-    chat_schluessel = str(chat.id)
-    chat_befehle = alle_befehle.get(chat_schluessel, {})
-    if text in chat_befehle:
-        befehl_info = chat_befehle[text]
-        ziel, fehlgeschlagen = await loese_ziel(nachricht, context, chat.id)
-        if fehlgeschlagen or not ziel:
+    chat_key = str(chat.id)
+    benutzerbefehle = alle_befehle.get(chat_key, {})
+    if text in benutzerbefehle:
+        cmd_info = benutzerbefehle[text]
+        target, mention_failed = await loese_ziel(msg, context, chat.id)
+        if mention_failed or not target:
             return
-        if ziel.id == context.bot.id:
-            await sende_temp(nachricht, "😅 من ربات هستم!", context)
+        if target.id == context.bot.id:
+            await sende_temp(msg, "😅 من ربات هستم!", context)
             return
-        if ziel.id in SUDO_IDS:
-            await sende_temp(nachricht, "👑 این کاربر سودو است.", context)
+        if target.id in SUDO_IDS:
+            await sende_temp(msg, "👑 این کاربر سودو است.", context)
             return
-        t_mitglied = await context.bot.get_chat_member(chat.id, ziel.id)
-        if t_mitglied.status in ("creator", "administrator"):
-            await sende_temp(nachricht, "🛡 امکان اجرای دستور روی این کاربر وجود ندارد.", context)
+        t_member = await context.bot.get_chat_member(chat.id, target.id)
+        if t_member.status in ("creator", "administrator"):
+            await sende_temp(msg, "🛡 امکان اجرای دستور روی این کاربر وجود ندارد.", context)
             return
         try:
-            if befehl_info["typ"] == "افزودن‌مدیر":
+            if cmd_info["type"] == "افزودن‌مدیر":
                 await context.bot.promote_chat_member(
-                    chat.id, ziel.id,
+                    chat.id, target.id,
                     can_delete_messages=True,
                     can_restrict_members=True,
                     can_invite_users=True,
                     can_pin_messages=True,
                     can_manage_topics=True
                 )
-            elif befehl_info["typ"] == "حذف‌مدیر":
+            elif cmd_info["type"] == "حذف‌مدیر":
                 await context.bot.promote_chat_member(
-                    chat.id, ziel.id,
+                    chat.id, target.id,
                     can_manage_chat=False,
                     can_delete_messages=False,
                     can_manage_video_chats=False,
@@ -177,14 +177,14 @@ async def bestrafen_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     can_pin_messages=False,
                     can_manage_topics=False
                 )
-            text_ausgabe = befehl_info.get("text", "").replace("{name}", ziel.first_name)
-            await sende_temp(nachricht, text_ausgabe or "✅ عملیات انجام شد.", context)
+            text_out = cmd_info.get("text", "").replace("{name}", target.first_name)
+            await sende_temp(msg, text_out or "✅ عملیات انجام شد.", context)
         except:
             return
         return
 
-    # ---------------- Nur persische Befehle ----------------
-    BEFEHL_MUSTER = {
+    # ---------------- Befehle nur auf Farsi ----------------
+    BEFEHLE = {
         "ban": [r"^بن(?:\s+|$)"],
         "unban": [r"^حذف\s*بن(?:\s+|$)"],
         "mute": [r"^سکوت(?:\s+|$)"],
@@ -193,103 +193,96 @@ async def bestrafen_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "delwarn": [r"^حذف\s*اخطار(?:\s+|$)"]
     }
 
-    befehl_typ = None
-    for b, muster in BEFEHL_MUSTER.items():
-        for m in muster:
-            if re.match(m, text):
-                befehl_typ = b
+    cmd_type = None
+    for cmd, patterns in BEFEHLE.items():
+        for pattern in patterns:
+            if re.match(pattern, text):
+                cmd_type = cmd
                 break
-        if befehl_typ:
+        if cmd_type:
             break
 
-    if not befehl_typ:
+    if not cmd_type:
         return
 
-    if not await hat_zugriff(context, chat.id, benutzer.id):
+    if not await hat_zugriff(context, chat.id, user.id):
         return
 
-    ziel, fehlgeschlagen = await loese_ziel(nachricht, context, chat.id)
-    if fehlgeschlagen or not ziel:
+    target, mention_failed = await loese_ziel(msg, context, chat.id)
+    if mention_failed or not target:
         return
 
-    if ziel.id == context.bot.id:
-        await sende_temp(nachricht, "😅 من ربات هستم — نمی‌توانم تنبیه شوم.", context)
+    if target.id == context.bot.id:
+        await sende_temp(msg, "😅 من ربات هستم — نمی‌توانم تنبیه شوم.", context)
         return
-    if ziel.id in SUDO_IDS:
-        await sende_temp(nachricht, "🚫 امکان اجرای دستور روی این کاربر وجود ندارد.", context)
+    if target.id in SUDO_IDS:
+        await sende_temp(msg, "🚫 امکان اجرای دستور روی این کاربر وجود ندارد.", context)
         return
     try:
-        t_mitglied = await context.bot.get_chat_member(chat.id, ziel.id)
-        if t_mitglied.status in ("creator", "administrator"):
-            await sende_temp(nachricht, "🛡 امکان اجرای دستور روی این کاربر وجود ندارد.", context)
+        t_member = await context.bot.get_chat_member(chat.id, target.id)
+        if t_member.status in ("creator", "administrator"):
+            await sende_temp(msg, "🛡 امکان اجرای دستور روی این کاربر وجود ندارد.", context)
             return
     except:
         pass
 
-    # ---------------- Hauptbefehle ausführen ----------------
     try:
-        if befehl_typ == "ban":
-            await context.bot.ban_chat_member(chat.id, ziel.id)
-            await nachricht.reply_text(f"🚫 {ziel.first_name} از گروه بن شد.")
-        elif befehl_typ == "unban":
-            await context.bot.unban_chat_member(chat.id, ziel.id)
-            await nachricht.reply_text(f"✅ {ziel.first_name} از بن خارج شد.")
-        elif befehl_typ == "mute":
+        if cmd_type == "ban":
+            await context.bot.ban_chat_member(chat.id, target.id)
+            await msg.reply_text(f"🚫 {target.first_name} از گروه بن شد.")
+        elif cmd_type == "unban":
+            await context.bot.unban_chat_member(chat.id, target.id)
+            await msg.reply_text(f"✅ {target.first_name} از بن خارج شد.")
+        elif cmd_type == "mute":
             m = re.search(r"سکوت\s*(\d+)?\s*(ثانیه|دقیقه|ساعت)?", text)
             if m and m.group(1):
                 num = int(m.group(1))
                 unit = m.group(2)
                 if unit == "ساعت":
-                    sekunden = num * 3600
+                    seconds = num * 3600
                 elif unit == "دقیقه":
-                    sekunden = num * 60
+                    seconds = num * 60
                 elif unit == "ثانیه":
-                    sekunden = num
+                    seconds = num
                 else:
-                    sekunden = num * 60
+                    seconds = num * 60
             else:
-                sekunden = 3600
-            bis_datum = datetime.utcnow() + timedelta(seconds=sekunden)
+                seconds = 3600
+            until_date = datetime.utcnow() + timedelta(seconds=seconds)
             await context.bot.restrict_chat_member(
-                chat.id, ziel.id,
+                chat.id, target.id,
                 permissions=ChatPermissions(can_send_messages=False),
-                until_date=bis_datum
+                until_date=until_date
             )
-            await nachricht.reply_text(f"🤐 {ziel.first_name} برای {sekunden} ثانیه سکوت شد.")
-        elif befehl_typ == "unmute":
+            await msg.reply_text(f"🤐 {target.first_name} برای {seconds} ثانیه سکوت شد.")
+        elif cmd_type == "unmute":
             await context.bot.restrict_chat_member(
-                chat.id, ziel.id,
+                chat.id, target.id,
                 permissions=ChatPermissions(can_send_messages=True)
             )
-            await nachricht.reply_text(f"🔊 {ziel.first_name} از سکوت خارج شد.")
-        elif befehl_typ == "warn":
+            await msg.reply_text(f"🔊 {target.first_name} از سکوت خارج شد.")
+        elif cmd_type == "warn":
             warns = lade_json(WARN_DATEI)
-            schluessel = f"{chat.id}:{ziel.id}"
-            warns[schluessel] = warns.get(schluessel, 0) + 1
+            key = f"{chat.id}:{target.id}"
+            warns[key] = warns.get(key, 0) + 1
             speichere_json(WARN_DATEI, warns)
-            if warns[schluessel] >= 3:
-                await context.bot.ban_chat_member(chat.id, ziel.id)
-                warns[schluessel] = 0
+            if warns[key] >= 3:
+                await context.bot.ban_chat_member(chat.id, target.id)
+                warns[key] = 0
                 speichere_json(WARN_DATEI, warns)
-                await nachricht.reply_text(f"🚫 {ziel.first_name} به‌دلیل ۳ اخطار بن شد.")
+                await msg.reply_text(f"🚫 {target.first_name} به‌دلیل ۳ اخطار بن شد.")
             else:
-                await nachricht.reply_text(f"⚠️ {ziel.first_name} اخطار {warns[schluessel]}/3 گرفت.")
-        elif befehl_typ == "delwarn":
+                await msg.reply_text(f"⚠️ {target.first_name} اخطار {warns[key]}/3 گرفت.")
+        elif cmd_type == "delwarn":
             warns = lade_json(WARN_DATEI)
-            schluessel = f"{chat.id}:{ziel.id}"
-            if schluessel in warns:
-                del warns[schluessel]
+            key = f"{chat.id}:{target.id}"
+            if key in warns:
+                del warns[key]
                 speichere_json(WARN_DATEI, warns)
-                await nachricht.reply_text(f"✅ اخطارهای {ziel.first_name} حذف شد.")
+                await msg.reply_text(f"✅ اخطارهای {target.first_name} حذف شد.")
     except:
         return
 
-# ================= 🔧 Handler registrieren =================
-def registriere_bestrafen_handler(application, gruppen_nummer: int = 12):
-    application.add_handler(
-        MessageHandler(
-            filters.TEXT & ~filters.COMMAND & filters.ChatType.GROUPS,
-            bestrafen_handler,
-        ),
-        group=gruppen_nummer,
-    )
+# ================= 🔧 Handler Registrierung =================
+def register_punishment_handlers(application, group_number: int = 12):
+    registriere_bestrafen_handler(application, group_number)
