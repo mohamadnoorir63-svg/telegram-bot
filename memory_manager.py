@@ -24,7 +24,7 @@ def load_data(file):
         with open(file, "r", encoding="utf-8") as f:
             return json.load(f)
     except json.JSONDecodeError:
-        print(f"خطا در {file}، تلاش برای تعمیر خودکار...")
+        print(f"⚠️ خطا در {file}، تلاش برای تعمیر خودکار...")
         fixed = fix_json(file)
         if fixed:
             with open(file, "r", encoding="utf-8") as f:
@@ -38,7 +38,7 @@ def save_data(file, data):
         with open(file, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
     except Exception as e:
-        print(f"خطا در ذخیره {file}: {e}")
+        print(f"⚠️ خطا در ذخیره {file}: {e}")
 
 # ========================= یادگیری هوشمند با وزن =========================
 
@@ -156,7 +156,7 @@ def clean_memory():
 
     if changed > 0:
         save_data("memory.json", data)
-        print(f"حافظه تمیز شد ({changed} مورد اصلاح شد)")
+        print(f"🧹 حافظه تمیز شد ({changed} مورد اصلاح شد)")
     return changed
 
 # ========================= آمار و اطلاعات =========================
@@ -272,9 +272,9 @@ def reinforce_learning(verbose=True):
 
     if verbose:
         if strengthened or removed:
-            print(f"حافظه تقویت شد → {strengthened} پاسخ قوی‌تر، {removed} پاسخ حذف شد.")
+            print(f"🧠 حافظه تقویت شد → {strengthened} پاسخ قوی‌تر، {removed} پاسخ حذف شد.")
         else:
-            print("حافظه نیازی به تقویت نداشت.")
+            print("✅ حافظه نیازی به تقویت نداشت.")
     return {"strengthened": strengthened, "removed": removed}
 
 # ========================= ارزیابی هوش خودکار =========================
