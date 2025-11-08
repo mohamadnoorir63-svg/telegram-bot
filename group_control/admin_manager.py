@@ -154,10 +154,10 @@ async def handle_admin_management(update: Update, context: ContextTypes.DEFAULT_
             return await msg.reply_text(text_out or "✅ عملیات انجام شد.")
         except Exception as e:
             return await msg.reply_text(f"⚠️ خطا در اجرای دستور: {e}")
-        return
+        return  # 🔴 جلوگیری از اجرای دستورات اصلی بعد از alias
 
     # ================= ➕ افزودن مدیر =================
-    if text.startswith("افزودن مدیر"):
+    elif text.startswith("افزودن مدیر"):
         target = await _get_target_user(update, context, text)
         if not target:
             return await msg.reply_text("⚠️ لطفاً روی پیام کاربر ریپلای کنید یا یوزرنیم/آیدی وارد کنید.")
