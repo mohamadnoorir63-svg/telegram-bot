@@ -1,235 +1,46 @@
+# context_memory.py
 import json
 import os
-import random
 from datetime import datetime
-from fix_memory import fix_json  # برای تعمیر خودکار JSON خراب
 
-FILES = ["memory.json", "shadow_memory.json", "group_data.json"]
+CONTEXT_FILE = "context_memory.json"
 
-def init_files():
-    for f in FILES:
-        if not os.path.exists(f):
-            with open(f, "w", encoding="utf-8") as file:
-                json.dump({"data": {}, "users": []}, file, ensure_ascii=False, indent=2)
-    print("فایل‌های حافظه بررسی و ایجاد شدند.")
+class ContextMemory:
+    """مدیریت حافظه‌ی زمینه‌ای کاربران"""
 
-def load_data(file):
-    try:
-        with open(file, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except json.JSONDecodeError:
-        print(f"خطا در {file}، تلاش برای تعمیر خودکار...")
-        fixed = fix_json(file)
-        if fixed:
-            with open(file, "r", encoding="utf-8") as f:
-                return json.load(f)
+    def __init__(self, file_path=CONTEXT_FILE):
+        self.file_path = file_path
+        self.data = {}
+        self.load()
+
+    def load(self):
+        """بارگذاری داده‌ها از فایل JSON"""
+        if os.path.exists(self.file_path):
+            try:
+                with open(self.file_path, "r", encoding="utf-8") as f:
+                    self.data = json.load(f)
+            except json.JSONDecodeError:
+                print(f"خطا در بارگذاری {self.file_path}، داده‌ها خالی شدند.")
+                self.data = {}
         else:
-            return {"data": {}, "users": []}
+            self.data = {}
 
-def save_data(file, data):
-    try:
-        with open(file, "w", encoding="utf-8") as f:
-            json.dump(data, f, ensure_ascii=False, indent=2)
-    except Exception as e:
-        print(f"خطا در ذخیره {file}: {e}")
+    def save(self):
+        """ذخیره داده‌ها در فایل JSON"""
+        with open(self.file_path, "w", encoding="utf-8") as f:
+            json.dump(self.data, f, ensure_ascii=False, indent=2)
 
-# یادگیری با وزن
-def learn(phrase, *responses):
-    data = load_data("memory.json")
-    if "data" not in data:
-        data["data"] = {}
+    def set_context(self, user_id, context):
+        """تنظیم حافظه‌ی زمینه‌ای برای یک کاربر"""
+        self.data[str(user_id)] = {"context": context, "updated_at": str(datetime.now())}
+        self.save()
 
-    phrase = phrase.strip()
-    responses = [r.strip() for r in responses if r.strip()]
-    if not responses:
-        return "<b>هیچ پاسخی برای یادگیری ارسال نشد.</b>"
+    def get_context(self, user_id):
+        """دریافت حافظه‌ی زمینه‌ای یک کاربر"""
+        return self.data.get(str(user_id), {}).get("context")
 
-    if phrase not in data["data"]:
-        data["data"][phrase] = [{"text": r, "weight": 1} for r in responses]
-        save_data("memory.json", data)
-        return f"<b>یادگیری جدید!</b>\n➕ جمله: <code>{phrase}</code>\nپاسخ‌ها: {len(responses)} عدد ثبت شد"
-
-    existing = data["data"][phrase]
-    existing_texts = [r["text"] for r in existing]
-    added = 0
-    for r in responses:
-        if r not in existing_texts:
-            existing.append({"text": r, "weight": 1})
-            added += 1
-    save_data("memory.json", data)
-    if added > 0:
-        return f"<b>خاطره‌ی قدیمی به‌روزرسانی شد!</b>\nپاسخ‌های تازه: {added}\nبه‌روزرسانی انجام شد."
-    else:
-        return "<b>این جمله را از قبل بلد بودم!</b>"
-
-def shadow_learn(phrase, response):
-    if not phrase or not response:
-        return
-    shadow = load_data("shadow_memory.json")
-    data = shadow.get("data", {})
-    phrase, response = phrase.strip(), response.strip()
-    if phrase not in data:
-        data[phrase] = [response]
-    elif response not in data[phrase]:
-        data[phrase].append(response)
-    else:
-        return
-    shadow["data"] = data
-    save_data("shadow_memory.json", shadow)
-
-def get_reply(text):
-    mem = load_data("memory.json")
-    data = mem.get("data", {})
-    matches = [k for k in data.keys() if k in text]
-    if not matches:
-        return None
-    key = random.choice(matches)
-    responses = data[key]
-    if isinstance(responses[0], str):
-        responses = [{"text": r, "weight": 1} for r in responses]
-        data[key] = responses
-        save_data("memory.json", mem)
-    weights = [r["weight"] for r in responses]
-    chosen = random.choices(responses, weights=weights, k=1)[0]
-    chosen["weight"] += 1
-    save_data("memory.json", mem)
-    return chosen["text"]
-
-def clean_memory():
-    data = load_data("memory.json")
-    changed = 0
-    for phrase, responses in list(data.get("data", {}).items()):
-        valid = []
-        seen = set()
-        for r in responses:
-            text = r["text"].strip()
-            if len(text) < 2 or text in seen:
-                continue
-            seen.add(text)
-            valid.append(r)
-        if len(valid) != len(responses):
-            data["data"][phrase] = valid
-            changed += 1
-    if changed > 0:
-        save_data("memory.json", data)
-        print(f"حافظه تمیز شد ({changed} مورد اصلاح شد)")
-    return changed
-
-def get_stats():
-    mem = load_data("memory.json")
-    total_phrases = len(mem.get("data", {}))
-    total_responses = sum(len(v) for v in mem.get("data", {}).values())
-    total_weight = sum(sum(r.get("weight", 1) for r in v) for v in mem.get("data", {}).values())
-    mode = mem.get("mode", "نرمال")
-    return {"phrases": total_phrases, "responses": total_responses, "total_weight": total_weight, "mode": mode}
-
-def set_mode(mode):
-    mem = load_data("memory.json")
-    mem["mode"] = mode
-    save_data("memory.json", mem)
-
-def enhance_sentence(sentence):
-    if not sentence:
-        return "نمی‌دانم چه بگویم!"
-    return sentence
-
-def generate_sentence():
-    mem = load_data("memory.json")
-    data = mem.get("data", {})
-    if not data:
-        return "هنوز چیزی بلد نیستم!"
-    phrases = list(data.keys())
-    if len(phrases) < 2:
-        phrase = random.choice(phrases)
-        resp = random.choice(data[phrase])
-        text = resp["text"] if isinstance(resp, dict) else resp
-        return f"{phrase} → {text}"
-    p1, p2 = random.sample(phrases, 2)
-    r1 = random.choice(data[p1])
-    r2 = random.choice(data[p2])
-    t1 = r1["text"] if isinstance(r1, dict) else r1
-    t2 = r2["text"] if isinstance(r2, dict) else r2
-    return f"{p1} ولی {t1}، بعدش {t2}"
-
-def list_phrases(limit=50):
-    mem = load_data("memory.json")
-    phrases = list(mem.get("data", {}).keys())
-    if not phrases:
-        return "هنوز چیزی یاد نگرفتم!"
-    show = phrases[:limit]
-    text = "<b>فهرست جملات یادگرفته‌شده:</b>\n\n"
-    for i, phrase in enumerate(show, 1):
-        text += f"{i}. <code>{phrase}</code>\n"
-    text += f"\nدر مجموع {len(phrases)} جمله در حافظه وجود دارد."
-    return text
-
-def reinforce_learning(verbose=True):
-    mem = load_data("memory.json")
-    data = mem.get("data", {})
-    changed = False
-    strengthened, removed = 0, 0
-    for phrase, responses in list(data.items()):
-        new_responses = []
-        for r in responses:
-            text = r.get("text", "").strip()
-            weight = r.get("weight", 1)
-            if len(text) < 2:
-                removed += 1
-                continue
-            if any(c in text for c in "؟!?!."):
-                new_weight = min(weight + random.choice([1, 2]), 15)
-                if new_weight > weight:
-                    strengthened += 1
-                r["weight"] = new_weight
-            elif weight > 1:
-                r["weight"] -= 1
-            if r["weight"] <= 0:
-                removed += 1
-                continue
-            new_responses.append(r)
-        if len(new_responses) != len(responses):
-            changed = True
-        data[phrase] = new_responses
-    if changed:
-        mem["data"] = data
-        save_data("memory.json", mem)
-    if verbose:
-        if strengthened or removed:
-            print(f"حافظه تقویت شد → {strengthened} پاسخ قوی‌تر، {removed} پاسخ حذف شد.")
-        else:
-            print("حافظه نیازی به تقویت نداشت.")
-    return {"strengthened": strengthened, "removed": removed}
-
-def evaluate_intelligence():
-    mem = load_data("memory.json")
-    data = mem.get("data", {})
-    if not data:
-        return {"iq": 0, "level": "تازه متولد شده", "summary": "هنوز چیزی یاد نگرفته‌ام."}
-    total_phrases = len(data)
-    total_responses = sum(len(v) for v in data.values())
-    total_weight, response_count = 0, 0
-    for responses in data.values():
-        for r in responses:
-            total_weight += r.get("weight", 1)
-            response_count += 1
-    avg_weight = total_weight / response_count if response_count else 1
-    iq_score = int((total_phrases * 0.7 + total_responses * 0.3) * (avg_weight / 3))
-    iq_score = min(iq_score, 9999)
-    if iq_score < 100:
-        level = "تازه‌کار"
-    elif iq_score < 300:
-        level = "در حال رشد"
-    elif iq_score < 700:
-        level = "هوش پیشرفته"
-    elif iq_score < 1500:
-        level = "خلاق و مستقل"
-    else:
-        level = "نابغه"
-    summary = (
-        f"جملات: {total_phrases}\n"
-        f"پاسخ‌ها: {total_responses}\n"
-        f"میانگین وزن پاسخ‌ها: {avg_weight:.2f}\n"
-        f"نمره‌ی هوش (AI IQ): {iq_score}\n"
-        f"سطح: {level}"
-    )
-    return {"iq": iq_score, "level": level, "summary": summary}
+    def clear_context(self, user_id):
+        """پاکسازی حافظه‌ی زمینه‌ای یک کاربر"""
+        if str(user_id) in self.data:
+            del self.data[str(user_id)]
+            self.save()
