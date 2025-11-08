@@ -1,9 +1,9 @@
 import os
 import json
 import re
-from datetime import datetime, timedelta
 from telegram import Update, ChatPermissions, MessageEntity
 from telegram.ext import ContextTypes, MessageHandler, filters
+from datetime import timedelta, datetime
 
 # ================= ⚙️ تنظیمات اولیه =================
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -42,41 +42,64 @@ async def _has_access(context, chat_id: int, user_id: int) -> bool:
 
 # ================= 🔧 استخراج هدف امن =================
 async def _resolve_target(msg, context, chat_id):
+    """
+    بازمی‌گرداند: (target_user_or_None, mention_present_but_not_found_or_None)
+    - اگر ریپلای باشد -> target و None
+    - اگر text_mention باشد -> target و None
+    - اگر mention (entity) باشد و عضو گروه باشد -> target و None
+    - اگر mention (متن) باشد و عضو گروه نباشد -> (None, username)  # تا پیام راهنما داده شود
+    - اگر آیدی عددی بعد از دستور باشد و عضو گروه باشد -> target و None
+    - در غیر این صورت -> (None, None)
+    """
     # 1) ریپلای
     if msg.reply_to_message:
-        return msg.reply_to_message.from_user
+        return msg.reply_to_message.from_user, None
 
     text = msg.text or ""
     entities = msg.entities or []
 
-    # 2) بررسی entities
+    # 2) entities: text_mention یا mention
     for ent in entities:
         try:
             if ent.type == MessageEntity.TEXT_MENTION:
-                return ent.user
+                return ent.user, None
             if ent.type == MessageEntity.MENTION:
                 start = ent.offset
                 length = ent.length
-                username = text[start:start + length].lstrip("@")
+                mention_text = text[start:start + length]  # شامل '@'
+                username = mention_text.lstrip("@")
+                # فقط اگر username عضو گروه باشد قبول می‌کنیم
                 try:
                     cm = await context.bot.get_chat_member(chat_id, username)
-                    return cm.user
+                    return cm.user, None
                 except:
-                    continue
-        except:
+                    # mention وجود داره ولی کاربر عضو گروه نیست یا پیدا نشد
+                    return None, username
+        except Exception:
             continue
 
-    # 3) آیدی عددی بعد از دستور
+    # 3) بررسی وجود @username به صورت متن (بدون entity) — مثال: "بن @username" ولی entity توسط تلگرام ساخته نشده
+    # regex برای گرفتن اولین @username در متن
+    plain_mention = re.search(r"@([A-Za-z0-9_]{5,32})", text)
+    if plain_mention:
+        username = plain_mention.group(1)
+        try:
+            cm = await context.bot.get_chat_member(chat_id, username)
+            return cm.user, None
+        except:
+            return None, username
+
+    # 4) آیدی عددی دقیقاً بعد از دستور
     m = re.search(r"^(بن|حذف\s*بن|سکوت|حذف\s*سکوت|اخطار|حذف\s*اخطار)\s+(\d{6,15})\b", text)
     if m:
         try:
             target_id = int(m.group(2))
             cm = await context.bot.get_chat_member(chat_id, target_id)
-            return cm.user
+            return cm.user, None
         except:
-            return None
+            return None, None
 
-    return None
+    return None, None
 
 
 # ================= 🔧 هندلر دستورات =================
@@ -92,16 +115,17 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
     if not text:
         return
 
-    # regex دستورات دقیق (فقط وقتی عدد یا یوزرنیم یا ریپلای هست)
+    # الگوهای دستورات (ابتدای پیام)
     COMMAND_PATTERNS = {
-        "ban": r"^بن(?:\s+(\d+)|\s+@[\w_]+)?$",
-        "unban": r"^حذف\s*بن(?:\s+(\d+)|\s+@[\w_]+)?$",
-        "mute": r"^سکوت(?:\s+(\d+)(?:\s*(ثانیه|دقیقه|ساعت))?|(?:\s+(\d+)|\s+@[\w_]+)?)?$",
-        "unmute": r"^حذف\s*سکوت(?:\s+(\d+)|\s+@[\w_]+)?$",
-        "warn": r"^اخطار(?:\s+(\d+)|\s+@[\w_]+)?$",
-        "delwarn": r"^حذف\s*اخطار(?:\s+(\d+)|\s+@[\w_]+)?$",
+        "ban": r"^بن(?:\s+|$)",
+        "unban": r"^حذف\s*بن(?:\s+|$)",
+        "mute": r"^سکوت(?:\s+|$)",
+        "unmute": r"^حذف\s*سکوت(?:\s+|$)",
+        "warn": r"^اخطار(?:\s+|$)",
+        "delwarn": r"^حذف\s*اخطار(?:\s+|$)",
     }
 
+    # تعیین نوع دستور (فقط بر اساس ابتدای پیام)
     cmd_type = None
     for cmd, pattern in COMMAND_PATTERNS.items():
         if re.match(pattern, text):
@@ -109,20 +133,32 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
             break
 
     if not cmd_type:
-        return  # پیام دستور واقعی نیست
+        return  # پیام دستور نیست
 
     # بررسی دسترسی اجراکننده
     if not await _has_access(context, chat.id, user.id):
         return await msg.reply_text("🚫 فقط مدیران یا سودوها مجازند.")
 
-    # استخراج هدف امن
-    target = await _resolve_target(msg, context, chat.id)
+    # استخراج هدف — همراه با پرچم mention_failed
+    target, mention_failed = await _resolve_target(msg, context, chat.id)
+
+    # اگر mention وجود داشته و اما پیدا نشده -> راهنمایی کنیم و دستور اجرا نشه
+    if mention_failed:
+        return await msg.reply_text(
+            f"⚠️ کاربری با یوزرنیم @{mention_failed} در گروه یافت نشد.\n"
+            "برای اجرای دستور یکی از روش‌ها را انجام دهید:\n"
+            "• روی پیامِ کاربر ریپلای کنید و دستور را بفرستید.\n"
+            "• آیدی عددی کاربر را بعد از دستور وارد کنید (مثال: بن 123456789)."
+        )
+
+    # اگر هدف مشخص نیست -> پیام عمومی راهنما
     if not target:
         return await msg.reply_text(
-            "⚠️ هدف مشخص نیست.\n"
-            "• ریپلای روی پیام کاربر\n"
-            "• @username (عضو گروه)\n"
-            "• آیدی عددی"
+            "⚠️ هدف مشخص نیست — دستور اجرا نشد.\n"
+            "برای مشخص کردن هدف یکی از روش‌ها را انجام دهید:\n"
+            "• ریپلای روی پیام کاربر و نوشتن دستور (مثلاً: بن)\n"
+            "• نوشتن @username (کاربر باید قبلاً در گروه فعال بوده باشد)\n"
+            "• یا نوشتن آیدی عددی بعد از دستور (مثلاً: بن 123456789)"
         )
 
     # محافظت‌ها
