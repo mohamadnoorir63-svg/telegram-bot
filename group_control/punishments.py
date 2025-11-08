@@ -32,7 +32,6 @@ def _save_json(file, data):
 
 # ================= 🔐 بررسی ادمین / سودو =================
 async def _has_access(context, chat_id: int, user_id: int) -> bool:
-    """بررسی دسترسی مجری دستور"""
     if user_id in SUDO_IDS:
         return True
     try:
@@ -55,13 +54,7 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
     if not text:
         return
 
-    # لیست دستورات پایه
-    base_cmds = ["بن", "حذف بن", "سکوت", "حذف سکوت", "اخطار", "حذف اخطار"]
-
-    if not any(text.startswith(c) for c in base_cmds):
-        return
-
-    # ---- استخراج هدف (از ریپلای، @، یا آیدی عددی) ----
+    # ---- استخراج هدف (ریپلای، @username، یا آیدی) ----
     target = None
     mentioned_username = re.search(r"@([A-Za-z0-9_]{5,32})", text)
     user_id_match = re.search(r"\b(\d{6,15})\b", text)
@@ -83,95 +76,99 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
         except Exception:
             target = None
 
-    if not target:
-        return await msg.reply_text(
-            "⚠️ کاربر یافت نشد.\n"
-            "برای استفاده:\n"
-            "📎 روی پیام فرد ریپلای کن یا آیدی عددی او را بنویس.\n"
-            "(@username فقط اگر فرد در گروه فعال باشد کار می‌کند.)"
-        )
-
     # ---- بررسی سطح دسترسی ----
     if not await _has_access(context, chat.id, user.id):
         return await msg.reply_text("🚫 فقط مدیران یا سودوها مجازند.")
 
-    # ---- محافظت از خود ربات، سودوها و مدیران ----
-    if target.id == context.bot.id:
-        return await msg.reply_text("😅 نمی‌تونم خودم رو تنبیه کنم.")
+    # ---- محافظت از خود ربات و سودو و مدیران ----
+    if target:
+        if target.id == context.bot.id:
+            return await msg.reply_text("😅 نمی‌تونم خودم رو تنبیه کنم.")
+        try:
+            t_member = await context.bot.get_chat_member(chat.id, target.id)
+            if t_member.status in ("creator", "administrator"):
+                return await msg.reply_text("🛡 این کاربر مدیر گروهه، نمی‌تونی تنبیهش کنی!")
+        except:
+            pass
+        if target.id in SUDO_IDS:
+            return await msg.reply_text("👑 این کاربر جزو سودوهاست و مصون از تنبیهه!")
 
-    # بررسی فقط در صورت وجود واقعی target در گروه
-    try:
-        t_member = await context.bot.get_chat_member(chat.id, target.id)
-        if t_member.status in ("creator", "administrator"):
-            return await msg.reply_text("🛡 این کاربر مدیر گروهه، نمی‌تونی تنبیهش کنی!")
-    except:
-        pass
+    # ---- اجرای دستورات ----
 
-    if target.id in SUDO_IDS:
-        return await msg.reply_text("👑 این کاربر جزو سودوهاست و مصون از تنبیهه!")
+    # ---- بن ----
+    if "بن" in text:
+        if not target:
+            return await msg.reply_text("⚠️ برای بن، باید روی پیام ریپلای کنید یا آیدی/یوزرنیم وارد کنید.")
+        await context.bot.ban_chat_member(chat.id, target.id)
+        return await msg.reply_text(f"🚫 {target.first_name} از گروه بن شد.")
 
-    # ---- اجرای دستور ----
-    try:
-        if text.startswith("بن"):
+    # ---- حذف بن ----
+    if "حذف بن" in text:
+        if not target:
+            return await msg.reply_text("⚠️ برای حذف بن، باید روی پیام ریپلای کنید یا آیدی/یوزرنیم وارد کنید.")
+        await context.bot.unban_chat_member(chat.id, target.id)
+        return await msg.reply_text(f"✅ {target.first_name} از بن خارج شد.")
+
+    # ---- سکوت ----
+    if "سکوت" in text:
+        if not target:
+            return await msg.reply_text("⚠️ برای سکوت، باید روی پیام ریپلای کنید یا آیدی/یوزرنیم وارد کنید.")
+        m = re.search(r"سکوت\s*(\d+)?\s*(ثانیه|دقیقه|ساعت)?", text)
+        if m and m.group(1):
+            num = int(m.group(1))
+            unit = m.group(2)
+            seconds = num * 3600 if unit == "ساعت" else (num * 60 if unit == "دقیقه" else num)
+        else:
+            seconds = 3600
+        until_date = datetime.utcnow() + timedelta(seconds=seconds)
+        await context.bot.restrict_chat_member(
+            chat.id, target.id,
+            permissions=ChatPermissions(can_send_messages=False),
+            until_date=until_date
+        )
+        return await msg.reply_text(f"🤐 {target.first_name} برای {seconds} ثانیه در سکوت است.")
+
+    # ---- حذف سکوت ----
+    if "حذف سکوت" in text:
+        if not target:
+            return await msg.reply_text("⚠️ برای حذف سکوت، باید روی پیام ریپلای کنید یا آیدی/یوزرنیم وارد کنید.")
+        await context.bot.restrict_chat_member(
+            chat.id, target.id,
+            permissions=ChatPermissions(can_send_messages=True)
+        )
+        return await msg.reply_text(f"🔊 {target.first_name} از سکوت خارج شد.")
+
+    # ---- اخطار ----
+    if "اخطار" in text:
+        if not target:
+            return await msg.reply_text("⚠️ برای اخطار، باید روی پیام ریپلای کنید یا آیدی/یوزرنیم وارد کنید.")
+        warns = _load_json(WARN_FILE)
+        key = f"{chat.id}:{target.id}"
+        warns[key] = warns.get(key, 0) + 1
+        _save_json(WARN_FILE, warns)
+        if warns[key] >= 3:
             await context.bot.ban_chat_member(chat.id, target.id)
-            return await msg.reply_text(f"🚫 {target.first_name} از گروه بن شد.")
-
-        elif text.startswith("حذف بن"):
-            await context.bot.unban_chat_member(chat.id, target.id)
-            return await msg.reply_text(f"✅ {target.first_name} از بن خارج شد.")
-
-        elif text.startswith("سکوت"):
-            m = re.search(r"سکوت\s*(\d+)?\s*(ثانیه|دقیقه|ساعت)?", text)
-            if m and m.group(1):
-                num = int(m.group(1))
-                unit = m.group(2)
-                seconds = num * 3600 if unit == "ساعت" else (num * 60 if unit == "دقیقه" else num)
-            else:
-                seconds = 3600  # پیش‌فرض ۱ ساعت
-            until_date = datetime.utcnow() + timedelta(seconds=seconds)
-            await context.bot.restrict_chat_member(
-                chat.id, target.id,
-                permissions=ChatPermissions(can_send_messages=False),
-                until_date=until_date
-            )
-            return await msg.reply_text(f"🤐 {target.first_name} برای {seconds} ثانیه در سکوت است.")
-
-        elif text.startswith("حذف سکوت"):
-            await context.bot.restrict_chat_member(
-                chat.id, target.id,
-                permissions=ChatPermissions(can_send_messages=True)
-            )
-            return await msg.reply_text(f"🔊 {target.first_name} از سکوت خارج شد.")
-
-        elif text.startswith("اخطار"):
-            warns = _load_json(WARN_FILE)
-            key = f"{chat.id}:{target.id}"
-            warns[key] = warns.get(key, 0) + 1
+            warns[key] = 0
             _save_json(WARN_FILE, warns)
-            if warns[key] >= 3:
-                await context.bot.ban_chat_member(chat.id, target.id)
-                warns[key] = 0
-                _save_json(WARN_FILE, warns)
-                return await msg.reply_text(f"🚫 {target.first_name} به‌دلیل ۳ اخطار بن شد.")
-            else:
-                return await msg.reply_text(f"⚠️ {target.first_name} اخطار {warns[key]}/3 گرفت.")
+            return await msg.reply_text(f"🚫 {target.first_name} به‌دلیل ۳ اخطار بن شد.")
+        else:
+            return await msg.reply_text(f"⚠️ {target.first_name} اخطار {warns[key]}/3 گرفت.")
 
-        elif text.startswith("حذف اخطار"):
-            warns = _load_json(WARN_FILE)
-            key = f"{chat.id}:{target.id}"
-            if key in warns:
-                del warns[key]
-                _save_json(WARN_FILE, warns)
-                return await msg.reply_text(f"✅ اخطارهای {target.first_name} حذف شد.")
-            return await msg.reply_text("ℹ️ این کاربر اخطاری نداشت.")
-
-    except Exception as e:
-        return await msg.reply_text(f"⚠️ خطا در اجرای دستور: {e}")
+    # ---- حذف اخطار ----
+    if "حذف اخطار" in text:
+        if not target:
+            return await msg.reply_text("⚠️ برای حذف اخطار، باید روی پیام ریپلای کنید یا آیدی/یوزرنیم وارد کنید.")
+        warns = _load_json(WARN_FILE)
+        key = f"{chat.id}:{target.id}"
+        if key in warns:
+            del warns[key]
+            _save_json(WARN_FILE, warns)
+            return await msg.reply_text(f"✅ اخطارهای {target.first_name} حذف شد.")
+        return await msg.reply_text("ℹ️ این کاربر اخطاری نداشت.")
 
 
 # ================= 🔧 ثبت هندلر =================
 def register_punishment_handlers(application, group_number: int = 12):
-    """ثبت هندلر دستورات تنبیهی در گروه"""
     application.add_handler(
         MessageHandler(
             filters.TEXT & ~filters.COMMAND & filters.ChatType.GROUPS,
