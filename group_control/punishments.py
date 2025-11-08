@@ -91,17 +91,16 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
     if not text:
         return
 
-    # regex دستورات معتبر — فقط ابتدای پیام بررسی می‌شود
+    # regex دستورات معتبر — فقط ابتدای پیام و بعدش فاصله یا انتهای پیام
     COMMAND_PATTERNS = {
-        "ban": r"^(بن)\b",
-        "unban": r"^(حذف\s*بن)\b",
-        "mute": r"^(سکوت)\b",
-        "unmute": r"^(حذف\s*سکوت)\b",
-        "warn": r"^(اخطار)\b",
-        "delwarn": r"^(حذف\s*اخطار)\b",
+        "ban": r"^بن(?:\s+|$)",
+        "unban": r"^حذف\s*بن(?:\s+|$)",
+        "mute": r"^سکوت(?:\s+|$)",
+        "unmute": r"^حذف\s*سکوت(?:\s+|$)",
+        "warn": r"^اخطار(?:\s+|$)",
+        "delwarn": r"^حذف\s*اخطار(?:\s+|$)",
     }
 
-    # بررسی اینکه پیام **دستور واقعی** است یا خیر
     is_command = False
     cmd_type = None
     for cmd, pattern in COMMAND_PATTERNS.items():
