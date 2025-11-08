@@ -1,173 +1,216 @@
-import re
+# memory_manager.py
+import json
+import os
 import random
-from memory_manager import learn, load_data, save_data, shadow_learn
+from datetime import datetime
+from fix_memory import fix_json  # برای تعمیر خودکار JSON خراب
 
-# ===============================================================
-# 🧱 فیلتر ضد ایموجی و ضد تکرار
-# ===============================================================
-def is_emoji_only(text: str) -> bool:
-    """بررسی اینکه آیا متن فقط شامل ایموجی یا علامت است"""
-    if not text or not text.strip():
-        return True
+FILES = ["memory.json", "shadow_memory.json", "group_data.json"]
 
-    clean = re.sub(r"[ \n\t.,!?؛،~\-_=+\[\]{}()<>0-9a-zA-Zء-ی]", "", text)
-    emoji_pattern = re.compile(
-        "["u"\U0001F600-\U0001F64F"
-        u"\U0001F300-\U0001F5FF"
-        u"\U0001F680-\U0001F6FF"
-        u"\U0001F1E0-\U0001F1FF"
-        u"\U00002700-\U000027BF"
-        u"\U0001F900-\U0001F9FF"
-        "]+", flags=re.UNICODE,
-    )
+# ================= آماده‌سازی اولیه =================
+def init_files():
+    for f in FILES:
+        if not os.path.exists(f):
+            with open(f, "w", encoding="utf-8") as file:
+                json.dump({"data": {}, "users": []}, file, ensure_ascii=False, indent=2)
+    print("فایل‌های حافظه بررسی و ایجاد شدند.")
 
-    # اگر بعد از حذف ایموجی چیزی نماند، یعنی فقط ایموجی بوده
-    return not re.sub(emoji_pattern, "", clean)
-
-
-# ===============================================================
-# 🤖 یادگیری خودکار خنگول Cloud+ — نسخه‌ی ضد ایموجی و ضد تکرار
-# ===============================================================
-def auto_learn_from_text(text: str):
-    """یادگیری خودکار از گفت‌وگوهای طبیعی کاربران با درک احساس و منطق ساده"""
+# ================= عملیات پایه =================
+def load_data(file):
     try:
-        from smart_reply import detect_emotion
-    except ImportError:
-        detect_emotion = lambda x: None
-
-    if not text or len(text.strip()) < 3:
-        return
-
-    # 🚫 جلوگیری از یادگیری از ایموجی‌ها
-    if is_emoji_only(text):
-        return
-
-    text = text.strip().replace("؟", "?")
-    emotion = detect_emotion(text)
-
-    # ==============================
-    # 🎯 الگوهای آماده یادگیری سریع
-    # ==============================
-    patterns = {
-        r"اسم(ت)? چیه": ["اسمم خنگوله", "من خنگولم"],
-        r"چطوری": ["خوبم، تو چطوری؟", "عالیم", "رو فرمم"],
-        r"کجایی": ["اینجام پیش خودت", "همین دور و برم"],
-        r"چیکار میکنی": ["دارم یاد می‌گیرم", "در حال رشد مغزمم"],
-        r"دوست(م)? داری": ["خیلی زیاد", "آره معلومه"],
-        r"کی ساختت": ["یه آدم مهربون", "خودت چی فکر می‌کنی؟"],
-        r"ربات(ی)?": ["آره ولی با احساس", "آره ولی شبیه آدمم"],
-        r"خنگ(ی)?": ["آره ولی باحال", "آره ولی باهوشم"],
-    }
-
-    # 🧩 بررسی و یادگیری سریع بر اساس الگوها
-    for pattern, responses in patterns.items():
-        if re.search(pattern, text, re.IGNORECASE):
-            mem = load_data("memory.json")
-            data = mem.get("data", {})
-
-            # 🚫 جلوگیری از ذخیره تکراری
-            if pattern in data:
-                existing_texts = [r["text"] if isinstance(r, dict) else r for r in data[pattern]]
-                if any(resp in existing_texts for resp in responses):
-                    return
-
-            learn(pattern, *responses)
-            shadow_learn(text, random.choice(responses))
-            return
-
-    # ===============================================================
-    # 🧠 یادگیری پویا — بدون الگوی از پیش تعیین‌شده
-    # ===============================================================
-    words = text.split()
-    if len(words) >= 3:
-        key = " ".join(words[:2])
-        base_reply = random.choice(["آره", "درسته", "جالبه", "باشه", "اوه"])
-        tail = random.choice(words[-2:])
-
-        # بر اساس احساس، لحن پاسخ رو تغییر بده
-        if emotion == "شاد":
-            resp = f"{base_reply} {tail}"
-        elif emotion == "غمگین":
-            resp = f"{base_reply} {tail}"
-        elif emotion == "عصبی":
-            resp = f"{base_reply.upper()}"
+        with open(file, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except json.JSONDecodeError:
+        print(f"خطا در {file}، تلاش برای تعمیر خودکار...")
+        fixed = fix_json(file)
+        if fixed:
+            with open(file, "r", encoding="utf-8") as f:
+                return json.load(f)
         else:
-            resp = f"{base_reply} {tail}"
+            return {"data": {}, "users": []}
 
-        # 🚫 جلوگیری از ذخیره تکراری
-        mem = load_data("memory.json")
-        data = mem.get("data", {})
-        if key in data:
-            existing = [r["text"] if isinstance(r, dict) else r for r in data[key]]
-            if resp in existing:
-                return
+def save_data(file, data):
+    try:
+        with open(file, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        print(f"خطا در ذخیره {file}: {e}")
 
-        shadow_learn(key, resp)
+# ================= یادگیری =================
+def learn(phrase, *responses):
+    data = load_data("memory.json")
+    if "data" not in data:
+        data["data"] = {}
 
+    phrase = phrase.strip()
+    responses = [r.strip() for r in responses if r.strip()]
 
-# ===============================================================
-# 🧹 پاک‌سازی هوشمند حافظه
-# ===============================================================
-def clean_duplicates():
-    """حذف تکراری‌ها + پاسخ‌های بی‌فایده و بهینه‌سازی داده‌ها"""
-    mem = load_data("memory.json")
-    data = mem.get("data") or mem.get("phrases") or {}
-    if not data:
+    if not responses:
+        return "<b>هیچ پاسخی برای یادگیری ارسال نشد.</b>"
+
+    if phrase not in data["data"]:
+        data["data"][phrase] = [{"text": r, "weight": 1} for r in responses]
+        save_data("memory.json", data)
+        return f"<b>یادگیری جدید!</b>\n➕ جمله: <code>{phrase}</code>\nپاسخ‌ها: {len(responses)} عدد ثبت شد"
+
+    existing = data["data"][phrase]
+    existing_texts = [r["text"] for r in existing]
+    added = 0
+    for r in responses:
+        if r not in existing_texts:
+            existing.append({"text": r, "weight": 1})
+            added += 1
+
+    save_data("memory.json", data)
+    if added > 0:
+        return f"<b>خاطره‌ی قدیمی به‌روزرسانی شد!</b>\nپاسخ‌های تازه: {added}\nبه‌روزرسانی انجام شد."
+    else:
+        return "<b>این جمله را از قبل بلد بودم!</b>"
+
+def shadow_learn(phrase, response):
+    if not phrase or not response:
         return
+    shadow = load_data("shadow_memory.json")
+    data = shadow.get("data", {})
+    phrase, response = phrase.strip(), response.strip()
+    if phrase not in data:
+        data[phrase] = [response]
+    elif response not in data[phrase]:
+        data[phrase].append(response)
+    else:
+        return
+    shadow["data"] = data
+    save_data("shadow_memory.json", shadow)
 
-    changed = False
-    for phrase, responses in list(data.items()):
-        if not isinstance(responses, list):
-            continue
-
-        # حذف پاسخ‌های تکراری و خالی
-        cleaned = list({r.strip() for r in responses if r and len(r.strip()) > 1})
-
-        # حذف پاسخ‌های بسیار کوتاه
-        cleaned = [r for r in cleaned if len(r) > 2]
-
-        if cleaned != responses:
-            data[phrase] = cleaned
-            changed = True
-
-    if changed:
-        if "data" in mem:
-            mem["data"] = data
-        elif "phrases" in mem:
-            mem["phrases"] = data
-        save_data("memory.json", mem)
-        print("حافظه تمیز و بهینه شد.")
-
-
-# ===============================================================
-# 🧩 رشد تدریجی هوش مصنوعی
-# ===============================================================
-def reinforce_learning():
-    """افزایش وزن پاسخ‌های پرتکرار و حذف موارد ضعیف"""
+# ================= پاسخ‌دهی =================
+def get_reply(text):
     mem = load_data("memory.json")
-    data = mem.get("data") or mem.get("phrases") or {}
-    weights = mem.get("weights", {})
-
-    strengthened = 0
-    removed = 0
-
-    for phrase, responses in data.items():
-        if not isinstance(responses, list):
-            continue
-        count = len(responses)
-        old_weight = weights.get(phrase, 1)
-        new_weight = min(old_weight + count / 5, 20)
-        if new_weight != old_weight:
-            strengthened += 1
-        weights[phrase] = new_weight
-
-    for phrase in list(weights.keys()):
-        if weights[phrase] <= 0.5:
-            removed += 1
-            del weights[phrase]
-
-    mem["weights"] = weights
+    data = mem.get("data", {})
+    matches = [k for k in data.keys() if k in text]
+    if not matches:
+        return None
+    key = random.choice(matches)
+    responses = data[key]
+    if isinstance(responses[0], str):
+        responses = [{"text": r, "weight": 1} for r in responses]
+        data[key] = responses
+        save_data("memory.json", mem)
+    weights = [r["weight"] for r in responses]
+    chosen = random.choices(responses, weights=weights, k=1)[0]
+    chosen["weight"] += 1
     save_data("memory.json", mem)
-    print(f"تقویت حافظه انجام شد ({strengthened} تقویت، {removed} حذف).")
+    return chosen["text"]
 
+# ================= تمیزسازی حافظه =================
+def clean_memory():
+    data = load_data("memory.json")
+    changed = 0
+    for phrase, responses in list(data.get("data", {}).items()):
+        valid, seen = [], set()
+        for r in responses:
+            text = r["text"].strip()
+            if len(text) < 2 or text in seen:
+                continue
+            seen.add(text)
+            valid.append(r)
+        if len(valid) != len(responses):
+            data["data"][phrase] = valid
+            changed += 1
+    if changed > 0:
+        save_data("memory.json", data)
+        print(f"حافظه تمیز شد ({changed} مورد اصلاح شد)")
+    return changed
+
+# ================= آمار و IQ =================
+def get_stats():
+    mem = load_data("memory.json")
+    total_phrases = len(mem.get("data", {}))
+    total_responses = sum(len(v) for v in mem.get("data", {}).values())
+    total_weight = sum(sum(r.get("weight", 1) for r in v) for v in mem.get("data", {}).values())
+    mode = mem.get("mode", "نرمال")
+    return {"phrases": total_phrases, "responses": total_responses, "total_weight": total_weight, "mode": mode}
+
+def set_mode(mode):
+    mem = load_data("memory.json")
+    mem["mode"] = mode
+    save_data("memory.json", mem)
+
+# ================= جمله‌سازی =================
+def enhance_sentence(sentence):
+    return sentence if sentence else "نمی‌دانم چه بگویم!"
+
+def generate_sentence():
+    mem = load_data("memory.json")
+    data = mem.get("data", {})
+    if not data:
+        return "هنوز چیزی بلد نیستم!"
+    phrases = list(data.keys())
+    if len(phrases) < 2:
+        phrase = random.choice(phrases)
+        resp = random.choice(data[phrase])
+        text = resp["text"] if isinstance(resp, dict) else resp
+        return f"{phrase} → {text}"
+    p1, p2 = random.sample(phrases, 2)
+    r1, r2 = random.choice(data[p1]), random.choice(data[p2])
+    t1 = r1["text"] if isinstance(r1, dict) else r1
+    t2 = r2["text"] if isinstance(r2, dict) else r2
+    return f"{p1} ولی {t1}، بعدش {t2}"
+
+# ================= تقویت حافظه =================
+def reinforce_learning(verbose=True):
+    mem = load_data("memory.json")
+    data = mem.get("data", {})
+    changed = False
+    strengthened = removed = 0
+    for phrase, responses in list(data.items()):
+        new_responses = []
+        for r in responses:
+            text = r.get("text", "").strip()
+            weight = r.get("weight", 1)
+            if len(text) < 2:
+                removed += 1
+                continue
+            if any(c in text for c in "؟!?!."):
+                new_weight = min(weight + random.choice([1, 2]), 15)
+                if new_weight > weight:
+                    strengthened += 1
+                r["weight"] = new_weight
+            elif weight > 1:
+                r["weight"] -= 1
+            if r["weight"] <= 0:
+                removed += 1
+                continue
+            new_responses.append(r)
+        if len(new_responses) != len(responses):
+            changed = True
+        data[phrase] = new_responses
+    if changed:
+        mem["data"] = data
+        save_data("memory.json", mem)
+    if verbose:
+        if strengthened or removed:
+            print(f"حافظه تقویت شد → {strengthened} پاسخ قوی‌تر، {removed} پاسخ حذف شد.")
+        else:
+            print("حافظه نیازی به تقویت نداشت.")
     return {"strengthened": strengthened, "removed": removed}
+
+# ================= ارزیابی هوش =================
+def evaluate_intelligence():
+    mem = load_data("memory.json")
+    data = mem.get("data", {})
+    if not data:
+        return {"iq": 0, "level": "تازه متولد شده", "summary": "هنوز چیزی یاد نگرفته‌ام."}
+    total_phrases = len(data)
+    total_responses = sum(len(v) for v in data.values())
+    total_weight = sum(sum(r.get("weight", 1) for r in v) for v in data.values())
+    response_count = sum(len(v) for v in data.values())
+    avg_weight = total_weight / response_count if response_count else 1
+    iq_score = int((total_phrases * 0.7 + total_responses * 0.3) * (avg_weight / 3))
+    iq_score = min(iq_score, 9999)
+    if iq_score < 100: level = "تازه‌کار"
+    elif iq_score < 300: level = "در حال رشد"
+    elif iq_score < 700: level = "هوش پیشرفته"
+    elif iq_score < 1500: level = "خلاق و مستقل"
+    else: level = "نابغه"
+    summary = f"جملات: {total_phrases}\nپاسخ‌ها: {total_responses}\nمیانگین وزن پاسخ‌ها: {avg_weight:.2f}\nنمره‌ی هوش (AI IQ): {iq_score}\nسطح: {level}"
+    return {"iq": iq_score, "level": level, "summary": summary}
