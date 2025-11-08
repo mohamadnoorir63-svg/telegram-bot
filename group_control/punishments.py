@@ -80,6 +80,7 @@ async def _resolve_target(msg, context, chat_id):
 
 
 # ================= 🔧 هندلر دستورات =================
+        # ================= 🔧 هندلر دستورات =================
 async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = update.effective_message
     user = update.effective_user
@@ -92,14 +93,14 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
     if not text:
         return
 
-    # regex دستورات معتبر (فقط ابتدای پیام)
+    # regex دستورات دقیق (فقط وقتی عدد یا یوزرنیم یا ریپلای هست)
     COMMAND_PATTERNS = {
-        "ban": r"^بن(?:\s+|$)",
-        "unban": r"^حذف\s*بن(?:\s+|$)",
-        "mute": r"^سکوت(?:\s+|$)",
-        "unmute": r"^حذف\s*سکوت(?:\s+|$)",
-        "warn": r"^اخطار(?:\s+|$)",
-        "delwarn": r"^حذف\s*اخطار(?:\s+|$)",
+        "ban": r"^بن(?:\s+(\d+)|\s+@[\w_]+)?$",
+        "unban": r"^حذف\s*بن(?:\s+(\d+)|\s+@[\w_]+)?$",
+        "mute": r"^سکوت(?:\s+(\d+)(?:\s*(ثانیه|دقیقه|ساعت))?|(?:\s+(\d+)|\s+@[\w_]+)?)?$",
+        "unmute": r"^حذف\s*سکوت(?:\s+(\d+)|\s+@[\w_]+)?$",
+        "warn": r"^اخطار(?:\s+(\d+)|\s+@[\w_]+)?$",
+        "delwarn": r"^حذف\s*اخطار(?:\s+(\d+)|\s+@[\w_]+)?$",
     }
 
     cmd_type = None
@@ -201,14 +202,3 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
     except Exception as e:
         return await msg.reply_text(f"⚠️ خطا در اجرای دستور: {e}")
-
-
-# ================= 🔧 ثبت هندلر =================
-def register_punishment_handlers(application, group_number: int = 12):
-    application.add_handler(
-        MessageHandler(
-            filters.TEXT & ~filters.COMMAND & filters.ChatType.GROUPS,
-            handle_punishments,
-        ),
-        group=group_number,
-    )
