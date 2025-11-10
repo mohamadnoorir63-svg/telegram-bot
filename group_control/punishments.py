@@ -2,7 +2,7 @@ import os
 import json
 import re
 import asyncio
-from telegram import Update, ChatPermissions, MessageEntity
+from telegram import Update, ChatPermissions
 from telegram.ext import ContextTypes, MessageHandler, filters
 from datetime import timedelta, datetime
 
@@ -38,53 +38,35 @@ async def hat_zugriff(context, chat_id: int, user_id: int) -> bool:
     except:
         return False
 
-# ================= 🔧 Zielbenutzer extrahieren =================
+# ================= 🔧 Zielbenutzer دقیق =================
 async def loese_ziel(msg, context, chat_id):
     """
     پیدا کردن دقیق کاربر:
     1. ریپلای
-    2. @username
-    3. user_id
+    2. @username یا user_id بعد از دستور
     """
-    # حالت ریپلای
     if msg.reply_to_message:
         return msg.reply_to_message.from_user, None
 
-    text = msg.text or ""
-    entities = msg.entities or []
-
-    # بررسی entity ها
-    for ent in entities:
-        try:
-            if ent.type == MessageEntity.TEXT_MENTION:
-                return ent.user, None
-        except:
-            continue
-
-    # بررسی @username
-    username_match = re.search(r"@([A-Za-z0-9_]{5,32})", text)
-    if username_match:
-        username = username_match.group(1)
-        # جستجو در اعضای گروه
-        try:
-            admins = await context.bot.get_chat_administrators(chat_id)
-            target_user = next((m.user for m in admins if m.user.username and m.user.username.lower() == username.lower()), None)
-            if target_user:
-                return target_user, None
-        except:
-            pass
-        return None, username
-
-    # بررسی user_id
-    id_match = re.search(r"\b(\d{6,15})\b", text)
-    if id_match:
-        try:
-            target_id = int(id_match.group(1))
-            cm = await context.bot.get_chat_member(chat_id, target_id)
-            return cm.user, None
-        except:
-            return None, None
-
+    text = (msg.text or "").strip()
+    # بررسی دقیق: فقط دستور + یک کاربر معتبر
+    m = re.search(r"^\S+\s+(@[A-Za-z0-9_]{5,32}|\d+)$", text)
+    if m:
+        target_str = m.group(1)
+        if target_str.startswith("@"):
+            username = target_str[1:]
+            try:
+                cm = await context.bot.get_chat_member(chat_id, username)
+                return cm.user, None
+            except:
+                return None, username
+        else:
+            try:
+                target_id = int(target_str)
+                cm = await context.bot.get_chat_member(chat_id, target_id)
+                return cm.user, None
+            except:
+                return None, None
     return None, None
 
 # ================= 📦 پیام موقت =================
@@ -160,9 +142,9 @@ async def registriere_bestrafen_handler(update: Update, context: ContextTypes.DE
             break
 
     if not cmd_type:
-        return  # هیچ متن دیگری اجرا نمی‌شود
+        return  # هیچ متن اضافی اجرا نمی‌شود
 
-    # اجرای دستور
+    # ================= اجرای دستور =================
     try:
         if cmd_type == "ban":
             await context.bot.ban_chat_member(chat.id, target.id)
