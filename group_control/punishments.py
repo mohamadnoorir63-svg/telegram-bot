@@ -49,8 +49,8 @@ async def loese_ziel(msg, context, chat_id):
         return msg.reply_to_message.from_user, None
 
     text = (msg.text or "").strip()
-    # بررسی دقیق: فقط دستور + یک کاربر معتبر
-    m = re.search(r"^\S+\s+(@[A-Za-z0-9_]{5,32}|\d+)$", text)
+    # فقط دستور + یک کاربر معتبر
+    m = re.fullmatch(r"\S+\s+(@[A-Za-z0-9_]{5,32}|\d+)", text)
     if m:
         target_str = m.group(1)
         if target_str.startswith("@"):
@@ -127,17 +127,17 @@ async def registriere_bestrafen_handler(update: Update, context: ContextTypes.DE
 
     # دستورات دقیق فارسی
     BEFEHLE = {
-        "ban": r"^بن\s+(@[A-Za-z0-9_]{5,32}|\d+)$",
-        "unban": r"^حذف\s*بن\s+(@[A-Za-z0-9_]{5,32}|\d+)$",
-        "mute": r"^سکوت\s+(@[A-Za-z0-9_]{5,32}|\d+)(?:\s+(\d+)\s*(ثانیه|دقیقه|ساعت)?)?$",
-        "unmute": r"^حذف\s*سکوت\s+(@[A-Za-z0-9_]{5,32}|\d+)$",
-        "warn": r"^اخطار\s+(@[A-Za-z0-9_]{5,32}|\d+)$",
-        "delwarn": r"^حذف\s*اخطار\s+(@[A-Za-z0-9_]{5,32}|\d+)$"
+        "ban": r"بن\s+(@[A-Za-z0-9_]{5,32}|\d+)",
+        "unban": r"حذف\s*بن\s+(@[A-Za-z0-9_]{5,32}|\d+)",
+        "mute": r"سکوت\s+(@[A-Za-z0-9_]{5,32}|\d+)(?:\s+(\d+)\s*(ثانیه|دقیقه|ساعت)?)?",
+        "unmute": r"حذف\s*سکوت\s+(@[A-Za-z0-9_]{5,32}|\d+)",
+        "warn": r"اخطار\s+(@[A-Za-z0-9_]{5,32}|\d+)",
+        "delwarn": r"حذف\s*اخطار\s+(@[A-Za-z0-9_]{5,32}|\d+)"
     }
 
     cmd_type = None
     for cmd, pattern in BEFEHLE.items():
-        if re.match(pattern, text):
+        if re.fullmatch(pattern, text):
             cmd_type = cmd
             break
 
@@ -155,7 +155,7 @@ async def registriere_bestrafen_handler(update: Update, context: ContextTypes.DE
             await sende_temp(msg, f"✅ {target.first_name} از بن خارج شد.", context)
 
         elif cmd_type == "mute":
-            m = re.match(BEFEHLE["mute"], text)
+            m = re.fullmatch(BEFEHLE["mute"], text)
             seconds = 3600  # پیشفرض 1 ساعت
             if m and m.group(2):
                 num = int(m.group(2))
