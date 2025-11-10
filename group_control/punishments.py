@@ -44,9 +44,10 @@ async def loese_ziel(msg, context, chat_id):
         return msg.reply_to_message.from_user, None
 
     text = (msg.text or "").strip()
-    # فقط یک username یا id بعد دستور
     parts = text.split()
-    if len(parts) == 2:
+
+    # فقط کلمه دوم را به عنوان هدف بررسی می‌کنیم
+    if len(parts) >= 2:
         target_str = parts[1]
         if target_str.startswith("@"):
             username = target_str[1:]
@@ -77,7 +78,6 @@ async def loesche_nach(message, verzogerung, context):
         pass
 
 # ================= 🔧 Handler اصلی =================
-    # ================= 🔧 Handler اصلی (نسخه بهبود یافته) =================
 async def registriere_bestrafen_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = update.effective_message
     user = update.effective_user
@@ -94,7 +94,7 @@ async def registriere_bestrafen_handler(update: Update, context: ContextTypes.DE
     if not await hat_zugriff(context, chat.id, user.id):
         return
 
-    # ================= دستورات دقیق =================
+    # ================= دستورات مجاز =================
     BEFEHLE = {
         "ban": "بن",
         "unban": "حذف بن",
@@ -104,11 +104,14 @@ async def registriere_bestrafen_handler(update: Update, context: ContextTypes.DE
         "delwarn": "حذف اخطار"
     }
 
-    # فقط کلمه اول متن را دستور در نظر می‌گیریم
     parts = text.split()
+    if not parts:
+        return
+
+    # فقط بررسی کلمه اول متن
     first_word = parts[0]
     if first_word not in BEFEHLE.values():
-        return  # هیچ دستور معتبری پیدا نشد
+        return  # اگر دستور مجاز نبود، کاری انجام نمی‌دهد
 
     cmd_type = next(k for k, v in BEFEHLE.items() if v == first_word)
 
@@ -189,3 +192,10 @@ async def registriere_bestrafen_handler(update: Update, context: ContextTypes.DE
 
     except Exception as e:
         await sende_temp(msg, f"❌ خطا در اجرای دستور: {e}", context)
+
+# ================= 🔧 ثبت Handler =================
+def register_punishment_handlers(application, group_number: int = 12):
+    application.add_handler(
+        MessageHandler(filters.TEXT & (~filters.COMMAND), registriere_bestrafen_handler),
+        group=group_number
+    )
