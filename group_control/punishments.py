@@ -6,17 +6,17 @@ from telegram import Update, ChatPermissions
 from telegram.ext import ContextTypes, MessageHandler, filters
 from datetime import timedelta, datetime
 
-# ================= ⚙️ Grundeinstellungen =================
+# ================= ⚙️ تنظیمات پایه =================
 BASIS_VERZEICHNIS = os.path.dirname(os.path.abspath(__file__))
 WARN_DATEI = os.path.join(BASIS_VERZEICHNIS, "warnings.json")
-SUDO_IDS = [8588347189]  # Admin-IDs
+SUDO_IDS = [8588347189]  # Admin ها
 
-# فایل‌ها را بساز اگر موجود نیست
+# ایجاد فایل اگر موجود نیست
 if not os.path.exists(WARN_DATEI):
     with open(WARN_DATEI, "w", encoding="utf-8") as x:
         json.dump({}, x, ensure_ascii=False, indent=2)
 
-# ================= 🔧 JSON Helfer =================
+# ================= 🔧 JSON helper =================
 def lade_json(datei):
     try:
         with open(datei, "r", encoding="utf-8") as f:
@@ -28,7 +28,7 @@ def speichere_json(datei, daten):
     with open(datei, "w", encoding="utf-8") as f:
         json.dump(daten, f, ensure_ascii=False, indent=2)
 
-# ================= 🔐 Zugriffsprüfung =================
+# ================= 🔐 دسترسی کاربر =================
 async def hat_zugriff(context, chat_id: int, user_id: int) -> bool:
     if user_id in SUDO_IDS:
         return True
@@ -38,18 +38,15 @@ async def hat_zugriff(context, chat_id: int, user_id: int) -> bool:
     except:
         return False
 
-# ================= 🔧 Zielbenutzer دقیق =================
+# ================= 🔧 استخراج هدف =================
 async def loese_ziel(msg, context, chat_id):
-    """
-    پیدا کردن دقیق کاربر:
-    1. ریپلای
-    2. @username یا user_id بعد از دستور
-    """
+    """هدف دقیق: ریپلای، @username یا user_id"""
+    # ریپلای
     if msg.reply_to_message:
         return msg.reply_to_message.from_user, None
 
     text = (msg.text or "").strip()
-    # فقط دستور + یک کاربر معتبر
+    # فقط یک username یا id بعد دستور
     m = re.fullmatch(r"\S+\s+(@[A-Za-z0-9_]{5,32}|\d+)", text)
     if m:
         target_str = m.group(1)
@@ -81,7 +78,7 @@ async def loesche_nach(message, verzogerung, context):
     except:
         pass
 
-# ================= 🔧 Haupt-Handler =================
+# ================= 🔧 Handler اصلی =================
 async def registriere_bestrafen_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = update.effective_message
     user = update.effective_user
@@ -125,24 +122,25 @@ async def registriere_bestrafen_handler(update: Update, context: ContextTypes.DE
         await sende_temp(msg, "⚠️ کاربر موردنظر در گروه نیست.", context)
         return
 
-    # دستورات دقیق فارسی
+    # ================= دستورات دقیق =================
     BEFEHLE = {
-        "ban": r"بن\s+(@[A-Za-z0-9_]{5,32}|\d+)",
-        "unban": r"حذف\s*بن\s+(@[A-Za-z0-9_]{5,32}|\d+)",
-        "mute": r"سکوت\s+(@[A-Za-z0-9_]{5,32}|\d+)(?:\s+(\d+)\s*(ثانیه|دقیقه|ساعت)?)?",
-        "unmute": r"حذف\s*سکوت\s+(@[A-Za-z0-9_]{5,32}|\d+)",
-        "warn": r"اخطار\s+(@[A-Za-z0-9_]{5,32}|\d+)",
-        "delwarn": r"حذف\s*اخطار\s+(@[A-Za-z0-9_]{5,32}|\d+)"
+        "ban": "بن",
+        "unban": "حذف بن",
+        "mute": "سکوت",
+        "unmute": "حذف سکوت",
+        "warn": "اخطار",
+        "delwarn": "حذف اخطار"
     }
 
     cmd_type = None
     for cmd, pattern in BEFEHLE.items():
-        if re.fullmatch(pattern, text):
+        # فقط وقتی دقیقاً متن برابر است اجرا شود
+        if text.startswith(pattern) and text.strip() == pattern:
             cmd_type = cmd
             break
 
     if not cmd_type:
-        return  # هیچ متن اضافی اجرا نمی‌شود
+        return  # هیچ متن اضافه اجرا نمی‌شود
 
     # ================= اجرای دستور =================
     try:
@@ -155,17 +153,7 @@ async def registriere_bestrafen_handler(update: Update, context: ContextTypes.DE
             await sende_temp(msg, f"✅ {target.first_name} از بن خارج شد.", context)
 
         elif cmd_type == "mute":
-            m = re.fullmatch(BEFEHLE["mute"], text)
             seconds = 3600  # پیشفرض 1 ساعت
-            if m and m.group(2):
-                num = int(m.group(2))
-                unit = m.group(3)
-                if unit == "ساعت":
-                    seconds = num * 3600
-                elif unit == "دقیقه":
-                    seconds = num * 60
-                elif unit == "ثانیه":
-                    seconds = num
             until_date = datetime.utcnow() + timedelta(seconds=seconds)
             await context.bot.restrict_chat_member(
                 chat.id, target.id,
@@ -205,9 +193,8 @@ async def registriere_bestrafen_handler(update: Update, context: ContextTypes.DE
     except Exception as e:
         await sende_temp(msg, f"❌ خطا در اجرای دستور: {e}", context)
 
-# ================= 🔧 Handler Registrierung =================
+# ================= 🔧 ثبت Handler =================
 def register_punishment_handlers(application, group_number: int = 12):
-    """ثبت handler با امکان مشخص کردن group_number"""
     application.add_handler(
         MessageHandler(filters.TEXT & (~filters.COMMAND), registriere_bestrafen_handler),
         group=group_number
