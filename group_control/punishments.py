@@ -145,12 +145,12 @@ async def registriere_bestrafen_handler(update: Update, context: ContextTypes.DE
 
     # دستورات دقیق فارسی
     BEFEHLE = {
-        "ban": r"^بن\s+(@?[A-Za-z0-9_]{5,32}|\d+)$",
-        "unban": r"^حذف\s*بن\s+(@?[A-Za-z0-9_]{5,32}|\d+)$",
-        "mute": r"^سکوت\s+(@?[A-Za-z0-9_]{5,32}|\d+)(?:\s+(\d+)\s*(ثانیه|دقیقه|ساعت)?)?$",
-        "unmute": r"^حذف\s*سکوت\s+(@?[A-Za-z0-9_]{5,32}|\d+)$",
-        "warn": r"^اخطار\s+(@?[A-Za-z0-9_]{5,32}|\d+)$",
-        "delwarn": r"^حذف\s*اخطار\s+(@?[A-Za-z0-9_]{5,32}|\d+)$"
+        "ban": r"^بن\s+(@[A-Za-z0-9_]{5,32}|\d+)$",
+        "unban": r"^حذف\s*بن\s+(@[A-Za-z0-9_]{5,32}|\d+)$",
+        "mute": r"^سکوت\s+(@[A-Za-z0-9_]{5,32}|\d+)(?:\s+(\d+)\s*(ثانیه|دقیقه|ساعت)?)?$",
+        "unmute": r"^حذف\s*سکوت\s+(@[A-Za-z0-9_]{5,32}|\d+)$",
+        "warn": r"^اخطار\s+(@[A-Za-z0-9_]{5,32}|\d+)$",
+        "delwarn": r"^حذف\s*اخطار\s+(@[A-Za-z0-9_]{5,32}|\d+)$"
     }
 
     cmd_type = None
@@ -160,7 +160,7 @@ async def registriere_bestrafen_handler(update: Update, context: ContextTypes.DE
             break
 
     if not cmd_type:
-        return
+        return  # هیچ متن دیگری اجرا نمی‌شود
 
     # اجرای دستور
     try:
