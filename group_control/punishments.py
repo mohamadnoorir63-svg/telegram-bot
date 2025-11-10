@@ -42,14 +42,14 @@ async def _has_access(context, chat_id: int, user_id: int) -> bool:
 
 # ================= 🎯 استخراج هدف امن =================
 async def _resolve_target(msg, context, chat_id):
-    # ✅ حالت ۱: ریپلای
+    # ✅ حالت ۱: ریپلای روی پیام
     if msg.reply_to_message:
         return msg.reply_to_message.from_user
 
-    text = msg.text or ""
+    text = (msg.text or "").strip()
     entities = msg.entities or []
 
-    # ✅ حالت ۲: mention یا text_mention
+    # ✅ حالت ۲: mention یا text_mention از طریق entity
     for ent in entities:
         try:
             if ent.type == MessageEntity.TEXT_MENTION:
@@ -59,7 +59,6 @@ async def _resolve_target(msg, context, chat_id):
                 start = ent.offset
                 length = ent.length
                 username = text[start:start + length].lstrip("@")
-
                 try:
                     user_obj = await context.bot.get_chat(username)
                     return user_obj
@@ -68,20 +67,31 @@ async def _resolve_target(msg, context, chat_id):
         except:
             continue
 
-    # ✅ حالت ۳: آیدی عددی در متن
-    m = re.search(r"\b(\d{6,15})\b", text)
-    if m:
+    # ✅ حالت ۳: بررسی دستی برای @username در متن
+    m_username = re.search(r"@([A-Za-z0-9_]{5,})", text)
+    if m_username:
+        username = m_username.group(1)
         try:
-            target_id = int(m.group(1))
+            user_obj = await context.bot.get_chat(username)
+            return user_obj
+        except:
+            pass
+
+    # ✅ حالت ۴: آیدی عددی در متن
+    m_id = re.search(r"\b(\d{6,15})\b", text)
+    if m_id:
+        try:
+            target_id = int(m_id.group(1))
             cm = await context.bot.get_chat_member(chat_id, target_id)
             return cm.user
         except:
-            return None
+            pass
 
+    # ❌ اگر هیچ‌کدوم نبود
     return None
 
 
-# ================= ⚙️ هندلر دستورات تنبیهی =================
+# ================= ⚙️ هندلر اصلی تنبیهات =================
 async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = update.effective_message
     user = update.effective_user
@@ -94,7 +104,7 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
     if not text:
         return
 
-    # ✅ regex فقط ابتدای جمله، تا توی وسط چت اشتباهی فعال نشه
+    # ✅ regex فقط ابتدای پیام (برای جلوگیری از اشتباه در وسط جمله)
     COMMAND_PATTERNS = {
         "ban": r"^بن(?:\s|$)",
         "unban": r"^حذف\s*بن(?:\s|$)",
@@ -111,7 +121,7 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
             break
 
     if not cmd_type:
-        return  # متن دستور واقعی نیست
+        return  # دستور واقعی نیست
 
     # ✅ بررسی دسترسی اجراکننده
     if not await _has_access(context, chat.id, user.id):
@@ -127,7 +137,7 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
             "• آیدی عددی"
         )
 
-    # ✅ محافظت در برابر بن ادمین‌ها یا خود ربات
+    # ✅ محافظت از ادمین / سودو / خود ربات
     if target.id == context.bot.id:
         return await msg.reply_text("😅 نمی‌تونم خودم رو تنبیه کنم.")
     if target.id in SUDO_IDS:
@@ -139,7 +149,7 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
     except:
         pass
 
-    # ✅ اجرای دستورات
+    # ✅ اجرای دستورات تنبیهی
     try:
         # 🚫 بن
         if cmd_type == "ban":
@@ -166,7 +176,7 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
                 else:
                     seconds = num * 60
             else:
-                seconds = 3600  # پیش‌فرض: ۱ ساعت
+                seconds = 3600  # پیش‌فرض ۱ ساعت
 
             until_date = datetime.utcnow() + timedelta(seconds=seconds)
             await context.bot.restrict_chat_member(
