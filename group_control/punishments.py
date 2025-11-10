@@ -1,6 +1,5 @@
 import os
 import json
-import re
 import asyncio
 from telegram import Update, ChatPermissions
 from telegram.ext import ContextTypes, MessageHandler, filters
@@ -41,15 +40,14 @@ async def hat_zugriff(context, chat_id: int, user_id: int) -> bool:
 # ================= 🔧 استخراج هدف =================
 async def loese_ziel(msg, context, chat_id):
     """هدف دقیق: ریپلای، @username یا user_id"""
-    # ریپلای
     if msg.reply_to_message:
         return msg.reply_to_message.from_user, None
 
     text = (msg.text or "").strip()
     # فقط یک username یا id بعد دستور
-    m = re.fullmatch(r"\S+\s+(@[A-Za-z0-9_]{5,32}|\d+)", text)
-    if m:
-        target_str = m.group(1)
+    parts = text.split()
+    if len(parts) == 2:
+        target_str = parts[1]
         if target_str.startswith("@"):
             username = target_str[1:]
             try:
@@ -133,14 +131,13 @@ async def registriere_bestrafen_handler(update: Update, context: ContextTypes.DE
     }
 
     cmd_type = None
-    for cmd, pattern in BEFEHLE.items():
-        # فقط وقتی دقیقاً متن برابر است اجرا شود
-        if text.startswith(pattern) and text.strip() == pattern:
-            cmd_type = cmd
-            break
+    # فقط وقتی متن دقیقاً برابر دستور است
+    parts = text.split()
+    if parts and parts[0] in BEFEHLE.values() and len(parts) == 2:
+        cmd_type = next(k for k, v in BEFEHLE.items() if v == parts[0])
 
     if not cmd_type:
-        return  # هیچ متن اضافه اجرا نمی‌شود
+        return  # هیچ متن اضافی اجرا نمی‌شود
 
     # ================= اجرای دستور =================
     try:
@@ -153,7 +150,7 @@ async def registriere_bestrafen_handler(update: Update, context: ContextTypes.DE
             await sende_temp(msg, f"✅ {target.first_name} از بن خارج شد.", context)
 
         elif cmd_type == "mute":
-            seconds = 3600  # پیشفرض 1 ساعت
+            seconds = 3600
             until_date = datetime.utcnow() + timedelta(seconds=seconds)
             await context.bot.restrict_chat_member(
                 chat.id, target.id,
