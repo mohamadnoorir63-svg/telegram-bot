@@ -77,6 +77,7 @@ async def loesche_nach(message, verzogerung, context):
         pass
 
 # ================= 🔧 Handler اصلی =================
+    # ================= 🔧 Handler اصلی (نسخه بهبود یافته) =================
 async def registriere_bestrafen_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = update.effective_message
     user = update.effective_user
@@ -92,6 +93,24 @@ async def registriere_bestrafen_handler(update: Update, context: ContextTypes.DE
     # بررسی دسترسی
     if not await hat_zugriff(context, chat.id, user.id):
         return
+
+    # ================= دستورات دقیق =================
+    BEFEHLE = {
+        "ban": "بن",
+        "unban": "حذف بن",
+        "mute": "سکوت",
+        "unmute": "حذف سکوت",
+        "warn": "اخطار",
+        "delwarn": "حذف اخطار"
+    }
+
+    # فقط کلمه اول متن را دستور در نظر می‌گیریم
+    parts = text.split()
+    first_word = parts[0]
+    if first_word not in BEFEHLE.values():
+        return  # هیچ دستور معتبری پیدا نشد
+
+    cmd_type = next(k for k, v in BEFEHLE.items() if v == first_word)
 
     # پیدا کردن هدف
     target, mention_failed = await loese_ziel(msg, context, chat.id)
@@ -119,25 +138,6 @@ async def registriere_bestrafen_handler(update: Update, context: ContextTypes.DE
     except:
         await sende_temp(msg, "⚠️ کاربر موردنظر در گروه نیست.", context)
         return
-
-    # ================= دستورات دقیق =================
-    BEFEHLE = {
-        "ban": "بن",
-        "unban": "حذف بن",
-        "mute": "سکوت",
-        "unmute": "حذف سکوت",
-        "warn": "اخطار",
-        "delwarn": "حذف اخطار"
-    }
-
-    cmd_type = None
-    # فقط وقتی متن دقیقاً برابر دستور است
-    parts = text.split()
-    if parts and parts[0] in BEFEHLE.values() and len(parts) == 2:
-        cmd_type = next(k for k, v in BEFEHLE.items() if v == parts[0])
-
-    if not cmd_type:
-        return  # هیچ متن اضافی اجرا نمی‌شود
 
     # ================= اجرای دستور =================
     try:
@@ -189,10 +189,3 @@ async def registriere_bestrafen_handler(update: Update, context: ContextTypes.DE
 
     except Exception as e:
         await sende_temp(msg, f"❌ خطا در اجرای دستور: {e}", context)
-
-# ================= 🔧 ثبت Handler =================
-def register_punishment_handlers(application, group_number: int = 12):
-    application.add_handler(
-        MessageHandler(filters.TEXT & (~filters.COMMAND), registriere_bestrafen_handler),
-        group=group_number
-    )
