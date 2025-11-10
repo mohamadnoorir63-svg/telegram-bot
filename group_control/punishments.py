@@ -4,6 +4,7 @@ import asyncio
 from telegram import Update, ChatPermissions
 from telegram.ext import ContextTypes, MessageHandler, filters
 from datetime import timedelta, datetime
+import re
 
 # ================= ⚙️ تنظیمات پایه =================
 BASIS_VERZEICHNIS = os.path.dirname(os.path.abspath(__file__))
@@ -44,22 +45,20 @@ async def loese_ziel(msg, context, chat_id):
         return msg.reply_to_message.from_user, None
 
     text = (msg.text or "").strip()
-    parts = text.split()
-
-    # فقط کلمه دوم را به عنوان هدف بررسی می‌کنیم
-    if len(parts) >= 2:
-        target_str = parts[1]
-        if target_str.startswith("@"):
-            username = target_str[1:]
+    # regex برای یافتن @username یا id
+    match = re.search(r"@?(\w+)|(\d+)", text)
+    if match:
+        username = match.group(1)
+        user_id = match.group(2)
+        if username:
             try:
                 cm = await context.bot.get_chat_member(chat_id, username)
                 return cm.user, None
             except:
                 return None, username
-        else:
+        elif user_id:
             try:
-                target_id = int(target_str)
-                cm = await context.bot.get_chat_member(chat_id, target_id)
+                cm = await context.bot.get_chat_member(chat_id, int(user_id))
                 return cm.user, None
             except:
                 return None, None
@@ -77,7 +76,7 @@ async def loesche_nach(message, verzogerung, context):
     except:
         pass
 
-# ================= 🔧 Handler اصلی =================
+# ================= 🔧 Handler اصلی حرفه‌ای =================
 async def registriere_bestrafen_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = update.effective_message
     user = update.effective_user
@@ -94,7 +93,7 @@ async def registriere_bestrafen_handler(update: Update, context: ContextTypes.DE
     if not await hat_zugriff(context, chat.id, user.id):
         return
 
-    # ================= دستورات مجاز =================
+    # دستورات مجاز
     BEFEHLE = {
         "ban": "بن",
         "unban": "حذف بن",
@@ -104,16 +103,16 @@ async def registriere_bestrafen_handler(update: Update, context: ContextTypes.DE
         "delwarn": "حذف اخطار"
     }
 
-    parts = text.split()
-    if not parts:
-        return
+    # پیدا کردن دستور دقیق با regex
+    cmd_type = None
+    for k, v in BEFEHLE.items():
+        pattern = f"^{re.escape(v)}(?:\s|$)"  # دستور باید اول متن باشد و یا بعدش فاصله باشد
+        if re.match(pattern, text):
+            cmd_type = k
+            break
 
-    # فقط بررسی کلمه اول متن
-    first_word = parts[0]
-    if first_word not in BEFEHLE.values():
-        return  # اگر دستور مجاز نبود، کاری انجام نمی‌دهد
-
-    cmd_type = next(k for k, v in BEFEHLE.items() if v == first_word)
+    if not cmd_type:
+        return  # اگر هیچ دستور پیدا نشد
 
     # پیدا کردن هدف
     target, mention_failed = await loese_ziel(msg, context, chat.id)
@@ -192,6 +191,7 @@ async def registriere_bestrafen_handler(update: Update, context: ContextTypes.DE
 
     except Exception as e:
         await sende_temp(msg, f"❌ خطا در اجرای دستور: {e}", context)
+
 
 # ================= 🔧 ثبت Handler =================
 def register_punishment_handlers(application, group_number: int = 12):
