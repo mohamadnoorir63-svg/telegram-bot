@@ -9,14 +9,12 @@ from datetime import timedelta, datetime
 # ================= ⚙️ Grundeinstellungen =================
 BASIS_VERZEICHNIS = os.path.dirname(os.path.abspath(__file__))
 WARN_DATEI = os.path.join(BASIS_VERZEICHNIS, "warnings.json")
-BENUTZERDEFINIERTE_BEFEHLE_DATEI = os.path.join(BASIS_VERZEICHNIS, "custom_commands.json")
 SUDO_IDS = [8588347189]  # Admin-IDs
 
 # فایل‌ها را بساز اگر موجود نیست
-for f in (WARN_DATEI, BENUTZERDEFINIERTE_BEFEHLE_DATEI):
-    if not os.path.exists(f):
-        with open(f, "w", encoding="utf-8") as x:
-            json.dump({}, x, ensure_ascii=False, indent=2)
+if not os.path.exists(WARN_DATEI):
+    with open(WARN_DATEI, "w", encoding="utf-8") as x:
+        json.dump({}, x, ensure_ascii=False, indent=2)
 
 # ================= 🔧 JSON Helfer =================
 def lade_json(datei):
@@ -112,31 +110,6 @@ async def registriere_bestrafen_handler(update: Update, context: ContextTypes.DE
     if not await hat_zugriff(context, chat.id, user.id):
         return
 
-    # ---------------- دستورات افزودن دستور جدید ----------------
-    if text.startswith("دستور جدید") or text.startswith("افزودن دستور"):
-        match = re.match(
-            r"^(?:دستور جدید|افزودن دستور)\s+(.+?)\s+(افزودن‌مدیر|حذف‌مدیر)\s+(.+)$", text
-        )
-        if not match:
-            await sende_temp(
-                msg,
-                "📘 فرمت درست:\n<code>افزودن دستور [نام دستور] [افزودن‌مدیر|حذف‌مدیر] [متن پاسخ]</code>",
-                context,
-            )
-            return
-        name, cmd_type, response = match.groups()
-        alle_befehle = lade_json(BENUTZERDEFINIERTE_BEFEHLE_DATEI)
-        chat_key = str(chat.id)
-        benutzerbefehle = alle_befehle.get(chat_key, {})
-        if name in benutzerbefehle:
-            await sende_temp(msg, "⚠️ این نام قبلاً تعریف شده.", context)
-            return
-        benutzerbefehle[name] = {"type": cmd_type, "text": response}
-        alle_befehle[chat_key] = benutzerbefehle
-        speichere_json(BENUTZERDEFINIERTE_BEFEHLE_DATEI, alle_befehle)
-        await sende_temp(msg, f"✅ دستور جدید <b>{name}</b> ثبت شد.", context)
-        return
-
     # ---------------- حل هدف کاربر ----------------
     target, mention_failed = await loese_ziel(msg, context, chat.id)
     if not target:
@@ -162,41 +135,6 @@ async def registriere_bestrafen_handler(update: Update, context: ContextTypes.DE
             return
     except:
         await sende_temp(msg, "⚠️ کاربر موردنظر در گروه نیست.", context)
-        return
-
-    # ---------------- اجرای دستورات کاربر ----------------
-    alle_befehle = lade_json(BENUTZERDEFINIERTE_BEFEHLE_DATEI)
-    chat_key = str(chat.id)
-    benutzerbefehle = alle_befehle.get(chat_key, {})
-    if text in benutzerbefehle:
-        cmd_info = benutzerbefehle[text]
-        try:
-            if cmd_info["type"] == "افزودن‌مدیر":
-                await context.bot.promote_chat_member(
-                    chat.id, target.id,
-                    can_delete_messages=True,
-                    can_restrict_members=True,
-                    can_invite_users=True,
-                    can_pin_messages=True,
-                    can_manage_topics=True
-                )
-            elif cmd_info["type"] == "حذف‌مدیر":
-                await context.bot.promote_chat_member(
-                    chat.id, target.id,
-                    can_manage_chat=False,
-                    can_delete_messages=False,
-                    can_manage_video_chats=False,
-                    can_restrict_members=False,
-                    can_promote_members=False,
-                    can_change_info=False,
-                    can_invite_users=False,
-                    can_pin_messages=False,
-                    can_manage_topics=False
-                )
-            text_out = cmd_info.get("text", "").replace("{name}", target.first_name)
-            await sende_temp(msg, text_out or "✅ عملیات انجام شد.", context)
-        except Exception as e:
-            await sende_temp(msg, f"❌ خطا در اجرای دستور: {e}", context)
         return
 
     # ---------------- دستورات پیشفرض فارسی ----------------
