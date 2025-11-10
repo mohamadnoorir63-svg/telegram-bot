@@ -1,43 +1,48 @@
-# ==== Core Telegram Library ====
-python-telegram-bot[job-queue]==20.7
+# ==== Core Build Tools ====
+pip>=25.3
+setuptools>=68.0
+wheel
 
-# ==== Async and HTTP ====
-aiofiles==23.2.1
-aiohttp==3.9.5
-requests==2.32.3
-uvloop==0.20.0
-pytz==2024.1
+# ==== Core Telegram Library ====  
+python-telegram-bot[job-queue]==20.7  
 
-# ==== Image & QR Tools ====
-pillow==10.3.0
-qrcode==7.4.2
-imageio==2.36.0
+# ==== Async and HTTP ====  
+aiofiles==23.2.1  
+aiohttp==3.9.5  
+requests==2.32.3  
+uvloop==0.20.0  
+pytz==2024.1  
 
-# ==== Database ====
-pymongo==4.10.1
-dnspython==2.6.1    # ✅ برای MongoDB لازم است
+# ==== Image & QR Tools ====  
+# برای جلوگیری از ارور build، نسخه پایدار pillow رو استفاده می‌کنیم
+pillow==9.5.0  
+qrcode==7.4.2  
+imageio==2.36.0  
 
-# ==== AI & NLP ====
-openai==0.28
-numpy==1.26.4
+# ==== Database ====  
+pymongo==4.10.1  
+dnspython==2.6.1    # ✅ برای MongoDB لازم است  
 
-# ==== Web Scraping & Parsing ====
-lxml==5.3.0
-beautifulsoup4==4.12.3
-newspaper3k==0.2.8
-lxml_html_clean==0.1.0
+# ==== AI & NLP ====  
+openai==0.28  
+numpy==1.26.4  
 
-# ==== Persian & Date ====
-jdatetime==4.1.1
-khayyam==3.0.17
+# ==== Web Scraping & Parsing ====  
+lxml==5.3.0  
+beautifulsoup4==4.12.3  
+newspaper3k==0.2.8  
+lxml_html_clean==0.1.0  
 
-# ==== Progress & Misc ====
-tqdm==4.66.5
-Flask==3.0.3
-gunicorn==23.0.0
-async-timeout==4.0.3
-tenacity==8.3.0
-hijri-converter
-jdatetime
-telethon==1.34.0
+# ==== Persian & Date ====  
+jdatetime==4.1.1  
+khayyam==3.0.17  
+
+# ==== Progress & Misc ====  
+tqdm==4.66.5  
+Flask==3.0.3  
+gunicorn==23.0.0  
+async-timeout==4.0.3  
+tenacity==8.3.0  
+hijri-converter  
+telethon==1.34.0  
 cryptography
