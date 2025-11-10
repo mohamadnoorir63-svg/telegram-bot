@@ -40,40 +40,46 @@ async def hat_zugriff(context, chat_id: int, user_id: int) -> bool:
 
 # ================= 🔧 Zielbenutzer extrahieren =================
 async def loese_ziel(msg, context, chat_id):
+    """
+    پیدا کردن دقیق کاربر:
+    1. ریپلای
+    2. @username
+    3. user_id
+    """
+    # حالت ریپلای
     if msg.reply_to_message:
         return msg.reply_to_message.from_user, None
 
     text = msg.text or ""
     entities = msg.entities or []
 
+    # بررسی entity ها
     for ent in entities:
         try:
             if ent.type == MessageEntity.TEXT_MENTION:
                 return ent.user, None
-            if ent.type == MessageEntity.MENTION:
-                start, length = ent.offset, ent.length
-                username = text[start:start + length].lstrip("@")
-                try:
-                    cm = await context.bot.get_chat_member(chat_id, username)
-                    return cm.user, None
-                except:
-                    return None, username
         except:
             continue
 
-    einfache_mention = re.search(r"@([A-Za-z0-9_]{5,32})", text)
-    if einfache_mention:
-        username = einfache_mention.group(1)
+    # بررسی @username
+    username_match = re.search(r"@([A-Za-z0-9_]{5,32})", text)
+    if username_match:
+        username = username_match.group(1)
+        # جستجو در اعضای گروه
         try:
-            cm = await context.bot.get_chat_member(chat_id, username)
-            return cm.user, None
+            admins = await context.bot.get_chat_administrators(chat_id)
+            target_user = next((m.user for m in admins if m.user.username and m.user.username.lower() == username.lower()), None)
+            if target_user:
+                return target_user, None
         except:
-            return None, username
+            pass
+        return None, username
 
-    m = re.search(r"\b(\d{6,15})\b", text)
-    if m:
+    # بررسی user_id
+    id_match = re.search(r"\b(\d{6,15})\b", text)
+    if id_match:
         try:
-            target_id = int(m.group(1))
+            target_id = int(id_match.group(1))
             cm = await context.bot.get_chat_member(chat_id, target_id)
             return cm.user, None
         except:
@@ -106,28 +112,28 @@ async def registriere_bestrafen_handler(update: Update, context: ContextTypes.DE
     if not text:
         return
 
-    # ---------------- بررسی دسترسی کاربر ----------------
+    # بررسی دسترسی
     if not await hat_zugriff(context, chat.id, user.id):
         return
 
-    # ---------------- حل هدف کاربر ----------------
+    # پیدا کردن هدف
     target, mention_failed = await loese_ziel(msg, context, chat.id)
     if not target:
         if mention_failed:
             await sende_temp(msg, f"⚠️ کاربر @{mention_failed} پیدا نشد.", context)
         return
 
-    # ---------------- بررسی بات ----------------
+    # بررسی بات
     if target.id == context.bot.id:
         await sende_temp(msg, "😅 من ربات هستم — نمی‌توانم تنبیه شوم.", context)
         return
 
-    # ---------------- بررسی سودو ----------------
+    # بررسی سودو
     if target.id in SUDO_IDS:
         await sende_temp(msg, "🚫 امکان اجرای دستور روی این کاربر سودو وجود ندارد.", context)
         return
 
-    # ---------------- بررسی مدیر یا سازنده گروه ----------------
+    # بررسی مدیر یا سازنده گروه
     try:
         t_member = await context.bot.get_chat_member(chat.id, target.id)
         if t_member.status in ("creator", "administrator"):
@@ -137,29 +143,26 @@ async def registriere_bestrafen_handler(update: Update, context: ContextTypes.DE
         await sende_temp(msg, "⚠️ کاربر موردنظر در گروه نیست.", context)
         return
 
-    # ---------------- دستورات پیشفرض فارسی ----------------
+    # دستورات دقیق فارسی
     BEFEHLE = {
-        "ban": [r"^بن(?:\s+|$)"],
-        "unban": [r"^حذف\s*بن(?:\s+|$)"],
-        "mute": [r"^سکوت(?:\s+|$)"],
-        "unmute": [r"^حذف\s*سکوت(?:\s+|$)"],
-        "warn": [r"^اخطار(?:\s+|$)"],
-        "delwarn": [r"^حذف\s*اخطار(?:\s+|$)"]
+        "ban": r"^بن\s+(@?[A-Za-z0-9_]{5,32}|\d+)$",
+        "unban": r"^حذف\s*بن\s+(@?[A-Za-z0-9_]{5,32}|\d+)$",
+        "mute": r"^سکوت\s+(@?[A-Za-z0-9_]{5,32}|\d+)(?:\s+(\d+)\s*(ثانیه|دقیقه|ساعت)?)?$",
+        "unmute": r"^حذف\s*سکوت\s+(@?[A-Za-z0-9_]{5,32}|\d+)$",
+        "warn": r"^اخطار\s+(@?[A-Za-z0-9_]{5,32}|\d+)$",
+        "delwarn": r"^حذف\s*اخطار\s+(@?[A-Za-z0-9_]{5,32}|\d+)$"
     }
 
     cmd_type = None
-    for cmd, patterns in BEFEHLE.items():
-        for pattern in patterns:
-            if re.match(pattern, text):
-                cmd_type = cmd
-                break
-        if cmd_type:
+    for cmd, pattern in BEFEHLE.items():
+        if re.match(pattern, text):
+            cmd_type = cmd
             break
 
     if not cmd_type:
         return
 
-    # ---------------- اجرای دستورات ----------------
+    # اجرای دستور
     try:
         if cmd_type == "ban":
             await context.bot.ban_chat_member(chat.id, target.id)
@@ -170,20 +173,17 @@ async def registriere_bestrafen_handler(update: Update, context: ContextTypes.DE
             await sende_temp(msg, f"✅ {target.first_name} از بن خارج شد.", context)
 
         elif cmd_type == "mute":
-            m = re.search(r"سکوت\s*(\d+)?\s*(ثانیه|دقیقه|ساعت)?", text)
-            if m and m.group(1):
-                num = int(m.group(1))
-                unit = m.group(2)
+            m = re.match(BEFEHLE["mute"], text)
+            seconds = 3600  # پیشفرض 1 ساعت
+            if m and m.group(2):
+                num = int(m.group(2))
+                unit = m.group(3)
                 if unit == "ساعت":
                     seconds = num * 3600
                 elif unit == "دقیقه":
                     seconds = num * 60
                 elif unit == "ثانیه":
                     seconds = num
-                else:
-                    seconds = num * 60
-            else:
-                seconds = 3600
             until_date = datetime.utcnow() + timedelta(seconds=seconds)
             await context.bot.restrict_chat_member(
                 chat.id, target.id,
