@@ -224,7 +224,9 @@ async def registriere_bestrafen_handler(update: Update, context: ContextTypes.DE
         await sende_temp(msg, f"❌ خطا در اجرای دستور: {e}", context)
 
 # ================= 🔧 Handler Registrierung =================
-def register_punishment_handlers(application):
+def register_punishment_handlers(application, group_number: int = 12):
+    """ثبت handler با امکان مشخص کردن group_number"""
     application.add_handler(
-        MessageHandler(filters.TEXT & (~filters.COMMAND), registriere_bestrafen_handler)
+        MessageHandler(filters.TEXT & (~filters.COMMAND), registriere_bestrafen_handler),
+        group=group_number
     )
