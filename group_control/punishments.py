@@ -30,13 +30,12 @@ async def _has_access(client, chat_id: int, user_id: int) -> bool:
     if user_id in SUDO_IDS:
         return True
     try:
-        member = await client.get_permissions(chat_id, user_id)
-        return member.is_admin
+        perm = await client.get_permissions(chat_id, user_id)
+        return perm.is_admin
     except:
         return False
 
 async def _resolve_target(event, text_arg=None):
-    """شناسایی هدف: ریپلای، یوزرنیم یا آیدی"""
     reply = await event.get_reply_message()
     if reply:
         return reply.sender_id
@@ -52,7 +51,6 @@ async def _resolve_target(event, text_arg=None):
             return int(text_arg)
     return None
 
-@events.register(events.NewMessage(pattern=r"^(بن|حذف بن|سکوت|حذف سکوت|اخطار|حذف اخطار)(?:\s+(.+))?$"))
 async def handle_punishments(event):
     cmd = event.pattern_match.group(1)
     arg = event.pattern_match.group(2)
@@ -68,10 +66,7 @@ async def handle_punishments(event):
     target_id = await _resolve_target(event, arg)
     if not target_id:
         return await event.reply(
-            "⚠️ هدف مشخص نیست.\n"
-            "• ریپلای روی پیام کاربر\n"
-            "• @username\n"
-            "• آیدی عددی"
+            "⚠️ هدف مشخص نیست.\n• ریپلای روی پیام کاربر\n• @username\n• آیدی عددی"
         )
 
     # محافظت از خود ربات و سودو
@@ -88,76 +83,59 @@ async def handle_punishments(event):
 
     # --- اجرای دستورات ---
     try:
-        # 🚫 بن
         if cmd == "بن":
-            rights = ChatBannedRights(
-                until_date=None,
-                view_messages=True,
-                send_messages=True
-            )
+            rights = ChatBannedRights(until_date=None, view_messages=True, send_messages=True)
             await event.client(EditBannedRequest(chat_id, target_id, rights))
-            return await event.reply(f"🚫 کاربر با موفقیت بن شد.")
+            await event.reply("🚫 کاربر با موفقیت بن شد.")
 
-        # 🔓 حذف بن
         elif cmd == "حذف بن":
-            rights = ChatBannedRights(
-                until_date=None,
-                view_messages=False,
-                send_messages=False
-            )
+            rights = ChatBannedRights(until_date=None, view_messages=False, send_messages=False)
             await event.client(EditBannedRequest(chat_id, target_id, rights))
-            return await event.reply(f"✅ بن کاربر حذف شد.")
+            await event.reply("✅ بن کاربر حذف شد.")
 
-        # 🤐 سکوت
         elif cmd == "سکوت":
-            seconds = 3600  # پیشفرض 1 ساعت
+            seconds = 3600
             if arg and arg.isdigit():
                 seconds = int(arg)
             until = datetime.utcnow() + timedelta(seconds=seconds)
-            rights = ChatBannedRights(
-                until_date=until,
-                send_messages=True
-            )
+            rights = ChatBannedRights(until_date=until, send_messages=True)
             await event.client(EditBannedRequest(chat_id, target_id, rights))
-            return await event.reply(f"🤐 کاربر برای {seconds} ثانیه سکوت شد.")
+            await event.reply(f"🤐 کاربر برای {seconds} ثانیه سکوت شد.")
 
-        # 🔊 حذف سکوت
         elif cmd == "حذف سکوت":
-            rights = ChatBannedRights(
-                until_date=None,
-                send_messages=False
-            )
+            rights = ChatBannedRights(until_date=None, send_messages=False)
             await event.client(EditBannedRequest(chat_id, target_id, rights))
-            return await event.reply("🔊 سکوت کاربر حذف شد.")
+            await event.reply("🔊 سکوت کاربر حذف شد.")
 
-        # ⚠️ اخطار
         elif cmd == "اخطار":
             warns = _load_json(WARN_FILE)
             key = f"{chat_id}:{target_id}"
             warns[key] = warns.get(key, 0) + 1
             _save_json(WARN_FILE, warns)
             if warns[key] >= 3:
-                rights = ChatBannedRights(
-                    until_date=None,
-                    view_messages=True,
-                    send_messages=True
-                )
+                rights = ChatBannedRights(until_date=None, view_messages=True, send_messages=True)
                 await event.client(EditBannedRequest(chat_id, target_id, rights))
                 warns[key] = 0
                 _save_json(WARN_FILE, warns)
-                return await event.reply(f"🚫 کاربر به دلیل ۳ اخطار بن شد.")
+                await event.reply("🚫 کاربر به دلیل ۳ اخطار بن شد.")
             else:
-                return await event.reply(f"⚠️ اخطار {warns[key]}/3 داده شد.")
+                await event.reply(f"⚠️ اخطار {warns[key]}/3 داده شد.")
 
-        # ✅ حذف اخطار
         elif cmd == "حذف اخطار":
             warns = _load_json(WARN_FILE)
             key = f"{chat_id}:{target_id}"
             if key in warns:
                 del warns[key]
                 _save_json(WARN_FILE, warns)
-                return await event.reply("✅ اخطارهای کاربر حذف شد.")
+                await event.reply("✅ اخطارهای کاربر حذف شد.")
             else:
-                return await event.reply("ℹ️ این کاربر اخطاری ندارد.")
+                await event.reply("ℹ️ این کاربر اخطاری ندارد.")
     except Exception as e:
-        return await event.reply(f"⚠️ خطا در اجرای دستور: {e}")
+        await event.reply(f"⚠️ خطا در اجرای دستور: {e}")
+
+def register_punishment_handlers(client):
+    """ثبت هندلر روی کلاینت Telethon"""
+    client.add_event_handler(
+        handle_punishments,
+        events.NewMessage(pattern=r"^(بن|حذف بن|سکوت|حذف سکوت|اخطار|حذف اخطار)(?:\s+(.+))?$")
+    )
