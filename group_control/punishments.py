@@ -36,21 +36,30 @@ async def _has_access(context, chat_id: int, user_id: int) -> bool:
     except Exception:
         return False
 
-# ================= 🎯 استخراج هدف با ریپلای یا آیدی عددی =================
-async def _resolve_target(msg, context, chat_id):
+# ================= 🎯 استخراج هدف مقاوم (ریپلای یا آیدی عددی) =================
+async def _resolve_target(msg, context, chat_id, explicit_arg: str = None):
     # 1) ریپلای
     if msg.reply_to_message and getattr(msg.reply_to_message, "from_user", None):
         return msg.reply_to_message.from_user
 
-    # 2) آیدی عددی در متن
-    text = (msg.text or "")
+    # 2) explicit_arg (آیدی عددی)
+    if explicit_arg:
+        arg = explicit_arg.strip()
+        if re.fullmatch(r"\d{6,15}", arg):
+            try:
+                cm = await context.bot.get_chat_member(chat_id, int(arg))
+                return cm.user
+            except:
+                pass
+
+    # 3) آیدی عددی در متن
+    text = msg.text or ""
     m_id = re.search(r"\b(\d{6,15})\b", text)
     if m_id:
         try:
-            target_id = int(m_id.group(1))
-            cm = await context.bot.get_chat_member(chat_id, target_id)
+            cm = await context.bot.get_chat_member(chat_id, int(m_id.group(1)))
             return cm.user
-        except Exception:
+        except:
             pass
 
     return None
@@ -68,45 +77,48 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
     if not text:
         return
 
-    # الگوهای دستور: فقط با ریپلای یا آیدی عددی
+    # الگوهای دقیق — فقط ریپلای یا آیدی عددی
     PATTERNS = {
-        "ban": r"^بن\s*$",
-        "unban": r"^حذف\s*بن\s*$",
-        "mute": r"^سکوت\s*(\d+)?\s*(ثانیه|دقیقه|ساعت)?\s*$",
-        "unmute": r"^حذف\s*سکوت\s*$",
-        "warn": r"^اخطار\s*$",
-        "delwarn": r"^حذف\s*اخطار\s*$",
+        "ban": re.compile(r"^بن(?:\s+(\d{6,15}))?\s*$"),
+        "unban": re.compile(r"^حذف\s*بن(?:\s+(\d{6,15}))?\s*$"),
+        "mute": re.compile(r"^سکوت(?:\s+(\d{6,15}))?(?:\s+(\d+)\s*(ثانیه|دقیقه|ساعت)?)?\s*$"),
+        "unmute": re.compile(r"^حذف\s*سکوت(?:\s+(\d{6,15}))?\s*$"),
+        "warn": re.compile(r"^اخطار(?:\s+(\d{6,15}))?\s*$"),
+        "delwarn": re.compile(r"^حذف\s*اخطار(?:\s+(\d{6,15}))?\s*$"),
     }
 
+    matched = None
     cmd_type = None
-    extra_time = None  # برای سکوت
     for k, pat in PATTERNS.items():
-        m = re.match(pat, text)
+        m = pat.match(text)
         if m:
             cmd_type = k
-            if cmd_type == "mute" and m.group(1):
-                num = int(m.group(1))
-                unit = m.group(2)
-                if unit == "ساعت":
-                    extra_time = num * 3600
-                elif unit == "دقیقه":
-                    extra_time = num * 60
-                else:
-                    extra_time = num
+            matched = m
             break
 
     if not cmd_type:
-        return
+        return  # دستور معتبر نبوده
 
     # مجوز اجرا
     if not await _has_access(context, chat.id, user.id):
         return await msg.reply_text("🚫 فقط مدیران یا سودوها مجازند.")
 
-    # استخراج کاربر هدف
-    target_user = await _resolve_target(msg, context, chat.id)
+    # استخراج explicit_arg از capture group (اگر موجود)
+    explicit_arg = None
+    extra_time = None
+    if matched:
+        explicit_arg = matched.group(1) if matched.lastindex and matched.lastindex >= 1 else None
+        if cmd_type == "mute" and matched.lastindex >= 3:
+            num = matched.group(2)
+            unit = matched.group(3)
+            if num:
+                extra_time = (int(num), unit)
+
+    # resolve target
+    target_user = await _resolve_target(msg, context, chat.id, explicit_arg)
     if not target_user:
         return await msg.reply_text(
-            "⚠️ هدف مشخص نیست.\n• ریپلای روی پیام کاربر\n• یا آیدی عددی",
+            "⚠️ هدف مشخص نیست.\n• ریپلای روی پیام کاربر\n• یا آیدی عددی\n",
             parse_mode="Markdown"
         )
 
@@ -134,7 +146,15 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
             return await msg.reply_text(f"✅ {target_user.first_name} از بن خارج شد.")
 
         if cmd_type == "mute":
-            seconds = extra_time or 3600
+            seconds = 3600  # پیش‌فرض یک ساعت
+            if extra_time:
+                num, unit = extra_time
+                if unit == "ساعت":
+                    seconds = num * 3600
+                elif unit == "دقیقه":
+                    seconds = num * 60
+                else:
+                    seconds = num
             until = datetime.utcnow() + timedelta(seconds=seconds)
             await context.bot.restrict_chat_member(
                 chat.id, target_user.id,
@@ -175,7 +195,6 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
     except Exception as e:
         print("handle_punishments execution exception:", e)
         return await msg.reply_text(f"⚠️ خطا در اجرای دستور: {e}")
-
 
 # ================= 🧩 ثبت هندلر =================
 def register_punishment_handlers(application, group_number: int = 12):
