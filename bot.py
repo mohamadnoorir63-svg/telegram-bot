@@ -1063,10 +1063,13 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # 🚫 جلوگیری از پاسخ در پیوی (فقط جوک و فال مجازند)
     if update.effective_chat.type == "private" and lower_text not in ["جوک", "فال"]:
         return
-        
-    if any(lower_text.startswith(word) for word in protected_words):
+
+    # ⚠️ جلوگیری از خطای ناشناخته بودن protected_words
+    protected_words_list = globals().get("protected_words", [])
+
+    if any(lower_text.startswith(word) for word in protected_words_list):
         return
-        
+
     if any(lower_text.startswith(word) for word in command_keywords):
         return
 
@@ -1085,8 +1088,7 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # 🧠 یادگیری سایه‌ای در صورت غیر فعال بودن سیستم اصلی
     if not status["active"]:
         shadow_learn(text, "")
-        return    
-
+        return
     # ✅ درصد هوش منطقی
     if text.lower() == "درصد هوش":
         score = 0
