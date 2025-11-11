@@ -9,10 +9,11 @@ from telegram.ext import ContextTypes, MessageHandler, filters
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 WARN_FILE = os.path.join(BASE_DIR, "warnings.json")
 MSG_FILE = os.path.join(BASE_DIR, "group_messages.json")
+ALIAS_FILE = os.path.join(BASE_DIR, "command_aliases.json")
 
 SUDO_IDS = [8588347189]  # آیدی سودوها
 
-for file in [WARN_FILE, MSG_FILE]:
+for file in [WARN_FILE, MSG_FILE, ALIAS_FILE]:
     if not os.path.exists(file):
         with open(file, "w", encoding="utf-8") as f:
             json.dump({}, f, ensure_ascii=False, indent=2)
@@ -68,56 +69,115 @@ def get_group_message(chat_id, cmd_type):
     }
     return chat_msgs.get(cmd_type, defaults.get(cmd_type, ""))
 
-# ================= ⚙️ هندلر اصلی =================
-async def handle_all_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
+# ================= ⚙️ ثبت پیام جدید توسط مدیر =================
+async def set_group_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = update.effective_message
     user = update.effective_user
     chat = update.effective_chat
+
     if not msg or chat.type not in ("group", "supergroup"):
         return
+
+    text = (msg.text or "").strip()
+    # قالب دستور برای تنظیم پیام: "تنظیم پیام <نوع> <متن دلخواه>"
+    m = re.match(r"تنظیم پیام\s+(ban|unban|mute|unmute|warn|delwarn)\s+(.+)", text)
+    if not m:
+        return
+
+    if not await _has_access(context, chat.id, user.id):
+        return await msg.reply_text("🚫 فقط مدیران یا سودوها مجازند.")
+
+    cmd_type = m.group(1)
+    message_text = m.group(2).strip()
+
+    messages = _load_json(MSG_FILE)
+    chat_msgs = messages.get(str(chat.id), {})
+    chat_msgs[cmd_type] = message_text
+    messages[str(chat.id)] = chat_msgs
+    _save_json(MSG_FILE, messages)
+
+    await msg.reply_text(f"✅ پیام دستور `{cmd_type}` با موفقیت تنظیم شد.")
+
+# ================= ⚙️ ثبت alias جدید =================
+async def set_command_alias(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    msg = update.effective_message
+    user = update.effective_user
+    chat = update.effective_chat
+
+    if not msg or chat.type not in ("group", "supergroup"):
+        return
+
+    text = (msg.text or "").strip()
+    # قالب دستور برای ثبت alias: "ثبت دستور <نام جدید> <دستور اصلی>"
+    m = re.match(r"ثبت دستور\s+(\S+)\s+(ban|unban|mute|unmute|warn|delwarn)", text)
+    if not m:
+        return
+
+    if not await _has_access(context, chat.id, user.id):
+        return await msg.reply_text("🚫 فقط مدیران یا سودوها مجازند.")
+
+    alias_name = m.group(1)
+    main_cmd = m.group(2)
+
+    aliases = _load_json(ALIAS_FILE)
+    chat_aliases = aliases.get(str(chat.id), {})
+    chat_aliases[alias_name] = main_cmd
+    aliases[str(chat.id)] = chat_aliases
+    _save_json(ALIAS_FILE, aliases)
+
+    await msg.reply_text(f"✅ دستور `{alias_name}` به عنوان جایگزین `{main_cmd}` ثبت شد.")
+
+# ================= ⚙️ هندلر دستورات تنبیهی =================
+async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    msg = update.effective_message
+    user = update.effective_user
+    chat = update.effective_chat
+
+    if not msg or chat.type not in ("group", "supergroup"):
+        return
+
     text = (msg.text or "").strip()
     if not text:
         return
 
-    # ----- بررسی دستور تنظیم پیام -----
-    m = re.match(r"تنظیم پیام\s+(ban|unban|mute|unmute|warn|delwarn)\s+(.+)", text)
-    if m:
-        if not await _has_access(context, chat.id, user.id):
-            return await msg.reply_text("🚫 فقط مدیران یا سودوها مجازند.")
-        cmd_type = m.group(1)
-        message_text = m.group(2).strip()
-        messages = _load_json(MSG_FILE)
-        chat_msgs = messages.get(str(chat.id), {})
-        chat_msgs[cmd_type] = message_text
-        messages[str(chat.id)] = chat_msgs
-        _save_json(MSG_FILE, messages)
-        return await msg.reply_text(f"✅ پیام دستور `{cmd_type}` با موفقیت تنظیم شد.")
+    # بارگذاری alias
+    aliases = _load_json(ALIAS_FILE).get(str(chat.id), {})
+    cmd_type = None
+    extra_time = None
 
-    # ----- بررسی دستور تنبیهی -----
+    # بررسی دستورات استاندارد
     PATTERNS = {
-        "ban": r"^(بن|گمشو)\s*$",
+        "ban": r"^بن\s*$",
         "unban": r"^حذف\s*بن\s*$",
         "mute": r"^سکوت\s*(\d+)?\s*(ثانیه|دقیقه|ساعت)?\s*$",
         "unmute": r"^حذف\s*سکوت\s*$",
         "warn": r"^اخطار\s*$",
         "delwarn": r"^حذف\s*اخطار\s*$",
     }
-    cmd_type = None
-    extra_time = None
-    for k, pat in PATTERNS.items():
-        m2 = re.match(pat, text)
-        if m2:
-            cmd_type = k
-            if cmd_type == "mute" and m2.group(1):
-                num = int(m2.group(1))
-                unit = m2.group(2)
-                if unit == "ساعت":
-                    extra_time = num * 3600
-                elif unit == "دقیقه":
-                    extra_time = num * 60
-                else:
-                    extra_time = num
+
+    # تطبیق alias
+    for alias, main_cmd in aliases.items():
+        if re.fullmatch(alias, text):
+            cmd_type = main_cmd
             break
+
+    # اگر alias نبود، بررسی دستور استاندارد
+    if not cmd_type:
+        for k, pat in PATTERNS.items():
+            m = re.match(pat, text)
+            if m:
+                cmd_type = k
+                if cmd_type == "mute" and m.group(1):
+                    num = int(m.group(1))
+                    unit = m.group(2)
+                    if unit == "ساعت":
+                        extra_time = num * 3600
+                    elif unit == "دقیقه":
+                        extra_time = num * 60
+                    else:
+                        extra_time = num
+                break
+
     if not cmd_type:
         return
 
@@ -140,7 +200,7 @@ async def handle_all_messages(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     try:
         msg_text = get_group_message(chat.id, cmd_type)
-        if cmd_type in ["ban", "گمشو"]:
+        if cmd_type == "ban":
             await context.bot.ban_chat_member(chat.id, target_user.id)
             return await msg.reply_text(msg_text.format(name=target_user.first_name))
         if cmd_type == "unban":
@@ -149,13 +209,17 @@ async def handle_all_messages(update: Update, context: ContextTypes.DEFAULT_TYPE
         if cmd_type == "mute":
             seconds = extra_time or 3600
             until = datetime.utcnow() + timedelta(seconds=seconds)
-            await context.bot.restrict_chat_member(chat.id, target_user.id,
+            await context.bot.restrict_chat_member(
+                chat.id, target_user.id,
                 permissions=ChatPermissions(can_send_messages=False),
-                until_date=until)
+                until_date=until
+            )
             return await msg.reply_text(msg_text.format(name=target_user.first_name, seconds=seconds))
         if cmd_type == "unmute":
-            await context.bot.restrict_chat_member(chat.id, target_user.id,
-                permissions=ChatPermissions(can_send_messages=True))
+            await context.bot.restrict_chat_member(
+                chat.id, target_user.id,
+                permissions=ChatPermissions(can_send_messages=True)
+            )
             return await msg.reply_text(msg_text.format(name=target_user.first_name))
         if cmd_type == "warn":
             warns = _load_json(WARN_FILE)
@@ -185,5 +249,15 @@ async def handle_all_messages(update: Update, context: ContextTypes.DEFAULT_TYPE
 def register_punishment_handlers(application, group_number: int = 12):
     application.add_handler(MessageHandler(
         filters.TEXT & ~filters.COMMAND & filters.ChatType.GROUPS,
-        handle_all_messages
+        handle_punishments
     ), group=group_number)
+
+    application.add_handler(MessageHandler(
+        filters.TEXT & ~filters.COMMAND & filters.ChatType.GROUPS,
+        set_group_message
+    ), group=group_number + 1)
+
+    application.add_handler(MessageHandler(
+        filters.TEXT & ~filters.COMMAND & filters.ChatType.GROUPS,
+        set_command_alias
+    ), group=group_number + 2)
