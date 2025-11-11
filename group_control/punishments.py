@@ -2,7 +2,7 @@ import os
 import json
 import re
 from datetime import datetime, timedelta
-from telegram import Update, ChatPermissions
+from telegram import Update, ChatPermissions, MessageEntity
 from telegram.ext import ContextTypes, MessageHandler, filters
 
 # ================= ⚙️ تنظیمات اولیه =================
@@ -39,20 +39,39 @@ async def _has_access(context, chat_id: int, user_id: int) -> bool:
     except Exception:
         return False
 
-# ================= 🎯 استخراج هدف با ریپلای یا آیدی عددی =================
+# ================= 🎯 استخراج هدف با ریپلای، آیدی یا منشن =================
 async def _resolve_target(msg, context, chat_id):
+    # 1) ریپلای
     if msg.reply_to_message and getattr(msg.reply_to_message, "from_user", None):
         return msg.reply_to_message.from_user
 
     text = (msg.text or "")
+    entities = msg.entities or []
+
+    # 2) بررسی entities برای منشن
+    for ent in entities:
+        try:
+            if ent.type == MessageEntity.TEXT_MENTION and getattr(ent, "user", None):
+                return ent.user
+            if ent.type == MessageEntity.MENTION:
+                start = ent.offset
+                length = ent.length
+                username = text[start+1:start+length]  # حذف @
+                cm = await context.bot.get_chat_member(chat_id, username)
+                return cm.user
+        except:
+            continue
+
+    # 3) آیدی عددی در متن
     m_id = re.search(r"\b(\d{6,15})\b", text)
     if m_id:
         try:
             target_id = int(m_id.group(1))
             cm = await context.bot.get_chat_member(chat_id, target_id)
             return cm.user
-        except Exception:
+        except:
             pass
+
     return None
 
 # ================= ⚙️ دریافت پیام سفارشی گروه =================
@@ -74,12 +93,10 @@ async def set_group_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = update.effective_message
     user = update.effective_user
     chat = update.effective_chat
-
     if not msg or chat.type not in ("group", "supergroup"):
         return
 
     text = (msg.text or "").strip()
-    # قالب دستور برای تنظیم پیام: "تنظیم پیام <نوع> <متن دلخواه>"
     m = re.match(r"تنظیم پیام\s+(ban|unban|mute|unmute|warn|delwarn)\s+(.+)", text)
     if not m:
         return
@@ -89,7 +106,6 @@ async def set_group_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     cmd_type = m.group(1)
     message_text = m.group(2).strip()
-
     messages = _load_json(MSG_FILE)
     chat_msgs = messages.get(str(chat.id), {})
     chat_msgs[cmd_type] = message_text
@@ -103,12 +119,10 @@ async def set_command_alias(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = update.effective_message
     user = update.effective_user
     chat = update.effective_chat
-
     if not msg or chat.type not in ("group", "supergroup"):
         return
 
     text = (msg.text or "").strip()
-    # قالب دستور برای ثبت alias: "ثبت دستور <نام جدید> <دستور اصلی>"
     m = re.match(r"ثبت دستور\s+(\S+)\s+(ban|unban|mute|unmute|warn|delwarn)", text)
     if not m:
         return
@@ -118,7 +132,6 @@ async def set_command_alias(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     alias_name = m.group(1)
     main_cmd = m.group(2)
-
     aliases = _load_json(ALIAS_FILE)
     chat_aliases = aliases.get(str(chat.id), {})
     chat_aliases[alias_name] = main_cmd
@@ -132,7 +145,6 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
     msg = update.effective_message
     user = update.effective_user
     chat = update.effective_chat
-
     if not msg or chat.type not in ("group", "supergroup"):
         return
 
@@ -145,6 +157,12 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
     cmd_type = None
     extra_time = None
 
+    # بررسی alias
+    for alias, main_cmd in aliases.items():
+        if re.fullmatch(alias, text):
+            cmd_type = main_cmd
+            break
+
     # بررسی دستورات استاندارد
     PATTERNS = {
         "ban": r"^بن\s*$",
@@ -155,13 +173,6 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
         "delwarn": r"^حذف\s*اخطار\s*$",
     }
 
-    # تطبیق alias
-    for alias, main_cmd in aliases.items():
-        if re.fullmatch(alias, text):
-            cmd_type = main_cmd
-            break
-
-    # اگر alias نبود، بررسی دستور استاندارد
     if not cmd_type:
         for k, pat in PATTERNS.items():
             m = re.match(pat, text)
@@ -186,7 +197,7 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
     target_user = await _resolve_target(msg, context, chat.id)
     if not target_user:
-        return await msg.reply_text("⚠️ هدف مشخص نیست.\n• ریپلای روی پیام کاربر\n• یا آیدی عددی", parse_mode="Markdown")
+        return await msg.reply_text("⚠️ هدف مشخص نیست.\n• ریپلای روی پیام کاربر\n• آیدی عددی\n• یا @username", parse_mode="Markdown")
 
     bot_user = await context.bot.get_me()
     if target_user.id == bot_user.id or target_user.id in SUDO_IDS:
@@ -200,6 +211,8 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
     try:
         msg_text = get_group_message(chat.id, cmd_type)
+        seconds = extra_time or 3600
+
         if cmd_type == "ban":
             await context.bot.ban_chat_member(chat.id, target_user.id)
             return await msg.reply_text(msg_text.format(name=target_user.first_name))
@@ -207,7 +220,6 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
             await context.bot.unban_chat_member(chat.id, target_user.id)
             return await msg.reply_text(msg_text.format(name=target_user.first_name))
         if cmd_type == "mute":
-            seconds = extra_time or 3600
             until = datetime.utcnow() + timedelta(seconds=seconds)
             await context.bot.restrict_chat_member(
                 chat.id, target_user.id,
