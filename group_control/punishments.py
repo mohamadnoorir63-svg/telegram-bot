@@ -29,7 +29,7 @@ def _save_json(file, data):
     with open(file, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
-# ================= 🔐 بررسی ادمین / سودو =================
+# ================= 🔐 بررسی دسترسی ادمین/سودو =================
 async def _has_access(context, chat_id: int, user_id: int) -> bool:
     if user_id in SUDO_IDS:
         return True
@@ -55,7 +55,7 @@ async def _resolve_target(msg, context, chat_id):
             pass
     return None
 
-# ================= ⚙️ دریافت پیام سفارشی =================
+# ================= ⚙️ پیام‌های سفارشی =================
 def get_group_message(chat_id, cmd_type):
     messages = _load_json(MSG_FILE)
     chat_msgs = messages.get(str(chat_id), {})
@@ -69,7 +69,7 @@ def get_group_message(chat_id, cmd_type):
     }
     return chat_msgs.get(cmd_type, defaults.get(cmd_type, ""))
 
-# ================= ⚙️ ثبت پیام جدید =================
+# ================= ⚙️ ثبت پیام دلخواه =================
 async def set_group_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = update.effective_message
     user = update.effective_user
@@ -78,7 +78,6 @@ async def set_group_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     text = (msg.text or "").strip()
-    # قالب: "تنظیم پیام <نام دستور> <متن پیام>"
     m = re.match(r"تنظیم پیام\s+(\S+)\s+(.+)", text)
     if not m:
         return
@@ -106,7 +105,6 @@ async def set_command_alias(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     text = (msg.text or "").strip()
-    # قالب: "ثبت دستور <نام جدید> <دستور اصلی>"
     m = re.match(r"ثبت دستور\s+(\S+)\s+(\S+)", text)
     if not m:
         return
@@ -137,15 +135,44 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
     if not text:
         return
 
-    # بارگذاری alias
+    # بارگذاری alias و تبدیل به دستور اصلی
     aliases = _load_json(ALIAS_FILE).get(str(chat.id), {})
-    cmd_type = aliases.get(text, text)  # اگر alias بود، جایگزین شود
+    cmd_type = None
     extra_time = None
 
-    # دستورهای اصلی
-    MAIN_CMDS = ["ban", "unban", "mute", "unmute", "warn", "delwarn"]
-    if cmd_type not in MAIN_CMDS:
-        return  # دستور نامعتبر
+    # بررسی alias
+    for alias, main_cmd in aliases.items():
+        if text.startswith(alias):
+            cmd_type = main_cmd
+            break
+
+    # اگر alias نبود، بررسی دستورهای اصلی
+    PATTERNS = {
+        "ban": r"^بن$",
+        "unban": r"^حذف بن$",
+        "mute": r"^سکوت(?: (\d+) (ثانیه|دقیقه|ساعت))?$",
+        "unmute": r"^حذف سکوت$",
+        "warn": r"^اخطار$",
+        "delwarn": r"^حذف اخطار$",
+    }
+    if not cmd_type:
+        for k, pat in PATTERNS.items():
+            m = re.match(pat, text)
+            if m:
+                cmd_type = k
+                if cmd_type == "mute" and m.group(1):
+                    num = int(m.group(1))
+                    unit = m.group(2)
+                    if unit == "ساعت":
+                        extra_time = num*3600
+                    elif unit == "دقیقه":
+                        extra_time = num*60
+                    else:
+                        extra_time = num
+                break
+
+    if not cmd_type:
+        return
 
     if not await _has_access(context, chat.id, user.id):
         return await msg.reply_text("🚫 فقط مدیران یا سودوها مجازند.")
@@ -157,6 +184,7 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
     bot_user = await context.bot.get_me()
     if target_user.id == bot_user.id or target_user.id in SUDO_IDS:
         return await msg.reply_text("🚫 نمی‌توان روی این کاربر دستور اجرا کرد.")
+
     try:
         tm = await context.bot.get_chat_member(chat.id, target_user.id)
         if tm.status in ("creator", "administrator"):
@@ -185,6 +213,11 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
             key = f"{chat.id}:{target_user.id}"
             warns[key] = warns.get(key, 0) + 1
             _save_json(WARN_FILE, warns)
+            if warns[key] >= 3:
+                await context.bot.ban_chat_member(chat.id, target_user.id)
+                warns[key] = 0
+                _save_json(WARN_FILE, warns)
+                msg_text = get_group_message(chat.id, "ban")
         elif cmd_type == "delwarn":
             warns = _load_json(WARN_FILE)
             key = f"{chat.id}:{target_user.id}"
