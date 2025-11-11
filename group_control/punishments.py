@@ -53,19 +53,6 @@ def _clean_username(u: str) -> str:
 
 
 # ================= 🎯 استخراج هدف مقاوم =================
-# جایگزین کن این توابع در punishments.py یا فایل مشابه
-import re, unicodedata
-from telegram import MessageEntity
-
-def _clean_username(u: str) -> str:
-    if not u:
-        return u
-    if u.startswith("@"):
-        u = u[1:]
-    u = unicodedata.normalize("NFKC", u)
-    u = re.sub(r"[\u200B\u200C\u200D\uFEFF\u2060]", "", u)  # حذف کاراکترهای zero-width
-    return u.strip()
-
 async def _resolve_target(msg, context, chat_id, explicit_arg: str = None, debug_reply: bool = True):
     """
     برگشت: telegram.User یا None
