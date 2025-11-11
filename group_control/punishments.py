@@ -54,15 +54,6 @@ def _clean_username(u: str) -> str:
 
 # ================= 🎯 استخراج هدف مقاوم =================
 async def _resolve_target(msg, context, chat_id, explicit_arg: str = None):
-    """
-    باز می‌گرداند: کاربر شیء (telegram.User) یا None.
-    حالات:
-      - ریپلای روی پیام -> reply_to_message.from_user
-      - text_mention entity -> ent.user
-      - mention entity (مثل @user) -> تلاش برای get_chat(username)
-      - @username در متن (fallback)
-      - آیدی عددی در متن -> تلاش get_chat_member
-    """
     # 1) ریپلای
     if msg.reply_to_message and getattr(msg.reply_to_message, "from_user", None):
         return msg.reply_to_message.from_user
@@ -78,9 +69,12 @@ async def _resolve_target(msg, context, chat_id, explicit_arg: str = None):
             if ent.type == MessageEntity.MENTION:
                 start = ent.offset
                 length = ent.length
-                raw = text[start:start + length]
+                raw = text[start:start + length]  # شامل @
                 username = _clean_username(raw)
                 if username:
+                    # get_chat نیاز به بدون @ دارد
+                    if username.startswith("@"):
+                        username = username[1:]
                     try:
                         user_obj = await context.bot.get_chat(username)
                         return user_obj
@@ -89,26 +83,26 @@ async def _resolve_target(msg, context, chat_id, explicit_arg: str = None):
         except Exception:
             continue
 
-    # 3) explicit arg (از الگوهایی که caller استخراج کرده)
+    # 3) explicit arg (username یا id از regex)
     if explicit_arg:
         arg = explicit_arg.strip()
-        # اگر با @ شروع کرده
-        if arg.startswith("@"):
-            username = _clean_username(arg)
-            try:
-                return await context.bot.get_chat(username)
-            except Exception:
-                return None
-        # اگر شماره است
-        if re.fullmatch(r"\d{6,15}", arg):
-            try:
-                cm = await context.bot.get_chat_member(chat_id, int(arg))
-                return cm.user
-            except Exception:
-                return None
+        username = _clean_username(arg)
+        if username.startswith("@"):
+            username = username[1:]
+        try:
+            return await context.bot.get_chat(username)
+        except Exception:
+            # ممکنه عدد باشه
+            if re.fullmatch(r"\d{6,15}", username):
+                try:
+                    cm = await context.bot.get_chat_member(chat_id, int(username))
+                    return cm.user
+                except Exception:
+                    return None
+            return None
 
-    # 4) fallback: پیدا کردن @username داخل متن
-    m_user = re.search(r"@([A-Za-z0-9_]{3,})", text)
+    # 4) fallback: پیدا کردن @username در متن
+    m_user = re.search(r"@([A-Za-z0-9_]{5,32})", text)  # طول معتبر تلگرام
     if m_user:
         username = _clean_username(m_user.group(1))
         try:
@@ -116,7 +110,7 @@ async def _resolve_target(msg, context, chat_id, explicit_arg: str = None):
         except Exception:
             pass
 
-    # 5) fallback: پیدا کردن آیدی عددی داخل متن
+    # 5) fallback: آیدی عددی
     m_id = re.search(r"\b(\d{6,15})\b", text)
     if m_id:
         try:
@@ -126,8 +120,6 @@ async def _resolve_target(msg, context, chat_id, explicit_arg: str = None):
             pass
 
     return None
-
-
 # ================= ⚙️ هندلر دستورات تنبیهی =================
 async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = update.effective_message
