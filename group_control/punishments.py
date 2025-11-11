@@ -68,66 +68,49 @@ def get_group_message(chat_id, cmd_type):
     }
     return chat_msgs.get(cmd_type, defaults.get(cmd_type, ""))
 
-# ================= ⚙️ ثبت پیام جدید توسط مدیر =================
-async def set_group_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+# ================= ⚙️ هندلر اصلی =================
+async def handle_all_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = update.effective_message
     user = update.effective_user
     chat = update.effective_chat
-
     if not msg or chat.type not in ("group", "supergroup"):
         return
-
-    text = (msg.text or "").strip()
-    # قالب دستور برای تنظیم پیام: "تنظیم پیام <نوع> <متن دلخواه>"
-    m = re.match(r"تنظیم پیام\s+(ban|unban|mute|unmute|warn|delwarn)\s+(.+)", text)
-    if not m:
-        return
-
-    if not await _has_access(context, chat.id, user.id):
-        return await msg.reply_text("🚫 فقط مدیران یا سودوها مجازند.")
-
-    cmd_type = m.group(1)
-    message_text = m.group(2).strip()
-
-    messages = _load_json(MSG_FILE)
-    chat_msgs = messages.get(str(chat.id), {})
-    chat_msgs[cmd_type] = message_text
-    messages[str(chat.id)] = chat_msgs
-    _save_json(MSG_FILE, messages)
-
-    await msg.reply_text(f"✅ پیام دستور `{cmd_type}` با موفقیت تنظیم شد.")
-
-# ================= ⚙️ هندلر دستورات تنبیهی =================
-async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    msg = update.effective_message
-    user = update.effective_user
-    chat = update.effective_chat
-
-    if not msg or chat.type not in ("group", "supergroup"):
-        return
-
     text = (msg.text or "").strip()
     if not text:
         return
 
+    # ----- بررسی دستور تنظیم پیام -----
+    m = re.match(r"تنظیم پیام\s+(ban|unban|mute|unmute|warn|delwarn)\s+(.+)", text)
+    if m:
+        if not await _has_access(context, chat.id, user.id):
+            return await msg.reply_text("🚫 فقط مدیران یا سودوها مجازند.")
+        cmd_type = m.group(1)
+        message_text = m.group(2).strip()
+        messages = _load_json(MSG_FILE)
+        chat_msgs = messages.get(str(chat.id), {})
+        chat_msgs[cmd_type] = message_text
+        messages[str(chat.id)] = chat_msgs
+        _save_json(MSG_FILE, messages)
+        return await msg.reply_text(f"✅ پیام دستور `{cmd_type}` با موفقیت تنظیم شد.")
+
+    # ----- بررسی دستور تنبیهی -----
     PATTERNS = {
-        "ban": r"^بن\s*$",
+        "ban": r"^(بن|گمشو)\s*$",
         "unban": r"^حذف\s*بن\s*$",
         "mute": r"^سکوت\s*(\d+)?\s*(ثانیه|دقیقه|ساعت)?\s*$",
         "unmute": r"^حذف\s*سکوت\s*$",
         "warn": r"^اخطار\s*$",
         "delwarn": r"^حذف\s*اخطار\s*$",
     }
-
     cmd_type = None
     extra_time = None
     for k, pat in PATTERNS.items():
-        m = re.match(pat, text)
-        if m:
+        m2 = re.match(pat, text)
+        if m2:
             cmd_type = k
-            if cmd_type == "mute" and m.group(1):
-                num = int(m.group(1))
-                unit = m.group(2)
+            if cmd_type == "mute" and m2.group(1):
+                num = int(m2.group(1))
+                unit = m2.group(2)
                 if unit == "ساعت":
                     extra_time = num * 3600
                 elif unit == "دقیقه":
@@ -135,7 +118,6 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
                 else:
                     extra_time = num
             break
-
     if not cmd_type:
         return
 
@@ -158,7 +140,7 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
     try:
         msg_text = get_group_message(chat.id, cmd_type)
-        if cmd_type == "ban":
+        if cmd_type in ["ban", "گمشو"]:
             await context.bot.ban_chat_member(chat.id, target_user.id)
             return await msg.reply_text(msg_text.format(name=target_user.first_name))
         if cmd_type == "unban":
@@ -167,17 +149,13 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
         if cmd_type == "mute":
             seconds = extra_time or 3600
             until = datetime.utcnow() + timedelta(seconds=seconds)
-            await context.bot.restrict_chat_member(
-                chat.id, target_user.id,
+            await context.bot.restrict_chat_member(chat.id, target_user.id,
                 permissions=ChatPermissions(can_send_messages=False),
-                until_date=until
-            )
+                until_date=until)
             return await msg.reply_text(msg_text.format(name=target_user.first_name, seconds=seconds))
         if cmd_type == "unmute":
-            await context.bot.restrict_chat_member(
-                chat.id, target_user.id,
-                permissions=ChatPermissions(can_send_messages=True)
-            )
+            await context.bot.restrict_chat_member(chat.id, target_user.id,
+                permissions=ChatPermissions(can_send_messages=True))
             return await msg.reply_text(msg_text.format(name=target_user.first_name))
         if cmd_type == "warn":
             warns = _load_json(WARN_FILE)
@@ -207,10 +185,5 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
 def register_punishment_handlers(application, group_number: int = 12):
     application.add_handler(MessageHandler(
         filters.TEXT & ~filters.COMMAND & filters.ChatType.GROUPS,
-        handle_punishments
+        handle_all_messages
     ), group=group_number)
-
-    application.add_handler(MessageHandler(
-        filters.TEXT & ~filters.COMMAND & filters.ChatType.GROUPS,
-        set_group_message
-    ), group=group_number + 1)
