@@ -104,14 +104,14 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
     if not text:
         return
 
-    # ✅ regex فقط ابتدای پیام (برای جلوگیری از اشتباه در وسط جمله)
+    # ✅ فقط دستور دقیق در ابتدای پیام (بدون اشتباه)
     COMMAND_PATTERNS = {
-        "ban": r"^بن(?:\s|$)",
-        "unban": r"^حذف\s*بن(?:\s|$)",
-        "mute": r"^سکوت(?:\s|$)",
-        "unmute": r"^حذف\s*سکوت(?:\s|$)",
-        "warn": r"^اخطار(?:\s|$)",
-        "delwarn": r"^حذف\s*اخطار(?:\s|$)",
+        "ban": r"^(?:/)?\s*(?:بن)\b",
+        "unban": r"^(?:/)?\s*(?:حذف\s*بن)\b",
+        "mute": r"^(?:/)?\s*(?:سکوت)\b",
+        "unmute": r"^(?:/)?\s*(?:حذف\s*سکوت)\b",
+        "warn": r"^(?:/)?\s*(?:اخطار)\b",
+        "delwarn": r"^(?:/)?\s*(?:حذف\s*اخطار)\b",
     }
 
     cmd_type = None
@@ -131,10 +131,11 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
     target = await _resolve_target(msg, context, chat.id)
     if not target:
         return await msg.reply_text(
-            "⚠️ هدف مشخص نیست.\n"
+            "⚠️ لطفاً هدف را مشخص کنید:\n"
             "• ریپلای روی پیام کاربر\n"
-            "• @username (عضو گروه)\n"
-            "• آیدی عددی"
+            "• @username یا آیدی عددی\n"
+            "📌 مثال:\n"
+            "«بن @user» یا ریپلای روی پیام و نوشتن «بن»"
         )
 
     # ✅ محافظت از ادمین / سودو / خود ربات
@@ -154,12 +155,12 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
         # 🚫 بن
         if cmd_type == "ban":
             await context.bot.ban_chat_member(chat.id, target.id)
-            return await msg.reply_text(f"🚫 {target.first_name} از گروه بن شد.")
+            return await msg.reply_text(f"🚫 کاربر [{target.first_name}](tg://user?id={target.id}) از گروه بن شد.", parse_mode="Markdown")
 
         # 🔓 حذف بن
         if cmd_type == "unban":
             await context.bot.unban_chat_member(chat.id, target.id)
-            return await msg.reply_text(f"✅ {target.first_name} از بن خارج شد.")
+            return await msg.reply_text(f"✅ کاربر [{target.first_name}](tg://user?id={target.id}) از بن خارج شد.", parse_mode="Markdown")
 
         # 🤐 سکوت
         if cmd_type == "mute":
@@ -185,7 +186,10 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
                 permissions=ChatPermissions(can_send_messages=False),
                 until_date=until_date
             )
-            return await msg.reply_text(f"🤐 {target.first_name} برای {seconds} ثانیه سکوت شد.")
+            return await msg.reply_text(
+                f"🤐 کاربر [{target.first_name}](tg://user?id={target.id}) برای {seconds} ثانیه در سکوت قرار گرفت.",
+                parse_mode="Markdown"
+            )
 
         # 🔊 حذف سکوت
         if cmd_type == "unmute":
@@ -194,7 +198,7 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
                 target.id,
                 permissions=ChatPermissions(can_send_messages=True)
             )
-            return await msg.reply_text(f"🔊 {target.first_name} از سکوت خارج شد.")
+            return await msg.reply_text(f"🔊 کاربر [{target.first_name}](tg://user?id={target.id}) از سکوت خارج شد.", parse_mode="Markdown")
 
         # ⚠️ اخطار
         if cmd_type == "warn":
@@ -206,9 +210,9 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
                 await context.bot.ban_chat_member(chat.id, target.id)
                 warns[key] = 0
                 _save_json(WARN_FILE, warns)
-                return await msg.reply_text(f"🚫 {target.first_name} به‌دلیل ۳ اخطار بن شد.")
+                return await msg.reply_text(f"🚫 {target.first_name} به‌دلیل دریافت ۳ اخطار بن شد.")
             else:
-                return await msg.reply_text(f"⚠️ {target.first_name} اخطار {warns[key]}/3 گرفت.")
+                return await msg.reply_text(f"⚠️ {target.first_name} اخطار {warns[key]}/3 دریافت کرد.")
 
         # ✅ حذف اخطار
         if cmd_type == "delwarn":
