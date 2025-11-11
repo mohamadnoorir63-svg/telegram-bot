@@ -51,142 +51,80 @@ def _clean_username(u: str) -> str:
     u = re.sub(r"[\u200B\u200C\u200D\uFEFF]", "", u)
     return u.strip()
 
-
-# ================= 🎯 استخراج هدف مقاوم =================
-async def _resolve_target(msg, context, chat_id, explicit_arg: str = None, debug_reply: bool = True):
+ # ================= 🎯 استخراج هدف مقاوم =================
+async def _resolve_target(msg, context, chat_id, explicit_arg: str = None):
     """
-    برگشت: telegram.User یا None
-    روش‌ها (اولویت):
-      1) ریپلای روی پیام
-      2) MessageEntity.TEXT_MENTION
-      3) MessageEntity.MENTION -> تلاش get_chat_member(chat_id, username)
-      4) explicit_arg (از regex) -> تلاش با get_chat_member سپس get_chat
-      5) جستجوی @username در متن (fallback)
-      6) آیدی عددی در متن
-      7) بررسی admins (آخرین تلاش)
-    اگر debug_reply=True و هدف پیدا نشد، یک پیام (کوتاه) برای اجراکننده می‌فرستد با اطلاعات مفید برای دیباگ.
+    باز می‌گرداند: کاربر شیء (telegram.User) یا None.
+    حالات:
+      - ریپلای روی پیام -> reply_to_message.from_user
+      - text_mention entity -> ent.user
+      - mention entity (مثل @user) -> تلاش برای get_chat(username)
+      - @username در متن (fallback)
+      - آیدی عددی در متن -> تلاش get_chat_member
     """
-    # 1) reply
+    # 1) ریپلای
     if msg.reply_to_message and getattr(msg.reply_to_message, "from_user", None):
         return msg.reply_to_message.from_user
 
     text = (msg.text or "") or ""
     entities = msg.entities or []
 
-    # 2) text_mention
+    # 2) entities (text_mention یا mention)
+    ent_info = []
+    for e in entities:
+        # لاگ debug بدون syntax error
+        ent_info.append(f"{getattr(e,'type',None)}@{getattr(e,'offset',None)}/{getattr(e,'length',None)}")
+    print("resolve_target: entities info:", ent_info)
+
     for ent in entities:
         try:
             if ent.type == MessageEntity.TEXT_MENTION and getattr(ent, "user", None):
                 return ent.user
-        except Exception:
-            pass
-
-    # 3) mention entity (@username)
-    for ent in entities:
-        try:
             if ent.type == MessageEntity.MENTION:
                 start = ent.offset
                 length = ent.length
-                raw = text[start:start+length]  # مثل "@user"
+                raw = text[start:start + length]
                 username = _clean_username(raw)
-                if username.startswith("@"):
-                    username = username[1:]
-                if not username:
-                    continue
-                # اول تلاش کن با get_chat_member در همین گروه (مطمئن‌ترین)
-                try:
-                    cm = await context.bot.get_chat_member(chat_id, username)
-                    return cm.user
-                except Exception:
-                    # اگر get_chat_member با username کار نکرد، تلاش کن با get_chat عمومی
+                if username:
                     try:
-                        uobj = await context.bot.get_chat(username)
-                        # اگر برگردد و یک user باشد، آن را برگردان
-                        if getattr(uobj, "type", None) in (None, "private"):
-                            return uobj
+                        user_obj = await context.bot.get_chat(username)
+                        return user_obj
                     except Exception:
                         continue
         except Exception:
             continue
 
-    # 4) explicit_arg (از regex)
+    # 3) explicit arg (از الگوهایی که caller استخراج کرده)
     if explicit_arg:
         arg = explicit_arg.strip()
-        cleaned = _clean_username(arg)
-        # اگر arg با @ است
-        if cleaned.startswith("@"):
-            cleaned = cleaned[1:]
-        # تلاش اول: get_chat_member در گروه (username یا id)
-        try:
-            # اگر عدد است
-            if re.fullmatch(r"\d{6,15}", cleaned):
-                cm = await context.bot.get_chat_member(chat_id, int(cleaned))
-                return cm.user
-            else:
-                cm = await context.bot.get_chat_member(chat_id, cleaned)
-                return cm.user
-        except Exception:
-            # تلاش دوم: get_chat عمومی
+        if arg.startswith("@"):
+            username = _clean_username(arg)
             try:
-                if re.fullmatch(r"\d{6,15}", cleaned):
-                    # اگر فقط عدد بود و get_chat_member نخوند، به None
-                    pass
-                else:
-                    uobj = await context.bot.get_chat(cleaned)
-                    return uobj
+                return await context.bot.get_chat(username)
             except Exception:
-                pass
+                return None
+        if re.fullmatch(r"\d{6,15}", arg):
+            try:
+                cm = await context.bot.get_chat_member(chat_id, int(arg))
+                return cm.user
+            except Exception:
+                return None
 
-    # 5) fallback: پیدا کردن @username داخل متن
-    m_user = re.search(r"@([A-Za-z0-9_]{3,32})", text)
+    # 4) fallback: پیدا کردن @username داخل متن
+    m_user = re.search(r"@([A-Za-z0-9_]{3,})", text)
     if m_user:
         username = _clean_username(m_user.group(1))
         try:
-            cm = await context.bot.get_chat_member(chat_id, username)
-            return cm.user
+            return await context.bot.get_chat(username)
         except Exception:
-            try:
-                uobj = await context.bot.get_chat(username)
-                return uobj
-            except Exception:
-                pass
+            pass
 
-    # 6) آیدی عددی در متن
+    # 5) fallback: پیدا کردن آیدی عددی داخل متن
     m_id = re.search(r"\b(\d{6,15})\b", text)
     if m_id:
         try:
             cm = await context.bot.get_chat_member(chat_id, int(m_id.group(1)))
             return cm.user
-        except Exception:
-            pass
-
-    # 7) آخرین راه: بررسی admins برای پیدا کردن با تطبیق username/displayname
-    try:
-        admins = await context.bot.get_chat_administrators(chat_id)
-        # بررسی بر اساس username یا نام
-        for a in admins:
-            uname = getattr(a.user, "username", "") or ""
-            if uname and uname.lower() in text.lower():
-                return a.user
-            # بررسی نام کامل
-            full = (getattr(a.user, "first_name", "") or "") + " " + (getattr(a.user, "last_name", "") or "")
-            if full.strip() and full.strip().lower() in text.lower():
-                return a.user
-    except Exception:
-        pass
-
-    # دیباگ: ارسال مختصر برای اجراکننده (فقط اگر بخوای)
-    if debug_reply:
-        try:
-            debug_lines = []
-            debug_lines.append("🔍 دیباگ شناسایی هدف:")
-            debug_lines.append(f"متن: {repr(text)[:200]}")
-            ent_info = []
-            for e in entities:
-                ent_info.append(f"{getattr(e,'type',None)}@{getattr(e,'offset',None')}/{getattr(e,'length',None)}")
-            debug_lines.append("entities: " + ", ".join(ent_info))
-            debug_lines.append("لطفاً مطمئن شوید username دقیق و بدون علامت اضافی است و ربات دسترسی لازم دارد.")
-            await msg.reply("\n".join(debug_lines))
         except Exception:
             pass
 
