@@ -53,15 +53,6 @@ def _clean_username(u: str) -> str:
 
  # ================= 🎯 استخراج هدف مقاوم =================
 async def _resolve_target(msg, context, chat_id, explicit_arg: str = None):
-    """
-    باز می‌گرداند: کاربر شیء (telegram.User) یا None.
-    حالات:
-      - ریپلای روی پیام -> reply_to_message.from_user
-      - text_mention entity -> ent.user
-      - mention entity (مثل @user) -> تلاش برای get_chat(username)
-      - @username در متن (fallback)
-      - آیدی عددی در متن -> تلاش get_chat_member
-    """
     # 1) ریپلای
     if msg.reply_to_message and getattr(msg.reply_to_message, "from_user", None):
         return msg.reply_to_message.from_user
@@ -69,13 +60,7 @@ async def _resolve_target(msg, context, chat_id, explicit_arg: str = None):
     text = (msg.text or "") or ""
     entities = msg.entities or []
 
-    # 2) entities (text_mention یا mention)
-    ent_info = []
-    for e in entities:
-        # لاگ debug بدون syntax error
-        ent_info.append(f"{getattr(e,'type',None)}@{getattr(e,'offset',None)}/{getattr(e,'length',None)}")
-    print("resolve_target: entities info:", ent_info)
-
+    # 2) بررسی entities
     for ent in entities:
         try:
             if ent.type == MessageEntity.TEXT_MENTION and getattr(ent, "user", None):
@@ -83,18 +68,20 @@ async def _resolve_target(msg, context, chat_id, explicit_arg: str = None):
             if ent.type == MessageEntity.MENTION:
                 start = ent.offset
                 length = ent.length
-                raw = text[start:start + length]
+                raw = text[start:start + length]  # شامل @
                 username = _clean_username(raw)
                 if username:
                     try:
+                        # get_chat همیشه با username بدون @
                         user_obj = await context.bot.get_chat(username)
                         return user_obj
                     except Exception:
+                        # fallback: اگر کاربر ربات هست یا member نبود، ادامه بده
                         continue
         except Exception:
             continue
 
-    # 3) explicit arg (از الگوهایی که caller استخراج کرده)
+    # 3) explicit_arg از دستور
     if explicit_arg:
         arg = explicit_arg.strip()
         if arg.startswith("@"):
@@ -102,15 +89,15 @@ async def _resolve_target(msg, context, chat_id, explicit_arg: str = None):
             try:
                 return await context.bot.get_chat(username)
             except Exception:
-                return None
-        if re.fullmatch(r"\d{6,15}", arg):
+                pass
+        elif re.fullmatch(r"\d{6,15}", arg):
             try:
                 cm = await context.bot.get_chat_member(chat_id, int(arg))
                 return cm.user
             except Exception:
-                return None
+                pass
 
-    # 4) fallback: پیدا کردن @username داخل متن
+    # 4) fallback: پیدا کردن @username در متن حتی بدون entity
     m_user = re.search(r"@([A-Za-z0-9_]{3,})", text)
     if m_user:
         username = _clean_username(m_user.group(1))
@@ -119,7 +106,7 @@ async def _resolve_target(msg, context, chat_id, explicit_arg: str = None):
         except Exception:
             pass
 
-    # 5) fallback: پیدا کردن آیدی عددی داخل متن
+    # 5) آیدی عددی در متن
     m_id = re.search(r"\b(\d{6,15})\b", text)
     if m_id:
         try:
