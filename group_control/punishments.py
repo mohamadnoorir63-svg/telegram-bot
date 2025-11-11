@@ -57,7 +57,7 @@ async def _resolve_target(msg, context, chat_id, explicit_arg: str = None):
     if msg.reply_to_message and getattr(msg.reply_to_message, "from_user", None):
         return msg.reply_to_message.from_user
 
-    text = (msg.text or "") or ""
+    text = (msg.text or "")
     entities = msg.entities or []
 
     # 2) بررسی entities
@@ -68,33 +68,40 @@ async def _resolve_target(msg, context, chat_id, explicit_arg: str = None):
             if ent.type == MessageEntity.MENTION:
                 start = ent.offset
                 length = ent.length
-                raw = text[start:start + length]  # شامل @
+                raw = text[start:start + length]
                 username = _clean_username(raw)
                 if username:
                     try:
-                        # get_chat همیشه با username بدون @
-                        user_obj = await context.bot.get_chat(username)
-                        return user_obj
-                    except Exception:
-                        # fallback: اگر کاربر ربات هست یا member نبود، ادامه بده
-                        continue
-        except Exception:
+                        # اول تلاش برای پیدا کردن در گروه
+                        cm = await context.bot.get_chat_member(chat_id, username)
+                        return cm.user
+                    except:
+                        # fallback: get_chat
+                        try:
+                            return await context.bot.get_chat(username)
+                        except:
+                            continue
+        except:
             continue
 
-    # 3) explicit_arg از دستور
+    # 3) explicit_arg
     if explicit_arg:
         arg = explicit_arg.strip()
         if arg.startswith("@"):
             username = _clean_username(arg)
             try:
-                return await context.bot.get_chat(username)
-            except Exception:
-                pass
+                cm = await context.bot.get_chat_member(chat_id, username)
+                return cm.user
+            except:
+                try:
+                    return await context.bot.get_chat(username)
+                except:
+                    pass
         elif re.fullmatch(r"\d{6,15}", arg):
             try:
                 cm = await context.bot.get_chat_member(chat_id, int(arg))
                 return cm.user
-            except Exception:
+            except:
                 pass
 
     # 4) fallback: پیدا کردن @username در متن حتی بدون entity
@@ -102,9 +109,13 @@ async def _resolve_target(msg, context, chat_id, explicit_arg: str = None):
     if m_user:
         username = _clean_username(m_user.group(1))
         try:
-            return await context.bot.get_chat(username)
-        except Exception:
-            pass
+            cm = await context.bot.get_chat_member(chat_id, username)
+            return cm.user
+        except:
+            try:
+                return await context.bot.get_chat(username)
+            except:
+                pass
 
     # 5) آیدی عددی در متن
     m_id = re.search(r"\b(\d{6,15})\b", text)
@@ -112,7 +123,7 @@ async def _resolve_target(msg, context, chat_id, explicit_arg: str = None):
         try:
             cm = await context.bot.get_chat_member(chat_id, int(m_id.group(1)))
             return cm.user
-        except Exception:
+        except:
             pass
 
     return None
