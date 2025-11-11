@@ -1064,20 +1064,11 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_chat.type == "private" and lower_text not in ["جوک", "فال"]:
         return
 
-    # ✅ جلوگیری از پاسخ به دستورات خاص (مثل راهنما، خوشامد، ربات و غیره)
-    protected_words = [
-        "راهنما", "ثبت راهنما", "خوشامد", "ثبت خوشامد",
-        "ربات", "save", "del", "panel", "backup", "cloudsync", "leave"
-    ]
+    
     if any(lower_text.startswith(word) for word in protected_words):
         return
 
-    # 🚫 جلوگیری از پاسخ به پیام‌های مدیریتی و دستوری
-    command_keywords = [
-        "قفل", "باز", "بازکردن", "پنل", "خوشامد",
-        "عکس خوشامد", "فیلتر", "سکوت", "بن", "اخطار",
-        "لقب", "اصل", "تگ", "پاکسازی", "گروه", "مدیر", "سودو"
-    ]
+    
     if any(lower_text.startswith(word) for word in command_keywords):
         return
 
@@ -2122,8 +2113,8 @@ register_filter_handlers(application, group_number=13)
 from group_control.tagger import register_tag_handlers
 register_tag_handlers(application, group_number=14)
 
-#from group_control.admin_manager import register_admin_handlers
-#register_admin_handlers(application, group_number=16)
+from group_control.admin_manager import register_admin_handlers
+register_admin_handlers(application, group_number=16)
 
 
 # ==========================================================
