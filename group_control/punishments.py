@@ -1,160 +1,163 @@
-import re
+# punishments.py
+import os
+import json
 from datetime import datetime, timedelta
 from telethon import events
-from telethon.tl.types import ChatPermissions, Message, MessageEntityMentionName
-from telethon.errors import UsernameNotOccupiedError, UsernameInvalidError, PeerIdInvalidError
+from telethon.tl.functions.channels import EditBannedRequest
+from telethon.tl.types import ChatBannedRights
 
-# 👑 سودوها
-SUDO_USERS = [8588347189]
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+WARN_FILE = os.path.join(BASE_DIR, "warnings.json")
 
+SUDO_IDS = [8588347189]  # آیدی سودوها
 
-# ================= 🔍 تشخیص کاربر هدف =================
-async def get_user_from_input(event, arg=None):
-    """دریافت آیدی کاربر از ریپلای، منشن، آیدی عددی یا یوزرنیم"""
-    reply = None
+if not os.path.exists(WARN_FILE):
+    with open(WARN_FILE, "w", encoding="utf-8") as f:
+        json.dump({}, f, ensure_ascii=False, indent=2)
+
+def _load_json(file):
     try:
-        reply = await event.get_reply_message()
-    except Exception:
-        reply = None
+        with open(file, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except:
+        return {}
 
-    # ✅ گاهی Telethon لیست پیام برمی‌گردونه → فقط اولی رو بگیر
-    if isinstance(reply, list):
-        reply = reply[0] if reply else None
+def _save_json(file, data):
+    with open(file, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
 
-    if reply and isinstance(reply, Message):
-        return reply.sender_id
-
-    # ✅ بررسی mention-type entity
-    if event.message.entities:
-        for ent in event.message.entities:
-            if isinstance(ent, MessageEntityMentionName):
-                return ent.user_id
-
-    # ✅ بررسی @username
-    if arg and arg.startswith("@"):
-        username = arg.strip("@")
-        try:
-            user = await event.client.get_entity(username)
-            return user.id
-        except (UsernameNotOccupiedError, UsernameInvalidError, PeerIdInvalidError):
-            return None
-
-    # ✅ بررسی آیدی عددی
-    if arg and re.match(r"^\d+$", arg):
-        try:
-            return int(arg)
-        except ValueError:
-            return None
-
-    return None
-
-
-# ================= 🔐 بررسی ادمین یا سودو =================
-async def is_admin_or_sudo(event):
-    if event.sender_id in SUDO_USERS:
+async def _has_access(client, chat_id: int, user_id: int) -> bool:
+    if user_id in SUDO_IDS:
         return True
     try:
-        perms = await event.client.get_permissions(event.chat_id, event.sender_id)
-        return perms.is_admin
+        member = await client.get_permissions(chat_id, user_id)
+        return member.is_admin
     except:
         return False
 
+async def _resolve_target(event, text_arg=None):
+    """شناسایی هدف: ریپلای، یوزرنیم یا آیدی"""
+    reply = await event.get_reply_message()
+    if reply:
+        return reply.sender_id
 
-# ================= ⚙️ ماژول اصلی تنبیهات =================
-def register_punishment_module(client):
-    @client.on(events.NewMessage(pattern=r"^(بن|سکوت|اخطار|حذف\s*بن|حذف\s*سکوت|حذف\s*اخطار)\b"))
-    async def punish_command(event):
-        if not await is_admin_or_sudo(event):
-            return await event.reply("🚫 فقط مدیران یا سودوها مجازند.")
+    if text_arg:
+        if text_arg.startswith("@"):
+            try:
+                entity = await event.client.get_entity(text_arg)
+                return entity.id
+            except:
+                return None
+        elif text_arg.isdigit():
+            return int(text_arg)
+    return None
 
-        text = event.raw_text.strip()
-        parts = text.split(maxsplit=1)
-        command = parts[0]
-        arg = parts[1] if len(parts) > 1 else None
+@events.register(events.NewMessage(pattern=r"^(بن|حذف بن|سکوت|حذف سکوت|اخطار|حذف اخطار)(?:\s+(.+))?$"))
+async def handle_punishments(event):
+    cmd = event.pattern_match.group(1)
+    arg = event.pattern_match.group(2)
+    me = await event.client.get_me()
+    chat_id = event.chat_id
+    sender_id = event.sender_id
 
-        # 🧠 پیدا کردن هدف
-        user_id = await get_user_from_input(event, arg)
-        if not user_id:
-            return await event.reply("⚠️ لطفاً روی پیام ریپلای کنید یا یوزرنیم/آیدی عددی را وارد کنید.")
+    # بررسی دسترسی
+    if not await _has_access(event.client, chat_id, sender_id):
+        return await event.reply("🚫 فقط مدیران یا سودوها مجاز هستند.")
 
-        # 🛡 محافظت از ادمین و خود ربات
-        try:
-            member = await event.client.get_permissions(event.chat_id, user_id)
-            if member.is_admin:
-                return await event.reply("🛡 نمی‌توان روی مدیر یا سازنده اجرا کرد.")
-        except:
-            pass
-        if user_id == (await event.client.get_me()).id:
-            return await event.reply("😅 نمی‌توانم خودم را تنبیه کنم.")
-        if user_id in SUDO_USERS:
-            return await event.reply("🚫 این کاربر در لیست سودو است!")
+    # تعیین هدف
+    target_id = await _resolve_target(event, arg)
+    if not target_id:
+        return await event.reply(
+            "⚠️ هدف مشخص نیست.\n"
+            "• ریپلای روی پیام کاربر\n"
+            "• @username\n"
+            "• آیدی عددی"
+        )
 
-        # ================= ⚙️ اجرای دستورات =================
-        try:
-            # 🚫 بن
-            if command == "بن":
-                await event.client.edit_permissions(event.chat_id, user_id, view_messages=False)
-                return await event.reply(f"🚫 کاربر با آیدی `{user_id}` از گروه بن شد.", parse_mode="md")
+    # محافظت از خود ربات و سودو
+    if target_id == me.id or target_id in SUDO_IDS:
+        return await event.reply("🚫 امکان اجرای دستور روی این کاربر وجود ندارد.")
 
-            # 🔓 حذف بن
-            elif command in ["حذفبن", "حذف بن"]:
-                await event.client.edit_permissions(event.chat_id, user_id, view_messages=True)
-                return await event.reply(f"✅ کاربر با آیدی `{user_id}` از بن خارج شد.", parse_mode="md")
+    # بررسی ادمین بودن هدف
+    try:
+        member = await event.client.get_permissions(chat_id, target_id)
+        if member.is_admin:
+            return await event.reply("🛡 امکان اجرای دستور روی ادمین وجود ندارد.")
+    except:
+        pass
 
-            # 🤐 سکوت
-            elif command == "سکوت":
-                m = re.search(r"سکوت\s*(\d+)?\s*(ثانیه|دقیقه|ساعت)?", text)
-                if m and m.group(1):
-                    num = int(m.group(1))
-                    unit = m.group(2)
-                    if unit == "ساعت":
-                        seconds = num * 3600
-                    elif unit == "دقیقه":
-                        seconds = num * 60
-                    elif unit == "ثانیه":
-                        seconds = num
-                    else:
-                        seconds = num * 60
-                else:
-                    seconds = 3600  # پیش‌فرض ۱ ساعت
-                until_date = datetime.utcnow() + timedelta(seconds=seconds)
-                await event.client.edit_permissions(
-                    event.chat_id,
-                    user_id,
-                    send_messages=False,
-                    until_date=until_date
-                )
-                return await event.reply(f"🤐 کاربر برای {seconds} ثانیه سکوت شد.")
+    # --- اجرای دستورات ---
+    try:
+        # 🚫 بن
+        if cmd == "بن":
+            rights = ChatBannedRights(
+                until_date=None,
+                view_messages=True,
+                send_messages=True
+            )
+            await event.client(EditBannedRequest(chat_id, target_id, rights))
+            return await event.reply(f"🚫 کاربر با موفقیت بن شد.")
 
-            # 🔊 حذف سکوت
-            elif command in ["حذفسکوت", "حذف سکوت"]:
-                await event.client.edit_permissions(
-                    event.chat_id,
-                    user_id,
+        # 🔓 حذف بن
+        elif cmd == "حذف بن":
+            rights = ChatBannedRights(
+                until_date=None,
+                view_messages=False,
+                send_messages=False
+            )
+            await event.client(EditBannedRequest(chat_id, target_id, rights))
+            return await event.reply(f"✅ بن کاربر حذف شد.")
+
+        # 🤐 سکوت
+        elif cmd == "سکوت":
+            seconds = 3600  # پیشفرض 1 ساعت
+            if arg and arg.isdigit():
+                seconds = int(arg)
+            until = datetime.utcnow() + timedelta(seconds=seconds)
+            rights = ChatBannedRights(
+                until_date=until,
+                send_messages=True
+            )
+            await event.client(EditBannedRequest(chat_id, target_id, rights))
+            return await event.reply(f"🤐 کاربر برای {seconds} ثانیه سکوت شد.")
+
+        # 🔊 حذف سکوت
+        elif cmd == "حذف سکوت":
+            rights = ChatBannedRights(
+                until_date=None,
+                send_messages=False
+            )
+            await event.client(EditBannedRequest(chat_id, target_id, rights))
+            return await event.reply("🔊 سکوت کاربر حذف شد.")
+
+        # ⚠️ اخطار
+        elif cmd == "اخطار":
+            warns = _load_json(WARN_FILE)
+            key = f"{chat_id}:{target_id}"
+            warns[key] = warns.get(key, 0) + 1
+            _save_json(WARN_FILE, warns)
+            if warns[key] >= 3:
+                rights = ChatBannedRights(
+                    until_date=None,
+                    view_messages=True,
                     send_messages=True
                 )
-                return await event.reply("🔊 کاربر از حالت سکوت خارج شد.")
+                await event.client(EditBannedRequest(chat_id, target_id, rights))
+                warns[key] = 0
+                _save_json(WARN_FILE, warns)
+                return await event.reply(f"🚫 کاربر به دلیل ۳ اخطار بن شد.")
+            else:
+                return await event.reply(f"⚠️ اخطار {warns[key]}/3 داده شد.")
 
-            # ⚠️ اخطار
-            elif command == "اخطار":
-                warns = getattr(client, "warns", {})
-                key = f"{event.chat_id}:{user_id}"
-                warns[key] = warns.get(key, 0) + 1
-                client.warns = warns
-                if warns[key] >= 3:
-                    await event.client.edit_permissions(event.chat_id, user_id, view_messages=False)
-                    warns[key] = 0
-                    return await event.reply(f"🚫 کاربر به‌دلیل ۳ اخطار بن شد.")
-                else:
-                    return await event.reply(f"⚠️ اخطار {warns[key]}/3 برای کاربر ثبت شد.")
-
-            # ✅ حذف اخطار
-            elif command in ["حذفاخطار", "حذف اخطار"]:
-                warns = getattr(client, "warns", {})
-                key = f"{event.chat_id}:{user_id}"
-                if key in warns:
-                    del warns[key]
-                    return await event.reply("✅ اخطارهای کاربر حذف شد.")
-                return await event.reply("ℹ️ این کاربر اخطاری نداشت.")
-        except Exception as e:
-            await event.reply(f"⚠️ خطا در اجرای دستور: `{e}`", parse_mode="md")
+        # ✅ حذف اخطار
+        elif cmd == "حذف اخطار":
+            warns = _load_json(WARN_FILE)
+            key = f"{chat_id}:{target_id}"
+            if key in warns:
+                del warns[key]
+                _save_json(WARN_FILE, warns)
+                return await event.reply("✅ اخطارهای کاربر حذف شد.")
+            else:
+                return await event.reply("ℹ️ این کاربر اخطاری ندارد.")
+    except Exception as e:
+        return await event.reply(f"⚠️ خطا در اجرای دستور: {e}")
