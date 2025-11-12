@@ -15,12 +15,6 @@ if not os.path.exists(ACTIVITY_FILE):
     with open(ACTIVITY_FILE, "w", encoding="utf-8") as f:
         json.dump({}, f, ensure_ascii=False, indent=2)
 
-# ---------- یوزربات ----------
-try:
-    from userbot_module.userbot import client as userbot_client
-except ImportError:
-    userbot_client = None  # اگر یوزربات نصب نبود
-
 # ================= 📁 توابع کمکی =================
 def _load_activity():
     try:
@@ -58,20 +52,10 @@ async def record_user_activity(update: Update, context: ContextTypes.DEFAULT_TYP
     data[chat_key][str(user.id)] = datetime.utcnow().timestamp()
     _save_activity(data)
 
-# ================= 👥 آماده سازی تگ با یوزربات =================
-async def fetch_users_via_userbot(chat_id):
-    participants = []
-    if userbot_client:
-        try:
-            members = await userbot_client.get_participants(chat_id)
-            participants.extend([m for m in members if not m.bot])
-        except:
-            pass
-    return participants
-
 # ================= 👥 ساخت پنل تگ =================
 def build_tag_panel():
     keyboard = [
+        [InlineKeyboardButton("تگ همه کاربران گروه", callback_data="tag_all")],
         [InlineKeyboardButton("تگ کاربران مقام دار", callback_data="tag_admins")],
         [InlineKeyboardButton("تگ کردن 50 کاربر بدون مقام", callback_data="tag_50")],
         [InlineKeyboardButton("تگ کردن 300 کاربر بدون مقام", callback_data="tag_300")],
@@ -103,6 +87,19 @@ async def handle_tag_panel_click(update: Update, context: ContextTypes.DEFAULT_T
         await query.message.delete()
         return
 
+    # ---------- تگ همه کاربران گروه ----------
+    elif query.data == "tag_all":
+        try:
+            members = await context.bot.get_chat_administrators(chat.id)
+            # ابتدا ادمین‌ها
+            mentions.extend([f"[{m.user.first_name}](tg://user?id={m.user.id})" for m in members if not m.user.is_bot])
+            # سپس اعضای عادی
+            all_members = await context.bot.get_chat(chat.id).get_members()
+            mentions.extend([f"[{m.user.first_name}](tg://user?id={m.user.id})" for m in all_members if not m.user.is_bot and m.user.id not in [a.user.id for a in members]])
+        except:
+            await query.message.edit_text("⚠️ خطا در دریافت اعضای گروه")
+            return
+
     # ---------- تگ کاربران مقام دار ----------
     elif query.data == "tag_admins":
         try:
@@ -116,15 +113,12 @@ async def handle_tag_panel_click(update: Update, context: ContextTypes.DEFAULT_T
     elif query.data in ("tag_50", "tag_300", "tag_500"):
         count_map = {"tag_50": 50, "tag_300": 300, "tag_500": 500}
         count = count_map[query.data]
-
-        participants = await fetch_users_via_userbot(chat.id)
-        if not participants:
+        participants = []
+        try:
+            all_members = await context.bot.get_chat(chat.id).get_members()
+            participants = [m.user for m in all_members if not m.user.is_bot]
+        except:
             participants = []
-            try:
-                members = await context.bot.get_chat_administrators(chat.id)
-                participants = [m.user for m in await context.bot.get_chat(chat.id).get_members() if not m.user.is_bot]
-            except:
-                participants = []
 
         if participants:
             sample = random.sample(participants, min(count, len(participants)))
