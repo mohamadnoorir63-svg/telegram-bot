@@ -15,7 +15,6 @@ for f in (ADMINS_FILE, ALIAS_FILE):
         with open(f, "w", encoding="utf-8") as x:
             json.dump({}, x, ensure_ascii=False, indent=2)
 
-
 # ================= 📁 توابع کمکی =================
 def _load_json(path):
     try:
@@ -24,11 +23,9 @@ def _load_json(path):
     except:
         return {}
 
-
 def _save_json(path, data):
     with open(path, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
-
 
 async def _has_access(context, chat_id, user_id):
     """بررسی دسترسی فرد اجراکننده"""
@@ -40,27 +37,25 @@ async def _has_access(context, chat_id, user_id):
     except:
         return False
 
-
-# ================= 🧰 مدیریت مدیران با alias =================
+# ================= 🧰 مدیریت مدیران =================
 async def handle_admin_management(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = update.effective_message
     chat = update.effective_chat
     user = update.effective_user
     text = (msg.text or "").strip()
 
-    if chat.type not in ("group", "supergroup") or not text:
-        return
+    if chat.type != "supergroup" or not text:
+        return  # فقط سوپرگروپ‌ها
 
     data = _load_json(ADMINS_FILE)
     chat_key = str(chat.id)
     if chat_key not in data:
         data[chat_key] = []
 
-    # بارگذاری aliasها
+    # بررسی aliasها
     aliases_all = _load_json(ALIAS_FILE)
     aliases = aliases_all.get(chat_key, {})
 
-    # بررسی alias‌ها برای افزودن یا حذف مدیر
     for cmd_name, cmd_info in aliases.items():
         if text == cmd_name:
             cmd_type = cmd_info.get("type")
@@ -73,9 +68,11 @@ async def handle_admin_management(update: Update, context: ContextTypes.DEFAULT_
 
                 if target.id in SUDO_IDS:
                     return await msg.reply_text("👑 این کاربر سودو است و تغییر نمی‌کند.")
+                if target.id == context.bot.id:
+                    return await msg.reply_text("⚠️ نمی‌توانم خودم را مدیر کنم!")
 
                 me = await context.bot.get_chat_member(chat.id, context.bot.id)
-                if getattr(me, "can_promote_members", False) is not True and me.status != "creator":
+                if me.status not in ("creator", "administrator") or not getattr(me, "can_promote_members", False):
                     return await msg.reply_text("🚫 من اجازه‌ی تغییر مدیران را ندارم.")
 
                 try:
@@ -83,10 +80,13 @@ async def handle_admin_management(update: Update, context: ContextTypes.DEFAULT_
                         await context.bot.promote_chat_member(
                             chat_id=chat.id,
                             user_id=target.id,
+                            can_change_info=True,
                             can_delete_messages=True,
+                            can_manage_video_chats=True,
                             can_restrict_members=True,
                             can_invite_users=True,
                             can_pin_messages=True,
+                            can_promote_members=True,
                             can_manage_topics=True
                         )
                         if target.id not in data[chat_key]:
@@ -96,14 +96,13 @@ async def handle_admin_management(update: Update, context: ContextTypes.DEFAULT_
                         await context.bot.promote_chat_member(
                             chat_id=chat.id,
                             user_id=target.id,
-                            can_manage_chat=False,
+                            can_change_info=False,
                             can_delete_messages=False,
                             can_manage_video_chats=False,
                             can_restrict_members=False,
-                            can_promote_members=False,
-                            can_change_info=False,
                             can_invite_users=False,
                             can_pin_messages=False,
+                            can_promote_members=False,
                             can_manage_topics=False
                         )
                         if target.id in data[chat_key]:
@@ -115,24 +114,33 @@ async def handle_admin_management(update: Update, context: ContextTypes.DEFAULT_
                 except Exception as e:
                     return await msg.reply_text(f"⚠️ خطا در اجرای دستور: {e}")
 
-    # ========== ➕ افزودن مدیر ==========
+    # ===== دستور افزودن مدیر =====
     if text.startswith("افزودن مدیر"):
         if not await _has_access(context, chat.id, user.id):
-            return await msg.reply_text("🚫 فقط مدیران یا سودوها مجاز به اجرای این دستور هستند.")
+            return await msg.reply_text("🚫 فقط مدیران یا سودوها مجاز هستند.")
         if not msg.reply_to_message:
             return await msg.reply_text("⚠️ لطفاً روی پیام فرد موردنظر ریپلای کن.")
         target = msg.reply_to_message.from_user
         if target.id in SUDO_IDS:
             return await msg.reply_text("👑 این کاربر سودو است و نیازی به افزودن ندارد.")
+        if target.id == context.bot.id:
+            return await msg.reply_text("⚠️ نمی‌توانم خودم را مدیر کنم!")
+
+        me = await context.bot.get_chat_member(chat.id, context.bot.id)
+        if me.status not in ("creator", "administrator") or not getattr(me, "can_promote_members", False):
+            return await msg.reply_text("🚫 من اجازه‌ی تغییر مدیران را ندارم.")
 
         try:
             await context.bot.promote_chat_member(
                 chat_id=chat.id,
                 user_id=target.id,
+                can_change_info=True,
                 can_delete_messages=True,
+                can_manage_video_chats=True,
                 can_restrict_members=True,
                 can_invite_users=True,
                 can_pin_messages=True,
+                can_promote_members=True,
                 can_manage_topics=True
             )
             if target.id not in data[chat_key]:
@@ -145,28 +153,31 @@ async def handle_admin_management(update: Update, context: ContextTypes.DEFAULT_
         except Exception as e:
             await msg.reply_text(f"⚠️ خطا در افزودن مدیر: {e}")
 
-    # ========== ❌ حذف مدیر ==========
+    # ===== دستور حذف مدیر =====
     elif text.startswith("حذف مدیر"):
         if not await _has_access(context, chat.id, user.id):
             return await msg.reply_text("🚫 فقط مدیران یا سودوها مجازند.")
         if not msg.reply_to_message:
             return await msg.reply_text("⚠️ لطفاً روی پیام مدیر موردنظر ریپلای کن.")
         target = msg.reply_to_message.from_user
-        if target.id in SUDO_IDS:
-            return await msg.reply_text("🚫 نمی‌توان سودو را از مدیریت حذف کرد!")
+        if target.id in SUDO_IDS or target.id == context.bot.id:
+            return await msg.reply_text("🚫 نمی‌توان این کاربر را از مدیریت حذف کرد!")
+
+        me = await context.bot.get_chat_member(chat.id, context.bot.id)
+        if me.status not in ("creator", "administrator") or not getattr(me, "can_promote_members", False):
+            return await msg.reply_text("🚫 من اجازه‌ی تغییر مدیران را ندارم.")
 
         try:
             await context.bot.promote_chat_member(
                 chat_id=chat.id,
                 user_id=target.id,
-                can_manage_chat=False,
+                can_change_info=False,
                 can_delete_messages=False,
                 can_manage_video_chats=False,
                 can_restrict_members=False,
-                can_promote_members=False,
-                can_change_info=False,
                 can_invite_users=False,
                 can_pin_messages=False,
+                can_promote_members=False,
                 can_manage_topics=False
             )
             if target.id in data[chat_key]:
@@ -179,7 +190,7 @@ async def handle_admin_management(update: Update, context: ContextTypes.DEFAULT_
         except Exception as e:
             await msg.reply_text(f"⚠️ خطا در حذف مدیر: {e}")
 
-    # ========== 📋 لیست مدیران ==========
+    # ===== لیست مدیران =====
     elif text == "لیست مدیران":
         try:
             current_admins = await context.bot.get_chat_administrators(chat.id)
@@ -190,7 +201,6 @@ async def handle_admin_management(update: Update, context: ContextTypes.DEFAULT_
                 await msg.reply_text("ℹ️ هیچ مدیری در گروه یافت نشد.")
         except Exception as e:
             await msg.reply_text(f"⚠️ خطا در دریافت لیست مدیران: {e}")
-
 
 # ================= 🔧 ثبت هندلر =================
 def register_admin_handlers(application, group_number: int = 15):
