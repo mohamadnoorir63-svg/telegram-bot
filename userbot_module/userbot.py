@@ -1,14 +1,17 @@
 # ================= هماهنگ سازی یوزربات با ربات اصلی =================
+
 import os
 import asyncio
 import random
-from telethon import TelegramClient, events, sessions
+import json
+import re
 from datetime import datetime, timedelta
+from telethon import TelegramClient, events, sessions
 from telegram import Update, ChatPermissions
 from telegram.ext import ContextTypes, MessageHandler, filters
-import json, re
 
 # ---------- یوزربات ----------
+
 API_ID = int(os.environ.get("API_ID"))
 API_HASH = os.environ.get("API_HASH")
 SESSION_STRING = os.environ.get("SESSION_STRING")
@@ -24,6 +27,7 @@ if not os.path.exists(WARN_FILE):
     with open(WARN_FILE, "w", encoding="utf-8") as f:
         json.dump({}, f, ensure_ascii=False, indent=2)
 
+
 def _load_json(file):
     try:
         with open(file, "r", encoding="utf-8") as f:
@@ -31,9 +35,11 @@ def _load_json(file):
     except:
         return {}
 
+
 def _save_json(file, data):
     with open(file, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
+
 
 # ================= تگ کاربران با یوزربات =================
 async def tag_users(chat_id, user_ids=None, random_count=None):
@@ -54,6 +60,7 @@ async def tag_users(chat_id, user_ids=None, random_count=None):
         except:
             continue
 
+
 # ================= ارسال دستورات تنبیهی روی یوزربات =================
 async def punish_via_userbot(chat_id, user_id, action="ban", seconds=None):
     try:
@@ -71,20 +78,6 @@ async def punish_via_userbot(chat_id, user_id, action="ban", seconds=None):
     except:
         pass
 
-# ================= هماهنگی با پاکسازی =================
-async def cleanup_via_userbot(chat_id, message_ids):
-    """
-    ارسال گزارش پاکسازی یا پاک کردن پیام‌ها از طریق یوزربات
-    بدون نیاز به ادمین بودن برای ارسال گزارش‌ها.
-    """
-    if not message_ids:
-        return
-    try:
-        # ارسال گزارش اولیه به گروه
-        report = f"🧹 Userbot synced cleanup: {len(message_ids)} messages processed."
-        await client.send_message(chat_id, report)
-    except:
-        pass
 
 # ================= دریافت فرمان از ربات اصلی =================
 @client.on(events.NewMessage)
@@ -141,13 +134,21 @@ async def handle_commands(event):
         if user_id:
             await punish_via_userbot(chat_id, user_id, action="unban")
 
-    # ---------- هماهنگی با پاکسازی ----------
-    elif action.startswith("cleanup"):
-        # parts[2] = لیست message_id های حذف شده توسط ربات اصلی
-        message_ids = []
-        if len(parts) > 2:
-            message_ids = [int(mid) for mid in parts[2].split(",") if mid.isdigit()]
-        await cleanup_via_userbot(chat_id, message_ids)
+
+# ================= هماهنگی با پاکسازی =================
+async def cleanup_via_userbot(chat_id, message_ids):
+    """
+    ارسال گزارش پاکسازی یا هماهنگی با پاکسازی ربات اصلی
+    بدون حذفیات و بدون نیاز به ادمین بودن
+    """
+    if not message_ids:
+        return
+    try:
+        report = f"🧹 Userbot synced cleanup: {len(message_ids)} messages processed."
+        await client.send_message(chat_id, report)
+    except:
+        pass
+
 
 # ================= استارت یوزربات =================
 async def start_userbot():
