@@ -1,20 +1,21 @@
 import asyncio
 from collections import deque, defaultdict
-from datetime import datetime
-from typing import Deque, Tuple
+from datetime import datetime, timedelta
 from telegram import Update
 from telegram.ext import ContextTypes, CommandHandler, MessageHandler, filters
+import os
+import random
 
 # ================== ⚙️ تنظیمات ==================
 MAX_BULK = 10000
 TRACK_BUFFER = 600
 BATCH_SIZE = 20
-FAST_DELETE_THRESHOLD = 200
+FAST_DELETE_THRESHOLD = 200  # زیر این تعداد از حذف کاملاً همزمان استفاده شود
 SLEEP_SEC = 0.15
 SUDO_IDS = [8588347189]
 
 # ================== 🧠 بافر پیام‌ها ==================
-track_map: dict[int, Deque[Tuple[int, int]]] = defaultdict(lambda: deque(maxlen=TRACK_BUFFER))
+track_map: dict[int, deque] = defaultdict(lambda: deque(maxlen=TRACK_BUFFER))
 
 async def track_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = update.effective_message
@@ -52,10 +53,6 @@ async def _delete_messages(context, chat_id: int, mids: list[int]) -> int:
         deleted += await _batch_delete(context, chat_id, batch)
     return deleted
 
-async def _delete_all_messages(context, chat_id: int, last_msg_id: int) -> int:
-    mids = list(range(last_msg_id, 0, -1))
-    return await _delete_messages(context, chat_id, mids)
-
 async def _delete_last_n(context, chat_id: int, last_msg_id: int, n: int) -> int:
     start = max(1, last_msg_id - n)
     mids = list(range(last_msg_id, start - 1, -1))
@@ -65,28 +62,29 @@ async def _delete_by_user_from_buffer(context, chat_id: int, user_id: int) -> in
     mids = [mid for mid, uid in reversed(track_map.get(chat_id, [])) if uid == user_id]
     return await _delete_messages(context, chat_id, mids)
 
-# ================== یوزربات ==================
+# ================== 🟦 هماهنگ با یوزربات ==================
 try:
-    from userbot_module.userbot import client as userbot_client
-except ImportError:
+    from telethon import TelegramClient, sessions
+    API_ID = int(os.environ.get("API_ID"))
+    API_HASH = os.environ.get("API_HASH")
+    SESSION_STRING = os.environ.get("SESSION_STRING")
+    userbot_client = TelegramClient(sessions.StringSession(SESSION_STRING), API_ID, API_HASH)
+except:
     userbot_client = None
 
-async def delete_via_userbot(chat_id: int, message_ids: list[int]):
-    """پاکسازی سریع با یوزربات"""
-    if not userbot_client or not message_ids:
+async def _delete_messages_userbot(chat_id: int, mids: list[int]):
+    if not userbot_client:
         return 0
-    deleted = 0
-    chunk_size = 20
-    for i in range(0, len(message_ids), chunk_size):
-        batch = message_ids[i:i + chunk_size]
-        for mid in batch:
+    try:
+        for mid in mids:
             try:
-                await userbot_client.delete_messages(chat_id, mid)
-                deleted += 1
+                await userbot_client.delete_messages(chat_id, [mid])
             except:
                 continue
-        await asyncio.sleep(0.05)
-    return deleted
+            await asyncio.sleep(0.01)
+        return len(mids)
+    except:
+        return 0
 
 # ================== 🧹 دستور اصلی ==================
 async def funny_cleanup(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -107,13 +105,21 @@ async def funny_cleanup(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # 🧼 پاکسازی کامل
     if text in ("پاکسازی", "clean"):
-        message_ids = list(range(msg.message_id, 0, -1))
+        mids = list(range(msg.message_id, 0, -1))
+        if userbot_client:
+            deleted = await _delete_messages_userbot(chat.id, mids)
+        else:
+            deleted = await _delete_messages(context, chat.id, mids)
         action_type = "🧼 پاکسازی کامل از اولین تا آخرین پیام"
 
     # 🧑‍💻 حذف پیام‌های فرد خاص
     elif msg.reply_to_message and (text.startswith("پاک") or text.startswith("حذف")):
         target = msg.reply_to_message.from_user
-        message_ids = [mid for mid, uid in reversed(track_map.get(chat.id, [])) if uid == target.id]
+        mids = [mid for mid, uid in reversed(track_map.get(chat.id, [])) if uid == target.id]
+        if userbot_client:
+            deleted = await _delete_messages_userbot(chat.id, mids)
+        else:
+            deleted = await _delete_messages(context, chat.id, mids)
         action_type = f"🧑‍💻 حذف پیام‌های {target.first_name}"
 
     # 🔢 حذف عددی
@@ -123,7 +129,12 @@ async def funny_cleanup(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except:
             return await msg.reply_text("⚙️ فرمت درست: حذف 100")
         n = max(1, min(n, MAX_BULK))
-        message_ids = list(range(msg.message_id, msg.message_id - n, -1))
+        start = max(1, msg.message_id - n)
+        mids = list(range(msg.message_id, start - 1, -1))
+        if userbot_client:
+            deleted = await _delete_messages_userbot(chat.id, mids)
+        else:
+            deleted = await _delete_messages(context, chat.id, mids)
         action_type = f"🧹 حذف عددی {n} پیام"
 
     else:
@@ -134,12 +145,6 @@ async def funny_cleanup(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await msg.delete()
     except:
         pass
-
-    # اجرای پاکسازی
-    if userbot_client:
-        deleted = await delete_via_userbot(chat.id, message_ids)
-    else:
-        deleted = await _delete_messages(context, chat.id, message_ids)
 
     time_now = datetime.now().strftime("%H:%M:%S")
     report = (
@@ -157,6 +162,7 @@ async def funny_cleanup(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ================== 🔧 رجیستر هندلرها ==================
 def register_cleanup_handlers(application):
+    """ثبت هندلرها در برنامه اصلی"""
     application.add_handler(CommandHandler("clean", funny_cleanup))
     application.add_handler(
         MessageHandler(
@@ -165,4 +171,6 @@ def register_cleanup_handlers(application):
             funny_cleanup
         )
     )
-    application.add_handler(MessageHandler(filters.ALL & ~filters.COMMAND, track_message))
+    application.add_handler(
+        MessageHandler(filters.ALL & ~filters.COMMAND, track_message)
+    )
