@@ -1032,7 +1032,7 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ======================= 💬 پاسخ و هوش مصنوعی =======================
 async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """پاسخ‌دهی اصلی هوش مصنوعی و سیستم یادگیری"""
-
+    
     # 🚫 جلوگیری از پاسخ هوشمند در صورت اجرای دستور سفارشی
     if context.user_data.get("custom_handled"):
         context.user_data["custom_handled"] = False
@@ -1047,16 +1047,6 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
     text = update.message.text.strip()
     lower_text = text.lower()
-
-    # 🧩 پردازش پیام گروهی
-    reply_text = process_group_message(uid, chat_id, text)
-
-    # 🧠 فعال‌سازی حافظهٔ کوتاه‌مدت گفتگو
-    context_memory.add_message(uid, text)
-
-    # 🧠 گرفتن کل تاریخچه اخیر کاربر
-    recent_context = context_memory.get_context(uid)
-    full_context = " ".join(recent_context[-3:]) if recent_context else text
 
     # 🚫 جلوگیری از پاسخ در پیوی (فقط جوک و فال مجازند)
     if update.effective_chat.type == "private" and lower_text not in ["جوک", "فال"]:
@@ -1079,10 +1069,20 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
         shadow_learn(text, "")
         return
 
+    # 🧩 پردازش پیام گروهی و گرفتن reply_text
+    reply_text = process_group_message(uid, chat_id, text)
+
+    # 🧠 فعال‌سازی حافظهٔ کوتاه‌مدت گفتگو
+    context_memory.add_message(uid, text)
+
+    # 🧠 گرفتن کل تاریخچه اخیر کاربر برای هوش مصنوعی
+    recent_context = context_memory.get_context(uid)
+    full_context = " ".join(recent_context[-3:]) if recent_context else text
+
     # 🧠 در نهایت فقط یک پاسخ اصلی هوش مصنوعی ارسال شود
     if reply_text:  # بررسی اینکه reply_text خالی نباشد
         await update.message.reply_text(reply_text)
-        
+
     # ✅ درصد هوش منطقی
     if text.lower() == "درصد هوش":
         score = 0
