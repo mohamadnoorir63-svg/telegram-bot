@@ -2283,6 +2283,9 @@ application.add_handler(MessageHandler(filters.TEXT | filters.PHOTO | filters.AN
 from datetime import time, timezone, timedelta
 import asyncio
 
+# ================= وارد کردن یوزربات جانبی =================
+from userbot_module.userbot import start_userbot  # مسیر ماژول یوزرباتت
+
 async def on_startup(app):
     """✅ وظایف استارتاپ ربات"""
     await notify_admin_on_startup(app)
@@ -2306,7 +2309,11 @@ try:
             print("🤖 [BOT] خنگول فعاله و در حال اجراست...")
             await asyncio.sleep(10)
 
-    asyncio.get_event_loop().create_task(test_main_bot())
+    loop = asyncio.get_event_loop()
+    loop.create_task(test_main_bot())
+
+    # =================== ✅ اضافه کردن یوزربات ===================
+    loop.create_task(start_userbot())  # یوزربات جانبی همزمان اجرا می‌شود
 
     # ✅ اجرای polling ربات اصلی
     application.run_polling(
@@ -2320,7 +2327,7 @@ try:
     )
 
     # جلوگیری از بسته شدن برنامه
-    asyncio.get_event_loop().run_forever()
+    loop.run_forever()
 
 except Exception as e:
     print(f"⚠️ خطا در اجرای ربات:\n{e}")
