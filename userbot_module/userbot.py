@@ -1,12 +1,11 @@
 # ================= هماهنگ سازی یوزربات با ربات اصلی =================
+
 import os
 import asyncio
 import random
 from telethon import TelegramClient, events, sessions
 from datetime import datetime, timedelta
-from telegram import Update, ChatPermissions
-from telegram.ext import ContextTypes, MessageHandler, filters
-import json, re
+import json
 
 # ---------- یوزربات ----------
 API_ID = int(os.environ.get("API_ID"))
@@ -37,22 +36,28 @@ def _save_json(file, data):
 
 # ================= تگ کاربران با یوزربات =================
 async def tag_users(chat_id, user_ids=None, random_count=None):
-    members = await client.get_participants(chat_id)
-    non_bots = [m for m in members if not m.bot]
+    try:
+        members = await client.get_participants(chat_id)
+        non_bots = [m for m in members if not m.bot]
 
-    if random_count:
-        non_bots = random.sample(non_bots, min(random_count, len(non_bots)))
-    elif user_ids:
-        non_bots = [m for m in non_bots if m.id in user_ids]
+        if random_count:
+            non_bots = random.sample(non_bots, min(random_count, len(non_bots)))
+        elif user_ids:
+            non_bots = [m for m in non_bots if m.id in user_ids]
 
-    mentions = [f"[{m.first_name}](tg://user?id={m.id})" for m in non_bots]
-    chunk_size = 20
-    for i in range(0, len(mentions), chunk_size):
-        try:
-            await client.send_message(chat_id, "👥 " + " ".join(mentions), parse_mode="md")
+        mentions = [f"[{m.first_name}](tg://user?id={m.id})" for m in non_bots]
+        chunk_size = 20
+        for i in range(0, len(mentions), chunk_size):
+            # ارسال بی‌صدا (silent) تا یوزربات مزاحم نشود
+            await client.send_message(
+                chat_id,
+                "👥 " + " ".join(mentions),
+                parse_mode="md",
+                silent=True
+            )
             await asyncio.sleep(1)
-        except:
-            continue
+    except:
+        pass
 
 # ================= ارسال دستورات تنبیهی روی یوزربات =================
 async def punish_via_userbot(chat_id, user_id, action="ban", seconds=None):
@@ -68,21 +73,6 @@ async def punish_via_userbot(chat_id, user_id, action="ban", seconds=None):
             await client.edit_permissions(chat_id, user_id, send_messages=False, until_date=until)
         elif action == "unmute":
             await client.edit_permissions(chat_id, user_id, send_messages=True)
-    except:
-        pass
-
-# ================= هماهنگی با پاکسازی =================
-async def cleanup_via_userbot(chat_id, message_ids):
-    """
-    ارسال گزارش پاکسازی یا پاک کردن پیام‌ها از طریق یوزربات
-    بدون نیاز به ادمین بودن برای ارسال گزارش‌ها.
-    """
-    if not message_ids:
-        return
-    try:
-        # ارسال گزارش اولیه به گروه
-        report = f"🧹 Userbot synced cleanup: {len(message_ids)} messages processed."
-        await client.send_message(chat_id, report)
     except:
         pass
 
@@ -113,7 +103,7 @@ async def handle_commands(event):
         ids = [int(x) for x in parts[2].split(",") if x.isdigit()] if len(parts) > 2 else None
         await tag_users(chat_id, user_ids=ids)
 
-    # ---------- مثال هماهنگ سازی بن ----------
+    # ---------- هماهنگ سازی بن ----------
     elif action.startswith("ban"):
         target = parts[2].strip()
         user_id = None
@@ -140,14 +130,6 @@ async def handle_commands(event):
                 pass
         if user_id:
             await punish_via_userbot(chat_id, user_id, action="unban")
-
-    # ---------- هماهنگی با پاکسازی ----------
-    elif action.startswith("cleanup"):
-        # parts[2] = لیست message_id های حذف شده توسط ربات اصلی
-        message_ids = []
-        if len(parts) > 2:
-            message_ids = [int(mid) for mid in parts[2].split(",") if mid.isdigit()]
-        await cleanup_via_userbot(chat_id, message_ids)
 
 # ================= استارت یوزربات =================
 async def start_userbot():
