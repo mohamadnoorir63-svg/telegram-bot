@@ -11,15 +11,15 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ACTIVITY_FILE = os.path.join(BASE_DIR, "activity.json")
 SUDO_IDS = [8588347189]
 
+if not os.path.exists(ACTIVITY_FILE):
+    with open(ACTIVITY_FILE, "w", encoding="utf-8") as f:
+        json.dump({}, f, ensure_ascii=False, indent=2)
+
 # ---------- یوزربات ----------
 try:
     from userbot_module.userbot import client as userbot_client
 except ImportError:
     userbot_client = None  # اگر یوزربات نصب نبود
-
-if not os.path.exists(ACTIVITY_FILE):
-    with open(ACTIVITY_FILE, "w", encoding="utf-8") as f:
-        json.dump({}, f, ensure_ascii=False, indent=2)
 
 # ================= 📁 توابع کمکی =================
 def _load_activity():
@@ -76,8 +76,6 @@ def build_tag_panel():
         [InlineKeyboardButton("تگ کردن 50 کاربر بدون مقام", callback_data="tag_50")],
         [InlineKeyboardButton("تگ کردن 300 کاربر بدون مقام", callback_data="tag_300")],
         [InlineKeyboardButton("تگ کردن 500 کاربر گروه", callback_data="tag_500")],
-        [InlineKeyboardButton("تگ کاربران فعال", callback_data="tag_active")],
-        [InlineKeyboardButton("تگ کاربران غیره فعال", callback_data="tag_inactive")],
         [InlineKeyboardButton("بستن", callback_data="close_panel")]
     ]
     return InlineKeyboardMarkup(keyboard)
@@ -98,8 +96,6 @@ async def handle_tag_panel_click(update: Update, context: ContextTypes.DEFAULT_T
     query = update.callback_query
     await query.answer()
     chat = query.message.chat
-    data = _load_activity()
-    chat_data = data.get(str(chat.id), {})
 
     mentions = []
 
@@ -116,30 +112,6 @@ async def handle_tag_panel_click(update: Update, context: ContextTypes.DEFAULT_T
             await query.message.edit_text("⚠️ خطا در دریافت مدیران گروه")
             return
 
-    # ---------- تگ کاربران فعال ----------
-    elif query.data == "tag_active":
-        now = datetime.utcnow().timestamp()
-        active_users = [uid for uid, t in chat_data.items() if now - t <= 24 * 3600]
-        for uid in active_users:
-            try:
-                member = await context.bot.get_chat_member(chat.id, int(uid))
-                if not member.user.is_bot:
-                    mentions.append(f"[{member.first_name}](tg://user?id={member.id})")
-            except:
-                continue
-
-    # ---------- تگ کاربران غیرفعال ----------
-    elif query.data == "tag_inactive":
-        now = datetime.utcnow().timestamp()
-        inactive_users = [uid for uid, t in chat_data.items() if now - t > 24 * 3600]
-        for uid in inactive_users:
-            try:
-                member = await context.bot.get_chat_member(chat.id, int(uid))
-                if not member.user.is_bot:
-                    mentions.append(f"[{member.first_name}](tg://user?id={member.id})")
-            except:
-                continue
-
     # ---------- تگ تعداد مشخص کاربران بدون مقام ----------
     elif query.data in ("tag_50", "tag_300", "tag_500"):
         count_map = {"tag_50": 50, "tag_300": 300, "tag_500": 500}
@@ -147,14 +119,12 @@ async def handle_tag_panel_click(update: Update, context: ContextTypes.DEFAULT_T
 
         participants = await fetch_users_via_userbot(chat.id)
         if not participants:
-            # fallback از activity.json
-            for uid_str in chat_data.keys():
-                try:
-                    member = await context.bot.get_chat_member(chat.id, int(uid_str))
-                    if not member.user.is_bot:
-                        participants.append(member.user)
-                except:
-                    continue
+            participants = []
+            try:
+                members = await context.bot.get_chat_administrators(chat.id)
+                participants = [m.user for m in await context.bot.get_chat(chat.id).get_members() if not m.user.is_bot]
+            except:
+                participants = []
 
         if participants:
             sample = random.sample(participants, min(count, len(participants)))
@@ -170,7 +140,6 @@ async def handle_tag_panel_click(update: Update, context: ContextTypes.DEFAULT_T
 
 # ================= 🔧 ثبت هندلرها =================
 def register_tag_handlers(application, group_number: int = 14):
-    # پیام / دستور باز کردن پنل
     application.add_handler(
         MessageHandler(
             filters.Regex(r"^(تگ)$") & filters.ChatType.GROUPS,
@@ -178,7 +147,6 @@ def register_tag_handlers(application, group_number: int = 14):
         ),
         group=group_number,
     )
-    # هندلر کلیک روی دکمه‌های پنل
     application.add_handler(
         CallbackQueryHandler(
             handle_tag_panel_click,
@@ -186,7 +154,6 @@ def register_tag_handlers(application, group_number: int = 14):
         ),
         group=group_number + 1,
     )
-    # ثبت فعالیت کاربران
     application.add_handler(
         MessageHandler(
             filters.ALL & filters.ChatType.GROUPS,
