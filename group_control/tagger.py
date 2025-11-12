@@ -9,7 +9,13 @@ from telegram.ext import ContextTypes, MessageHandler, filters, CallbackQueryHan
 # ================= ⚙️ تنظیمات اولیه =================
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ACTIVITY_FILE = os.path.join(BASE_DIR, "activity.json")
-SUDO_IDS = [8588347189]  # آیدی سودوها
+SUDO_IDS = [8588347189]
+
+# ---------- یوزربات ----------
+try:
+    from userbot_module.userbot import client as userbot_client
+except ImportError:
+    userbot_client = None  # اگر یوزربات نصب نبود
 
 if not os.path.exists(ACTIVITY_FILE):
     with open(ACTIVITY_FILE, "w", encoding="utf-8") as f:
@@ -51,6 +57,17 @@ async def record_user_activity(update: Update, context: ContextTypes.DEFAULT_TYP
         data[chat_key] = {}
     data[chat_key][str(user.id)] = datetime.utcnow().timestamp()
     _save_activity(data)
+
+# ================= 👥 آماده سازی تگ با یوزربات =================
+async def fetch_users_via_userbot(chat_id):
+    participants = []
+    if userbot_client:
+        try:
+            members = await userbot_client.get_participants(chat_id)
+            participants.extend([m for m in members if not m.bot])
+        except:
+            pass
+    return participants
 
 # ================= 👥 ساخت پنل تگ =================
 def build_tag_panel():
@@ -107,7 +124,7 @@ async def handle_tag_panel_click(update: Update, context: ContextTypes.DEFAULT_T
             try:
                 member = await context.bot.get_chat_member(chat.id, int(uid))
                 if not member.user.is_bot:
-                    mentions.append(f"[{member.user.first_name}](tg://user?id={member.user.id})")
+                    mentions.append(f"[{member.first_name}](tg://user?id={member.id})")
             except:
                 continue
 
@@ -119,29 +136,28 @@ async def handle_tag_panel_click(update: Update, context: ContextTypes.DEFAULT_T
             try:
                 member = await context.bot.get_chat_member(chat.id, int(uid))
                 if not member.user.is_bot:
-                    mentions.append(f"[{member.user.first_name}](tg://user?id={member.user.id})")
+                    mentions.append(f"[{member.first_name}](tg://user?id={member.id})")
             except:
                 continue
 
-    # ---------- تگ تعداد مشخص از کاربران بدون مقام ----------
+    # ---------- تگ تعداد مشخص کاربران بدون مقام ----------
     elif query.data in ("tag_50", "tag_300", "tag_500"):
         count_map = {"tag_50": 50, "tag_300": 300, "tag_500": 500}
         count = count_map[query.data]
-        normal_users = []
 
-        # استفاده از activity.json به جای متدهای غیر موجود
-        for uid_str in chat_data.keys():
-            try:
-                member = await context.bot.get_chat_member(chat.id, int(uid_str))
-                if not member.user.is_bot:
-                    # چک می‌کنیم که ادمین نباشد
-                    if member.status == "member":
-                        normal_users.append(member.user)
-            except:
-                continue
+        participants = await fetch_users_via_userbot(chat.id)
+        if not participants:
+            # fallback از activity.json
+            for uid_str in chat_data.keys():
+                try:
+                    member = await context.bot.get_chat_member(chat.id, int(uid_str))
+                    if not member.user.is_bot:
+                        participants.append(member.user)
+                except:
+                    continue
 
-        if normal_users:
-            sample = random.sample(normal_users, min(count, len(normal_users)))
+        if participants:
+            sample = random.sample(participants, min(count, len(participants)))
             mentions = [f"[{m.first_name}](tg://user?id={m.id})" for m in sample]
 
     # ---------- ارسال تگ روی ربات اصلی ----------
