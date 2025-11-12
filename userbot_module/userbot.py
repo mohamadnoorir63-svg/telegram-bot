@@ -15,20 +15,21 @@ if not all([API_ID, API_HASH, SESSION_STRING, BOT_USER_ID]):
 client = TelegramClient(sessions.StringSession(SESSION_STRING), API_ID, API_HASH)
 
 # ================= 🧩 توابع تگ =================
-async def tag_all(chat_id):
+async def tag_users(chat_id, user_ids=None, random_count=None):
+    """ارسال تگ به کاربران مشخص یا تصادفی"""
     members = await client.get_participants(chat_id)
-    mentions = [f"[{m.first_name}](tg://user?id={m.id})" for m in members if not m.bot]
+    non_bots = [m for m in members if not m.bot]
+
+    if random_count:
+        non_bots = random.sample(non_bots, min(random_count, len(non_bots)))
+    elif user_ids:
+        non_bots = [m for m in non_bots if m.id in user_ids]
+
+    mentions = [f"[{m.first_name}](tg://user?id={m.id})" for m in non_bots]
     chunk_size = 20
     for i in range(0, len(mentions), chunk_size):
         await client.send_message(chat_id, "👥 " + " ".join(mentions), parse_mode="md")
         await asyncio.sleep(1)
-
-async def tag_random(chat_id, count=5):
-    members = await client.get_participants(chat_id)
-    non_bots = [m for m in members if not m.bot]
-    sample = random.sample(non_bots, min(count, len(non_bots)))
-    mentions = [f"[{m.first_name}](tg://user?id={m.id})" for m in sample]
-    await client.send_message(chat_id, "🎲 تگ تصادفی:\n" + " ".join(mentions), parse_mode="md")
 
 # ================= ⚡ دریافت فرمان از ربات اصلی =================
 @client.on(events.NewMessage)
@@ -44,13 +45,17 @@ async def handle_commands(event):
 
     action = parts[0].strip().lower()
     chat_id = int(parts[1])
+
     if action == "tagall":
-        await tag_all(chat_id)
+        await tag_users(chat_id)
     elif action.startswith("tagrandom"):
         count = 5
         if len(parts) == 3 and parts[2].isdigit():
             count = int(parts[2])
-        await tag_random(chat_id, count)
+        await tag_users(chat_id, random_count=count)
+    elif action.startswith("taglist"):  # لیست آیدی‌های مشخص
+        ids = [int(x) for x in parts[2].split(",") if x.isdigit()] if len(parts) > 2 else None
+        await tag_users(chat_id, user_ids=ids)
 
 # ================= 🚀 استارت یوزربات =================
 async def start_userbot():
