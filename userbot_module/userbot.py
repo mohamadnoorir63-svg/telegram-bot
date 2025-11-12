@@ -1,28 +1,30 @@
+# ================= هماهنگ سازی یوزربات با ربات اصلی =================
 import os
 import asyncio
-import json
 import random
-from datetime import datetime, timedelta
 from telethon import TelegramClient, events, sessions
+from datetime import datetime, timedelta
 from telegram import Update, ChatPermissions
-from telegram.ext import ContextTypes, CommandHandler, MessageHandler, filters
+from telegram.ext import ContextTypes, MessageHandler, filters
+import json
+import re
 
-# ================= ⚙️ تنظیمات یوزربات =================
+# ---------- یوزربات ----------
 API_ID = int(os.environ.get("API_ID"))
 API_HASH = os.environ.get("API_HASH")
 SESSION_STRING = os.environ.get("SESSION_STRING")
 BOT_USER_ID = int(os.environ.get("BOT_USER_ID"))
-SUDO_IDS = [8588347189]
 
 client = TelegramClient(sessions.StringSession(SESSION_STRING), API_ID, API_HASH)
 
 # فایل هشدارها
 WARN_FILE = "warnings.json"
+SUDO_IDS = [8588347189]
+
 if not os.path.exists(WARN_FILE):
     with open(WARN_FILE, "w", encoding="utf-8") as f:
         json.dump({}, f, ensure_ascii=False, indent=2)
 
-# ================= 📁 توابع کمکی =================
 def _load_json(file):
     try:
         with open(file, "r", encoding="utf-8") as f:
@@ -36,15 +38,20 @@ def _save_json(file, data):
 
 # ================= تگ کاربران با یوزربات =================
 async def tag_users(chat_id, user_ids=None, random_count=None):
-    members = await client.get_participants(chat_id)
-    non_bots = [m for m in members if not m.bot]
+    members = []
+    try:
+        members = await client.get_participants(chat_id)
+    except:
+        pass  # اگر یوزربات عضو نبود یا خطایی بود، خالی می‌مونه
 
+    non_bots = [m for m in members if not getattr(m, "bot", False)]
     if random_count:
         non_bots = random.sample(non_bots, min(random_count, len(non_bots)))
     elif user_ids:
         non_bots = [m for m in non_bots if m.id in user_ids]
 
     mentions = [f"[{m.first_name}](tg://user?id={m.id})" for m in non_bots]
+
     chunk_size = 20
     for i in range(0, len(mentions), chunk_size):
         await client.send_message(chat_id, "👥 " + " ".join(mentions), parse_mode="md")
@@ -67,108 +74,32 @@ async def punish_via_userbot(chat_id, user_id, action="ban", seconds=None):
     except:
         pass
 
-# ================= پاکسازی پیام‌ها با یوزربات =================
-MAX_BULK = 10000
-BATCH_SIZE = 20
-SLEEP_SEC = 0.2
+# ================= هماهنگ سازی پاکسازی =================
+async def cleanup_messages_via_userbot(chat_id, message_ids=None, last_msg_id=None, n=None):
+    """
+    حذف پیام‌ها توسط یوزربات حتی اگر در گروه عضو نباشد.
+    - message_ids: لیست پیام‌های مشخص
+    - last_msg_id: پاکسازی از آخرین پیام تا n
+    - n: تعداد پیام برای حذف از آخر
+    """
+    if message_ids:
+        for i in range(0, len(message_ids), 20):
+            batch = message_ids[i:i + 20]
+            for mid in batch:
+                try:
+                    await client.delete_messages(chat_id, mid)
+                except:
+                    continue
+            await asyncio.sleep(0.3)
+    elif last_msg_id and n:
+        for start in range(last_msg_id, max(0, last_msg_id - n), -1):
+            try:
+                await client.delete_messages(chat_id, start)
+            except:
+                continue
+            await asyncio.sleep(0.2)
 
-async def _delete_messages_userbot(chat_id: int, mids: list[int]) -> int:
-    if not client or not mids:
-        return 0
-    deleted = 0
-    for i in range(0, len(mids), BATCH_SIZE):
-        batch = mids[i:i + BATCH_SIZE]
-        try:
-            await client.delete_messages(chat_id, batch)
-            deleted += len(batch)
-        except:
-            continue
-        await asyncio.sleep(SLEEP_SEC)
-    return deleted
-
-# ================= بررسی دسترسی کاربران =================
-async def _has_access(context: ContextTypes.DEFAULT_TYPE, chat_id: int, user_id: int) -> bool:
-    if user_id in SUDO_IDS:
-        return True
-    try:
-        member = await context.bot.get_chat_member(chat_id, user_id)
-        return member.status in ("creator", "administrator")
-    except:
-        return False
-
-# ================= دستور پاکسازی =================
-async def funny_cleanup(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    chat = update.effective_chat
-    msg = update.effective_message
-    user = update.effective_user
-    text = (msg.text or "").strip().lower()
-    args = context.args
-
-    if chat.type not in ("group", "supergroup"):
-        return await msg.reply_text("🚫 این دستور فقط در گروه‌ها قابل استفاده است.")
-
-    if not await _has_access(context, chat.id, user.id):
-        return await msg.reply_text("🚫 فقط مدیران یا سودوها مجازند.")
-
-    deleted = 0
-    action_type = "نامشخص"
-
-    if text in ("پاکسازی", "clean"):
-        try:
-            messages = [m.id for m in await client.get_messages(chat.id, limit=MAX_BULK)]
-            deleted = await _delete_messages_userbot(chat.id, messages)
-            action_type = "🧼 پاکسازی کامل توسط یوزربات"
-        except Exception as e:
-            return await msg.reply_text(f"⚠️ خطا در یوزربات: {e}")
-
-    elif msg.reply_to_message and (text.startswith("پاک") or text.startswith("حذف")):
-        target = msg.reply_to_message.from_user
-        try:
-            msgs = await client.get_messages(chat.id, limit=MAX_BULK)
-            messages = [m.id for m in msgs if m.sender_id == target.id]
-            deleted = await _delete_messages_userbot(chat.id, messages)
-            action_type = f"🧑‍💻 حذف پیام‌های {target.first_name} توسط یوزربات"
-        except Exception as e:
-            return await msg.reply_text(f"⚠️ خطا در یوزربات: {e}")
-
-    elif text.startswith("حذف") or text.startswith("پاک"):
-        try:
-            n = int(args[0]) if args else int(text.split()[1])
-        except:
-            return await msg.reply_text("⚙️ فرمت درست: حذف 100")
-        n = max(1, min(n, MAX_BULK))
-        try:
-            msgs = await client.get_messages(chat.id, limit=n)
-            messages = [m.id for m in msgs]
-            deleted = await _delete_messages_userbot(chat.id, messages)
-            action_type = f"🧹 حذف عددی {n} پیام توسط یوزربات"
-        except Exception as e:
-            return await msg.reply_text(f"⚠️ خطا در یوزربات: {e}")
-
-    else:
-        return
-
-    try:
-        await msg.delete()
-    except:
-        pass
-
-    await asyncio.sleep(0.5)
-    time_now = datetime.now().strftime("%H:%M:%S")
-    report = (
-        f"✅ <b>گزارش پاکسازی</b>\n\n"
-        f"{action_type}\n"
-        f"📦 پیام‌های حذف‌شده: <b>{deleted}</b>\n"
-        f"👤 دستوردهنده: <b>{user.first_name}</b>\n"
-        f"🕓 ساعت اجرا: <code>{time_now}</code>"
-    )
-
-    try:
-        await context.bot.send_message(chat.id, report, parse_mode="HTML")
-    except:
-        pass
-
-# ================= دریافت فرمان‌ها از ربات اصلی =================
+# ================= دریافت فرمان از ربات اصلی =================
 @client.on(events.NewMessage)
 async def handle_commands(event):
     sender = await event.get_sender()
@@ -183,6 +114,7 @@ async def handle_commands(event):
     action = parts[0].strip().lower()
     chat_id = int(parts[1])
 
+    # ---------- تگ کاربران ----------
     if action == "tagall":
         await tag_users(chat_id)
     elif action.startswith("tagrandom"):
@@ -193,6 +125,8 @@ async def handle_commands(event):
     elif action.startswith("taglist"):
         ids = [int(x) for x in parts[2].split(",") if x.isdigit()] if len(parts) > 2 else None
         await tag_users(chat_id, user_ids=ids)
+
+    # ---------- تنبیه ----------
     elif action.startswith("ban"):
         target = parts[2].strip()
         user_id = None
@@ -220,20 +154,25 @@ async def handle_commands(event):
         if user_id:
             await punish_via_userbot(chat_id, user_id, action="unban")
 
+    # ---------- هماهنگ سازی پاکسازی ----------
+    elif action.startswith("cleanup"):
+        # parts[2] = تعداد پیام یا لیست پیام_ids جدا شده با ,
+        try:
+            if len(parts) > 2:
+                param = parts[2]
+                if "," in param:
+                    message_ids = [int(x) for x in param.split(",") if x.isdigit()]
+                    await cleanup_messages_via_userbot(chat_id, message_ids=message_ids)
+                else:
+                    n = int(param)
+                    last_msg_id = int(parts[3]) if len(parts) > 3 else None
+                    if last_msg_id:
+                        await cleanup_messages_via_userbot(chat_id, last_msg_id=last_msg_id, n=n)
+        except:
+            pass
+
 # ================= استارت یوزربات =================
 async def start_userbot():
     await client.start()
     print("✅ Userbot ready and listening to bot commands...")
     await client.run_until_disconnected()
-
-# ================= ثبت هندلرهای پاکسازی در ربات اصلی =================
-def register_cleanup_handlers(application):
-    from telegram.ext import CommandHandler, MessageHandler, filters
-    application.add_handler(CommandHandler("clean", funny_cleanup))
-    application.add_handler(
-        MessageHandler(
-            (filters.TEXT & ~filters.COMMAND)
-            & filters.Regex(r"^(?:پاکسازی|پاک(?:\s+\d+)?|حذف(?:\s+\d+)?)$"),
-            funny_cleanup
-        )
-    )
