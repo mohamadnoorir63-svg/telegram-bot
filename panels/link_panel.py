@@ -7,6 +7,19 @@ from telegram.ext import ContextTypes
 # 📂 مسیر فایل داده گروه‌ها
 GROUP_CTRL_FILE = os.path.join(os.path.dirname(os.path.dirname(__file__)), "group_control.json")
 
+SUDO_IDS = [8588347189]  # آیدی سودو
+
+# ===================== 🧰 دسترسی =====================
+async def _has_access(context: ContextTypes.DEFAULT_TYPE, chat_id: int, user_id: int) -> bool:
+    if user_id in SUDO_IDS:
+        return True
+    try:
+        member = await context.bot.get_chat_member(chat_id, user_id)
+        return member.status in ("creator", "administrator")
+    except:
+        return False
+
+# ===================== 🗂 مدیریت فایل =====================
 def load_group_data():
     if os.path.exists(GROUP_CTRL_FILE):
         try:
@@ -32,12 +45,16 @@ async def fast_replace(query, text, keyboard=None, parse_mode="HTML"):
         reply_markup=InlineKeyboardMarkup(keyboard) if keyboard else None
     )
 
-
 # ===================== 🧭 پنل اصلی =====================
 async def link_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat = update.effective_chat
+    user = update.effective_user
+
     if chat.type not in ["group", "supergroup"]:
         return await update.message.reply_text("⚠️ فقط در گروه قابل استفاده است.")
+
+    if not await _has_access(context, chat.id, user.id):
+        return await update.message.reply_text("🚫 فقط مدیران یا سودو می‌توانند از این پنل استفاده کنند.")
 
     gdata = load_group_data()
     group = gdata.setdefault(str(chat.id), {})
@@ -47,7 +64,6 @@ async def link_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = get_panel_text(lang)
     await update.message.reply_text(text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
 
-
 # ===================== ⚙️ کنترل دکمه‌ها =====================
 async def link_panel_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -56,6 +72,9 @@ async def link_panel_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE)
     chat = query.message.chat
     chat_id = chat.id
     user = query.from_user
+
+    if not await _has_access(context, chat_id, user.id):
+        return await query.message.reply_text("🚫 فقط مدیران یا سودو می‌توانند این بخش را استفاده کنند.")
 
     gdata = load_group_data()
     group = gdata.setdefault(str(chat_id), {})
@@ -178,7 +197,6 @@ async def link_panel_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE)
         except:
             pass
 
-
 # ===================== 🔤 توابع کمکی زبان =====================
 def generate_main_keyboard(lang):
     if lang == "en":
@@ -199,7 +217,6 @@ def generate_main_keyboard(lang):
             [InlineKeyboardButton("📚 راهنما", callback_data="link_help")],
             [InlineKeyboardButton("❌ بستن", callback_data="link_close")]
         ]
-
 
 def get_panel_text(lang):
     return (
