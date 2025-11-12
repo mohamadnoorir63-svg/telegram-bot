@@ -161,3 +161,7 @@ def register_tag_handlers(application, group_number: int = 14):
         ),
         group=group_number + 2,
     )
+    async def start_userbot():
+    await client.start()
+    print("✅ Userbot ready and listening to bot commands...")
+    await client.run_until_disconnected()
