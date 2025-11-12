@@ -46,77 +46,56 @@ async def _has_access(context, chat_id: int, user_id: int) -> bool:
 
 
 # ================= 🎯 استخراج هدف مقاوم (ریپلای، آیدی عددی، یوزرنیم + هماهنگی با یوزربات) =================
+
+# ================= 🚫 ارسال دستورات بن/سکوت روی یوزربات =================
 async def _resolve_target(msg, context, chat_id, explicit_arg: str = None):
-    # 1️⃣ ریپلای روی پیام
+    text = (msg.text or "").strip()
+
+    # 1️⃣ اگر روی پیام کسی ریپلای شده
     if msg.reply_to_message and getattr(msg.reply_to_message, "from_user", None):
         return msg.reply_to_message.from_user
 
-    text = (msg.text or "").strip()
-
-    # 2️⃣ آیدی عددی مستقیم در دستور یا آرگومان
-    id_match = re.search(r"\b(\d{6,15})\b", text)
+    # 2️⃣ اگر آیدی عددی مستقیم داده شده (مثل: بن 123456789)
+    m_id = None
     if explicit_arg and explicit_arg.isdigit():
-        id_match = re.match(r"\d{6,15}", explicit_arg)
+        m_id = explicit_arg
+    else:
+        m_id = re.search(r"\b(\d{6,15})\b", text)
+        m_id = m_id.group(1) if m_id else None
 
-    if id_match:
-        user_id = int(id_match.group(1))
+    if m_id:
         try:
-            cm = await context.bot.get_chat_member(chat_id, user_id)
-            return cm.user
-        except:
-            pass
-
-    # 3️⃣ یوزرنیم (با @)
-    username_match = re.search(r"@(\w{3,})", text)
-    if username_match:
-        username = username_match.group(1)
-        try:
-            # اول با ربات اصلی تلاش می‌کنیم
-            user_obj = await context.bot.get_chat(f"@{username}")
-            cm = await context.bot.get_chat_member(chat_id, user_obj.id)
+            cm = await context.bot.get_chat_member(chat_id, int(m_id))
             return cm.user
         except Exception as e:
-            print(f"⚠️ ربات نتونست @{username} رو resolve کنه: {e}")
-            # حالا با یوزربات تلاش می‌کنیم (اگر فعال بود)
-            if userbot_client:
-                try:
-                    user_entity = await userbot_client.get_entity(f"@{username}")
-                    # اگر در گروه بود، برمی‌گردونیم
-                    try:
-                        cm = await context.bot.get_chat_member(chat_id, user_entity.id)
-                        return cm.user
-                    except:
-                        # حتی اگه در گروه نباشه، همون آیدی عددی رو برگردون
-                        class DummyUser:
-                            def __init__(self, id, first_name):
-                                self.id = id
-                                self.first_name = first_name
-                        return DummyUser(user_entity.id, getattr(user_entity, "first_name", username))
-                except Exception as e2:
-                    print(f"⚠️ یوزربات هم نتونست @{username} رو resolve کنه: {e2}")
-                    pass
+            print(f"⚠️ خطا در گرفتن آیدی عددی: {e}")
 
+    # 3️⃣ اگر یوزرنیم داده شده مثل @username
+    m_username = re.search(r"@([A-Za-z0-9_]{3,32})", text)
+    if m_username:
+        username = m_username.group(1)
+        try:
+            # تلاش اول با ربات
+            user_obj = await context.bot.get_chat(f"@{username}")
+            if user_obj:
+                return user_obj
+        except Exception as e:
+            print(f"⚠️ ربات نتونست @{username} رو resolve کنه: {e}")
+
+        # تلاش دوم با یوزربات (در صورتی که فعال باشه)
+        if userbot_client:
+            try:
+                user_entity = await userbot_client.get_entity(f"@{username}")
+                class DummyUser:
+                    def __init__(self, id, first_name):
+                        self.id = id
+                        self.first_name = first_name
+                return DummyUser(user_entity.id, getattr(user_entity, "first_name", username))
+            except Exception as e2:
+                print(f"⚠️ یوزربات هم نتونست @{username} رو resolve کنه: {e2}")
+
+    # اگر هیچ حالتی match نشد
     return None
-# ================= 🚫 ارسال دستورات بن/سکوت روی یوزربات =================
-async def punish_via_userbot(chat_id, user_id, action="ban", seconds=None):
-    if not userbot_client:
-        return
-    try:
-        if action == "ban":
-            await userbot_client.edit_permissions(chat_id, user_id, view_messages=False)
-        elif action == "unban":
-            await userbot_client.edit_permissions(chat_id, user_id, view_messages=True)
-        elif action == "mute":
-            until = None
-            if seconds:
-                until = datetime.utcnow() + timedelta(seconds=seconds)
-            await userbot_client.edit_permissions(
-                chat_id, user_id, send_messages=False, until_date=until
-            )
-        elif action == "unmute":
-            await userbot_client.edit_permissions(chat_id, user_id, send_messages=True)
-    except:
-        pass
 
 # ================= ⚙️ هندلر دستورات تنبیهی =================
 async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE):
