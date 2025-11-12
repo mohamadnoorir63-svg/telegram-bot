@@ -1082,7 +1082,7 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # 🧠 در نهایت فقط یک پاسخ اصلی هوش مصنوعی ارسال شود
     if reply_text:  # بررسی اینکه reply_text خالی نباشد
         await update.message.reply_text(reply_text)
-        return
+        
     # ✅ درصد هوش منطقی
     if text.lower() == "درصد هوش":
         score = 0
