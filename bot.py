@@ -1033,12 +1033,12 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """پاسخ‌دهی اصلی هوش مصنوعی و سیستم یادگیری"""
 
-    # 🚫 جلوگیری از پاسخ هوشمند در صورت اجرای دستور سفارشی
+    # 🚫 جلوگیری از پاسخ هوشمند اگر پیام توسط هندلر دیگر پاسخ داده شده
     if context.user_data.get("custom_handled"):
         context.user_data["custom_handled"] = False
         return
 
-    # 🧩 اطمینان از اینکه پیام معتبره
+    # 🧩 اطمینان از اینکه پیام معتبر است
     if not update.message or not update.message.text:
         return
 
@@ -1047,10 +1047,10 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
     text = update.message.text.strip()
 
-    # 🧩 پردازش پیام گروهی (می‌تونه در ادامه برای سیستم هوش مصنوعی استفاده بشه)
+    # 🧩 پردازش پیام گروهی (می‌تونه برای سیستم هوش مصنوعی استفاده شود)
     reply_text = process_group_message(uid, chat_id, text)
 
-    # 🧠 فعال‌سازی حافظهٔ کوتاه‌مدت گفتگو
+    # 🧠 فعال‌سازی حافظه کوتاه‌مدت گفتگو
     context_memory.add_message(uid, text)
 
     # 🧠 گرفتن کل تاریخچه اخیر کاربر
@@ -1064,11 +1064,13 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_chat.type == "private" and lower_text not in ["جوک", "فال"]:
         return
 
-    # ❌ حذف محدودیت روی command_keywords و protected_words
-    # حالا ربات روی همه پیام‌ها پاسخ می‌دهد
+    # ❌ دیگر محدودیتی روی command_keywords یا protected_words وجود ندارد
+    # ربات روی همه پیام‌ها پاسخ می‌دهد
 
-    # 🧠 بررسی حالت ریپلی مود گروهی
-    if await handle_group_reply_mode(update, context):
+    # 🧠 بررسی حالت ریپلی مود گروهی (اگر هندلر دیگری پاسخ داد، اینجا هم جلوگیری می‌شود)
+    handled = await handle_group_reply_mode(update, context)
+    if handled:
+        context.user_data["custom_handled"] = True
         return
 
     # 🧾 ثبت کاربر و گروه
@@ -1084,8 +1086,10 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
         shadow_learn(text, "")
         return    
 
-    # در نهایت پاسخ اصلی هوش مصنوعی
+    # ✅ در نهایت پاسخ اصلی هوش مصنوعی
     await update.message.reply_text(reply_text)
+    # علامت‌گذاری پیام به عنوان پاسخ داده شده
+    context.user_data["custom_handled"] = True
     # ✅ درصد هوش منطقی
     if text.lower() == "درصد هوش":
         score = 0
