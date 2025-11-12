@@ -61,24 +61,14 @@ async def record_user_activity(update: Update, context: ContextTypes.DEFAULT_TYP
 
 
 
-# ================= 👥 ارسال تگ همزمان روی یوزربات (سکوت) =================
+
+# ================= 👥 آماده سازی تگ روی یوزربات بدون ارسال =================
 async def send_tag_via_userbot(mentions, chat_id):
     if not userbot_client:
         return
-    chunk_size = 20
-    for i in range(0, len(mentions), chunk_size):
-        chunk = mentions[i:i + chunk_size]
-        try:
-            # ارسال بی‌صدا با silent=True
-            await userbot_client.send_message(
-                chat_id,
-                "👥 " + " ".join(chunk),
-                parse_mode="md",
-                silent=True  # این خط باعث سکوت یوزربات می‌شود
-            )
-            await asyncio.sleep(1)
-        except:
-            continue
+    # دیگر هیچ پیامی ارسال نمی‌شود
+    # فقط می‌توان اینجا برای آینده ذخیره یا پردازش کرد
+    return
 # ================= 👥 تگ کاربران =================
 async def handle_tag_requests(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = update.effective_message
