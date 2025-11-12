@@ -45,6 +45,7 @@ async def _has_access(context, chat_id: int, user_id: int) -> bool:
         return False
 
 # ================= 🎯 استخراج هدف مقاوم (ریپلای، آیدی عددی، یوزرنیم) =================
+# ================= 🎯 استخراج هدف مقاوم (ریپلای، آیدی عددی، یوزرنیم) =================
 async def _resolve_target(msg, context, chat_id, explicit_arg: str = None):
     # 1) ریپلای
     if msg.reply_to_message and getattr(msg.reply_to_message, "from_user", None):
@@ -70,14 +71,18 @@ async def _resolve_target(msg, context, chat_id, explicit_arg: str = None):
         except:
             pass
 
-    # 4) یوزرنیم در متن
+    # ✅ 4) یوزرنیم (اصلاح‌شده)
     m_username = re.search(r"@(\w+)", text)
     if m_username:
-        username = m_username.group(0)
+        username = m_username.group(1)
         try:
-            cm = await context.bot.get_chat_member(chat_id, username)
+            # ابتدا اطلاعات کاربر را با username بگیر
+            user_obj = await context.bot.get_chat(username)
+            # حالا اطلاعات عضوی او را در گروه بگیر
+            cm = await context.bot.get_chat_member(chat_id, user_obj.id)
             return cm.user
-        except:
+        except Exception as e:
+            print("⚠️ خطا در گرفتن یوزرنیم:", e)
             pass
 
     return None
