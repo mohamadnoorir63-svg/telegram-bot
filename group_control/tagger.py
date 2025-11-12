@@ -1,6 +1,7 @@
 import os
 import json
 import random
+import asyncio
 from datetime import datetime
 from telegram import Update
 from telegram.ext import ContextTypes, MessageHandler, filters
@@ -69,34 +70,32 @@ async def handle_tag_requests(update: Update, context: ContextTypes.DEFAULT_TYPE
     if not await _has_access(context, chat.id, user.id):
         return await msg.reply_text("🚫 فقط مدیران یا سودوها مجاز به استفاده از این دستور هستند!")
 
-    data = _load_activity()
-    chat_key = str(chat.id)
-    chat_data = data.get(chat_key, {})
-
     # -------------------- تگ همه --------------------
     if text == "تگ همه":
-        if not chat_data:
-            return await msg.reply_text("ℹ️ هنوز فعالیتی از کاربران در این گروه ثبت نشده است.")
-        user_ids = list(chat_data.keys())
-        chunks = [user_ids[i:i + 20] for i in range(0, len(user_ids), 20)]
-        for chunk in chunks:
-            mentions = []
-            for uid in chunk:
-                try:
-                    member = await context.bot.get_chat_member(chat.id, int(uid))
-                    if not member.user.is_bot:
-                        mentions.append(f"[{member.user.first_name}](tg://user?id={uid})")
-                except:
-                    continue
-            if mentions:
-                await msg.reply_text("👥 " + " ".join(mentions), parse_mode="Markdown")
-            await asyncio.sleep(1)
+        try:
+            all_users = []
+            async for member in context.bot.get_chat_members(chat.id):
+                if not member.user.is_bot:
+                    all_users.append(f"[{member.user.first_name}](tg://user?id={member.user.id})")
+            
+            if not all_users:
+                return await msg.reply_text("ℹ️ هیچ کاربر مناسبی برای تگ پیدا نشد.")
+
+            chunks = [all_users[i:i + 20] for i in range(0, len(all_users), 20)]
+            for chunk in chunks:
+                await msg.reply_text("👥 " + " ".join(chunk), parse_mode="Markdown")
+                await asyncio.sleep(1)
+
+        except Exception as e:
+            await msg.reply_text(f"⚠️ خطا در تگ همه: {e}")
 
     # -------------------- تگ مدیران --------------------
     elif text == "تگ مدیران":
         try:
             admins = await context.bot.get_chat_administrators(chat.id)
             mentions = [f"[{a.user.first_name}](tg://user?id={a.user.id})" for a in admins if not a.user.is_bot]
+            if not mentions:
+                return await msg.reply_text("ℹ️ هیچ مدیر فعالی در گروه وجود ندارد.")
             chunks = [mentions[i:i + 20] for i in range(0, len(mentions), 20)]
             for chunk in chunks:
                 await msg.reply_text("👑 " + " ".join(chunk), parse_mode="Markdown")
@@ -106,66 +105,63 @@ async def handle_tag_requests(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     # -------------------- تگ فعال --------------------
     elif text == "تگ فعال":
+        data = _load_activity()
+        chat_data = data.get(str(chat.id), {})
         now = datetime.utcnow().timestamp()
         active_users = [uid for uid, t in chat_data.items() if now - t <= 24 * 3600]
         if not active_users:
             return await msg.reply_text("ℹ️ هیچ کاربر فعالی در ۲۴ ساعت گذشته وجود ندارد.")
-        chunks = [active_users[i:i + 20] for i in range(0, len(active_users), 20)]
+        mentions = []
+        for uid in active_users:
+            try:
+                member = await context.bot.get_chat_member(chat.id, int(uid))
+                if not member.user.is_bot:
+                    mentions.append(f"[{member.user.first_name}](tg://user?id={member.user.id})")
+            except:
+                continue
+        chunks = [mentions[i:i + 20] for i in range(0, len(mentions), 20)]
         for chunk in chunks:
-            mentions = []
-            for uid in chunk:
-                try:
-                    member = await context.bot.get_chat_member(chat.id, int(uid))
-                    if not member.user.is_bot:
-                        mentions.append(f"[{member.user.first_name}](tg://user?id={uid})")
-                except:
-                    continue
-            if mentions:
-                await msg.reply_text("💬 " + " ".join(mentions), parse_mode="Markdown")
+            await msg.reply_text("💬 " + " ".join(chunk), parse_mode="Markdown")
             await asyncio.sleep(1)
 
     # -------------------- تگ غیرفعال --------------------
     elif text == "تگ غیرفعال":
+        data = _load_activity()
+        chat_data = data.get(str(chat.id), {})
         now = datetime.utcnow().timestamp()
         inactive_users = [uid for uid, t in chat_data.items() if now - t > 24 * 3600]
         if not inactive_users:
             return await msg.reply_text("ℹ️ همه کاربران در ۲۴ ساعت گذشته فعال بوده‌اند.")
-        chunks = [inactive_users[i:i + 20] for i in range(0, len(inactive_users), 20)]
+        mentions = []
+        for uid in inactive_users:
+            try:
+                member = await context.bot.get_chat_member(chat.id, int(uid))
+                if not member.user.is_bot:
+                    mentions.append(f"[{member.user.first_name}](tg://user?id={member.user.id})")
+            except:
+                continue
+        chunks = [mentions[i:i + 20] for i in range(0, len(mentions), 20)]
         for chunk in chunks:
-            mentions = []
-            for uid in chunk:
-                try:
-                    member = await context.bot.get_chat_member(chat.id, int(uid))
-                    if not member.user.is_bot:
-                        mentions.append(f"[{member.user.first_name}](tg://user?id={uid})")
-                except:
-                    continue
-            if mentions:
-                await msg.reply_text("😴 " + " ".join(mentions), parse_mode="Markdown")
+            await msg.reply_text("😴 " + " ".join(chunk), parse_mode="Markdown")
             await asyncio.sleep(1)
 
     # -------------------- تگ تصادفی --------------------
     elif text.startswith("تگ تصادفی"):
-        count = 5
         parts = text.split()
+        count = 5
         if len(parts) > 2 and parts[2].isdigit():
             count = int(parts[2])
-        if not chat_data:
-            return await msg.reply_text("ℹ️ هیچ فعالیتی برای کاربران وجود ندارد.")
-        user_ids = list(chat_data.keys())
-        sample = random.sample(user_ids, min(count, len(user_ids)))
-        mentions = []
-        for uid in sample:
-            try:
-                member = await context.bot.get_chat_member(chat.id, int(uid))
+        try:
+            all_users = []
+            async for member in context.bot.get_chat_members(chat.id):
                 if not member.user.is_bot:
-                    mentions.append(f"[{member.user.first_name}](tg://user?id={uid})")
-            except:
-                continue
-        if mentions:
-            await msg.reply_text("🎲 تگ تصادفی:\n" + " ".join(mentions), parse_mode="Markdown")
-        else:
-            await msg.reply_text("ℹ️ هیچ کاربر مناسبی برای تگ تصادفی وجود ندارد.")
+                    all_users.append(f"[{member.user.first_name}](tg://user?id={member.user.id})")
+            if not all_users:
+                return await msg.reply_text("ℹ️ هیچ کاربر مناسبی برای تگ تصادفی وجود ندارد.")
+            sample = random.sample(all_users, min(count, len(all_users)))
+            await msg.reply_text("🎲 تگ تصادفی:\n" + " ".join(sample), parse_mode="Markdown")
+        except Exception as e:
+            await msg.reply_text(f"⚠️ خطا در تگ تصادفی: {e}")
 
 # ================= 🔧 ثبت هندلر =================
 def register_tag_handlers(application, group_number: int = 14):
