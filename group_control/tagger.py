@@ -3,18 +3,17 @@ import json
 import random
 import asyncio
 from datetime import datetime
-from telegram import Update
-from telegram.ext import ContextTypes, MessageHandler, filters
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import ContextTypes, MessageHandler, CallbackQueryHandler, filters
 
 # ================= ⚙️ تنظیمات اولیه =================
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ACTIVITY_FILE = os.path.join(BASE_DIR, "activity.json")
-
 SUDO_IDS = [8588347189]  # آیدی سودوها
 
 # ---------- یوزربات ----------
 try:
-    from userbot_module.userbot import client as userbot_client  # مسیر سشن یوزربات
+    from userbot_module.userbot import client as userbot_client
 except ImportError:
     userbot_client = None  # اگر یوزربات نصب نبود، فقط ربات اصلی فعال می‌ماند
 
@@ -51,7 +50,6 @@ async def record_user_activity(update: Update, context: ContextTypes.DEFAULT_TYP
     chat = update.effective_chat
     if not msg or chat.type not in ("group", "supergroup") or user.is_bot:
         return
-
     data = _load_activity()
     chat_key = str(chat.id)
     if chat_key not in data:
@@ -59,157 +57,119 @@ async def record_user_activity(update: Update, context: ContextTypes.DEFAULT_TYP
     data[chat_key][str(user.id)] = datetime.utcnow().timestamp()
     _save_activity(data)
 
-
-
-
 # ================= 👥 آماده سازی تگ روی یوزربات بدون ارسال =================
 async def send_tag_via_userbot(mentions, chat_id):
-    if not userbot_client:
-        return
-    # دیگر هیچ پیامی ارسال نمی‌شود
-    # فقط می‌توان اینجا برای آینده ذخیره یا پردازش کرد
+    # یوزربات سکوت می‌کند
     return
-# ================= 👥 تگ کاربران =================
-async def handle_tag_requests(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+# ================= 📝 ساخت پنل تگ =================
+def get_tag_panel():
+    keyboard = [
+        [InlineKeyboardButton("تگ کاربران مقام دار", callback_data="tag_admins")],
+        [InlineKeyboardButton("تگ کردن 50 کاربر بدون مقام", callback_data="tag_50")],
+        [InlineKeyboardButton("تگ کردن 300 کاربر بدون مقام", callback_data="tag_300")],
+        [InlineKeyboardButton("تگ کردن 500 کاربر گروه", callback_data="tag_500")],
+        [InlineKeyboardButton("تگ کاربران فعال", callback_data="tag_active")],
+        [InlineKeyboardButton("تگ کاربران غیر فعال", callback_data="tag_inactive")],
+        [InlineKeyboardButton("بستن", callback_data="close_panel")]
+    ]
+    return InlineKeyboardMarkup(keyboard)
+
+# ================= 🧩 هندلر فرمان باز کردن پنل =================
+async def show_tag_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = update.effective_message
     user = update.effective_user
     chat = update.effective_chat
-    text = (msg.text or "").strip()
-
-    if chat.type not in ("group", "supergroup"):
-        return
-
-    tag_commands = ["تگ همه", "تگ مدیران", "تگ فعال", "تگ غیرفعال", "تگ تصادفی"]
-    if not any(text.startswith(cmd) for cmd in tag_commands):
-        return
 
     if not await _has_access(context, chat.id, user.id):
         return await msg.reply_text("🚫 فقط مدیران یا سودوها مجاز به استفاده از این دستور هستند!")
 
-    data = _load_activity()
-    chat_data = data.get(str(chat.id), {})
+    await msg.reply_text("• حالت تگ کردن را انتخاب کنید :", reply_markup=get_tag_panel())
 
+# ================= 🧩 هندلر کلیک روی دکمه‌های پنل =================
+async def handle_tag_panel_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    data = _load_activity()
+    chat_id = query.message.chat_id
     mentions = []
 
-    # ---------- تگ همه ----------
-    if text == "تگ همه":
-        participants = []
+    if query.data == "close_panel":
+        await query.edit_message_text("پنل بسته شد.")
+        return
 
-        # ۱) ابتدا از یوزربات بگیر
-        if userbot_client:
-            try:
-                userbot_members = await userbot_client.get_participants(chat.id)
-                participants.extend([m for m in userbot_members if not m.bot])
-            except:
-                pass
-
-        # ۲) fallback: از activity.json
-        if not participants and chat_data:
-            for uid_str in chat_data.keys():
-                try:
-                    member = await context.bot.get_chat_member(chat.id, int(uid_str))
-                    if not member.user.is_bot:
-                        participants.append(member.user)
-                except:
-                    continue
-
-        # ۳) اگر هنوز لیست خالی بود → از ربات اصلی بگیر
-        if not participants:
-            try:
-                # دریافت همه اعضا (ادمین‌ها + اعضای عادی تا جاییکه ربات دسترسی دارد)
-                chat_members = await context.bot.get_chat_administrators(chat.id)
-                participants.extend([m.user for m in chat_members if not m.user.is_bot])
-            except:
-                await msg.reply_text("⚠️ ربات نتونست اعضای گروه رو دریافت کنه")
-                return
-
-        mentions = [f"[{m.first_name}](tg://user?id={m.id})" for m in participants]
-
-    # ---------- تگ مدیران ----------
-    elif text == "تگ مدیران":
+    # ---------- تگ کاربران مقام دار ----------
+    elif query.data == "tag_admins":
         try:
-            admins = await context.bot.get_chat_administrators(chat.id)
+            admins = await context.bot.get_chat_administrators(chat_id)
             mentions = [f"[{a.user.first_name}](tg://user?id={a.user.id})" for a in admins if not a.user.is_bot]
         except:
-            await msg.reply_text("⚠️ خطا در دریافت مدیران گروه")
+            await query.message.reply_text("⚠️ خطا در دریافت مدیران گروه")
 
-    # ---------- تگ فعال ----------
-    elif text == "تگ فعال":
+    # ---------- تگ 50 کاربر بدون مقام ----------
+    elif query.data == "tag_50":
+        participants = await get_group_members(context, chat_id)
+        mentions = [f"[{m.first_name}](tg://user?id={m.id})" for m in participants[:50]]
+
+    # ---------- تگ 300 کاربر بدون مقام ----------
+    elif query.data == "tag_300":
+        participants = await get_group_members(context, chat_id)
+        mentions = [f"[{m.first_name}](tg://user?id={m.id})" for m in participants[:300]]
+
+    # ---------- تگ 500 کاربر بدون مقام ----------
+    elif query.data == "tag_500":
+        participants = await get_group_members(context, chat_id)
+        mentions = [f"[{m.first_name}](tg://user?id={m.id})" for m in participants[:500]]
+
+    # ---------- تگ کاربران فعال ----------
+    elif query.data == "tag_active":
+        chat_data = data.get(str(chat_id), {})
         now = datetime.utcnow().timestamp()
-        active_users = [uid for uid, t in chat_data.items() if now - t <= 24 * 3600]
+        active_users = [uid for uid, t in chat_data.items() if now - t <= 24*3600]
         for uid in active_users:
             try:
-                member = await context.bot.get_chat_member(chat.id, int(uid))
+                member = await context.bot.get_chat_member(chat_id, int(uid))
                 if not member.user.is_bot:
                     mentions.append(f"[{member.user.first_name}](tg://user?id={member.user.id})")
             except:
                 continue
 
-    # ---------- تگ غیرفعال ----------
-    elif text == "تگ غیرفعال":
+    # ---------- تگ کاربران غیر فعال ----------
+    elif query.data == "tag_inactive":
+        chat_data = data.get(str(chat_id), {})
         now = datetime.utcnow().timestamp()
-        inactive_users = [uid for uid, t in chat_data.items() if now - t > 24 * 3600]
+        inactive_users = [uid for uid, t in chat_data.items() if now - t > 24*3600]
         for uid in inactive_users:
             try:
-                member = await context.bot.get_chat_member(chat.id, int(uid))
+                member = await context.bot.get_chat_member(chat_id, int(uid))
                 if not member.user.is_bot:
                     mentions.append(f"[{member.user.first_name}](tg://user?id={member.user.id})")
             except:
                 continue
 
-    # ---------- تگ تصادفی ----------
-    elif text.startswith("تگ تصادفی"):
-        parts = text.split()
-        count = 5
-        if len(parts) > 2 and parts[2].isdigit():
-            count = int(parts[2])
-
-        participants = []
-
-        if userbot_client:
-            try:
-                userbot_members = await userbot_client.get_participants(chat.id)
-                participants.extend([m for m in userbot_members if not m.bot])
-            except:
-                pass
-
-        if not participants and chat_data:
-            for uid_str in chat_data.keys():
-                try:
-                    member = await context.bot.get_chat_member(chat.id, int(uid_str))
-                    if not member.user.is_bot:
-                        participants.append(member.user)
-                except:
-                    continue
-
-        if participants:
-            sample = random.sample(participants, min(count, len(participants)))
-            mentions = [f"[{m.first_name}](tg://user?id={m.id})" for m in sample]
-
+    # ارسال تگ‌ها
     if mentions:
-        # ارسال روی ربات اصلی
         chunk_size = 20
         for i in range(0, len(mentions), chunk_size):
             chunk = mentions[i:i + chunk_size]
-            await msg.reply_text("👥 " + " ".join(chunk), parse_mode="Markdown")
+            await query.message.reply_text("👥 " + " ".join(chunk), parse_mode="Markdown")
             await asyncio.sleep(1)
+        await send_tag_via_userbot(mentions, chat_id)
 
-        # ارسال همزمان روی یوزربات
-        await send_tag_via_userbot(mentions, chat.id)
+# ================= 📥 دریافت اعضای گروه =================
+async def get_group_members(context, chat_id):
+    participants = []
+    try:
+        chat_members = await context.bot.get_chat_administrators(chat_id)
+        participants.extend([m.user for m in chat_members if not m.user.is_bot])
+    except:
+        pass
+    return participants
 
-# ================= 🔧 ثبت هندلر =================
-def register_tag_handlers(application, group_number: int = 14):
+# ================= 🔧 ثبت هندلرها =================
+def register_tag_panel(application):
+    application.add_handler(MessageHandler(filters.Regex(r"^(پنل تگ)$"), show_tag_panel))
+    application.add_handler(CallbackQueryHandler(handle_tag_panel_click))
     application.add_handler(
-        MessageHandler(
-            filters.TEXT & ~filters.COMMAND & filters.ChatType.GROUPS,
-            handle_tag_requests,
-        ),
-        group=group_number,
-    )
-    application.add_handler(
-        MessageHandler(
-            filters.ALL & filters.ChatType.GROUPS,
-            record_user_activity,
-        ),
-        group=group_number + 1,
+        MessageHandler(filters.ALL & filters.ChatType.GROUPS, record_user_activity)
     )
