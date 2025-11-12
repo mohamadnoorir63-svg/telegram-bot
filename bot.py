@@ -1065,17 +1065,17 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     # ⚠️ جلوگیری از خطاهای ناشناخته
-    protected_words_list = globals().get("protected_words", [])
-    command_keywords_list = globals().get("command_keywords", [
-        "قفل", "باز", "بازکردن", "پنل", "خوشامد",
-        "عکس خوشامد", "فیلتر", "سکوت", "بن", "اخطار",
-        "لقب", "اصل", "تگ", "پاکسازی", "گروه", "مدیر", "سودو"
+  #  protected_words_list = globals().get("protected_words", [])
+ #   command_keywords_list = globals().get("command_keywords", [
+     #   "قفل", "باز", "بازکردن", "پنل", "خوشامد",
+     #   "عکس خوشامد", "فیلتر", "سکوت", "بن", "اخطار",
+     #   "لقب", "اصل", "تگ", "پاکسازی", "گروه", "مدیر", "سودو"
     ])
 
-    if any(lower_text.startswith(word) for word in protected_words_list):
+  #  if any(lower_text.startswith(word) for word in protected_words_list):
         return
 
-    if any(lower_text.startswith(word) for word in command_keywords_list):
+   # if any(lower_text.startswith(word) for word in command_keywords_list):
         return
 
     # 🧠 بررسی حالت ریپلی مود گروهی
