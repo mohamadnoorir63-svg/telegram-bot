@@ -1046,6 +1046,7 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     uid = update.effective_user.id
     chat_id = update.effective_chat.id
     text = update.message.text.strip()
+    lower_text = text.lower()
 
     # 🧩 پردازش پیام گروهی
     reply_text = process_group_message(uid, chat_id, text)
@@ -1055,27 +1056,10 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # 🧠 گرفتن کل تاریخچه اخیر کاربر
     recent_context = context_memory.get_context(uid)
-
-    # 🧩 ترکیب سه پیام آخر برای درک بهتر ادامه گفتگو
     full_context = " ".join(recent_context[-3:]) if recent_context else text
-    lower_text = text.lower()
 
     # 🚫 جلوگیری از پاسخ در پیوی (فقط جوک و فال مجازند)
     if update.effective_chat.type == "private" and lower_text not in ["جوک", "فال"]:
-        return
-
-    # ⚠️ جلوگیری از خطاهای ناشناخته
-    protected_words_list = globals().get("protected_words", [])
-    command_keywords_list = globals().get("command_keywords", [
-        "قفل", "باز", "بازکردن", "پنل", "خوشامد",
-        "عکس خوشامد", "فیلتر", "سکوت", "بن", "اخطار",
-        "لقب", "اصل", "تگ", "پاکسازی", "گروه", "مدیر", "سودو"
-    ])
-
-  #  if any(lower_text.startswith(word) for word in protected_words_list):
-        return
-
-   # if any(lower_text.startswith(word) for word in command_keywords_list):
         return
 
     # 🧠 بررسی حالت ریپلی مود گروهی
@@ -1093,6 +1077,11 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # 🧠 یادگیری سایه‌ای در صورت غیر فعال بودن سیستم اصلی
     if not status["active"]:
         shadow_learn(text, "")
+        return
+
+    # 🧠 در نهایت فقط یک پاسخ اصلی هوش مصنوعی ارسال شود
+    if reply_text:  # بررسی اینکه reply_text خالی نباشد
+        await update.message.reply_text(reply_text)
         return
     # ✅ درصد هوش منطقی
     if text.lower() == "درصد هوش":
