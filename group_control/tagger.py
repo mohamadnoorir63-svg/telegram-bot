@@ -59,7 +59,9 @@ async def record_user_activity(update: Update, context: ContextTypes.DEFAULT_TYP
     data[chat_key][str(user.id)] = datetime.utcnow().timestamp()
     _save_activity(data)
 
-# ================= 👥 ارسال تگ همزمان روی یوزربات =================
+
+
+# ================= 👥 ارسال تگ همزمان روی یوزربات (سکوت) =================
 async def send_tag_via_userbot(mentions, chat_id):
     if not userbot_client:
         return
@@ -67,11 +69,16 @@ async def send_tag_via_userbot(mentions, chat_id):
     for i in range(0, len(mentions), chunk_size):
         chunk = mentions[i:i + chunk_size]
         try:
-            await userbot_client.send_message(chat_id, "👥 " + " ".join(chunk), parse_mode="md")
+            # ارسال بی‌صدا با silent=True
+            await userbot_client.send_message(
+                chat_id,
+                "👥 " + " ".join(chunk),
+                parse_mode="md",
+                silent=True  # این خط باعث سکوت یوزربات می‌شود
+            )
             await asyncio.sleep(1)
         except:
             continue
-
 # ================= 👥 تگ کاربران =================
 async def handle_tag_requests(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = update.effective_message
