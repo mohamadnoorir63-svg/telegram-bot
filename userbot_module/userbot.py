@@ -1,5 +1,6 @@
 import os
 import asyncio
+import json
 import random
 from datetime import datetime, timedelta
 from telethon import TelegramClient, events, sessions
