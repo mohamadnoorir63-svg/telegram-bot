@@ -1,140 +1,163 @@
-# ================= هماهنگ سازی یوزربات با ربات اصلی =================
-
 import os
-import asyncio
-import random
-from telethon import TelegramClient, events, sessions
-from datetime import datetime, timedelta
 import json
+import random
+import asyncio
+from datetime import datetime
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import ContextTypes, MessageHandler, filters, CallbackQueryHandler
 
-# ---------- یوزربات ----------
-
-API_ID = int(os.environ.get("API_ID"))
-API_HASH = os.environ.get("API_HASH")
-SESSION_STRING = os.environ.get("SESSION_STRING")
-BOT_USER_ID = int(os.environ.get("BOT_USER_ID"))
-
-client = TelegramClient(sessions.StringSession(SESSION_STRING), API_ID, API_HASH)
-
-# فایل هشدارها
-WARN_FILE = "warnings.json"
+# ================= ⚙️ تنظیمات اولیه =================
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+ACTIVITY_FILE = os.path.join(BASE_DIR, "activity.json")
 SUDO_IDS = [8588347189]
 
-if not os.path.exists(WARN_FILE):
-    with open(WARN_FILE, "w", encoding="utf-8") as f:
+if not os.path.exists(ACTIVITY_FILE):
+    with open(ACTIVITY_FILE, "w", encoding="utf-8") as f:
         json.dump({}, f, ensure_ascii=False, indent=2)
 
-def _load_json(file):
+# ---------- یوزربات ----------
+try:
+    from userbot_module.userbot import client as userbot_client
+except ImportError:
+    userbot_client = None  # اگر یوزربات نصب نبود
+
+# ================= 📁 توابع کمکی =================
+def _load_activity():
     try:
-        with open(file, "r", encoding="utf-8") as f:
+        with open(ACTIVITY_FILE, "r", encoding="utf-8") as f:
             return json.load(f)
     except:
         return {}
 
-def _save_json(file, data):
-    with open(file, "w", encoding="utf-8") as f:
+def _save_activity(data):
+    with open(ACTIVITY_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
-# ================= تگ کاربران با یوزربات =================
-
-async def tag_users(chat_id, user_ids=None, random_count=None):
+# ================= 🔐 بررسی دسترسی =================
+async def _has_access(context, chat_id, user_id):
+    if user_id in SUDO_IDS:
+        return True
     try:
-        members = await client.get_participants(chat_id)
-        non_bots = [m for m in members if not m.bot]
+        member = await context.bot.get_chat_member(chat_id, user_id)
+        return member.status in ("creator", "administrator")
+    except:
+        return False
 
-        if random_count:
-            non_bots = random.sample(non_bots, min(random_count, len(non_bots)))
-        elif user_ids:
-            non_bots = [m for m in non_bots if m.id in user_ids]
-
-        mentions = [f"[{m.first_name}](tg://user?id={m.id})" for m in non_bots]
-        chunk_size = 20
-
-        for i in range(0, len(mentions), chunk_size):
-            # ارسال بی‌صدا (silent) تا یوزربات مزاحم نشود
-            await client.send_message(
-                chat_id,
-                "👥 " + " ".join(mentions[i:i+chunk_size]),
-                parse_mode="md",
-                silent=True
-            )
-            await asyncio.sleep(1)
-    except Exception as e:
-        print(f"Error in tag_users: {e}")
-        pass
-
-# ================= ارسال دستورات تنبیهی روی یوزربات =================
-
-async def punish_via_userbot(chat_id, user_id, action="ban", seconds=None):
-    try:
-        if action == "ban":
-            await client.edit_permissions(chat_id, user_id, view_messages=False)
-        elif action == "unban":
-            await client.edit_permissions(chat_id, user_id, view_messages=True)
-        elif action == "mute":
-            until = None
-            if seconds:
-                until = datetime.utcnow() + timedelta(seconds=seconds)
-            await client.edit_permissions(chat_id, user_id, send_messages=False, until_date=until)
-        elif action == "unmute":
-            await client.edit_permissions(chat_id, user_id, send_messages=True)
-    except Exception as e:
-        print(f"Error in punish_via_userbot: {e}")
-        pass
-
-# ================= دریافت فرمان از ربات اصلی =================
-
-@client.on(events.NewMessage)
-async def handle_commands(event):
-    sender = await event.get_sender()
-    if sender.id != BOT_USER_ID:
+# ================= 🧾 ثبت فعالیت کاربران =================
+async def record_user_activity(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    msg = update.effective_message
+    user = update.effective_user
+    chat = update.effective_chat
+    if not msg or chat.type not in ("group", "supergroup") or user.is_bot:
         return
 
-    text = event.raw_text
-    parts = text.split("|")
-    if len(parts) < 2:
+    data = _load_activity()
+    chat_key = str(chat.id)
+    if chat_key not in data:
+        data[chat_key] = {}
+    data[chat_key][str(user.id)] = datetime.utcnow().timestamp()
+    _save_activity(data)
+
+# ================= 👥 آماده سازی تگ با یوزربات =================
+async def fetch_users_via_userbot(chat_id):
+    participants = []
+    if userbot_client:
+        try:
+            members = await userbot_client.get_participants(chat_id)
+            participants.extend([m for m in members if not m.bot])
+        except:
+            pass
+    return participants
+
+# ================= 👥 ساخت پنل تگ =================
+def build_tag_panel():
+    keyboard = [
+        [InlineKeyboardButton("تگ کاربران مقام دار", callback_data="tag_admins")],
+        [InlineKeyboardButton("تگ کردن 50 کاربر بدون مقام", callback_data="tag_50")],
+        [InlineKeyboardButton("تگ کردن 300 کاربر بدون مقام", callback_data="tag_300")],
+        [InlineKeyboardButton("تگ کردن 500 کاربر گروه", callback_data="tag_500")],
+        [InlineKeyboardButton("بستن", callback_data="close_panel")]
+    ]
+    return InlineKeyboardMarkup(keyboard)
+
+# ================= 👥 هندلر باز کردن پنل =================
+async def open_tag_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    msg = update.effective_message
+    user = update.effective_user
+    chat = update.effective_chat
+
+    if not await _has_access(context, chat.id, user.id):
+        return await msg.reply_text("🚫 فقط مدیران یا سودوها مجاز به استفاده از این پنل هستند!")
+
+    await msg.reply_text("• حالت تگ کردن را انتخاب کنید :", reply_markup=build_tag_panel())
+
+# ================= 👥 هندلر کلیک روی پنل =================
+async def handle_tag_panel_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    chat = query.message.chat
+
+    mentions = []
+
+    if query.data == "close_panel":
+        await query.message.delete()
         return
 
-    action = parts[0].strip().lower()
-    chat_id = int(parts[1])
+    # ---------- تگ کاربران مقام دار ----------
+    elif query.data == "tag_admins":
+        try:
+            admins = await context.bot.get_chat_administrators(chat.id)
+            mentions = [f"[{a.user.first_name}](tg://user?id={a.user.id})" for a in admins if not a.user.is_bot]
+        except:
+            await query.message.edit_text("⚠️ خطا در دریافت مدیران گروه")
+            return
 
-    # ---------- تگ همه ----------
-    if action == "tagall":
-        await tag_users(chat_id)
-    elif action.startswith("tagrandom"):
-        count = 5
-        if len(parts) == 3 and parts[2].isdigit():
-            count = int(parts[2])
-        await tag_users(chat_id, random_count=count)
-    elif action.startswith("taglist"):
-        ids = [int(x) for x in parts[2].split(",") if x.isdigit()] if len(parts) > 2 else None
-        await tag_users(chat_id, user_ids=ids)
+    # ---------- تگ تعداد مشخص کاربران بدون مقام ----------
+    elif query.data in ("tag_50", "tag_300", "tag_500"):
+        count_map = {"tag_50": 50, "tag_300": 300, "tag_500": 500}
+        count = count_map[query.data]
 
-    # ---------- هماهنگ سازی بن ----------
-    elif action.startswith("ban") or action.startswith("unban"):
-        target = parts[2].strip()
-        user_id = None
-
-        if target.isdigit():
-            user_id = int(target)
-        elif target.startswith("@"):
+        participants = await fetch_users_via_userbot(chat.id)
+        if not participants:
+            participants = []
             try:
-                user_obj = await client.get_entity(target)
-                user_id = user_obj.id
+                members = await context.bot.get_chat_administrators(chat.id)
+                participants = [m.user for m in await context.bot.get_chat(chat.id).get_members() if not m.user.is_bot]
             except:
-                pass
+                participants = []
 
-        if user_id:
-            await punish_via_userbot(chat_id, user_id, action="ban" if action.startswith("ban") else "unban")
+        if participants:
+            sample = random.sample(participants, min(count, len(participants)))
+            mentions = [f"[{m.first_name}](tg://user?id={m.id})" for m in sample]
 
-# ================= استارت یوزربات =================
+    # ---------- ارسال تگ روی ربات اصلی ----------
+    if mentions:
+        chunk_size = 20
+        for i in range(0, len(mentions), chunk_size):
+            chunk = mentions[i:i + chunk_size]
+            await query.message.reply_text("👥 " + " ".join(chunk), parse_mode="Markdown")
+            await asyncio.sleep(1)
 
-async def start_userbot():
-    await client.start()
-    print("✅ Userbot ready and listening to bot commands...")
-    await client.run_until_disconnected()
-
-
-# ================= اجرای یوزربات =================
-if __name__ == "__main__":
-    asyncio.run(start_userbot())
+# ================= 🔧 ثبت هندلرها =================
+def register_tag_handlers(application, group_number: int = 14):
+    application.add_handler(
+        MessageHandler(
+            filters.Regex(r"^(تگ)$") & filters.ChatType.GROUPS,
+            open_tag_panel,
+        ),
+        group=group_number,
+    )
+    application.add_handler(
+        CallbackQueryHandler(
+            handle_tag_panel_click,
+            pattern=r"^tag_.*|close_panel$"
+        ),
+        group=group_number + 1,
+    )
+    application.add_handler(
+        MessageHandler(
+            filters.ALL & filters.ChatType.GROUPS,
+            record_user_activity,
+        ),
+        group=group_number + 2,
+    )
