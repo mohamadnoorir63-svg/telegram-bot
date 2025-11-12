@@ -1042,47 +1042,57 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message or not update.message.text:
         return
 
-    # 🧠 تعریف اولیه متغیرها
+    # 🧠 فعال‌سازی حافظهٔ کوتاه‌مدت گفتگو
     uid = update.effective_user.id
     chat_id = update.effective_chat.id
     text = update.message.text.strip()
+
+    # 🧠 ثبت پیام در حافظه کوتاه‌مدت
+    context_memory.add_message(uid, text)
+
+    # 🧠 گرفتن کل تاریخچه اخیر کاربر
+    recent_context = context_memory.get_context(uid)
+
+    # 🧩 ترکیب سه پیام آخر برای درک بهتر ادامه گفتگو
+    full_context = " ".join(recent_context[-3:]) if recent_context else text
+
     lower_text = text.lower()
 
     # 🚫 جلوگیری از پاسخ در پیوی (فقط جوک و فال مجازند)
     if update.effective_chat.type == "private" and lower_text not in ["جوک", "فال"]:
         return
 
+    # 🚫 جلوگیری از پاسخ به موضوعات آب و هوا
+    if re.search(r"(هوای|آب[\s‌]*و[\s‌]*هوا)", text):
+        return
+
+    # ✅ جلوگیری از پاسخ به دستورات خاص (مثل راهنما، خوشامد، ربات و غیره)
+    protected_words = [
+        "راهنما", "ثبت راهنما", "خوشامد", "ثبت خوشامد",
+        "ربات", "save", "del", "panel", "backup", "cloudsync", "leave"
+    ]
+    if any(lower_text.startswith(word) for word in protected_words):
+        return
+
     # 🧠 بررسی حالت ریپلی مود گروهی
     if await handle_group_reply_mode(update, context):
         return
 
-    # 🧾 ثبت کاربر و گروه
+    # ثبت کاربر و گروه
     await register_user(update.effective_user)
     register_group_activity(chat_id, uid)
 
-    # 🧠 یادگیری خودکار از متن کاربر
+    # 🧠 یادگیری خودکار در صورت باز بودن وضعیت
     if not status["locked"]:
         auto_learn_from_text(text)
 
-    # 🧠 یادگیری سایه‌ای در صورت غیر فعال بودن سیستم اصلی
+    # 🧠 یادگیری سایه در صورت غیرفعال بودن
     if not status["active"]:
         shadow_learn(text, "")
         return
 
-    # 🧩 پردازش پیام گروهی و گرفتن reply_text
+    # پردازش پیام گروه
     reply_text = process_group_message(uid, chat_id, text)
-
-    # 🧠 فعال‌سازی حافظهٔ کوتاه‌مدت گفتگو
-    context_memory.add_message(uid, text)
-
-    # 🧠 گرفتن کل تاریخچه اخیر کاربر برای هوش مصنوعی
-    recent_context = context_memory.get_context(uid)
-    full_context = " ".join(recent_context[-3:]) if recent_context else text
-
-    # 🧠 در نهایت فقط یک پاسخ اصلی هوش مصنوعی ارسال شود
-    if reply_text:  # بررسی اینکه reply_text خالی نباشد
-        await update.message.reply_text(reply_text)
-
     # ✅ درصد هوش منطقی
     if text.lower() == "درصد هوش":
         score = 0
