@@ -127,17 +127,24 @@ async def handle_tag_panel_click(update: Update, context: ContextTypes.DEFAULT_T
     elif query.data in ("tag_50", "tag_300", "tag_500"):
         count_map = {"tag_50": 50, "tag_300": 300, "tag_500": 500}
         count = count_map[query.data]
-        try:
-            members = await context.bot.get_chat_administrators(chat.id)
-            normal_members = [m.user for m in await context.bot.get_chat(chat.id).get_members() if not m.user.is_bot]
-        except:
-            normal_members = []
+        normal_users = []
 
-        if normal_members:
-            sample = random.sample(normal_members, min(count, len(normal_members)))
+        # استفاده از activity.json به جای متدهای غیر موجود
+        for uid_str in chat_data.keys():
+            try:
+                member = await context.bot.get_chat_member(chat.id, int(uid_str))
+                if not member.user.is_bot:
+                    # چک می‌کنیم که ادمین نباشد
+                    if member.status == "member":
+                        normal_users.append(member.user)
+            except:
+                continue
+
+        if normal_users:
+            sample = random.sample(normal_users, min(count, len(normal_users)))
             mentions = [f"[{m.first_name}](tg://user?id={m.id})" for m in sample]
 
-    # ارسال تگ روی ربات اصلی
+    # ---------- ارسال تگ روی ربات اصلی ----------
     if mentions:
         chunk_size = 20
         for i in range(0, len(mentions), chunk_size):
