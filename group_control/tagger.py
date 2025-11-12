@@ -96,13 +96,13 @@ async def handle_tag_requests(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     # ---------- تگ همه ----------
     if text == "تگ همه":
-        for uid_str in chat_data.keys():
-            try:
-                member = await context.bot.get_chat_member(chat.id, int(uid_str))
-                if not member.user.is_bot:
-                    mentions.append(f"[{member.user.first_name}](tg://user?id={member.user.id})")
-            except:
-                continue
+        try:
+            members = await context.bot.get_chat_members(chat.id)  # همه اعضای واقعی
+            for m in members:
+                if not m.user.is_bot:
+                    mentions.append(f"[{m.user.first_name}](tg://user?id={m.user.id})")
+        except Exception as e:
+            return await msg.reply_text(f"⚠️ خطا در دریافت اعضای گروه: {e}")
 
     # ---------- تگ مدیران ----------
     elif text == "تگ مدیران":
@@ -135,18 +135,18 @@ async def handle_tag_requests(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     # ---------- تگ تصادفی ----------
     elif text.startswith("تگ تصادفی"):
-        parts = text.split()
-        count = 5
-        if len(parts) > 2 and parts[2].isdigit():
-            count = int(parts[2])
-        sample_users = random.sample(list(chat_data.keys()), min(count, len(chat_data)))
-        for uid in sample_users:
-            try:
-                member = await context.bot.get_chat_member(chat.id, int(uid))
-                if not member.user.is_bot:
-                    mentions.append(f"[{member.user.first_name}](tg://user?id={member.user.id})")
-            except:
-                continue
+        try:
+            members = await context.bot.get_chat_members(chat.id)
+            non_bots = [m for m in members if not m.user.is_bot]
+            parts = text.split()
+            count = 5
+            if len(parts) > 2 and parts[2].isdigit():
+                count = int(parts[2])
+            sample = random.sample(non_bots, min(count, len(non_bots)))
+            for m in sample:
+                mentions.append(f"[{m.user.first_name}](tg://user?id={m.user.id})")
+        except Exception as e:
+            return await msg.reply_text(f"⚠️ خطا در دریافت اعضای گروه: {e}")
 
     if mentions:
         # ارسال روی ربات اصلی
