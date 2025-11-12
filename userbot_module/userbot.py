@@ -1,22 +1,42 @@
+# ================= هماهنگ سازی یوزربات با ربات اصلی =================
 import os
 import asyncio
 import random
 from telethon import TelegramClient, events, sessions
+from datetime import datetime, timedelta
+from telegram import Update, ChatPermissions
+from telegram.ext import ContextTypes, MessageHandler, filters
+import json, re
 
-# ================= ⚙️ اطلاعات یوزربات =================
-API_ID = int(os.environ.get("API_ID"))           # از my.telegram.org
+# ---------- یوزربات ----------
+API_ID = int(os.environ.get("API_ID"))
 API_HASH = os.environ.get("API_HASH")
 SESSION_STRING = os.environ.get("SESSION_STRING")
-BOT_USER_ID = int(os.environ.get("BOT_USER_ID"))  # آیدی ربات اصلی که فرمان می‌دهد
-
-if not all([API_ID, API_HASH, SESSION_STRING, BOT_USER_ID]):
-    raise ValueError("API_ID, API_HASH, SESSION_STRING و BOT_USER_ID باید تعریف شوند!")
+BOT_USER_ID = int(os.environ.get("BOT_USER_ID"))
 
 client = TelegramClient(sessions.StringSession(SESSION_STRING), API_ID, API_HASH)
 
-# ================= 🧩 توابع تگ =================
+# فایل هشدارها
+WARN_FILE = "warnings.json"
+SUDO_IDS = [8588347189]
+
+if not os.path.exists(WARN_FILE):
+    with open(WARN_FILE, "w", encoding="utf-8") as f:
+        json.dump({}, f, ensure_ascii=False, indent=2)
+
+def _load_json(file):
+    try:
+        with open(file, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except:
+        return {}
+
+def _save_json(file, data):
+    with open(file, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
+# ================= تگ کاربران با یوزربات =================
 async def tag_users(chat_id, user_ids=None, random_count=None):
-    """ارسال تگ به کاربران مشخص یا تصادفی"""
     members = await client.get_participants(chat_id)
     non_bots = [m for m in members if not m.bot]
 
@@ -31,7 +51,24 @@ async def tag_users(chat_id, user_ids=None, random_count=None):
         await client.send_message(chat_id, "👥 " + " ".join(mentions), parse_mode="md")
         await asyncio.sleep(1)
 
-# ================= ⚡ دریافت فرمان از ربات اصلی =================
+# ================= ارسال دستورات تنبیهی روی یوزربات =================
+async def punish_via_userbot(chat_id, user_id, action="ban", seconds=None):
+    try:
+        if action == "ban":
+            await client.edit_permissions(chat_id, user_id, view_messages=False)
+        elif action == "unban":
+            await client.edit_permissions(chat_id, user_id, view_messages=True)
+        elif action == "mute":
+            until = None
+            if seconds:
+                until = datetime.utcnow() + timedelta(seconds=seconds)
+            await client.edit_permissions(chat_id, user_id, send_messages=False, until_date=until)
+        elif action == "unmute":
+            await client.edit_permissions(chat_id, user_id, send_messages=True)
+    except:
+        pass
+
+# ================= دریافت فرمان از ربات اصلی =================
 @client.on(events.NewMessage)
 async def handle_commands(event):
     sender = await event.get_sender()
@@ -46,6 +83,7 @@ async def handle_commands(event):
     action = parts[0].strip().lower()
     chat_id = int(parts[1])
 
+    # ---------- تگ همه ----------
     if action == "tagall":
         await tag_users(chat_id)
     elif action.startswith("tagrandom"):
@@ -53,11 +91,39 @@ async def handle_commands(event):
         if len(parts) == 3 and parts[2].isdigit():
             count = int(parts[2])
         await tag_users(chat_id, random_count=count)
-    elif action.startswith("taglist"):  # لیست آیدی‌های مشخص
+    elif action.startswith("taglist"):
         ids = [int(x) for x in parts[2].split(",") if x.isdigit()] if len(parts) > 2 else None
         await tag_users(chat_id, user_ids=ids)
+    # ---------- مثال هماهنگ سازی بن ----------
+    elif action.startswith("ban"):
+        # parts[2] = user_id یا @username
+        target = parts[2].strip()
+        user_id = None
+        if target.isdigit():
+            user_id = int(target)
+        elif target.startswith("@"):
+            try:
+                user_obj = await client.get_entity(target)
+                user_id = user_obj.id
+            except:
+                pass
+        if user_id:
+            await punish_via_userbot(chat_id, user_id, action="ban")
+    elif action.startswith("unban"):
+        target = parts[2].strip()
+        user_id = None
+        if target.isdigit():
+            user_id = int(target)
+        elif target.startswith("@"):
+            try:
+                user_obj = await client.get_entity(target)
+                user_id = user_obj.id
+            except:
+                pass
+        if user_id:
+            await punish_via_userbot(chat_id, user_id, action="unban")
 
-# ================= 🚀 استارت یوزربات =================
+# ================= استارت یوزربات =================
 async def start_userbot():
     await client.start()
     print("✅ Userbot ready and listening to bot commands...")
