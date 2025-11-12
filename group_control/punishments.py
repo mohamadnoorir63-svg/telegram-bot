@@ -18,7 +18,7 @@ if not os.path.exists(WARN_FILE):
 
 # ---------- یوزربات ----------
 try:
-    from userbot_module.userbot import client as userbot_client  # مسیر سشن یوزربات
+    from userbot_module.userbot import client as userbot_client
 except ImportError:
     userbot_client = None  # اگر یوزربات نصب نبود، فقط ربات اصلی فعال می‌ماند
 
@@ -26,30 +26,30 @@ def _load_json(file):
     try:
         with open(file, "r", encoding="utf-8") as f:
             return json.load(f)
-    except Exception:
+    except:
         return {}
 
 def _save_json(file, data):
     with open(file, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
-# ================= 🔐 بررسی ادمین / سودو =================
+# ================= 🔐 بررسی دسترسی =================
 async def _has_access(context, chat_id: int, user_id: int) -> bool:
     if user_id in SUDO_IDS:
         return True
     try:
         member = await context.bot.get_chat_member(chat_id, user_id)
         return member.status in ("creator", "administrator")
-    except Exception:
+    except:
         return False
 
-# ================= 🎯 استخراج هدف مقاوم (ریپلای یا آیدی عددی) =================
+# ================= 🎯 پیدا کردن هدف (ریپلای، آیدی، یوزرنیم) =================
 async def _resolve_target(msg, context, chat_id, explicit_arg: str = None):
-    # 1) ریپلای
+    # ریپلای
     if msg.reply_to_message and getattr(msg.reply_to_message, "from_user", None):
         return msg.reply_to_message.from_user
 
-    # 2) explicit_arg (آیدی عددی)
+    # explicit_arg (آیدی عددی)
     if explicit_arg:
         arg = explicit_arg.strip()
         if re.fullmatch(r"\d{6,15}", arg):
@@ -59,8 +59,9 @@ async def _resolve_target(msg, context, chat_id, explicit_arg: str = None):
             except:
                 pass
 
-    # 3) آیدی عددی در متن
     text = msg.text or ""
+
+    # آیدی عددی در متن
     m_id = re.search(r"\b(\d{6,15})\b", text)
     if m_id:
         try:
@@ -69,19 +70,19 @@ async def _resolve_target(msg, context, chat_id, explicit_arg: str = None):
         except:
             pass
 
-    # 4) یوزرنیم
+    # یوزرنیم در متن
     m_username = re.search(r"@(\w+)", text)
     if m_username:
-        username = m_username.group(0)
+        username = m_username.group(1)
         try:
-            cm = await context.bot.get_chat_member(chat_id, username)
-            return cm.user
+            user_obj = await context.bot.get_chat(f"@{username}")
+            return user_obj
         except:
             pass
 
     return None
 
-# ================= 🚫 ارسال دستورات بن/سکوت روی یوزربات =================
+# ================= 🚫 ارسال دستورات روی یوزربات =================
 async def punish_via_userbot(chat_id, user_id, action="ban", seconds=None):
     if not userbot_client:
         return
@@ -94,9 +95,7 @@ async def punish_via_userbot(chat_id, user_id, action="ban", seconds=None):
             until = None
             if seconds:
                 until = datetime.utcnow() + timedelta(seconds=seconds)
-            await userbot_client.edit_permissions(
-                chat_id, user_id, send_messages=False, until_date=until
-            )
+            await userbot_client.edit_permissions(chat_id, user_id, send_messages=False, until_date=until)
         elif action == "unmute":
             await userbot_client.edit_permissions(chat_id, user_id, send_messages=True)
     except:
@@ -116,12 +115,12 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
         return
 
     PATTERNS = {
-        "ban": re.compile(r"^بن(?:\s+(\d{6,15}))?\s*$"),
-        "unban": re.compile(r"^حذف\s*بن(?:\s+(\d{6,15}))?\s*$"),
-        "mute": re.compile(r"^سکوت(?:\s+(\d{6,15}))?(?:\s+(\d+)\s*(ثانیه|دقیقه|ساعت)?)?\s*$"),
-        "unmute": re.compile(r"^حذف\s*سکوت(?:\s+(\d{6,15}))?\s*$"),
-        "warn": re.compile(r"^اخطار(?:\s+(\d{6,15}))?\s*$"),
-        "delwarn": re.compile(r"^حذف\s*اخطار(?:\s+(\d{6,15}))?\s*$"),
+        "ban": re.compile(r"^بن(?:\s+(\S+))?$"),
+        "unban": re.compile(r"^حذف\s*بن(?:\s+(\S+))?$"),
+        "mute": re.compile(r"^سکوت(?:\s+(\S+))?(?:\s+(\d+)\s*(ثانیه|دقیقه|ساعت)?)?$"),
+        "unmute": re.compile(r"^حذف\s*سکوت(?:\s+(\S+))?$"),
+        "warn": re.compile(r"^اخطار(?:\s+(\S+))?$"),
+        "delwarn": re.compile(r"^حذف\s*اخطار(?:\s+(\S+))?$"),
     }
 
     matched = None
@@ -139,22 +138,16 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
     if not await _has_access(context, chat.id, user.id):
         return await msg.reply_text("🚫 فقط مدیران یا سودوها مجازند.")
 
-    explicit_arg = None
+    explicit_arg = matched.group(1) if matched and matched.lastindex >= 1 else None
     extra_time = None
-    if matched:
-        explicit_arg = matched.group(1) if matched.lastindex and matched.lastindex >= 1 else None
-        if cmd_type == "mute" and matched.lastindex >= 3:
-            num = matched.group(2)
-            unit = matched.group(3)
-            if num:
-                extra_time = (int(num), unit)
+    if cmd_type == "mute" and matched.lastindex >= 3:
+        num, unit = matched.group(2), matched.group(3)
+        if num:
+            extra_time = (int(num), unit)
 
     target_user = await _resolve_target(msg, context, chat.id, explicit_arg)
     if not target_user:
-        return await msg.reply_text(
-            "⚠️ هدف مشخص نیست.\n• ریپلای روی پیام کاربر\n• یا آیدی عددی/یوزرنیم",
-            parse_mode="Markdown"
-        )
+        return await msg.reply_text("⚠️ هدف مشخص نیست.\n• ریپلای روی پیام کاربر\n• یا آیدی/یوزرنیم", parse_mode="Markdown")
 
     bot_user = await context.bot.get_me()
     if target_user.id == bot_user.id:
@@ -169,16 +162,18 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
         pass
 
     try:
+        # ---------- بن ----------
         if cmd_type == "ban":
             await context.bot.ban_chat_member(chat.id, target_user.id)
-            await punish_via_userbot(chat.id, target_user.id, action="ban")
+            await punish_via_userbot(chat.id, target_user.id, "ban")
             return await msg.reply_text(f"🚫 {target_user.first_name} از گروه بن شد.")
 
         if cmd_type == "unban":
             await context.bot.unban_chat_member(chat.id, target_user.id)
-            await punish_via_userbot(chat.id, target_user.id, action="unban")
+            await punish_via_userbot(chat.id, target_user.id, "unban")
             return await msg.reply_text(f"✅ {target_user.first_name} از بن خارج شد.")
 
+        # ---------- سکوت ----------
         if cmd_type == "mute":
             seconds = 3600
             if extra_time:
@@ -190,22 +185,16 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
                 else:
                     seconds = num
             until = datetime.utcnow() + timedelta(seconds=seconds)
-            await context.bot.restrict_chat_member(
-                chat.id, target_user.id,
-                permissions=ChatPermissions(can_send_messages=False),
-                until_date=until
-            )
-            await punish_via_userbot(chat.id, target_user.id, action="mute", seconds=seconds)
+            await context.bot.restrict_chat_member(chat.id, target_user.id, permissions=ChatPermissions(can_send_messages=False), until_date=until)
+            await punish_via_userbot(chat.id, target_user.id, "mute", seconds)
             return await msg.reply_text(f"🤐 {target_user.first_name} برای {seconds} ثانیه سکوت شد.")
 
         if cmd_type == "unmute":
-            await context.bot.restrict_chat_member(
-                chat.id, target_user.id,
-                permissions=ChatPermissions(can_send_messages=True)
-            )
-            await punish_via_userbot(chat.id, target_user.id, action="unmute")
+            await context.bot.restrict_chat_member(chat.id, target_user.id, permissions=ChatPermissions(can_send_messages=True))
+            await punish_via_userbot(chat.id, target_user.id, "unmute")
             return await msg.reply_text(f"🔊 {target_user.first_name} از سکوت خارج شد.")
 
+        # ---------- اخطار ----------
         if cmd_type == "warn":
             warns = _load_json(WARN_FILE)
             key = f"{chat.id}:{target_user.id}"
@@ -213,12 +202,11 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
             _save_json(WARN_FILE, warns)
             if warns[key] >= 3:
                 await context.bot.ban_chat_member(chat.id, target_user.id)
-                await punish_via_userbot(chat.id, target_user.id, action="ban")
+                await punish_via_userbot(chat.id, target_user.id, "ban")
                 warns[key] = 0
                 _save_json(WARN_FILE, warns)
                 return await msg.reply_text(f"🚫 {target_user.first_name} به‌دلیل ۳ اخطار بن شد.")
-            else:
-                return await msg.reply_text(f"⚠️ {target_user.first_name} اخطار {warns[key]}/3 گرفت.")
+            return await msg.reply_text(f"⚠️ {target_user.first_name} اخطار {warns[key]}/3 گرفت.")
 
         if cmd_type == "delwarn":
             warns = _load_json(WARN_FILE)
@@ -230,7 +218,7 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
             return await msg.reply_text("ℹ️ این کاربر اخطاری نداشت.")
 
     except Exception as e:
-        print("handle_punishments execution exception:", e)
+        print("handle_punishments exception:", e)
         return await msg.reply_text(f"⚠️ خطا در اجرای دستور: {e}")
 
 # ================= 🧩 ثبت هندلر =================
