@@ -44,49 +44,59 @@ async def _has_access(context, chat_id: int, user_id: int) -> bool:
     except Exception:
         return False
 
-# ================= 🎯 استخراج هدف مقاوم (ریپلای، آیدی عددی، یوزرنیم) =================
-# ================= 🎯 استخراج هدف مقاوم (ریپلای، آیدی عددی، یوزرنیم) =================
+
+# ================= 🎯 استخراج هدف مقاوم (ریپلای، آیدی عددی، یوزرنیم + هماهنگی با یوزربات) =================
 async def _resolve_target(msg, context, chat_id, explicit_arg: str = None):
-    # 1) ریپلای
+    # 1️⃣ ریپلای روی پیام
     if msg.reply_to_message and getattr(msg.reply_to_message, "from_user", None):
         return msg.reply_to_message.from_user
 
-    # 2) explicit_arg (آیدی عددی)
-    if explicit_arg:
-        arg = explicit_arg.strip()
-        if re.fullmatch(r"\d{6,15}", arg):
-            try:
-                cm = await context.bot.get_chat_member(chat_id, int(arg))
-                return cm.user
-            except:
-                pass
+    text = (msg.text or "").strip()
 
-    # 3) آیدی عددی در متن
-    text = msg.text or ""
-    m_id = re.search(r"\b(\d{6,15})\b", text)
-    if m_id:
+    # 2️⃣ آیدی عددی مستقیم در دستور یا آرگومان
+    id_match = re.search(r"\b(\d{6,15})\b", text)
+    if explicit_arg and explicit_arg.isdigit():
+        id_match = re.match(r"\d{6,15}", explicit_arg)
+
+    if id_match:
+        user_id = int(id_match.group(1))
         try:
-            cm = await context.bot.get_chat_member(chat_id, int(m_id.group(1)))
+            cm = await context.bot.get_chat_member(chat_id, user_id)
             return cm.user
         except:
             pass
 
-    # ✅ 4) یوزرنیم (اصلاح‌شده)
-    m_username = re.search(r"@(\w+)", text)
-    if m_username:
-        username = m_username.group(1)
+    # 3️⃣ یوزرنیم (با @)
+    username_match = re.search(r"@(\w{3,})", text)
+    if username_match:
+        username = username_match.group(1)
         try:
-            # ابتدا اطلاعات کاربر را با username بگیر
-            user_obj = await context.bot.get_chat(username)
-            # حالا اطلاعات عضوی او را در گروه بگیر
+            # اول با ربات اصلی تلاش می‌کنیم
+            user_obj = await context.bot.get_chat(f"@{username}")
             cm = await context.bot.get_chat_member(chat_id, user_obj.id)
             return cm.user
         except Exception as e:
-            print("⚠️ خطا در گرفتن یوزرنیم:", e)
-            pass
+            print(f"⚠️ ربات نتونست @{username} رو resolve کنه: {e}")
+            # حالا با یوزربات تلاش می‌کنیم (اگر فعال بود)
+            if userbot_client:
+                try:
+                    user_entity = await userbot_client.get_entity(f"@{username}")
+                    # اگر در گروه بود، برمی‌گردونیم
+                    try:
+                        cm = await context.bot.get_chat_member(chat_id, user_entity.id)
+                        return cm.user
+                    except:
+                        # حتی اگه در گروه نباشه، همون آیدی عددی رو برگردون
+                        class DummyUser:
+                            def __init__(self, id, first_name):
+                                self.id = id
+                                self.first_name = first_name
+                        return DummyUser(user_entity.id, getattr(user_entity, "first_name", username))
+                except Exception as e2:
+                    print(f"⚠️ یوزربات هم نتونست @{username} رو resolve کنه: {e2}")
+                    pass
 
     return None
-
 # ================= 🚫 ارسال دستورات بن/سکوت روی یوزربات =================
 async def punish_via_userbot(chat_id, user_id, action="ban", seconds=None):
     if not userbot_client:
