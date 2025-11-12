@@ -59,23 +59,20 @@ async def record_user_activity(update: Update, context: ContextTypes.DEFAULT_TYP
     data[chat_key][str(user.id)] = datetime.utcnow().timestamp()
     _save_activity(data)
 
-# ================= 👥 ارسال تگ با یوزربات (حتی اگه داخل گروه نباشه) =================
+# ================= 👥 ارسال تگ همزمان روی یوزربات =================
 async def send_tag_via_userbot(mentions, chat_id):
     if not userbot_client:
         return
-    try:
-        chunk_size = 20
-        for i in range(0, len(mentions), chunk_size):
-            chunk = mentions[i:i + chunk_size]
-            try:
-                await userbot_client.send_message(chat_id, "👥 " + " ".join(chunk), parse_mode="md")
-                await asyncio.sleep(1)
-            except Exception as e:
-                print(f"⚠️ خطا در ارسال تگ توسط یوزربات: {e}")
-    except Exception as e:
-        print(f"⚠️ خطای کلی یوزربات در تگ: {e}")
+    chunk_size = 20
+    for i in range(0, len(mentions), chunk_size):
+        chunk = mentions[i:i + chunk_size]
+        try:
+            await userbot_client.send_message(chat_id, "👥 " + " ".join(chunk), parse_mode="md")
+            await asyncio.sleep(1)
+        except:
+            continue
 
-# ================= 👥 تگ کاربران (حالت ترکیبی) =================
+# ================= 👥 تگ کاربران =================
 async def handle_tag_requests(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = update.effective_message
     user = update.effective_user
@@ -100,16 +97,17 @@ async def handle_tag_requests(update: Update, context: ContextTypes.DEFAULT_TYPE
     # ---------- تگ همه ----------
     if text == "تگ همه":
         participants = []
+
+        # ۱) ابتدا از یوزربات بگیر
         if userbot_client:
             try:
-                # 🔹 تلاش برای دریافت اعضا از یوزربات
-                participants = await userbot_client.get_participants(chat.id)
-            except Exception as e:
-                print(f"⚠️ یوزربات نتونست اعضا رو بگیره: {e}")
+                userbot_members = await userbot_client.get_participants(chat.id)
+                participants.extend([m for m in userbot_members if not m.bot])
+            except:
+                pass
 
-        # اگر یوزربات عضو گروه نبود → از activity.json استفاده کن
+        # ۲) fallback: از activity.json
         if not participants and chat_data:
-            print("ℹ️ استفاده از داده‌های ذخیره‌شده activity.json برای تگ همه")
             for uid_str in chat_data.keys():
                 try:
                     member = await context.bot.get_chat_member(chat.id, int(uid_str))
@@ -118,8 +116,17 @@ async def handle_tag_requests(update: Update, context: ContextTypes.DEFAULT_TYPE
                 except:
                     continue
 
-        # ساخت منشن‌ها
-        mentions = [f"[{getattr(m, 'first_name', 'ناشناس')}](tg://user?id={m.id})" for m in participants if not getattr(m, "bot", False)]
+        # ۳) اگر هنوز لیست خالی بود → از ربات اصلی بگیر
+        if not participants:
+            try:
+                # دریافت همه اعضا (ادمین‌ها + اعضای عادی تا جاییکه ربات دسترسی دارد)
+                chat_members = await context.bot.get_chat_administrators(chat.id)
+                participants.extend([m.user for m in chat_members if not m.user.is_bot])
+            except:
+                await msg.reply_text("⚠️ ربات نتونست اعضای گروه رو دریافت کنه")
+                return
+
+        mentions = [f"[{m.first_name}](tg://user?id={m.id})" for m in participants]
 
     # ---------- تگ مدیران ----------
     elif text == "تگ مدیران":
@@ -160,41 +167,38 @@ async def handle_tag_requests(update: Update, context: ContextTypes.DEFAULT_TYPE
         if len(parts) > 2 and parts[2].isdigit():
             count = int(parts[2])
 
-        sample_users = []
+        participants = []
+
         if userbot_client:
             try:
-                participants = await userbot_client.get_participants(chat.id)
-                non_bots = [m for m in participants if not m.bot]
-                sample_users = random.sample(non_bots, min(count, len(non_bots)))
+                userbot_members = await userbot_client.get_participants(chat.id)
+                participants.extend([m for m in userbot_members if not m.bot])
             except:
                 pass
 
-        if not sample_users and chat_data:
-            uid_list = list(chat_data.keys())
-            chosen = random.sample(uid_list, min(count, len(uid_list)))
-            for uid in chosen:
+        if not participants and chat_data:
+            for uid_str in chat_data.keys():
                 try:
-                    member = await context.bot.get_chat_member(chat.id, int(uid))
+                    member = await context.bot.get_chat_member(chat.id, int(uid_str))
                     if not member.user.is_bot:
-                        sample_users.append(member.user)
+                        participants.append(member.user)
                 except:
                     continue
 
-        mentions = [f"[{m.first_name}](tg://user?id={m.id})" for m in sample_users]
+        if participants:
+            sample = random.sample(participants, min(count, len(participants)))
+            mentions = [f"[{m.first_name}](tg://user?id={m.id})" for m in sample]
 
-    # ---------- ارسال تگ‌ها ----------
     if mentions:
-        # ارسال با ربات اصلی
+        # ارسال روی ربات اصلی
         chunk_size = 20
         for i in range(0, len(mentions), chunk_size):
             chunk = mentions[i:i + chunk_size]
             await msg.reply_text("👥 " + " ".join(chunk), parse_mode="Markdown")
             await asyncio.sleep(1)
 
-        # ارسال همزمان با یوزربات
+        # ارسال همزمان روی یوزربات
         await send_tag_via_userbot(mentions, chat.id)
-    else:
-        await msg.reply_text("⚠️ هیچ کاربری برای تگ یافت نشد.")
 
 # ================= 🔧 ثبت هندلر =================
 def register_tag_handlers(application, group_number: int = 14):
