@@ -1,11 +1,11 @@
 # ================= هماهنگ سازی یوزربات با ربات اصلی =================
- 
+
 import os
 import asyncio
 import random
-from telethon import TelegramClient, events, sessions
 from datetime import datetime, timedelta
 import json
+from telethon import TelegramClient, events, sessions
 
 # ---------- یوزربات ----------
 API_ID = int(os.environ.get("API_ID"))
@@ -75,28 +75,20 @@ async def punish_via_userbot(chat_id, user_id, action="ban", seconds=None):
     except:
         pass
 
-# ================= پاکسازی پیام‌ها با یوزربات =================
-async def delete_messages_userbot(chat_id, message_ids):
-    """حذف پیام‌ها به صورت دسته‌ای و امن"""
+# ================= پاکسازی سریع با یوزربات =================
+async def cleanup_chat(chat_id, messages, sender_id=None):
     deleted = 0
-    BATCH_SIZE = 50
-    for i in range(0, len(message_ids), BATCH_SIZE):
-        batch = message_ids[i:i+BATCH_SIZE]
-        try:
-            await client.delete_messages(chat_id, batch)
-            deleted += len(batch)
-        except:
+    for msg_id, user_id in reversed(messages):
+        if sender_id and user_id != sender_id:
             continue
-        await asyncio.sleep(0.1)  # تاخیر کوتاه بین دسته‌ها
+        try:
+            await client.delete_messages(chat_id, msg_id)
+            deleted += 1
+        except:
+            pass
+        if deleted % 20 == 0:
+            await asyncio.sleep(0.2)  # جلوگیری از Flood
     return deleted
-
-async def cleanup_chat(chat_id, message_ids, sender_id=None):
-    """حذف همه یا پیام‌های یک کاربر خاص"""
-    if sender_id:
-        message_ids = [mid for mid, uid in message_ids if uid == sender_id]
-    mids = [mid for mid, uid in message_ids]
-    deleted_count = await delete_messages_userbot(chat_id, mids)
-    return deleted_count
 
 # ================= دریافت فرمان از ربات اصلی =================
 @client.on(events.NewMessage)
@@ -113,7 +105,7 @@ async def handle_commands(event):
     action = parts[0].strip().lower()
     chat_id = int(parts[1])
 
-    # ---------- تگ همه ----------
+    # ---------- تگ ----------
     if action == "tagall":
         await tag_users(chat_id)
     elif action.startswith("tagrandom"):
@@ -125,7 +117,7 @@ async def handle_commands(event):
         ids = [int(x) for x in parts[2].split(",") if x.isdigit()] if len(parts) > 2 else None
         await tag_users(chat_id, user_ids=ids)
 
-    # ---------- هماهنگ سازی بن ----------
+    # ---------- بن و مدیریت ----------
     elif action.startswith("ban"):
         target = parts[2].strip()
         user_id = None
@@ -155,21 +147,18 @@ async def handle_commands(event):
 
     # ---------- پاکسازی ----------
     elif action.startswith("cleanup"):
-        # parts[2] = تعداد یا 'all' یا آیدی کاربر
-        message_ids = await client.get_messages(chat_id, limit=5000)  # گرفتن آخرین پیام‌ها
-        mids_list = [(m.id, m.sender_id) for m in message_ids]
-        target_user = None
-        if len(parts) > 2:
-            if parts[2].isdigit():
+        # دریافت پیام‌های آخر گروه
+        limit = 5000
+        try:
+            msgs = await client.get_messages(chat_id, limit=limit)
+            messages_list = [(m.id, m.sender_id) for m in msgs if m.sender_id]
+            target_user = None
+            if len(parts) > 2 and parts[2].isdigit():
                 target_user = int(parts[2])
-            elif parts[2].lower() != "all":
-                try:
-                    user_obj = await client.get_entity(parts[2])
-                    target_user = user_obj.id
-                except:
-                    pass
-        deleted_count = await cleanup_chat(chat_id, mids_list, sender_id=target_user)
-        await client.send_message(chat_id, f"✅ پاکسازی انجام شد\n📦 تعداد پیام‌های حذف‌شده: {deleted_count}")
+            deleted_count = await cleanup_chat(chat_id, messages_list, sender_id=target_user)
+            await client.send_message(chat_id, f"✅ پاکسازی انجام شد\n📦 تعداد پیام‌های حذف‌شده: {deleted_count}")
+        except:
+            pass
 
 # ================= استارت یوزربات =================
 async def start_userbot():
