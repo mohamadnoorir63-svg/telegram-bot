@@ -6,18 +6,7 @@ from telegram.ext import ContextTypes
 
 # 📂 مسیر فایل داده گروه‌ها
 GROUP_CTRL_FILE = os.path.join(os.path.dirname(os.path.dirname(__file__)), "group_control.json")
-
-SUDO_IDS = [8588347189]  # آیدی سودو
-
-# ===================== 🧰 دسترسی =====================
-async def _has_access(context: ContextTypes.DEFAULT_TYPE, chat_id: int, user_id: int) -> bool:
-    if user_id in SUDO_IDS:
-        return True
-    try:
-        member = await context.bot.get_chat_member(chat_id, user_id)
-        return member.status in ("creator", "administrator")
-    except:
-        return False
+SUDO_IDS = [8588347189]  # آیدی سودو اصلی
 
 # ===================== 🗂 مدیریت فایل =====================
 def load_group_data():
@@ -53,8 +42,18 @@ async def link_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if chat.type not in ["group", "supergroup"]:
         return await update.message.reply_text("⚠️ فقط در گروه قابل استفاده است.")
 
-    if not await _has_access(context, chat.id, user.id):
-        return await update.message.reply_text("🚫 فقط مدیران یا سودو می‌توانند از این پنل استفاده کنند.")
+    # بررسی دسترسی مدیر یا سودو
+    async def _has_access(user_id):
+        if user_id in SUDO_IDS:
+            return True
+        try:
+            member = await context.bot.get_chat_member(chat.id, user_id)
+            return member.status in ("creator", "administrator")
+        except:
+            return False
+
+    if not await _has_access(user.id):
+        return await update.message.reply_text("🚫 فقط مدیران یا سودو می‌توانند از پنل استفاده کنند.")
 
     gdata = load_group_data()
     group = gdata.setdefault(str(chat.id), {})
@@ -67,14 +66,28 @@ async def link_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ===================== ⚙️ کنترل دکمه‌ها =====================
 async def link_panel_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    await query.answer()
     data = query.data
     chat = query.message.chat
     chat_id = chat.id
     user = query.from_user
 
-    if not await _has_access(context, chat_id, user.id):
-        return await query.message.reply_text("🚫 فقط مدیران یا سودو می‌توانند این بخش را استفاده کنند.")
+    # بررسی دسترسی مدیر یا سودو
+    async def _has_access(user_id):
+        if user_id in SUDO_IDS:
+            return True
+        try:
+            member = await context.bot.get_chat_member(chat_id, user_id)
+            return member.status in ("creator", "administrator")
+        except:
+            return False
+
+    if not await _has_access(user.id):
+        return await query.answer(
+            "🚫 فقط مدیران یا سودو می‌توانند این بخش را استفاده کنند.",
+            show_alert=True
+        )
+
+    await query.answer()  # پاسخ اولیه برای جلوگیری از ساعت‌گرد شدن دکمه
 
     gdata = load_group_data()
     group = gdata.setdefault(str(chat_id), {})
