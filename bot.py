@@ -1347,40 +1347,43 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
         
         # ✅ جوک تصادفی
-if text == "جوک":
-    if os.path.exists("jokes.json"):
-        data = load_data("jokes.json")
-        if data:
-            key, val = random.choice(list(data.items()))
-            t = val.get("type", "text")
-            v = val.get("value", "")
-            try:
-                if t == "text":
-                    decorated = decorate_joke(v)
-                    decorated_html = (
-                        decorated.replace("&", "&amp;")
-                                 .replace("<", "&lt;")
-                                 .replace(">", "&gt;")
-                    )
-                    await update.message.reply_text(
-                        f"😂 {decorated_html}",
-                        parse_mode=ParseMode.HTML
-                    )
-                elif t == "photo":
-                    await update.message.reply_photo(photo=v, caption="😂 جوک تصویری!")
-                elif t == "video":
-                    await update.message.reply_video(video=v, caption="😂 جوک ویدیویی!")
-                elif t == "sticker":
-                    await update.message.reply_sticker(sticker=v)
-                else:
-                    await update.message.reply_text("⚠️ نوع فایل پشتیبانی نمی‌شود.")
-            except Exception as e:
-                await update.message.reply_text(f"⚠️ خطا در ارسال جوک: {e}")
+async def handle_joke(update, context):
+    text = update.message.text
+
+    if text == "جوک":
+        if os.path.exists("jokes.json"):
+            data = load_data("jokes.json")
+            if data:
+                key, val = random.choice(list(data.items()))
+                t = val.get("type", "text")
+                v = val.get("value", "")
+                try:
+                    if t == "text":
+                        decorated = decorate_joke(v)
+                        decorated_html = (
+                            decorated.replace("&", "&amp;")
+                                     .replace("<", "&lt;")
+                                     .replace(">", "&gt;")
+                        )
+                        await update.message.reply_text(
+                            f"😂 {decorated_html}",
+                            parse_mode=ParseMode.HTML
+                        )
+                    elif t == "photo":
+                        await update.message.reply_photo(photo=v, caption="😂 جوک تصویری!")
+                    elif t == "video":
+                        await update.message.reply_video(video=v, caption="😂 جوک ویدیویی!")
+                    elif t == "sticker":
+                        await update.message.reply_sticker(sticker=v)
+                    else:
+                        await update.message.reply_text("⚠️ نوع فایل پشتیبانی نمی‌شود.")
+                except Exception as e:
+                    await update.message.reply_text(f"⚠️ خطا در ارسال جوک: {e}")
+            else:
+                await update.message.reply_text("هنوز جوکی ثبت نشده 😅")
         else:
-            await update.message.reply_text("هنوز جوکی ثبت نشده 😅")
-    else:
-        await update.message.reply_text("📂 فایل جوک‌ها پیدا نشد 😕")
-    return
+            await update.message.reply_text("📂 فایل جوک‌ها پیدا نشد 😕")
+
 
     # ✅ فال تصادفی
     if text == "فال":
