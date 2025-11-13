@@ -1,11 +1,7 @@
-import json
-import os
-from datetime import datetime, timedelta
+from emotion_memory import init_emotion_memory, remember_emotion, get_last_emotion, emotion_context_reply
 
-# 📁 مسیر فایل حافظه احساسات
-EMOTION_FILE = "emotion_memory.json"
-
-
+# 🧠 اطمینان از وجود فایل حافظه احساسات
+init_emotion_memory()
 # ========================= ⚙️ آماده‌سازی =========================
 def init_emotion_memory():
     """بررسی و ساخت فایل احساسات در صورت نبود"""
