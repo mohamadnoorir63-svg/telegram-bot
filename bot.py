@@ -1828,7 +1828,7 @@ async def show_main_panel(update: Update, context: ContextTypes.DEFAULT_TYPE, ed
             InlineKeyboardButton("🧩 قابلیت‌های ربات", callback_data="panel_features")
         ],
         [
-            InlineKeyboardButton("🤖 درباره ربات", callback_data="panel_about"),
+            InlineKeyboardButton("🤖 راهنما ربات", callback_data="panel_about"),
             InlineKeyboardButton("👨‍💻 درباره تیم ما", callback_data="panel_team")
         ],
         [
