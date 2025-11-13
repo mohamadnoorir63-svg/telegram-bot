@@ -50,12 +50,8 @@ def save_jokes(data):
     with open(JOKE_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
-# ========================= تزئین جوک با لوگو =========================
+# ========================= تزئین جوک با قاب =========================
 def decorate_joke(text: str) -> str:
-    """
-    اضافه کردن قاب/لوگو به متن جوک و شکستن متن طولانی به چند خط.
-    لوگو برای استایل عاشقی/شاد/شیک قابل تغییر است.
-    """
     max_len = 50
     lines = []
     for line in text.split("\n"):
@@ -207,8 +203,15 @@ async def list_jokes(update: Update):
         try:
             if t == "text":
                 decorated = decorate_joke(v.get("value"))
-                decorated = decorated.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-                await update.message.reply_text(f"😂 جوک شماره {k}\n{decorated}", parse_mode=ParseMode.HTML)
+                decorated_html = (
+                    decorated.replace("&", "&amp;")
+                             .replace("<", "&lt;")
+                             .replace(">", "&gt;")
+                )
+                await update.message.reply_text(
+                    f"😂 جوک شماره {k}\n{decorated_html}",
+                    parse_mode=ParseMode.HTML
+                )
             elif t == "photo":
                 await update.message.reply_photo(photo=val, caption=f"😂 جوک شماره {k}")
             elif t == "video":
@@ -262,14 +265,14 @@ async def send_random_joke(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         if t == "text":
             decorated = decorate_joke(v.get("value"))
-            # encode کردن کاراکترهای خاص برای HTML
             decorated_html = (
                 decorated.replace("&", "&amp;")
                          .replace("<", "&lt;")
                          .replace(">", "&gt;")
             )
             await update.message.reply_text(
-                f"😂 {decorated_html}", parse_mode=ParseMode.HTML
+                f"😂 {decorated_html}",
+                parse_mode=ParseMode.HTML
             )
         elif t == "photo":
             await update.message.reply_photo(photo=val, caption=f"😂 جوک شماره {k}")
