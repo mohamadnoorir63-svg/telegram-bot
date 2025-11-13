@@ -1540,7 +1540,7 @@ async def reset_memory(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_ID:
         return await update.message.reply_text("⛔ فقط مدیر اصلی مجازه!")
 
-    loading_text = "🧠 <b>در حال پاکسازی کامل مغز خنگول...</b>\n"
+    loading_text = "🧠 <b>در حال پاکسازی کامل مغز ربات...</b>\n"
     msg = await update.message.reply_text(loading_text, parse_mode="HTML")
 
     steps = [
@@ -1810,7 +1810,7 @@ async def load_text(file_name, default_text):
 
 # ======================= 🎛 پنل اصلی خنگول =======================
 async def show_main_panel(update: Update, context: ContextTypes.DEFAULT_TYPE, edit=False):
-    about = "🌙 <b>به منوی اصلی ربات خوش آمدی!</b>\nاز دکمه‌های زیر یکی رو انتخاب کن 😎"
+    about = f"🌙 <b>به منوی اصلی ربات خوش آمدی {user_first_name}!</b>\n📅 {now}\nاز دکمه‌های زیر یکی رو انتخاب کن 😎"
 
     keyboard = [
         [
