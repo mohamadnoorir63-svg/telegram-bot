@@ -1,9 +1,11 @@
+# jokes_manager.py
+
 import json
 import os
 import random
 from datetime import datetime
 from urllib.parse import urlparse
-from telegram import Update
+from telegram import Update, InputFile
 from telegram.ext import ContextTypes
 
 # ========================= مسیرها و آماده‌سازی =========================
@@ -49,16 +51,6 @@ def load_jokes():
 def save_jokes(data):
     with open(JOKE_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
-
-# ========================= قاب خنده‌دار =========================
-
-def decorate_funny_joke(text: str) -> str:
-    """
-    قاب ساده و شیک برای جوک‌های خنده‌دار 😄
-    """
-    top = "🃏—————————————————"
-    bottom = "—————————————————🃏"
-    return f"{top}\n{text.strip()}\n{bottom}"
 
 # ========================= ثبت جوک (ریپلای) =========================
 
@@ -198,8 +190,7 @@ async def list_jokes(update: Update):
 
         try:
             if t == "text":
-                caption = decorate_funny_joke(f"😂 جوک شماره {k}\n{v.get('value')}")
-                await update.message.reply_text(caption)
+                await update.message.reply_text(f"😂 جوک شماره {k}\n{v.get('value')}")
             elif t == "photo":
                 await update.message.reply_photo(photo=val, caption=f"😂 جوک شماره {k}")
             elif t == "video":
@@ -254,8 +245,7 @@ async def send_random_joke(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     try:
         if t == "text":
-            caption = decorate_funny_joke(v.get("value", ""))
-            await update.message.reply_text(f"😂 {caption}")
+            await update.message.reply_text(f"😂 {v.get('value')}")
         elif t == "photo":
             await update.message.reply_photo(photo=val, caption=f"😂 جوک شماره {k}")
         elif t == "video":
