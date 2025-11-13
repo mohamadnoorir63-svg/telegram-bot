@@ -30,6 +30,7 @@ from memory_manager import (
     enhance_sentence,
     generate_sentence,
     list_phrases
+   delete_phrase
 )
 from jokes_manager import save_joke, delete_joke, list_jokes, send_random_joke
 from fortune_manager import save_fortune, list_fortunes, send_random_fortune, delete_fortune
@@ -1427,6 +1428,29 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # ✅ لیست جملات
     if text == "لیست":
         await update.message.reply_text(list_phrases(), parse_mode="HTML")
+        return
+        # ✅ حذف جمله یا جملات از حافظه
+    if text.startswith("حذف "):
+        phrase = text.replace("حذف ", "").strip()
+
+        if not phrase:
+            await update.message.reply_text(
+                "❗ لطفاً جمله‌ای برای حذف بنویس.\n\n"
+                "📘 مثال:\n"
+                "<code>حذف سلام</code>\n"
+                "یا برای حذف چند جمله مشابه:\n"
+                "<code>حذف سلام*</code>",
+                parse_mode="HTML"
+            )
+            return
+
+        # اگر کاربر ستاره گذاشته باشد یعنی حذف جزئی (partial)
+        partial = phrase.endswith("*")
+        if partial:
+            phrase = phrase[:-1].strip()
+
+        msg = delete_phrase(phrase, partial=partial)
+        await update.message.reply_text(msg, parse_mode="HTML")
         return
 
     # ✅ یادگیری دستی با استایل زیبا و خروجی حرفه‌ای
