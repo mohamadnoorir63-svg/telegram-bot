@@ -251,7 +251,7 @@ async def send_random_joke(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     try:
         if t == "text":
-            decorated = decorate_joke(v.get("value"))
+            decorated = decorate_joke(v.get('value'))  # اضافه کردن لوگو
             await update.message.reply_text(f"😂 {decorated}")
         elif t == "photo":
             await update.message.reply_photo(photo=val, caption=f"😂 جوک شماره {k}")
