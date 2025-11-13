@@ -281,7 +281,7 @@ async def handle_group_reply_mode(update: Update, context: ContextTypes.DEFAULT_
             text = update.message.text.strip()
 
             # واکنش به درخواست حضور
-            if text.lower() in ["خنگول کجایی", "خنگول کجایی؟", "کجایی خنگول"]:
+            if text.lower() in ["ربات کجایی", " پینگ ؟", "کجایی ربات"]:
                 return await update.message.reply_text("😄 من اینجام! فقط روی پیام‌هام ریپلای کن 💬")
 
             # اگر پیام ریپلای به خود ربات نبود، پاسخی نده
@@ -316,7 +316,7 @@ async def notify_admin_on_startup(app):
     try:
         await app.bot.send_message(
             chat_id=ADMIN_ID,
-            text="🚀 ربات خنگول با موفقیت راه‌اندازی شد ✅"
+            text="🚀 ربات با موفقیت راه‌اندازی شد ✅"
         )
         print("[INFO] Startup notification sent ✅")
     except Exception as e:
@@ -332,7 +332,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # پیام ساده خوشامد
     await update.message.reply_text(
-        f"✨ **سیستم خنگول فعال شد!**\n\n"
+        f"✨ **سیستم ربات فعال شد!**\n\n"
         f"👤 کاربر: **{user.first_name}**\n"
         f"🕓 زمان اجرا: `{now}`\n"
         "💬 آماده‌ای برای خنده، احساس و هوش مصنوعی 😎\n\n"
@@ -378,11 +378,11 @@ async def detect_admin_movement(update: Update, context: ContextTypes.DEFAULT_TY
                 if str(chat.id) in sudo_status:
                     text = (
                         f"👑 <b>بازگشت دوباره‌ی {member.first_name}!</b>\n"
-                        f"🎉 خوش اومدی رئیس! مغز خنگول دوباره بیدار شد 🤖✨"
+                        f"🎉 خوش اومدی رئیس! مغز ربات دوباره بیدار شد 🤖✨"
                     )
                 else:
                     text = (
-                        f"👑 <b>سازنده‌ی خنگول وارد گروه شد!</b>\n"
+                        f"👑 <b>سازنده‌ی ربات وارد گروه شد!</b>\n"
                         f"✨ حضور {member.first_name} باعث افتخار خنگوله 😎\n"
                         f"🧠 حالت مدیریتی فعال شد و همه آماده‌ی خدمتن!"
                     )
@@ -405,7 +405,7 @@ async def detect_admin_movement(update: Update, context: ContextTypes.DEFAULT_TY
         text = (
             f"😢 <b>سازنده از گروه خارج شد...</b>\n"
             f"🔕 حالت مدیریتی موقتاً غیرفعال شد.\n"
-            f"🕯️ تا بازگشت دوباره‌ی خنگول در حالت خودکار می‌مونیم."
+            f"🕯️ تا بازگشت دوباره‌ی ربات در حالت خودکار می‌مونیم."
         )
         await message.reply_text(text, parse_mode="HTML")
 
@@ -431,7 +431,7 @@ async def sudo_bot_call(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "🤖 در خدمتتم رئیس!",
         "⚡ بفرما قربان!",
         "🧠 گوش به فرمانتم!",
-        "✨ دستور بده شاه خنگول!",
+        "✨ دستور بده شاه !",
         "😄 آماده‌م برای هر کاری!",
         "🔥 بگو رئیس، منتظرم!"
     ]
@@ -469,7 +469,7 @@ async def unlock_learning(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("🔓 یادگیری باز شد!")
 
 
-# ======================= 📊 آمار خنگول واقعی =======================
+# ======================= 📊 آمار ربات واقعی =======================
 async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """نمایش آمار کلی — فقط برای مدیر اصلی یا سودوها"""
     ADMIN_ID = int(os.getenv("ADMIN_ID", "8588347189"))
@@ -501,7 +501,7 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # ✅ ساخت پیام نهایی
     msg = (
-        f"📊 <b>آمار کلی خنگول:</b>\n\n"
+        f"📊 <b> آمار کلی ربات:</b>\n\n"
         f"👤 کاربران واقعی: <b>{users}</b>\n"
         f"👥 گروه‌های فعال: <b>{groups}</b>\n"
         f"🧩 جملات ذخیره‌شده: <b>{data['phrases']}</b>\n"
@@ -1818,7 +1818,7 @@ async def load_text(file_name, default_text):
 
 # ======================= 🎛 پنل اصلی خنگول =======================
 async def show_main_panel(update: Update, context: ContextTypes.DEFAULT_TYPE, edit=False):
-    about = "🌙 <b>به منوی اصلی خنگول خوش آمدی!</b>\nاز دکمه‌های زیر یکی رو انتخاب کن 😎"
+    
 
     keyboard = [
         [
@@ -1830,7 +1830,7 @@ async def show_main_panel(update: Update, context: ContextTypes.DEFAULT_TYPE, ed
             InlineKeyboardButton("🧩 قابلیت‌های ربات", callback_data="panel_features")
         ],
         [
-            InlineKeyboardButton("🤖 درباره خنگول", callback_data="panel_about"),
+            InlineKeyboardButton("🤖 درباره ربات", callback_data="panel_about"),
             InlineKeyboardButton("👨‍💻 درباره تیم ما", callback_data="panel_team")
         ],
         [
@@ -1839,7 +1839,7 @@ async def show_main_panel(update: Update, context: ContextTypes.DEFAULT_TYPE, ed
         ],
         [
             InlineKeyboardButton("🎨 فونت‌ساز حرفه‌ای", callback_data="panel_font"),
-            InlineKeyboardButton("💳 آیدی خنگولی من", callback_data="panel_stats")
+            InlineKeyboardButton("💳 آیدی من", callback_data="panel_stats")
         ],
         [
             InlineKeyboardButton("🧠 گفتگوی ChatGPT", callback_data="panel_chatgpt")
@@ -1886,7 +1886,7 @@ async def panel_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     now = datetime.now().strftime("%Y/%m/%d - %H:%M:%S")
 
     panels = {
-        "panel_about": ("about_khengol.txt", "💫 درباره خنگول"),
+        "panel_about": ("about_khengol.txt", "💫 درباره ربات"),
         "panel_team": ("team_noori.txt", "👨‍💻 تیم نوری"),
         "panel_features": ("features.txt", "🧩 قابلیت‌های ربات"),
     }
