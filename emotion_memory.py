@@ -10,36 +10,47 @@ EMOTION_FILE = "emotion_memory.json"
 def init_emotion_memory():
     """بررسی و ساخت فایل احساسات در صورت نبود"""
     if not os.path.exists(EMOTION_FILE):
-        with open(EMOTION_FILE, "w", encoding="utf-8") as f:
-            json.dump({}, f, ensure_ascii=False, indent=2)
-        print("فایل emotion_memory.json ساخته شد.")
+        try:
+            with open(EMOTION_FILE, "w", encoding="utf-8") as f:
+                json.dump({}, f, ensure_ascii=False, indent=2)
+            print("✅ فایل emotion_memory.json ساخته شد.")
+        except Exception as e:
+            print(f"❌ خطا در ساخت فایل احساسات: {e}")
 
 
 # ========================= 💾 خواندن و ذخیره =========================
 def load_emotions():
+    """بارگذاری احساسات از فایل (در صورت نبود، خودکار ساخته می‌شود)"""
+    if not os.path.exists(EMOTION_FILE):
+        init_emotion_memory()
+
     try:
         with open(EMOTION_FILE, "r", encoding="utf-8") as f:
             return json.load(f)
+
     except json.JSONDecodeError:
-        print("فایل احساسات خراب بود — بازنشانی شد.")
+        print("⚠️ فایل احساسات خراب بود — بازنشانی شد.")
         save_emotions({})
         return {}
+
     except Exception as e:
-        print(f"خطا در بارگذاری emotion_memory.json: {e}")
+        print(f"❌ خطا در بارگذاری emotion_memory.json: {e}")
+        init_emotion_memory()
         return {}
 
 
 def save_emotions(data):
+    """ذخیره احساسات در فایل"""
     try:
         with open(EMOTION_FILE, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
     except Exception as e:
-        print(f"خطا در ذخیره احساسات: {e}")
+        print(f"❌ خطا در ذخیره احساسات: {e}")
 
 
 # ========================= 💖 ثبت احساس جدید =========================
 def remember_emotion(user_id: int, emotion: str):
-    """ثبت احساس جدید برای هر کاربر"""
+    """ثبت یا به‌روزرسانی احساس کاربر"""
     data = load_emotions()
     now = datetime.now().isoformat()
 
@@ -49,11 +60,12 @@ def remember_emotion(user_id: int, emotion: str):
     }
 
     save_emotions(data)
+    print(f"🧠 احساس {emotion} برای کاربر {user_id} ذخیره شد.")
 
 
 # ========================= 🔍 واکشی احساس قبلی =========================
 def get_last_emotion(user_id: int) -> str:
-    """برگرداندن آخرین احساس ذخیره‌شده کاربر"""
+    """بازگرداندن آخرین احساس ذخیره‌شده برای کاربر"""
     data = load_emotions()
     info = data.get(str(user_id))
 
@@ -65,14 +77,14 @@ def get_last_emotion(user_id: int) -> str:
     except Exception:
         return "neutral"
 
-    # اگر بیشتر از ۳۰ دقیقه گذشته باشه، احساس ریست میشه
+    # اگر بیشتر از ۳۰ دقیقه گذشته باشد، احساس ریست می‌شود
     if datetime.now() - last_time > timedelta(minutes=30):
         return "neutral"
 
     return info.get("emotion", "neutral")
 
 
-# ========================= ✨ بررسی و واکنش به تغییر احساس =========================
+# ========================= ✨ واکنش به تغییر احساس =========================
 def emotion_context_reply(current_emotion: str, last_emotion: str) -> str:
     """ایجاد پاسخ بر اساس تغییر احساس کاربر"""
     if last_emotion == "sad" and current_emotion == "happy":
@@ -87,3 +99,5 @@ def emotion_context_reply(current_emotion: str, last_emotion: str) -> str:
         return None  # احساس تغییری نکرده
 
     return None
+
+
