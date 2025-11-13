@@ -23,6 +23,7 @@ from memory_manager import (
     load_data,
     save_data,
     learn,
+    long_learn,      # ← این خط رو اضافه کن
     shadow_learn,
     get_reply,
     set_mode,
@@ -30,7 +31,7 @@ from memory_manager import (
     enhance_sentence,
     generate_sentence,
     list_phrases,
-    delete_phrase  # ✅ درست شد
+    delete_phrase
 )
 from jokes_manager import save_joke, delete_joke, list_jokes, send_random_joke
 from fortune_manager import save_fortune, list_fortunes, send_random_fortune, delete_fortune
