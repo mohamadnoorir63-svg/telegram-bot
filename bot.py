@@ -1063,7 +1063,7 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # ✅ جلوگیری از پاسخ به دستورات خاص (مثل راهنما، خوشامد، ربات و غیره)
     protected_words = [
         "راهنما", "ثبت راهنما", "خوشامد", "ثبت خوشامد",
-        "ربات", "save", "del", "panel", "backup", "cloudsync", "leave"
+         "save", "del", "panel", "backup", "cloudsync", "leave"
     ]
     
     if any(lower_text.startswith(word) for word in protected_words):
