@@ -190,9 +190,9 @@ async def list_jokes(update: Update):
 
         try:
             if t == "text":
-                await update.message.reply_text(f"😍 جوک شماره {k}\n{v.get('value')}")
+                await update.message.reply_text(f"😂 جوک شماره {k}\n{v.get('value')}")
             elif t == "photo":
-                await update.message.reply_photo(photo=val, caption=f"💔 جوک شماره {k}")
+                await update.message.reply_photo(photo=val, caption=f"😂 جوک شماره {k}")
             elif t == "video":
                 await update.message.reply_video(video=val, caption=f"🎥 جوک شماره {k}")
             elif t == "sticker":
@@ -206,10 +206,11 @@ async def list_jokes(update: Update):
         await update.message.reply_text("⚠️ هیچ جوک سالمی برای نمایش پیدا نشد.")
 
 # ========================= ارسال جوک تصادفی (بدون تکرار) =========================
+
 async def send_random_joke(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data = load_jokes()
     if not data:
-        return await update.message.reply_text("📭 هنوز جوکی ذخیره نشده 🍁")
+        return await update.message.reply_text("📭 هنوز جوکی ذخیره نشده 😅")
 
     sent_state_file = os.path.join(BASE_DIR, "sent_jokes.json")
 
@@ -244,12 +245,9 @@ async def send_random_joke(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     try:
         if t == "text":
-            # اضافه کردن قاب مخصوص خنده به متن جوک
-            decorated = decorate_joke(v.get("value"))
-            joke_with_laugh_frame = f"──────༺♡༻──────\n{decorated}\n──────༺♡༻──────"
-            await update.message.reply_text(joke_with_laugh_frame)
+            await update.message.reply_text(f"😂 {v.get('value')}")
         elif t == "photo":
-            await update.message.reply_photo(photo=val, caption=f"🍁🍁🍁🍁🍁🍁🍁🍁🍁🍁🍁 جوک شماره {k}")
+            await update.message.reply_photo(photo=val, caption=f"😂 جوک شماره {k}")
         elif t == "video":
             await update.message.reply_video(video=val, caption=f"🎥 جوک شماره {k}")
         elif t == "sticker":
