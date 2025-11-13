@@ -249,7 +249,7 @@ async def send_random_joke(update: Update, context: ContextTypes.DEFAULT_TYPE):
             joke_with_laugh_frame = f"──────༺♡༻──────\n{decorated}\n──────༺♡༻──────"
             await update.message.reply_text(joke_with_laugh_frame)
         elif t == "photo":
-            await update.message.reply_photo(photo=val, caption=f"😂 جوک شماره {k}")
+            await update.message.reply_photo(photo=val, caption=f"🍁🍁🍁🍁🍁🍁🍁🍁🍁🍁🍁 جوک شماره {k}")
         elif t == "video":
             await update.message.reply_video(video=val, caption=f"🎥 جوک شماره {k}")
         elif t == "sticker":
