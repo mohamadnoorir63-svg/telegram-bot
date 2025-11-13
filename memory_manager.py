@@ -318,3 +318,30 @@ def evaluate_intelligence():
     )
 
     return {"iq": iq_score, "level": level, "summary": summary}
+
+# ========================= حذف جمله از حافظه =========================
+
+def delete_phrase(phrase, partial=False):
+    """حذف یک جمله یا چند جمله‌ی مشابه از حافظه"""
+    phrase = phrase.strip()
+    data = load_data("memory.json")
+
+    if "data" not in data:
+        return "<b>حافظه خالی است.</b>"
+
+    found = []
+    keys = list(data["data"].keys())
+
+    if partial:
+        found = [k for k in keys if phrase in k]
+    elif phrase in data["data"]:
+        found = [phrase]
+
+    if not found:
+        return f"<b>هیچ جمله‌ای شامل '{phrase}' پیدا نشد.</b>"
+
+    for k in found:
+        del data["data"][k]
+
+    save_data("memory.json", data)
+    return f"<b>{len(found)} جمله حذف شد:</b>\n" + "\n".join(f"- {k}" for k in found)
