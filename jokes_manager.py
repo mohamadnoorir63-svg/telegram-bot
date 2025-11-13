@@ -50,25 +50,6 @@ def save_jokes(data):
         json.dump(data, f, ensure_ascii=False, indent=2)
 
 # ========================= تزئین جوک با لوگو =========================
-def decorate_joke(text: str) -> str:
-    """
-    اضافه کردن قاب/لوگو به متن جوک و شکستن متن طولانی به چند خط.
-    هر خط حفظ می‌شود و خطوط طولانی جداگانه شکسته می‌شوند.
-    """
-    max_len = 50
-    lines = []
-
-    for line in text.split("\n"):
-        line = line.strip()
-        while len(line) > max_len:
-            lines.append(line[:max_len])
-            line = line[max_len:]
-        if line:
-            lines.append(line)
-
-    decorated_text = "\n".join(lines)
-    # لوگو با فاصله کمی تا متن
-    return f"🖤🥀──────༺♡༻──────🥀🖤\n{decorated_text}\n🖤🥀──────༺♡༻──────🥀🖤"
 
 # ========================= ثبت جوک (ریپلای) =========================
 async def save_joke(update: Update):
@@ -95,7 +76,27 @@ async def save_joke(update: Update):
             filename = f"video_{int(datetime.now().timestamp())}.mp4"
             path = os.path.join(MEDIA_DIR, filename)
             await file.download_to_drive(path)
-            entry["type"] = "video"
+            entry["typdef decorate_joke(text: str) -> str:
+    """
+    اضافه کردن قاب/لوگو به متن جوک.
+    هر خط متن بین لوگوهای بالا و پایین قرار می‌گیرد و خطوط طولانی جداگانه شکسته می‌شوند.
+    """
+    max_len = 50
+    final_lines = []
+
+    for line in text.split("\n"):
+        line = line.strip()
+        while len(line) > max_len:
+            final_lines.append(f"🖤🥀 {line[:max_len]} 🥀🖤")
+            line = line[max_len:]
+        if line:
+            final_lines.append(f"🖤🥀 {line} 🥀🖤")
+
+    # خط جداکننده در بالا و پایین کل متن
+    decorated_text = "\n".join(final_lines)
+    decorated_text = f"🖤🥀──────༺♡༻──────🥀🖤\n{decorated_text}\n🖤🥀──────༺♡༻──────🥀🖤"
+
+    return decorated_texte"] = "video"
             entry["value"] = os.path.relpath(path, BASE_DIR)
         elif reply.sticker:
             file = await reply.sticker.get_file()
@@ -266,7 +267,7 @@ async def send_random_joke(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         if t == "text":
             decorated = decorate_joke(v.get('value'))  # اضافه کردن لوگو و شکستن متن
-            await update.message.reply_text(f"😂 {decorated}")
+            await update.message.reply_text(f"😁😁😁😁😁😂 {decorated}")
         elif t == "photo":
             await update.message.reply_photo(photo=val, caption=f"😂 جوک شماره {k}")
         elif t == "video":
