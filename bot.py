@@ -1452,6 +1452,33 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
         msg = delete_phrase(phrase, partial=partial)
         await update.message.reply_text(msg, parse_mode="HTML")
         return
+        # ✅ یادگیری چندخطی (طولانی یادبگیر)
+    if text.startswith("طولانی یادبگیر "):
+        parts = text.replace("طولانی یادبگیر ", "").split("\n")
+
+        if len(parts) > 1:
+            phrase = parts[0].strip()
+            lines = [p.strip() for p in parts[1:] if p.strip()]
+            msg = long_learn(phrase, *lines)
+
+            visual = (
+                f"🧠 <b>یادگیری چندخطی انجام شد!</b>\n"
+                f"💬 <b>جمله:</b> <code>{phrase}</code>\n"
+                f"📜 <b>تعداد خطوط:</b> {len(lines)}\n"
+                f"➕ <i>{msg}</i>"
+            )
+
+            await update.message.reply_text(visual, parse_mode="HTML")
+        else:
+            await update.message.reply_text(
+                "❗ بعد از 'طولانی یادبگیر' جمله‌ی اصلی و متن چندخطی رو بنویس.\n\n"
+                "📘 مثال:\n"
+                "<code>طولانی یادبگیر بیو\n"
+                "ای پادشاه خوبان داد از غم تنهایی دل بی\n"
+                "دل بی‌تو به جان آمد ❤️</code>",
+                parse_mode="HTML"
+            )
+        return
 
     # ✅ یادگیری دستی با استایل زیبا و خروجی حرفه‌ای
     if text.startswith("یادبگیر "):
