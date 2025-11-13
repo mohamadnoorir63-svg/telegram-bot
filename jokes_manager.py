@@ -1,4 +1,5 @@
 # jokes_manager.py
+
 import json
 import os
 import random
@@ -50,6 +51,27 @@ def save_jokes(data):
         json.dump(data, f, ensure_ascii=False, indent=2)
 
 # ========================= تزئین جوک با لوگو =========================
+def decorate_joke(text: str) -> str:
+    """
+    اضافه کردن قاب/لوگو به متن جوک.
+    - هر خط متن بین لوگوهای بالا و پایین خودش قرار می‌گیرد.
+    - خطوط طولانی به بخش‌های کوچک 40 کاراکتری تقسیم می‌شوند.
+    """
+    max_len = 40
+    final_lines = []
+
+    for line in text.split("\n"):
+        line = line.strip()
+        while len(line) > max_len:
+            segment = line[:max_len]
+            final_lines.append(f"🖤🥀 {segment} 🥀🖤")
+            line = line[max_len:]
+        if line:
+            final_lines.append(f"🖤🥀 {line} 🥀🖤")
+
+    decorated_text = "\n".join(final_lines)
+    decorated_text = f"🖤🥀──────༺♡༻──────🥀🖤\n{decorated_text}\n🖤🥀──────༺♡༻──────🥀🖤"
+    return decorated_text
 
 # ========================= ثبت جوک (ریپلای) =========================
 async def save_joke(update: Update):
@@ -76,27 +98,7 @@ async def save_joke(update: Update):
             filename = f"video_{int(datetime.now().timestamp())}.mp4"
             path = os.path.join(MEDIA_DIR, filename)
             await file.download_to_drive(path)
-            entry["typdef decorate_joke(text: str) -> str:
-    """
-    اضافه کردن قاب/لوگو به متن جوک.
-    هر خط متن بین لوگوهای بالا و پایین قرار می‌گیرد و خطوط طولانی جداگانه شکسته می‌شوند.
-    """
-    max_len = 50
-    final_lines = []
-
-    for line in text.split("\n"):
-        line = line.strip()
-        while len(line) > max_len:
-            final_lines.append(f"🖤🥀 {line[:max_len]} 🥀🖤")
-            line = line[max_len:]
-        if line:
-            final_lines.append(f"🖤🥀 {line} 🥀🖤")
-
-    # خط جداکننده در بالا و پایین کل متن
-    decorated_text = "\n".join(final_lines)
-    decorated_text = f"🖤🥀──────༺♡༻──────🥀🖤\n{decorated_text}\n🖤🥀──────༺♡༻──────🥀🖤"
-
-    return decorated_texte"] = "video"
+            entry["type"] = "video"
             entry["value"] = os.path.relpath(path, BASE_DIR)
         elif reply.sticker:
             file = await reply.sticker.get_file()
@@ -130,7 +132,7 @@ async def delete_joke(update: Update):
     if not data:
         return await update.message.reply_text("📂 هیچ جوکی برای حذف وجود ندارد.")
 
-    # 📌 حالت ۱: حذف از روی شماره (جوک شماره X)
+    # حذف بر اساس شماره
     if (reply.text and "جوک شماره" in reply.text) or (reply.caption and "جوک شماره" in reply.caption):
         text = reply.text or reply.caption
         num = "".join(ch for ch in text if ch.isdigit())
@@ -147,7 +149,7 @@ async def delete_joke(update: Update):
 
             return await update.message.reply_text(f"🗑️ جوک شماره {num} حذف شد ✅")
 
-    # 📌 حالت ۲: حذف از روی محتوای واقعی (متن/مدیا)
+    # حذف بر اساس محتوای واقعی
     delete_type = None
     delete_value = None
 
@@ -266,8 +268,8 @@ async def send_random_joke(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     try:
         if t == "text":
-            decorated = decorate_joke(v.get('value'))  # اضافه کردن لوگو و شکستن متن
-            await update.message.reply_text(f"😁😁😁😁😁😂 {decorated}")
+            decorated = decorate_joke(v.get('value'))
+            await update.message.reply_text(f"😂 {decorated}")
         elif t == "photo":
             await update.message.reply_photo(photo=val, caption=f"😂 جوک شماره {k}")
         elif t == "video":
