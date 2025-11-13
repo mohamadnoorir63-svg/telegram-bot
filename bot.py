@@ -38,7 +38,10 @@ from fortune_manager import save_fortune, list_fortunes, send_random_fortune, de
 from group_manager import register_group_activity, get_group_stats
 from ai_learning import auto_learn_from_text
 from smart_reply import detect_emotion, smart_response
-from emotion_memory import remember_emotion, get_last_emotion, emotion_context_reply
+from emotion_memory import init_emotion_memory, remember_emotion, get_last_emotion, emotion_context_reply
+
+# اجرای اولیه
+init_emotion_memory()
 from auto_brain.auto_brain import start_auto_brain_loop
 from selective_backup import selective_backup_menu, selective_backup_buttons
 from auto_brain import auto_backup
