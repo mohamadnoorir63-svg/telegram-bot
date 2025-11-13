@@ -1035,7 +1035,7 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # 🧩 اطمینان از اینکه پیام معتبره
     if not update.message or not update.message.text:
         return
-
+        
     # 🧠 فعال‌سازی حافظهٔ کوتاه‌مدت گفتگو
     uid = update.effective_user.id
     chat_id = update.effective_chat.id
@@ -1060,6 +1060,11 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if re.search(r"(هوای|آب[\s‌]*و[\s‌]*هوا)", text):
         return
 
+    # ✅ جلوگیری از پاسخ به دستورات خاص (مثل راهنما، خوشامد، ربات و غیره)
+    protected_words = [
+        "راهنما", "ثبت راهنما", "خوشامد", "ثبت خوشامد",
+        "ربات", "save", "del", "panel", "backup", "cloudsync", "leave"
+    ]
     
     if any(lower_text.startswith(word) for word in protected_words):
         return
