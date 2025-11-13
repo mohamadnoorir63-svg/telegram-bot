@@ -1,5 +1,6 @@
-from emotion_memory import init_emotion_memory, remember_emotion, get_last_emotion, emotion_context_reply
-
+import json
+import os
+from datetime import datetime, timedelta
 # 🧠 اطمینان از وجود فایل حافظه احساسات
 init_emotion_memory()
 # ========================= ⚙️ آماده‌سازی =========================
