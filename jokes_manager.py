@@ -176,7 +176,8 @@ def decorate_joke(text: str) -> str:
     اضافه کردن قاب/لوگو به متن جوک.
     لوگو برای استایل عاشقی/شاد/شیک قابل تغییر است.
     """
-    return f"🃏🎭──────🎉──────🎭🃏\n{text}\n🃏🎭──────🎉──────🎭🃏"    
+    return f"🃏🎭──────🎉──────🎭🃏\n{text}\n🃏🎭──────🎉──────🎭🃏"
+
 # ========================= لیست جوک‌ها =========================
 async def list_jokes(update: Update):
     data = load_jokes()
@@ -195,7 +196,8 @@ async def list_jokes(update: Update):
 
         try:
             if t == "text":
-                await update.message.reply_text(f"😂 جوک شماره {k}\n{v.get('value')}")
+                decorated = decorate_joke(v.get("value"))
+                await update.message.reply_text(f"😂 جوک شماره {k}\n{decorated}")
             elif t == "photo":
                 await update.message.reply_photo(photo=val, caption=f"😂 جوک شماره {k}")
             elif t == "video":
@@ -210,7 +212,7 @@ async def list_jokes(update: Update):
     if shown == 0:
         await update.message.reply_text("⚠️ هیچ جوک سالمی برای نمایش پیدا نشد.")
 
-# ========================= ارسال جوک تصادفی (بدون تکرار) =========================
+# ========================= ارسال جوک تصادفی =========================
 async def send_random_joke(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data = load_jokes()
     if not data:
@@ -249,7 +251,8 @@ async def send_random_joke(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     try:
         if t == "text":
-            await update.message.reply_text(f"😂 {v.get('value')}")
+            decorated = decorate_joke(v.get("value"))
+            await update.message.reply_text(f"😂 {decorated}")
         elif t == "photo":
             await update.message.reply_photo(photo=val, caption=f"😂 جوک شماره {k}")
         elif t == "video":
