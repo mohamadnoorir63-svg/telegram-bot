@@ -1,19 +1,22 @@
 # jokes_manager.py
+
 import json
 import os
 import random
 from datetime import datetime
 from urllib.parse import urlparse
-from telegram import Update
+from telegram import Update, InputFile
 from telegram.ext import ContextTypes
 
 # ========================= مسیرها و آماده‌سازی =========================
+
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 JOKE_FILE = os.path.join(BASE_DIR, "jokes.json")
 MEDIA_DIR = os.path.join(BASE_DIR, "jokes_media")
 os.makedirs(MEDIA_DIR, exist_ok=True)
 
 # ========================= ابزارهای کمکی =========================
+
 def _is_valid_url(val: str) -> bool:
     if not isinstance(val, str) or not val.strip():
         return False
@@ -49,26 +52,12 @@ def save_jokes(data):
     with open(JOKE_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
-# ========================= تزئین جوک با قاب =========================
-def decorate_joke(text: str) -> str:
-    """
-    اضافه کردن قاب/لوگو به متن جوک و شکستن متن طولانی به چند خط.
-    """
-    max_len = 50
-    lines = []
-    for line in text.split("\n"):
-        while len(line) > max_len:
-            lines.append(line[:max_len])
-            line = line[max_len:]
-        lines.append(line)
-    decorated_text = "\n".join(lines)
-    return f"🖤🥀──────༺♡༻──────🥀🖤\n{decorated_text}\n🖤🥀──────༺♡༻──────🥀🖤"
-
 # ========================= ثبت جوک (ریپلای) =========================
+
 async def save_joke(update: Update):
     reply = update.message.reply_to_message
     if not reply:
-        return await update.message.reply_text("❗ لطفاً روی پیام جوک ریپلای کنید.")
+        return await update.message.reply_text("❗ لطفاً روی پیام جوک (متن/عکس/ویدیو/استیکر) ریپلای کن.")
 
     data = load_jokes()
     entry = {"type": "text", "value": ""}
@@ -109,22 +98,39 @@ async def save_joke(update: Update):
         data[str(len(data) + 1)] = entry
         save_jokes(data)
         await update.message.reply_text("✅ جوک با موفقیت ذخیره شد!")
-
     except Exception as e:
         await update.message.reply_text(f"⚠️ خطا در ذخیره جوک: {e}")
 
 # ========================= حذف جوک =========================
+
 async def delete_joke(update: Update):
     reply = update.message.reply_to_message
     if not reply:
-        return await update.message.reply_text("❗ لطفاً روی پیام جوک ریپلای کنید.")
+        return await update.message.reply_text("❗ لطفاً روی پیام جوک ریپلای کن تا حذف شود.")
 
     data = load_jokes()
     if not data:
         return await update.message.reply_text("📂 هیچ جوکی برای حذف وجود ندارد.")
 
+    # حالت ۱: حذف از روی شماره (جوک شماره X)
+    if (reply.text and "جوک شماره" in reply.text) or (reply.caption and "جوک شماره" in reply.caption):
+        text = reply.text or reply.caption
+        num = "".join(ch for ch in text if ch.isdigit())
+        if num and num in data:
+            deleted = data.pop(num)
+            save_jokes(data)
+            val = _abs_media_path(deleted.get("value", ""))
+            if os.path.exists(val) and not _is_valid_url(val):
+                try:
+                    os.remove(val)
+                except Exception as e:
+                    print(f"[Delete Joke Warning] حذف فایل شکست خورد: {e}")
+            return await update.message.reply_text(f"🗑️ جوک شماره {num} حذف شد ✅")
+
+    # حالت ۲: حذف از روی محتوای واقعی (متن/مدیا)
     delete_type = None
     delete_value = None
+
     if reply.text or reply.caption:
         delete_type = "text"
         delete_value = (reply.text or reply.caption).strip()
@@ -165,26 +171,8 @@ async def delete_joke(update: Update):
     else:
         await update.message.reply_text("⚠️ جوک موردنظر در فایل پیدا نشد.")
 
-# ========================= ارسال یا نمایش جوک متنی =========================
-async def send_text_joke(update: Update, text: str, joke_number: str = None):
-    """
-    ارسال جوک متنی با قاب تزیینی و ایمن برای HTML
-    اگر joke_number داده شود، شماره جوک را هم نمایش می‌دهد.
-    """
-    decorated = decorate_joke(text)
-    decorated_html = (
-        decorated.replace("&", "&amp;")
-                 .replace("<", "&lt;")
-                 .replace(">", "&gt;")
-    )
-    prefix = f"😂 جوک شماره {joke_number}\n" if joke_number else "😂 "
-    await update.message.reply_text(
-        f"{prefix}{decorated_html}",
-        parse_mode=ParseMode.HTML
-    )
-
-
 # ========================= لیست جوک‌ها =========================
+
 async def list_jokes(update: Update):
     data = load_jokes()
     if not data:
@@ -202,7 +190,7 @@ async def list_jokes(update: Update):
 
         try:
             if t == "text":
-                await send_text_joke(update, v.get("value"), joke_number=k)
+                await update.message.reply_text(f"😂 جوک شماره {k}\n{v.get('value')}")
             elif t == "photo":
                 await update.message.reply_photo(photo=val, caption=f"😂 جوک شماره {k}")
             elif t == "video":
@@ -217,14 +205,14 @@ async def list_jokes(update: Update):
     if shown == 0:
         await update.message.reply_text("⚠️ هیچ جوک سالمی برای نمایش پیدا نشد.")
 
-
-# ========================= ارسال جوک تصادفی =========================
+# ========================= ارسال جوک تصادفی (بدون تکرار) =========================
 async def send_random_joke(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data = load_jokes()
     if not data:
         return await update.message.reply_text("📭 هنوز جوکی ذخیره نشده 😅")
 
     sent_state_file = os.path.join(BASE_DIR, "sent_jokes.json")
+
     if os.path.exists(sent_state_file):
         try:
             with open(sent_state_file, "r", encoding="utf-8") as f:
@@ -256,8 +244,8 @@ async def send_random_joke(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     try:
         if t == "text":
+            # اضافه کردن قاب مخصوص خنده به متن جوک
             decorated = decorate_joke(v.get("value"))
-            # اضافه کردن قاب مخصوص خنده
             joke_with_laugh_frame = f"──────༺♡༻──────\n{decorated}\n──────༺♡༻──────"
             await update.message.reply_text(joke_with_laugh_frame)
         elif t == "photo":
