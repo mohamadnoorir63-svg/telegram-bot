@@ -1345,8 +1345,8 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         await update.message.reply_text(result, parse_mode="Markdown")
         return
-
-    # ✅ جوک تصادفی
+        
+        # ✅ جوک تصادفی
 if text == "جوک":
     if os.path.exists("jokes.json"):
         data = load_data("jokes.json")
