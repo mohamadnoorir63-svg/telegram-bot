@@ -1,8 +1,12 @@
 import json
 import os
 from datetime import datetime, timedelta
-# 🧠 اطمینان از وجود فایل حافظه احساسات
-init_emotion_memory()
+
+# 📁 مسیر مطلق فایل حافظه احساسات (در کنار همین فایل)
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+EMOTION_FILE = os.path.join(BASE_DIR, "emotion_memory.json")
+
+
 # ========================= ⚙️ آماده‌سازی =========================
 def init_emotion_memory():
     """بررسی و ساخت فایل احساسات در صورت نبود"""
@@ -98,3 +102,7 @@ def emotion_context_reply(current_emotion: str, last_emotion: str) -> str:
     return None
 
 
+# ========================= 🚀 اجرای اولیه =========================
+if __name__ == "__main__":
+    init_emotion_memory()
+    print("📂 سیستم حافظه احساسات آماده است.")
