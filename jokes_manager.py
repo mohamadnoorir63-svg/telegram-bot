@@ -49,6 +49,23 @@ def save_jokes(data):
     with open(JOKE_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
+# ========================= تزئین جوک با لوگو =========================
+def decorate_joke(text: str) -> str:
+    """
+    اضافه کردن قاب/لوگو به متن جوک و شکستن متن طولانی به چند خط.
+    لوگو برای استایل عاشقی/شاد/شیک قابل تغییر است.
+    """
+    max_len = 50
+    lines = []
+    for line in text.split("\n"):
+        while len(line) > max_len:
+            lines.append(line[:max_len])
+            line = line[max_len:]
+        lines.append(line)
+    decorated_text = "\n".join(lines)
+
+    return f"🖤🥀──────༺♡༻──────🥀🖤\n{decorated_text}\n🖤🥀──────༺♡༻──────🥀🖤"
+
 # ========================= ثبت جوک (ریپلای) =========================
 async def save_joke(update: Update):
     reply = update.message.reply_to_message
@@ -170,13 +187,6 @@ async def delete_joke(update: Update):
         await update.message.reply_text("🗑️ جوک با موفقیت حذف شد ✅")
     else:
         await update.message.reply_text("⚠️ جوک موردنظر در فایل پیدا نشد.")
-    # ========================= تزئین جوک با لوگو =========================
-def decorate_joke(text: str) -> str:
-    """
-    اضافه کردن قاب/لوگو به متن جوک.
-    لوگو برای استایل عاشقی/شاد/شیک قابل تغییر است.
-    """
-    return f"🃏🎭──────🎉──────🎭🃏\n{text}\n🃏🎭──────🎉──────🎭🃏"
 
 # ========================= لیست جوک‌ها =========================
 async def list_jokes(update: Update):
@@ -251,7 +261,7 @@ async def send_random_joke(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     try:
         if t == "text":
-            decorated = decorate_joke(v.get('value'))  # اضافه کردن لوگو
+            decorated = decorate_joke(v.get('value'))  # اضافه کردن لوگو و شکستن متن
             await update.message.reply_text(f"😂 {decorated}")
         elif t == "photo":
             await update.message.reply_photo(photo=val, caption=f"😂 جوک شماره {k}")
