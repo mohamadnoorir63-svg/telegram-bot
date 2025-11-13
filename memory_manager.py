@@ -39,7 +39,42 @@ def save_data(file, data):
             json.dump(data, f, ensure_ascii=False, indent=2)
     except Exception as e:
         print(f"⚠️ خطا در ذخیره {file}: {e}")
+        
+# ========================= یادگیری چندخطی =========================
+def long_learn(phrase, *lines):
+    """
+    یادگیری چندخطی به عنوان یک پاسخ واحد.
+    مثال:
+        طولانی یادبگیر بیو
+        خط اول
+        خط دوم
+        خط سوم
+    """
+    data = load_data("memory.json")
+    if "data" not in data:
+        data["data"] = {}
 
+    phrase = phrase.strip()
+    lines = [line.strip() for line in lines if line.strip()]
+    if not lines:
+        return "<b>هیچ متنی برای یادگیری ارسال نشد.</b>"
+
+    # ترکیب تمام خطوط به یک پاسخ واحد
+    combined_response = "\n".join(lines)
+
+    if phrase not in data["data"]:
+        data["data"][phrase] = [{"text": combined_response, "weight": 1}]
+        save_data("memory.json", data)
+        return f"<b>یادگیری جدید چندخطی!</b>\n➕ جمله: <code>{phrase}</code>\nپاسخ ثبت شد."
+    
+    # اگر قبلاً بود ولی پاسخ جدید بود
+    existing_texts = [r["text"] for r in data["data"][phrase]]
+    if combined_response not in existing_texts:
+        data["data"][phrase].append({"text": combined_response, "weight": 1})
+        save_data("memory.json", data)
+        return f"<b>خاطره‌ی قدیمی به‌روزرسانی شد!</b>\nپاسخ چندخطی جدید اضافه شد."
+    
+    return "<b>این جمله چندخطی را از قبل بلد بودم!</b>"
 # ========================= یادگیری هوشمند با وزن =========================
 
 def learn(phrase, *responses):
