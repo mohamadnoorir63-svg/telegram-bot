@@ -1809,9 +1809,15 @@ async def load_text(file_name, default_text):
 
 
 # ======================= 🎛 پنل اصلی خنگول =======================
+from datetime import datetime
+
 async def show_main_panel(update: Update, context: ContextTypes.DEFAULT_TYPE, edit=False):
+    user_first_name = update.effective_user.first_name
+    now = datetime.now().strftime("%Y/%m/%d - %H:%M:%S")
+
     about = f"🌙 <b>به منوی اصلی ربات خوش آمدی {user_first_name}!</b>\n📅 {now}\nاز دکمه‌های زیر یکی رو انتخاب کن 😎"
 
+    # ادامه کدت اینجاست...
     keyboard = [
         [
             InlineKeyboardButton("💻 ارتباط با سازنده", url="https://t.me/NOORI_NOOR"),
