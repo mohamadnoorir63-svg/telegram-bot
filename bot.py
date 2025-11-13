@@ -1048,7 +1048,7 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     recent_context = context_memory.get_context(uid)
 
     # 🧩 ترکیب سه پیام آخر برای درک بهتر ادامه گفتگو
-    full_context = " ".join(recent_context[-3:]) if recent_context else text
+    #full_context = " ".join(recent_context[-3:]) if recent_context else text
 
     lower_text = text.lower()
 
