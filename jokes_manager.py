@@ -225,13 +225,14 @@ async def send_random_joke(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return await update.message.reply_text("📭 هنوز جوکی ذخیره نشده 😅")
 
     sent_state_file = os.path.join(BASE_DIR, "sent_jokes.json")
-    sent_keys = []
     if os.path.exists(sent_state_file):
         try:
             with open(sent_state_file, "r", encoding="utf-8") as f:
                 sent_keys = json.load(f)
         except Exception:
             sent_keys = []
+    else:
+        sent_keys = []
 
     all_keys = list(data.keys())
     if len(sent_keys) >= len(all_keys):
@@ -255,7 +256,10 @@ async def send_random_joke(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     try:
         if t == "text":
-            await send_text_joke(update, v.get("value"), joke_number=k)
+            decorated = decorate_joke(v.get("value"))
+            # اضافه کردن قاب مخصوص خنده
+            joke_with_laugh_frame = f"──────༺♡༻──────\n{decorated}\n──────༺♡༻──────"
+            await update.message.reply_text(joke_with_laugh_frame)
         elif t == "photo":
             await update.message.reply_photo(photo=val, caption=f"😂 جوک شماره {k}")
         elif t == "video":
