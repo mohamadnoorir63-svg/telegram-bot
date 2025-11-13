@@ -262,8 +262,8 @@ async def send_random_joke(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         if t == "text":
             decorated = decorate_joke(v.get("value"))
-            decorated = decorated.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-            await update.message.reply_text(f"😂 {decorated}", parse_mode=ParseMode.HTML)
+            # ارسال بدون HTML/Markdown برای حفظ قاب و کاراکترهای خاص
+            await update.message.reply_text(f"😂 {decorated}")
         elif t == "photo":
             await update.message.reply_photo(photo=val, caption=f"😂 جوک شماره {k}")
         elif t == "video":
