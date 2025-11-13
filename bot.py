@@ -330,15 +330,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     now = datetime.now().strftime("%Y/%m/%d - %H:%M:%S")
 
-    # پیام ساده خوشامد
-    await update.message.reply_text(
-        f"✨ **سیستم ربات فعال شد!**\n\n"
-        f"👤 کاربر: **{user.first_name}**\n"
-        f"🕓 زمان اجرا: `{now}`\n"
-        "💬 آماده‌ای برای خنده، احساس و هوش مصنوعی 😎\n\n"
-        "👇 از دکمه‌های زیر استفاده کن:",
-        parse_mode="HTML"
-    )
+    
 
     # نمایش مستقیم پنل اصلی
     await show_main_panel(update, context)
@@ -1818,7 +1810,7 @@ async def load_text(file_name, default_text):
 
 # ======================= 🎛 پنل اصلی خنگول =======================
 async def show_main_panel(update: Update, context: ContextTypes.DEFAULT_TYPE, edit=False):
-    
+    about = "🌙 <b>به منوی اصلی ربات خوش آمدی!</b>\nاز دکمه‌های زیر یکی رو انتخاب کن 😎"
 
     keyboard = [
         [
