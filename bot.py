@@ -1433,16 +1433,16 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(list_phrases(), parse_mode="HTML")
         return
         # ✅ حذف جمله یا جملات از حافظه
-    if text.startswith("حذف "):
-        phrase = text.replace("حذف ", "").strip()
+    if text.startswith("حذف جمله"):
+        phrase = text.replace("حذف جمله ", "").strip()
 
         if not phrase:
             await update.message.reply_text(
-                "❗ لطفاً جمله‌ای برای حذف بنویس.\n\n"
+                "❗ لطفاً جمله‌ای برای حذف جمله بنویس.\n\n"
                 "📘 مثال:\n"
-                "<code>حذف سلام</code>\n"
+                "<code>حذف جمله سلام</code>\n"
                 "یا برای حذف چند جمله مشابه:\n"
-                "<code>حذف سلام*</code>",
+                "<code>حذف جمله سلام*</code>",
                 parse_mode="HTML"
             )
             return
