@@ -5,9 +5,8 @@ import json
 import asyncio
 from datetime import datetime, timedelta
 import jdatetime
-from telegram import Update, InputMediaPhoto
+from telegram import Update
 from telegram.ext import ContextTypes
-import matplotlib.pyplot as plt
 
 # ------------------- تنظیمات -------------------
 STATS_FILE = "advanced_stats.json"
@@ -54,7 +53,8 @@ def init_daily_stats(chat_id, today):
             "links": 0, "mentions": 0, "hashtags": 0,
             "replies": 0, "message_length": {},
             "joins_link": 0, "joins_added": 0,
-            "lefts": 0, "kicked": 0, "muted": 0
+            "lefts": 0, "kicked": 0, "muted": 0,
+            "joins_added_per_user": {}  # شمارش بهترین عضوکننده‌ها
         }
 
 # ------------------- ثبت فعالیت پیام -------------------
@@ -112,7 +112,7 @@ async def record_message_activity(update: Update, context: ContextTypes.DEFAULT_
 
     save_queue.add(chat_id)
 
-# ------------------- ثبت ورود اعضا -------------------
+# ------------------- ثبت ورود اعضا و شمارش عضوکننده ها -------------------
 async def record_new_members(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message or not update.message.new_chat_members:
         return
@@ -125,8 +125,11 @@ async def record_new_members(update: Update, context: ContextTypes.DEFAULT_TYPE)
     for member in update.message.new_chat_members:
         if member.is_bot:
             continue
+        # اگر توسط شخص دیگری اضافه شده باشد
         if update.message.from_user and update.message.from_user.id != member.id:
             data["joins_added"] += 1
+            adder_id = str(update.message.from_user.id)
+            data["joins_added_per_user"][adder_id] = data["joins_added_per_user"].get(adder_id, 0) + 1
         else:
             data["joins_link"] += 1
 
@@ -205,40 +208,84 @@ async def show_daily_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
         time_str = now.strftime("%H:%M:%S")
         jalali_date = jdatetime.datetime.now().strftime("%A %d %B %Y")
 
-        # فعال‌ترین کاربر
-        if data["messages"]:
-            top_user_id = max(data["messages"], key=lambda x: data["messages"][x])
-            top_user_count = data["messages"][top_user_id]
-            top_name = (await context.bot.get_chat_member(chat_id, top_user_id)).user.first_name
-        else:
-            top_user_id, top_user_count, top_name = None, 0, "❌ هیچ فعالیتی نیست"
+        # نفرات برتر امروز
+        top_today = sorted(data["messages"].items(), key=lambda x: x[1], reverse=True)[:3]
+        top_today_text = ""
+        medals = ["🥇", "🥈", "🥉"]
+        for i, (uid, count) in enumerate(top_today, 1):
+            try:
+                name = (await context.bot.get_chat_member(chat_id, uid)).user.first_name
+            except:
+                name = "کاربر ناشناس"
+            top_today_text += f"◂ نفر {i} {medals[i-1]} :( {count} پیام | {name} )\n"
+        if not top_today_text:
+            top_today_text = "◂ اطلاعاتی یافت نشد."
 
-        text = (
-            f"♡ <b>فعالیت‌های امروز تا این لحظه :</b>\n"
-            f"➲ <b>تاریخ :</b> {jalali_date}\n"
-            f"➲ <b>ساعت :</b> {time_str}\n\n"
-            f"✛ <b>کل پیام‌ها :</b> {sum(data['messages'].values())}\n"
-            f"✛ <b>فیلم :</b> {data['videos']}\n"
-            f"✛ <b>عکس :</b> {data['photos']}\n"
-            f"✛ <b>گیف :</b> {data['animations']}\n"
-            f"✛ <b>ویس :</b> {data['voices']}\n"
-            f"✛ <b>آهنگ :</b> {data['audios']}\n"
-            f"✛ <b>استیکر :</b> {data['stickers']}\n"
-            f"✛ <b>استیکر متحرک :</b> {data['animated_stickers']}\n\n"
-            f"✛ <b>لینک‌ها :</b> {data['links']}\n"
-            f"✛ <b>منشن‌ها :</b> {data['mentions']}\n"
-            f"✛ <b>هشتگ‌ها :</b> {data['hashtags']}\n"
-            f"✛ <b>ریپلای‌ها :</b> {data['replies']}\n"
-        )
+        # نفرات برتر کل
+        total_msgs_all = {}
+        for day_data in stats.get(chat_id, {}).values():
+            for uid, count in day_data["messages"].items():
+                total_msgs_all[uid] = total_msgs_all.get(uid, 0) + count
+        top_all = sorted(total_msgs_all.items(), key=lambda x: x[1], reverse=True)[:3]
+        top_all_text = ""
+        for i, (uid, count) in enumerate(top_all, 1):
+            try:
+                name = (await context.bot.get_chat_member(chat_id, uid)).user.first_name
+            except:
+                name = "کاربر ناشناس"
+            top_all_text += f"◂ نفر {i} {medals[i-1]} :( {count} پیام | {name} )\n"
+        if not top_all_text:
+            top_all_text = "◂ اطلاعاتی یافت نشد."
 
-        if top_user_id:
-            text += f"🥇 <b>فعال‌ترین عضو:</b> 👤 <a href='tg://user?id={top_user_id}'>{top_name}</a> ({top_user_count} پیام)\n\n"
+        # بهترین عضو کننده‌ها
+        top_adders = sorted(data["joins_added_per_user"].items(), key=lambda x: x[1], reverse=True)[:3]
+        top_adders_text = ""
+        for i, (uid, count) in enumerate(top_adders, 1):
+            try:
+                name = (await context.bot.get_chat_member(chat_id, uid)).user.first_name
+            except:
+                name = "کاربر ناشناس"
+            top_adders_text += f"◂ نفر {i} {medals[i-1]} :( {count} اد | {name} )\n"
+        if not top_adders_text:
+            top_adders_text = "◂ اطلاعاتی یافت نشد."
 
-        text += (
-            f"✧ <b>اعضای وارد شده با لینک :</b> {data['joins_link']}\n"
-            f"✧ <b>اعضای اد شده :</b> {data['joins_added']}\n"
-            f"✧ <b>اعضای لفت داده :</b> {data['lefts']}\n"
-        )
+        # قالب متن
+        text = f"""
+◄ آمار فعالیت گروه از 00:00 تا این لحظه :
+• تاریخ : {jalali_date}
+• ساعت : {time_str}
+
+─┅━ پیام های امروز ━┅─
+◂ کل پیام ها : {sum(data['messages'].values())}
+◂ پیام فرواردی : {data['forwards']}
+◂ متن : {sum([v for k,v in data['messages'].items()]) - data['forwards']}
+◂ استیکر : {data['stickers']}
+◂ استیکر متحرک : {data['animated_stickers']}
+◂ گیف : {data['animations']}
+◂ عکس : {data['photos']}
+◂ ویس : {data['voices']}
+◂ موزیک : {data['audios']}
+◂ فیلم : {data['videos']}
+◂ فیلم سلفی : {data['video_notes']}
+◂ فایل : {data.get('files',0)}
+
+─┅━ فعال ترین های امروز ━┅─
+{top_today_text}
+
+─━ بهترین عضو کننده های امروز ━─
+{top_adders_text}
+
+─┅━ ورودی و خروجی عضو ━┅─
+◂ اعضای وارد شده با لینک : {data['joins_link']}
+◂ اعضای اد شده : {data['joins_added']}
+◂ اعضای لفت داده : {data['lefts']}
+◂ اعضای اخراج شده : {data['kicked']}
+◂ کل اعضای وارد شده : {data['joins_link'] + data['joins_added']}
+◂ کل اعضای خارج شده : {data['lefts'] + data['kicked']}
+
+─┅━ فعال ترین های کل ━┅─
+{top_all_text}
+"""
 
         msg = await update.message.reply_text(text, parse_mode="HTML")
         await asyncio.sleep(15)
