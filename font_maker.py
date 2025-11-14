@@ -143,10 +143,9 @@ async def prev_font(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 # ======================= 🎛 بازگشت به منوی اصلی =======================
-# ⚠️ اینجا فقط باید show_main_panel رو ایمپورت کنی از پنل اصلی خودت
-from panels import show_main_panel  # <--- مسیر فایل پنل اصلی
-
-async def feature_back(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def feature_back(update, context):
     query = update.callback_query
     await query.answer()
-    await show_main_panel(update, context, edit=True)
+
+    # به جای show_main_panel مستقیم متن و دکمه ها رو بفرست یا callback به bot.py بسپار
+    await query.message.reply_text("🔙 بازگشت به منوی اصلی (پنل اصلی در bot.py هندل می‌شود)")
