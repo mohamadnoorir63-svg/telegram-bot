@@ -17,7 +17,7 @@ from telegram.ext import (
 import aiofiles
 
 # 📦 ماژول‌ها
-from font_maker import font_maker, next_font, prev_font
+from font_maker import font_maker, next_font, prev_font, send_selected_font
 from memory_manager import (
     init_files,
     load_data,
@@ -2313,19 +2313,19 @@ application.add_handler(CommandHandler("reply", toggle_reply_mode))
 # ==========================================================
 # 🎨 فونت‌ساز خنگول
 # ==========================================================
-from telegram.ext import ConversationHandler
-from font_maker import font_maker, receive_font_name, next_font, prev_font, ASK_NAME
-
 font_handler = ConversationHandler(
     entry_points=[MessageHandler(filters.TEXT & filters.Regex(r"^فونت"), font_maker)],
     states={ASK_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, receive_font_name)]},
-    fallbacks=[],
+    fallbacks=[]
 )
 application.add_handler(font_handler, group=2)
-application.add_handler(CallbackQueryHandler(next_font, pattern="^next_font"), group=2)
-application.add_handler(CallbackQueryHandler(prev_font, pattern="^prev_font"), group=2)
-application.add_handler(CallbackQueryHandler(feature_back, pattern="^feature_back$"), group=2)
 
+# صفحات
+application.add_handler(CallbackQueryHandler(next_font, pattern=r"^next_font_\d+$"), group=2)
+application.add_handler(CallbackQueryHandler(prev_font, pattern=r"^prev_font_\d+$"), group=2)
+
+# ارسال فونت مستقیم
+application.add_handler(CallbackQueryHandler(send_selected_font, pattern=r"^send_font_\d+$"), group=2)
 # ==========================================================
 # 🤖 پنل ChatGPT هوش مصنوعی
 # ==========================================================
