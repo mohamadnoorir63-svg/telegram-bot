@@ -141,13 +141,10 @@ async def prev_font(update: Update, context: ContextTypes.DEFAULT_TYPE):
     pages = context.user_data.get("font_pages", [])
     if 0 <= index < len(pages):
         await query.edit_message_text(pages[index]["text"], parse_mode="HTML", reply_markup=pages[index]["keyboard"])
-
-
-# ======================= 🎛 بازگشت به منوی اصلی =======================
 # ======================= 🎛 بازگشت به منوی اصلی =======================
 async def feature_back(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
 
-    # مستقیماً تابع show_main_panel که داخل bot.py است را صدا بزن
+    # مستقیم به پنل اصلی برمی‌گردد
     await show_main_panel(update, context, edit=True)
