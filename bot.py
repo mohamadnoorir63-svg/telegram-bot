@@ -1097,8 +1097,8 @@ _sent_messages_by_chat[chat_id].append(reply_text)
 if len(_sent_messages_by_chat[chat_id]) > 300:
     _sent_messages_by_chat[chat_id] = _sent_messages_by_chat[chat_id][-300:]
 
-# ارسال پاسخ
-if reply_text:
+    # ارسال پاسخ
+    if reply_text:
     await update.message.reply_text(reply_text)
 
     # ثبت کاربر و گروه
