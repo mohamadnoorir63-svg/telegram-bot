@@ -1033,7 +1033,7 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data["custom_handled"] = False
         return
 
-    # 🧩 پیام معتبر
+    # 🧩 بررسی معتبر بودن پیام
     if not update.message or not update.message.text:
         return
 
@@ -1044,10 +1044,6 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # 🧠 ثبت پیام در حافظه کوتاه‌مدت
     context_memory.add_message(uid, text)
-
-    # 🧩 ترکیب سه پیام اخیر کاربر برای full_context
-    recent_context = context_memory.get_context(uid)
-    full_context = " ".join(recent_context[-3:]) if recent_context else text
 
     # 🚫 جلوگیری از پاسخ در پیوی (به جز جوک و فال)
     if update.effective_chat.type == "private" and lower_text not in ["جوک", "فال"]:
@@ -1070,7 +1066,7 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     # =================== تولید پاسخ ===================
-    reply_text = process_group_message(uid, chat_id, text, full_context)
+    reply_text = process_group_message(uid, chat_id, text)  # فقط ۳ آرگومان
 
     # =================== جلوگیری از ارسال پاسخ تکراری ===================
     global _sent_messages_by_chat
@@ -1080,23 +1076,18 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if chat_id not in _sent_messages_by_chat:
         _sent_messages_by_chat[chat_id] = []
 
-    # تلاش برای جلوگیری از ارسال پاسخ تکراری بیش از 20 بار
-    attempts = 0
-    while reply_text in _sent_messages_by_chat[chat_id] and attempts < 20:
-        reply_text = process_group_message(uid, chat_id, text, full_context)
-        attempts += 1
-
-    if not reply_text:  # اگر هیچ پاسخی تولید نشد، پاسخ نده
+    # اگر پیام مشابه آخرین پیام ارسال شده است، پاسخ نده
+    if reply_text in _sent_messages_by_chat[chat_id]:
         return
 
+    # ذخیره پیام جدید در لیست برای جلوگیری از تکرار
     _sent_messages_by_chat[chat_id].append(reply_text)
-
-    # جلوگیری از سنگین شدن حافظه
     if len(_sent_messages_by_chat[chat_id]) > 300:
         _sent_messages_by_chat[chat_id] = _sent_messages_by_chat[chat_id][-300:]
 
-    # =================== ارسال پیام ===================
-    await update.message.reply_text(reply_text)
+    # =================== ارسال پاسخ ===================
+    if reply_text:
+        await update.message.reply_text(reply_text)
 
     # =================== ثبت کاربر و گروه ===================
     await register_user(update.effective_user)
@@ -1107,7 +1098,7 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
         auto_learn_from_text(text)
 
     if not status["active"]:
-        shadow_learn(text, reply_text)
+        shadow_learn(text, "")
         return
     
 
