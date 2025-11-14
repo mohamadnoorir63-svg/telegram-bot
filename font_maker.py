@@ -103,11 +103,14 @@ def make_pages(name, fonts, page_size=10, max_pages=5):
             nav.append(InlineKeyboardButton("➡️ بعدی", callback_data=f"next_font_{idx+1}"))
         if nav: keyboard.append(nav)
         keyboard.append([InlineKeyboardButton("🔙 بازگشت", callback_data="feature_back")])
+
         pages.append({"text": text, "keyboard": InlineKeyboardMarkup(keyboard)})
     return pages
 
 # ======================= 📋 ارسال فونت انتخاب شده =======================
 async def send_selected_font(update, context: ContextTypes.DEFAULT_TYPE):
+    if not update.callback_query:
+        return
     query = update.callback_query
     await query.answer()
     font_id = int(query.data.replace("send_font_", ""))
@@ -119,23 +122,29 @@ async def send_selected_font(update, context: ContextTypes.DEFAULT_TYPE):
 
 # ======================= 🔁 صفحات =======================
 async def next_font(update, context):
-    query = update.callback_query
-    await query.answer()
-    index = int(query.data.replace("next_font_", ""))
+    if not update.callback_query:
+        return
+    q = update.callback_query
+    await q.answer()
+    index = int(q.data.replace("next_font_", ""))
     pages = context.user_data.get("font_pages", [])
     if 0 <= index < len(pages):
-        await query.edit_message_text(pages[index]["text"], parse_mode="HTML", reply_markup=pages[index]["keyboard"])
+        await q.edit_message_text(pages[index]["text"], parse_mode="HTML", reply_markup=pages[index]["keyboard"])
 
 async def prev_font(update, context):
-    query = update.callback_query
-    await query.answer()
-    index = int(query.data.replace("prev_font_", ""))
+    if not update.callback_query:
+        return
+    q = update.callback_query
+    await q.answer()
+    index = int(q.data.replace("prev_font_", ""))
     pages = context.user_data.get("font_pages", [])
     if 0 <= index < len(pages):
-        await query.edit_message_text(pages[index]["text"], parse_mode="HTML", reply_markup=pages[index]["keyboard"])
+        await q.edit_message_text(pages[index]["text"], parse_mode="HTML", reply_markup=pages[index]["keyboard"])
 
 # ======================= 🔙 بازگشت =======================
 async def feature_back(update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-    await query.edit_message_text("🔙 به منوی اصلی بازگشتی انجام شد.")
+    if not update.callback_query:
+        return
+    q = update.callback_query
+    await q.answer()
+    await q.edit_message_text("🔙 به منوی اصلی بازگشتی انجام شد.")
