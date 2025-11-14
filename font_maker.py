@@ -10,7 +10,6 @@ async def font_maker(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
     chat_type = update.effective_chat.type
 
-    # جلوگیری از استفاده در گروه
     if chat_type in ["group", "supergroup"]:
         msg = await update.message.reply_text(
             "✨ لطفاً برای ساخت فونت، به پیوی ربات مراجعه کنید 🙏"
@@ -144,11 +143,10 @@ async def prev_font(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 # ======================= 🎛 بازگشت به منوی اصلی =======================
+# ⚠️ اینجا فقط باید show_main_panel رو ایمپورت کنی از پنل اصلی خودت
+from panels import show_main_panel  # <--- مسیر فایل پنل اصلی
+
 async def feature_back(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-
-    # 🔹 ایمپورت تاخیری برای جلوگیری از ImportError
-    from bot import show_main_panel  # show_main_panel داخل bot.py هست
-
     await show_main_panel(update, context, edit=True)
