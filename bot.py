@@ -2313,6 +2313,9 @@ application.add_handler(CommandHandler("reply", toggle_reply_mode))
 # ==========================================================
 # 🎨 فونت‌ساز خنگول
 # ==========================================================
+from telegram.ext import ConversationHandler
+from font_maker import font_maker, receive_font_name, next_font, prev_font, ASK_NAME
+
 font_handler = ConversationHandler(
     entry_points=[MessageHandler(filters.TEXT & filters.Regex(r"^فونت"), font_maker)],
     states={
