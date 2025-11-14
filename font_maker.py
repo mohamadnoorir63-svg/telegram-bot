@@ -144,9 +144,10 @@ async def prev_font(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 # ======================= 🎛 بازگشت به منوی اصلی =======================
+# ======================= 🎛 بازگشت به منوی اصلی =======================
 async def feature_back(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    # مستقیم update را بده بدون FakeUpdate
-    from main_panel import show_main_panel  # فرض می‌کنیم تابع منوی اصلی در main_panel.py است
+
+    # مستقیماً تابع show_main_panel که داخل bot.py است را صدا بزن
     await show_main_panel(update, context, edit=True)
