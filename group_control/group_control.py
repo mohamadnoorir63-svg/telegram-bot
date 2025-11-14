@@ -518,21 +518,25 @@ async def handle_group_message(update: Update, context: ContextTypes.DEFAULT_TYP
 
     if not update.message:
         return
-        # دستورات VIP
-if text.startswith("تنظیم ویژه"):
-    return await set_vip(update, context)
-
-if text.startswith("حذف ویژه"):
-    return await remove_vip(update, context)
-
-if text == "لیست ویژه":
-    return await list_vips(update, context)
 
     text = (update.message.text or update.message.caption or "").strip().lower()
 
-    # 🔒 بررسی دستورات قفل / بازکردن
+    # ───────────── دستورات VIP ─────────────
+    if text.startswith("تنظیم ویژه"):
+        await set_vip(update, context)
+        return
+
+    if text.startswith("حذف ویژه"):
+        await remove_vip(update, context)
+        return
+
+    if text == "لیست ویژه":
+        await list_vips(update, context)
+        return
+
+    # ───────────── بررسی دستورات قفل / بازکردن ─────────────
     if text.startswith("قفل ") or text.startswith("باز کردن ") or text.startswith("بازکردن "):
         await handle_lock_commands(update, context)
 
-    # 🔐 بررسی دستورات قفل گروه و قفل خودکار
+    # ───────────── بررسی دستورات قفل گروه و قفل خودکار ─────────────
     await handle_group_lock_commands(update, context)
