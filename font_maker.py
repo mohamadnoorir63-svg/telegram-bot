@@ -80,13 +80,12 @@ def generate_fonts(name: str):
         pre = "".join(random.choice(group) for group in pre_groups)
         post = "".join(random.choice(group) for group in post_groups)
 
+        # 🟢 کل اسم با یک استایل یکسان
+        style = random.choice(unicode_styles)
         uname = ""
         for ch in name:
-            # فقط حروف انگلیسی جایگزین می‌شوند، بقیه بدون تغییر
             if ch.lower() in "abcdefghijklmnopqrstuvwxyz":
-                style = random.choice(unicode_styles)
                 idx = "abcdefghijklmnopqrstuvwxyz".index(ch.lower())
-                # اگر طول استایل کمتر از 26 بود از همون حرف استفاده کن
                 if idx < len(style):
                     uname += style[idx]
                 else:
