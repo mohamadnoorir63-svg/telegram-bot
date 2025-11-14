@@ -17,7 +17,7 @@ from telegram.ext import (
 import aiofiles
 
 # 📦 ماژول‌ها
-from font_maker import font_maker, next_font, prev_font
+
 from memory_manager import (
     init_files,
     load_data,
