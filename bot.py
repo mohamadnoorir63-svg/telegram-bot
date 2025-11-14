@@ -1074,28 +1074,26 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # 🧠 بررسی حالت ریپلی مود گروهی
     if await handle_group_reply_mode(update, context):
         return
-        # ================= پردازش پیام و جلوگیری از ارسال پاسخ تکراری =================
-reply_text = process_group_message(uid, chat_id, text)
+        
+    global _sent_messages_by_chat
+    if '_sent_messages_by_chat' not in globals():
+        _sent_messages_by_chat = {}
 
-global _sent_messages_by_chat
-if '_sent_messages_by_chat' not in globals():
-    _sent_messages_by_chat = {}
+    if chat_id not in _sent_messages_by_chat:
+        _sent_messages_by_chat[chat_id] = []
 
-if chat_id not in _sent_messages_by_chat:
-    _sent_messages_by_chat[chat_id] = []
+    # تلاش برای پیدا کردن پاسخ غیرتکراری
+    attempts = 0
+    while reply_text in _sent_messages_by_chat[chat_id] and attempts < 20:
+        reply_text = process_group_message(uid, chat_id, text)
+        attempts += 1
 
-# تلاش برای پیدا کردن پاسخ غیرتکراری
-attempts = 0
-while reply_text in _sent_messages_by_chat[chat_id] and attempts < 20:
-    reply_text = process_group_message(uid, chat_id, text)
-    attempts += 1
+    # ذخیره پاسخ ارسال شده
+    _sent_messages_by_chat[chat_id].append(reply_text)
 
-# ذخیره پاسخ ارسال شده
-_sent_messages_by_chat[chat_id].append(reply_text)
-
-# جلوگیری از سنگین شدن
-if len(_sent_messages_by_chat[chat_id]) > 300:
-    _sent_messages_by_chat[chat_id] = _sent_messages_by_chat[chat_id][-300:]
+    # جلوگیری از سنگین شدن
+    if len(_sent_messages_by_chat[chat_id]) > 300:
+        _sent_messages_by_chat[chat_id] = _sent_messages_by_chat[chat_id][-300:]
 
     # ارسال پاسخ
     if reply_text:
