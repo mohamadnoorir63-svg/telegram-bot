@@ -56,15 +56,19 @@ async def set_vip(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await _has_full_access(context, chat.id, user.id):
         return await update.message.reply_text("🚫 فقط مدیران یا سودوها مجازند.", quote=True)
 
-    args = (update.message.text or "").split()
-    if len(args) != 2 or not args[1].isdigit():
-        return await update.message.reply_text(
-            "📘 مثال صحیح:\n<code>تنظیم ویژه 123456789</code>",
-            parse_mode="HTML",
-            quote=True
-        )
+    # اگر پیام ریپلی شده است، آیدی از پیام ریپلی گرفته شود
+    if update.message.reply_to_message:
+        target_id = update.message.reply_to_message.from_user.id
+    else:
+        args = (update.message.text or "").split()
+        if len(args) != 2 or not args[1].isdigit():
+            return await update.message.reply_text(
+                "📘 مثال صحیح:\n<code>تنظیم ویژه 123456789</code>",
+                parse_mode="HTML",
+                quote=True
+            )
+        target_id = int(args[1])
 
-    target_id = int(args[1])
     cid = str(chat.id)
     if cid not in VIPS:
         VIPS[cid] = []
@@ -75,44 +79,6 @@ async def set_vip(update: Update, context: ContextTypes.DEFAULT_TYPE):
     VIPS[cid].append(target_id)
     _save_vips()
     await update.message.reply_text(f"✅ کاربر <b>{target_id}</b> به ویژه‌ها اضافه شد.", parse_mode="HTML", quote=True)
-
-
-async def remove_vip(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """حذف کاربر از VIP"""
-    chat = update.effective_chat
-    user = update.effective_user
-
-    if not await _has_full_access(context, chat.id, user.id):
-        return await update.message.reply_text("🚫 فقط مدیران یا سودوها مجازند.", quote=True)
-
-    args = (update.message.text or "").split()
-    if len(args) != 2 or not args[1].isdigit():
-        return await update.message.reply_text(
-            "📘 مثال صحیح:\n<code>حذف ویژه 123456789</code>",
-            parse_mode="HTML",
-            quote=True
-        )
-
-    target_id = int(args[1])
-    cid = str(chat.id)
-    if cid not in VIPS or target_id not in VIPS[cid]:
-        return await update.message.reply_text("❌ این کاربر ویژه نیست.", quote=True)
-
-    VIPS[cid].remove(target_id)
-    _save_vips()
-    await update.message.reply_text(f"❎ کاربر <b>{target_id}</b> از ویژه‌ها حذف شد.", parse_mode="HTML", quote=True)
-
-
-async def list_vips(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """نمایش لیست کاربران VIP گروه"""
-    chat = update.effective_chat
-    cid = str(chat.id)
-
-    if cid not in VIPS or not VIPS[cid]:
-        return await update.message.reply_text("ℹ️ هیچ کاربر ویژه‌ای وجود ندارد.", quote=True)
-
-    vip_list = "\n".join([f"• <b>{uid}</b>" for uid in VIPS[cid]])
-    await update.message.reply_text(f"🛡 لیست کاربران ویژه گروه:\n{vip_list}", parse_mode="HTML", quote=True)
 # ─────────────────────────────── مسیر فایل و لود قفل‌ها ───────────────────────────────
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
