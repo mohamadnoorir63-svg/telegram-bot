@@ -5,7 +5,6 @@ from telegram.ext import ContextTypes, ConversationHandler
 
 ASK_NAME = 1
 
-
 # ======================= 🎨 تابع اصلی =======================
 async def font_maker(update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
@@ -31,12 +30,10 @@ async def font_maker(update, context: ContextTypes.DEFAULT_TYPE):
 
     return ConversationHandler.END
 
-
 # ======================= 🌸 دریافت اسم =======================
 async def receive_font_name(update, context: ContextTypes.DEFAULT_TYPE):
     name = update.message.text.strip()
     return await send_fonts(update, context, name)
-
 
 # ======================= 💎 ارسال فونت‌ها =======================
 async def send_fonts(update, context, name):
@@ -55,10 +52,8 @@ async def send_fonts(update, context, name):
 
     return ConversationHandler.END
 
-
 # ======================= 🎭 تولید فونت‌های شیک =======================
 def generate_fonts(name):
-
     pre_groups = [
         ["𓄂","𓆃","𓃬","𓋥","𓄼","𓂀","𓅓"],
         ["ꪰ","ꪴ","𝄠","𝅔","꧁","꧂","ꕥ"],
@@ -97,7 +92,6 @@ def generate_fonts(name):
 
     return fonts
 
-
 # ======================= 📄 ساخت صفحات =======================
 def make_pages(name, fonts, page_size=10, max_pages=5):
     pages = []
@@ -105,26 +99,17 @@ def make_pages(name, fonts, page_size=10, max_pages=5):
     total_chunks = total_chunks[:max_pages]
 
     for page_index, chunk in enumerate(total_chunks):
-
         text = f"<b>↻ {name} ⇦</b>\n:• لیست فونت های پیشنهادی :\n"
 
-        keyboard = []
-
+        # فقط لیست فونت‌ها بدون دکمه کپی
         for i, style in enumerate(chunk, start=1):
-            global_index = page_index * page_size + (i - 1)
             text += f"{i}- {style}\n"
-
-            # دکمه = ارسال مستقیم فونت
-            keyboard.append([
-                InlineKeyboardButton(
-                    f"{i}",  # دکمه فقط شماره باشد برای جلوگیری از خطا
-                    callback_data=f"copy_font_id_{global_index}"
-                )
-            ])
 
         text += f"\n📄 صفحه {page_index + 1} از {len(total_chunks)}"
 
+        keyboard = []
         nav = []
+
         if page_index > 0:
             nav.append(InlineKeyboardButton("⬅️ قبلی", callback_data=f"prev_font_{page_index - 1}"))
         if page_index < len(total_chunks) - 1:
@@ -142,22 +127,6 @@ def make_pages(name, fonts, page_size=10, max_pages=5):
 
     return pages
 
-
-# ======================= 📋 هندلر کپی =======================
-async def copy_font(update, context: ContextTypes.DEFAULT_TYPE):
-    q = update.callback_query
-    await q.answer()
-
-    font_id = int(q.data.replace("copy_font_id_", ""))
-
-    all_fonts = context.user_data.get("all_fonts", [])
-
-    if font_id < len(all_fonts):
-        await q.message.reply_text(all_fonts[font_id])
-    else:
-        await q.message.reply_text("❗ فونت پیدا نشد.")
-
-
 # ======================= 🔁 صفحات =======================
 async def next_font(update, context):
     q = update.callback_query
@@ -171,7 +140,6 @@ async def next_font(update, context):
         parse_mode="HTML",
         reply_markup=pages[index]["keyboard"]
     )
-
 
 async def prev_font(update, context):
     q = update.callback_query
