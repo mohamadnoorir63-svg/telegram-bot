@@ -1096,10 +1096,10 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # =================== یادگیری هوشمند ===================
     if not status["locked"]:
         auto_learn_from_text(text)
-
-    if not status["active"]:
-        shadow_learn(text, "")
-         return
+        
+    if not update.message or not update.message.text:
+        return
+    
 
     # ✅ درصد هوش منطقی
     if text.lower() == "درصد هوش":
