@@ -151,31 +151,97 @@ def shadow_learn(phrase, response):
     print(f"[Shadow Learn] '{phrase}' → '{response}'")
 
 # ========================= پاسخ‌دهی وزنی =========================
-
 def get_reply(text):
-    """پیدا کردن پاسخ از حافظه با سیستم وزن‌دهی"""
+    """پیدا کردن پاسخ از حافظه با سیستم وزن‌دهی (نسخه مقاوم‌تر)."""
     mem = load_data("memory.json")
     data = mem.get("data", {})
 
+    # پیدا کردن کلیدهایی که در متن وجود دارند
     matches = [k for k in data.keys() if k in text]
     if not matches:
         return None
 
-    key = random.choice(matches)
-    responses = data[key]
+    # سعی می‌کنیم از بین matches یکی یکی انتخاب کنیم تا اگر جمله‌ای خراب بود از بقیه استفاده شود
+    random.shuffle(matches)
+    changed = False
 
-    # پشتیبانی از ساختار قدیمی
-    if isinstance(responses[0], str):
-        responses = [{"text": r, "weight": 1} for r in responses]
-        data[key] = responses
+    for key in matches:
+        responses = data.get(key, [])
+
+        # اگر لیست پاسخ‌ها خالی است => جمله را پاک کن و برو سراغ بعدی
+        if not responses:
+            if key in data:
+                del data[key]
+                changed = True
+            continue
+
+        # نرمال‌سازی: اگر ساختار قدیمی (رشته) بود تبدیل به دیکت کنیم
+        try:
+            if isinstance(responses[0], str):
+                responses = [{"text": r, "weight": 1} for r in responses]
+                data[key] = responses
+                changed = True
+        except Exception:
+            # اگر دسترسی responses[0] خطا داد، جمله را حذف میکنیم و ادامه میدیم
+            if key in data:
+                del data[key]
+                changed = True
+            continue
+
+        # مطمئن شویم همه آیتم‌ها دیکت با کلید text و weight هستند
+        cleaned = []
+        for r in responses:
+            if isinstance(r, dict):
+                text_field = r.get("text") or r.get("value") or ""
+                weight = r.get("weight", 1)
+                try:
+                    weight = int(weight)
+                except Exception:
+                    weight = 1
+                cleaned.append({"text": str(text_field), "weight": max(1, weight)})
+            else:
+                # اگر مورد ناهمگون پیدا شد، تبدیلش کن
+                cleaned.append({"text": str(r), "weight": 1})
+
+        if not cleaned:
+            # اگر بعد از پاکسازی خالی شد، حذف کن و برو سراغ بعدی
+            if key in data:
+                del data[key]
+                changed = True
+            continue
+
+        # محاسبه وزن‌ها — اگر همه صفر بودند وزن یکسان بگذار
+        weights = [max(0, int(r.get("weight", 1))) for r in cleaned]
+        if sum(weights) == 0:
+            weights = [1] * len(weights)
+
+        # انتخاب ایمن با try/except
+        try:
+            chosen = random.choices(cleaned, weights=weights, k=1)[0]
+        except Exception:
+            # اگر به هر دلیل خطا شد، fallback به اولین پاسخ
+            chosen = cleaned[0]
+
+        # افزایش وزن و ذخیره
+        try:
+            for r in cleaned:
+                if r["text"] == chosen["text"]:
+                    r["weight"] = r.get("weight", 1) + 1
+                    break
+            data[key] = cleaned
+            save_data("memory.json", mem)
+        except Exception:
+            # اگر ذخیره مشکل داشت، حداقل پاسخ را برگردان
+            return chosen["text"]
+
+        return chosen["text"]
+
+    # اگر تغییراتی داشتیم آنها را ذخیره کن
+    if changed:
         save_data("memory.json", mem)
 
-    weights = [r["weight"] for r in responses]
-    chosen = random.choices(responses, weights=weights, k=1)[0]
-    chosen["weight"] += 1
-    save_data("memory.json", mem)
+    return None
 
-    return chosen["text"]
 
 # ========================= تمیزسازی حافظه =========================
 
