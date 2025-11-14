@@ -316,6 +316,39 @@ def generate_sentence():
     t1 = r1["text"] if isinstance(r1, dict) else r1
     t2 = r2["text"] if isinstance(r2, dict) else r2
     return f"{p1} ولی {t1}، بعدش {t2}"
+    # ========================= مدیریت صف جملات برای عدم تکرار =========================
+_sentence_queue = []
+
+def get_random_sentence_no_repeat():
+    """
+    برگرداندن یک جمله تصادفی بدون تکرار تا تمام جملات استفاده شوند.
+    وقتی تمام جملات مصرف شد، دوباره لیست shuffle می‌شود.
+    """
+    global _sentence_queue
+    mem = load_data("memory.json")
+    data = mem.get("data", {})
+
+    phrases = list(data.keys())
+    if not phrases:
+        return "هنوز چیزی بلد نیستم!"
+
+    # ساخت صف جدید اگر خالی باشد
+    if not _sentence_queue:
+        _sentence_queue = phrases.copy()
+        random.shuffle(_sentence_queue)
+
+    # برداشتن اولین جمله از صف
+    phrase = _sentence_queue.pop(0)
+    responses = data.get(phrase, [])
+
+    # اگر پاسخ دارد، یکی را انتخاب کن
+    if responses:
+        r = random.choice(responses)
+        text = r["text"] if isinstance(r, dict) else r
+        return f"{phrase} → {text}"
+    else:
+        # اگر پاسخی ندارد، برو سراغ بعدی (بازگشتی)
+        return get_random_sentence_no_repeat()
 
 # ========================= لیست زیبا از جملات =========================
 
