@@ -1107,6 +1107,13 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if reply_text:
         await update.message.reply_text(reply_text)
 
+    # ================= دستورات هوش =================
+    if lower_text == "درصد هوش":
+        await send_logical_iq(update)
+    elif lower_text == "درصد هوش اجتماعی":
+        await send_social_iq(update)
+    elif lower_text == "هوش کلی":
+        await send_total_iq(update)
     
     # ✅ درصد هوش منطقی
     if text.lower() == "درصد هوش":
