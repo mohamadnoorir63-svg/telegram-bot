@@ -1,4 +1,5 @@
 # ai_learning.py
+
 import re
 import random
 from memory_manager import learn, shadow_learn, load_data, save_data
@@ -6,29 +7,32 @@ from memory_manager import learn, shadow_learn, load_data, save_data
 # ================================
 # 🧱 فیلتر ضد ایموجی و متن کوتاه
 # ================================
+
 def is_emoji_only(text: str) -> bool:
+    """بررسی می‌کند که متن تنها شامل ایموجی باشد"""
     if not text or not text.strip():
         return True
-    clean = re.sub(r"[ \n\t.,!?؛،~\-_=+\[\]{}()<>0-9a-zA-Zء-ی]", "", text)
+    clean = re.sub(r"[ \n\t.,!?؛،~\-_=+{}()<>0-9a-zA-Zء-ی]", "", text)
     emoji_pattern = re.compile(
-        "["u"\U0001F600-\U0001F64F"
-        u"\U0001F300-\U0001F5FF"
-        u"\U0001F680-\U0001F6FF"
-        u"\U0001F1E0-\U0001F1FF"
-        u"\U00002700-\U000027BF"
-        u"\U0001F900-\U0001F9FF"
-        "]+", flags=re.UNICODE,
+        "[" 
+        u"\U0001F600-\U0001F64F"  # صورتک‌ها
+        u"\U0001F300-\U0001F5FF"  # نمادها و تصاویر
+        u"\U0001F680-\U0001F6FF"  # وسایل نقلیه و نقشه‌ها
+        u"\U0001F1E0-\U0001F1FF"  # پرچم‌ها
+        u"\U00002700-\U000027BF"  # نمادهای مختلف
+        u"\U0001F900-\U0001F9FF"  # صورتک‌ها و شخصیت‌های اضافی
+        "]+", flags=re.UNICODE
     )
     return not re.sub(emoji_pattern, "", clean)
 
 # ================================
 # 🤖 یادگیری خودکار Cloud+
 # ================================
+
 def auto_learn_from_text(text: str):
     """یادگیری خودکار از پیام کاربر"""
     if not text or len(text.strip()) < 3:
         return
-
     if is_emoji_only(text):
         return
 
@@ -64,7 +68,7 @@ def auto_learn_from_text(text: str):
     words = text.split()
     if len(words) >= 3:
         key = " ".join(words[:2])
-        base_reply = random.choice(["آره",  "جالبه", "باشه", "اوه"])
+        base_reply = random.choice(["آره", "درسته", "جالبه", "باشه", "اوه"])
         tail = random.choice(words[-2:])
         resp = f"{base_reply} {tail}"
 
@@ -80,10 +84,12 @@ def auto_learn_from_text(text: str):
 # ================================
 # 🧹 پاکسازی خودکار حافظه سایه
 # ================================
+
 def clean_shadow_memory():
     shadow = load_data("shadow_memory.json")
     data = shadow.get("data", {})
     changed = False
+
     for phrase, responses in list(data.items()):
         if not isinstance(responses, list):
             continue
@@ -91,6 +97,7 @@ def clean_shadow_memory():
         if cleaned != responses:
             data[phrase] = cleaned
             changed = True
+
     if changed:
         shadow["data"] = data
         save_data("shadow_memory.json", shadow)
@@ -98,14 +105,18 @@ def clean_shadow_memory():
 # ================================
 # 🏋️‍♂️ تقویت خودکار حافظه
 # ================================
-def reinforce_shadow_memory():
+
+def reinforce_shadow_memory() -> int:
+    """انتقال داده‌های حافظه سایه به حافظه اصلی"""
     shadow = load_data("shadow_memory.json")
     data = shadow.get("data", {})
     moved = 0
+
     for phrase, responses in data.items():
         for resp in responses:
             learn(phrase, resp)
             moved += 1
+
     # پاکسازی حافظه سایه پس از انتقال
     shadow["data"] = {}
     save_data("shadow_memory.json", shadow)
@@ -114,27 +125,33 @@ def reinforce_shadow_memory():
 # ================================
 # 🧹 پاکسازی داده‌های تکراری حافظه اصلی
 # ================================
-def clean_duplicates():
+
+def clean_duplicates() -> int:
     """پاکسازی خودکار داده‌های تکراری و غیرمعتبر در حافظه اصلی"""
     mem = load_data("memory.json")
     data = mem.get("data", {})
     if not data:
         return 0
+
     changed = 0
     for phrase, responses in list(data.items()):
         if not isinstance(responses, list):
             continue
+
         cleaned_texts = []
         new_responses = []
+
         for r in responses:
             text = r.get("text", "").strip() if isinstance(r, dict) else str(r).strip()
             if len(text) < 2 or text in cleaned_texts:
                 continue
             cleaned_texts.append(text)
             new_responses.append({"text": text, "weight": r.get("weight", 1) if isinstance(r, dict) else 1})
+
         if len(new_responses) != len(responses):
             data[phrase] = new_responses
             changed += 1
+
     if changed:
         mem["data"] = data
         save_data("memory.json", mem)
