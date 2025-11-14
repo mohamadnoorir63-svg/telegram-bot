@@ -1071,7 +1071,7 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     # ================= پردازش پیام و جلوگیری از پاسخ تکراری =================
-    reply_text = process_group_message(uid, chat_id, text)
+    reply_text = process_group_message(uid, chat_id, text)  # فقط رشته برگردانده شود
 
     global _sent_messages_by_chat
     if '_sent_messages_by_chat' not in globals():
@@ -1089,11 +1089,11 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # ذخیره پاسخ ارسالی
     _sent_messages_by_chat[chat_id].append(reply_text)
 
-    # اگر تعداد زیاد شد، پاک کردن قدیمی‌ترین‌ها
+    # پاک کردن قدیمی‌ترین‌ها در صورت زیاد شدن
     if len(_sent_messages_by_chat[chat_id]) > 200:
         _sent_messages_by_chat[chat_id] = _sent_messages_by_chat[chat_id][-200:]
 
-    # ارسال پاسخ
+    # ✅ ارسال پاسخ فقط یک بار
     if reply_text:
         await update.message.reply_text(reply_text)
 
@@ -1108,7 +1108,6 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not status.get("active", True):
         shadow_learn(text, "")
         return
-    
     # ✅ درصد هوش منطقی
     if text.lower() == "درصد هوش":
         score = 0
