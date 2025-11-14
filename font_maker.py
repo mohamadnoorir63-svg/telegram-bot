@@ -41,7 +41,6 @@ async def receive_font_name(update, context: ContextTypes.DEFAULT_TYPE):
 async def send_fonts(update, context, name):
     fonts = generate_fonts(name)
 
-    # ذخیره همه فونت‌ها
     context.user_data["all_fonts"] = fonts
     context.user_data["font_pages"] = make_pages(name, fonts, 10, 5)
 
@@ -55,29 +54,32 @@ async def send_fonts(update, context, name):
     return ConversationHandler.END
 
 
-# ======================= 🎭 تولید فونت‌های شیک و مرتب =======================
+# ======================= 🎭 تولید فونت‌های شیک =======================
 def generate_fonts(name):
 
     pre_groups = [
-        ["𓄂","𓆃","𓃬","𓋥"],
-        ["ꪰ","ꪴ","𝄠","𝅔"],
-        ["⚝","☬","☾","☽"]
+        ["𓄂","𓆃","𓃬","𓋥","𓄼","𓂀","𓅓"],
+        ["ꪰ","ꪴ","𝄠","𝅔","꧁","꧂","ꕥ"],
+        ["⚝","☬","☾","☽","★","✦","✧"]
     ]
 
     post_groups = [
-        ["✿","♡","❖","░"],
-        ["✧","✦","❂","★"],
-        ["⋆","⟡","❋","•"]
+        ["✿","♡","❖","░","❋","☯","❂"],
+        ["✧","✦","❂","★","✺","✶","✸"],
+        ["⋆","⟡","❋","•","✾","✢","✤"]
     ]
 
     unicode_styles = [
-        ("𝓐𝓑𝓒𝓓𝓔𝓕𝓖𝓗𝓘𝓙𝓚𝓛𝓜𝓝𝓞𝓟𝓠𝓡𝓢𝓣𝓤𝓥𝓦𝓧𝓨𝓩"
-         "𝓪𝓫𝓬𝓭𝓮𝓯𝓰𝓱𝓲𝓳𝓴𝓵𝓶𝓷𝓸𝓹𝓺𝓻𝓼𝓽𝓾𝓿𝔀𝔁𝔂𝔃",
-         "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"),
-
-        ("🄰🄱🄲🄳🄴🄵🄶🄷🄸🄹🄺🄻🄼🄽🄾🄿🅀🅁🅂🅃🅄🅅🅆🅇🅈🅉"
-         "🄰🄱🄲🄳🄴🄵🄶🄷🄸🄹🄺🄻🄼🄽🄾🄿🅀🅁🅂🅃🅄🅅🅆🅇🅈🅉",
-         "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz")
+        (
+            "𝓐𝓑𝓒𝓓𝓔𝓕𝓖𝓗𝓘𝓙𝓚𝓛𝓜𝓝𝓞𝓟𝓠𝓡𝓢𝓣𝓤𝓥𝓦𝓧𝓨𝓩"
+            "𝓪𝓫𝓬𝓭𝓮𝓯𝓰𝓱𝓲𝓳𝓴𝓵𝓶𝓷𝓸𝓹𝓺𝓻𝓼𝓽𝓾𝓿𝔀𝔁𝔂𝔃",
+            "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+        ),
+        (
+            "🄰🄱🄲🄳🄴🄵🄶🄷🄸🄹🄺🄻🄼🄽🄾🄿🅀🅁🅂🅃🅄🅅🅆🅇🅈🅉"
+            "🄰🄱🄲🄳🄴🄵🄶🄷🄸🄹🄺🄻🄼🄽🄾🄿🅀🅁🅂🅃🅄🅅🅆🅇🅈🅉",
+            "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+        )
     ]
 
     fonts = []
@@ -108,9 +110,10 @@ def make_pages(name, fonts, page_size=10, max_pages=5):
         for i, style in enumerate(chunk, start=1):
 
             global_index = page_index * page_size + (i - 1)
+
             text += f"{i}- {style}\n"
 
-            # دکمه = خود فونت → فشار بده = ارسال فونت برای کپی
+            # دکمه = کل متن فونت (قابل لمس = کپی)
             keyboard.append([
                 InlineKeyboardButton(
                     style,
@@ -122,11 +125,17 @@ def make_pages(name, fonts, page_size=10, max_pages=5):
 
         nav = []
         if page_index > 0:
-            nav.append(InlineKeyboardButton("⬅️ قبلی", callback_data=f"prev_font:{page_index - 1}"))
+            nav.append(
+                InlineKeyboardButton("⬅️ قبلی", callback_data=f"prev_font:{page_index - 1}")
+            )
         if page_index < len(total_chunks) - 1:
-            nav.append(InlineKeyboardButton("➡️ بعدی", callback_data=f"next_font:{page_index + 1}"))
+            nav.append(
+                InlineKeyboardButton("➡️ بعدی", callback_data=f"next_font:{page_index + 1}")
+            )
 
-        keyboard.append(nav)
+        if nav:
+            keyboard.append(nav)
+
         keyboard.append([InlineKeyboardButton("🔙 بازگشت", callback_data="feature_back")])
 
         pages.append({
@@ -157,12 +166,19 @@ async def next_font(update, context):
     await q.answer()
     index = int(q.data.split(":")[1])
     pages = context.user_data["font_pages"]
-    await q.edit_message_text(pages[index]["text"], parse_mode="HTML", reply_markup=pages[index]["keyboard"])
-
+    await q.edit_message_text(
+        pages[index]["text"],
+        parse_mode="HTML",
+        reply_markup=pages[index]["keyboard"]
+    )
 
 async def prev_font(update, context):
     q = update.callback_query
     await q.answer()
     index = int(q.data.split(":")[1])
     pages = context.user_data["font_pages"]
-    await q.edit_message_text(pages[index]["text"], parse_mode="HTML", reply_markup=pages[index]["keyboard"])
+    await q.edit_message_text(
+        pages[index]["text"],
+        parse_mode="HTML",
+        reply_markup=pages[index]["keyboard"]
+    )
