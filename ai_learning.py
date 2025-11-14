@@ -64,7 +64,7 @@ def auto_learn_from_text(text: str):
     words = text.split()
     if len(words) >= 3:
         key = " ".join(words[:2])
-        base_reply = random.choice(["آره", "درسته", "جالبه", "باشه", "اوه"])
+        base_reply = random.choice(["آره",  "جالبه", "باشه", "اوه"])
         tail = random.choice(words[-2:])
         resp = f"{base_reply} {tail}"
 
