@@ -1085,10 +1085,9 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not status["active"]:
         shadow_learn(text, "")
         return
-
-    # پردازش پیام گروه
-    reply_text = process_group_message(uid, chat_id, text)
-
+        
+        # پردازش پیام گروه
+reply_text = process_group_message(uid, chat_id, text)
 
 # ================= جلوگیری از ارسال پاسخ تکراری =================
 global _sent_messages_by_chat
@@ -1114,6 +1113,8 @@ if len(_sent_messages_by_chat[chat_id]) > 200:
 # ارسال پاسخ
 if reply_text:
     await update.message.reply_text(reply_text)
+
+
     # ✅ درصد هوش منطقی
     if text.lower() == "درصد هوش":
         score = 0
