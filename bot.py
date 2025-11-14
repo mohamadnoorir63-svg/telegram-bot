@@ -19,20 +19,21 @@ import aiofiles
 # 📦 ماژول‌ها
 from font_maker import font_maker, next_font, prev_font
 from memory_manager import (
-init_files,
-load_data,
-save_data,
-learn,
-long_learn,
-shadow_learn,
-get_reply,
-set_mode,
-get_stats,
-enhance_sentence,
-generate_sentence,
-list_phrases,
-delete_phrase,
-delete_response   # ← این هم اضافه شد
+    init_files,
+    load_data,
+    save_data,
+    learn,
+    long_learn,
+    shadow_learn,
+    get_reply,
+    set_mode,
+    get_stats,
+    enhance_sentence,
+    generate_sentence,
+    list_phrases,
+    delete_phrase,
+    delete_response   # ← این خط اضافه شد
+)
 from jokes_manager import save_joke, delete_joke, list_jokes, send_random_joke
 from fortune_manager import save_fortune, list_fortunes, send_random_fortune, delete_fortune
 from group_manager import register_group_activity, get_group_stats
