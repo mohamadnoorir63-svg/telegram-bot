@@ -1025,7 +1025,91 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data["await_restore"] = False
         
 # ======================= 💬 پاسخ و هوش مصنوعی =======================
+async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """پاسخ‌دهی اصلی هوش مصنوعی و سیستم یادگیری"""
+    
 
+    # 🚫 جلوگیری از پاسخ هوشمند در صورت اجرای دستور سفارشی
+    if context.user_data.get("custom_handled"):
+        context.user_data["custom_handled"] = False
+        return
+    
+
+    # 🧩 اطمینان از اینکه پیام معتبره
+    if not update.message or not update.message.text:
+        return
+        reply_text = process_group_message(uid, chat_id, text)
+        # 🧠 فعال‌سازی حافظهٔ کوتاه‌مدت گفتگو
+    uid = update.effective_user.id
+    text = update.message.text.strip()
+
+    # 🧠 ثبت پیام در حافظه کوتاه‌مدت
+    context_memory.add_message(uid, text)
+
+    # 🧠 گرفتن کل تاریخچه اخیر کاربر
+    recent_context = context_memory.get_context(uid)
+
+    # 🧩 ترکیب سه پیام آخر برای درک بهتر ادامه گفتگو
+    full_context = " ".join(recent_context[-3:]) if recent_context else text
+
+    text = update.message.text.strip()
+    lower_text = text.lower()
+    uid = update.effective_user.id
+    chat_id = update.effective_chat.id
+
+    # 🚫 جلوگیری از پاسخ در پیوی (فقط جوک و فال مجازند)
+    if update.effective_chat.type == "private" and lower_text not in ["جوک", "فال"]:
+        return
+    if re.search(r"(هوای|آب[\s‌]*و[\s‌]*هوا)", text):
+        return
+
+    # ✅ جلوگیری از پاسخ به دستورات خاص (مثل راهنما، خوشامد، ربات و غیره)
+    protected_words = [
+        "راهنما", "ثبت راهنما", "خوشامد", "ثبت خوشامد",
+        "ربات", "save", "del", "panel", "backup", "cloudsync", "leave"
+    ]
+    if any(lower_text.startswith(word) for word in protected_words):
+        return
+
+    # 🧠 بررسی حالت ریپلی مود گروهی
+    if await handle_group_reply_mode(update, context):
+        return
+        # ================= پردازش پیام و جلوگیری از ارسال پاسخ تکراری =================
+reply_text = process_group_message(uid, chat_id, text)
+
+global _sent_messages_by_chat
+if '_sent_messages_by_chat' not in globals():
+    _sent_messages_by_chat = {}
+
+if chat_id not in _sent_messages_by_chat:
+    _sent_messages_by_chat[chat_id] = []
+
+# تلاش برای پیدا کردن پاسخ غیرتکراری
+attempts = 0
+while reply_text in _sent_messages_by_chat[chat_id] and attempts < 20:
+    reply_text = process_group_message(uid, chat_id, text)
+    attempts += 1
+
+# ذخیره پاسخ ارسال شده
+_sent_messages_by_chat[chat_id].append(reply_text)
+
+# جلوگیری از سنگین شدن
+if len(_sent_messages_by_chat[chat_id]) > 300:
+    _sent_messages_by_chat[chat_id] = _sent_messages_by_chat[chat_id][-300:]
+
+# ارسال پاسخ
+if reply_text:
+    await update.message.reply_text(reply_text)
+# ثبت کاربر و گروه
+    await register_user(update.effective_user)
+    register_group_activity(chat_id, uid)
+
+    if not status["locked"]:
+        auto_learn_from_text(text)
+
+    if not status["active"]:
+        shadow_learn(text, "")
+        return
 
     # ✅ درصد هوش منطقی
     if text.lower() == "درصد هوش":
