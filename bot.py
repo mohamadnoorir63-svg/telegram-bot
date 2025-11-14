@@ -1033,7 +1033,7 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data["custom_handled"] = False
         return
 
-    # 🧩 بررسی معتبر بودن پیام
+    # 🧩 پیام معتبر
     if not update.message or not update.message.text:
         return
 
@@ -1066,9 +1066,9 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     # =================== تولید پاسخ ===================
-    reply_text = process_group_message(uid, chat_id, text)  # فقط ۳ آرگومان
+    reply_text = process_group_message(uid, chat_id, text)
 
-    # =================== جلوگیری از ارسال پاسخ تکراری ===================
+    # =================== جلوگیری از تکرار ===================
     global _sent_messages_by_chat
     if '_sent_messages_by_chat' not in globals():
         _sent_messages_by_chat = {}
@@ -1086,22 +1086,25 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
         _sent_messages_by_chat[chat_id] = _sent_messages_by_chat[chat_id][-300:]
 
     # =================== ارسال پاسخ ===================
-    if reply_text:
-        await update.message.reply_text(reply_text)
+    try:
+        if reply_text:
+            await update.message.reply_text(reply_text)
+    except Exception as e:
+        print(f"⚠️ خطا در ارسال پاسخ: {e}")
 
     # =================== ثبت کاربر و گروه ===================
-    await register_user(update.effective_user)
-    register_group_activity(chat_id, uid)
+    try:
+        await register_user(update.effective_user)
+        register_group_activity(chat_id, uid)
+    except Exception as e:
+        print(f"⚠️ خطا در ثبت کاربر/گروه: {e}")
 
     # =================== یادگیری هوشمند ===================
-    if not status["locked"]:
-        auto_learn_from_text(text)
-
-    if not status["active"]:
-        shadow_learn(text, "")
-        return
-    
-
+    if not status.get("locked", False):
+        try:
+            auto_learn_from_text(text)
+        except Exception as e:
+            print(f"⚠️ خطا در یادگیری هوشمند: {e}")
     # ✅ درصد هوش منطقی
     if text.lower() == "درصد هوش":
         score = 0
