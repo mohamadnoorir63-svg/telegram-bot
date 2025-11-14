@@ -1438,6 +1438,21 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 parse_mode="HTML"
             )
             return
+            # ✅ حذف پاسخ مشخص
+    if text.startswith("حذف پاسخ "):
+        response_text = text.replace("حذف پاسخ ", "").strip()
+        if not response_text:
+            await update.message.reply_text(
+                "❗ لطفاً متنی برای حذف پاسخ بنویس.\n\n"
+                "📘 مثال:\n"
+                "<code>حذف پاسخ علیک</code>",
+                parse_mode="HTML"
+            )
+            return
+
+        msg = delete_response(response_text)  # از تابعی که اضافه کردی
+        await update.message.reply_text(msg, parse_mode="HTML")
+        return
 
         # اگر کاربر ستاره گذاشته باشد یعنی حذف جزئی (partial)
         partial = phrase.endswith("*")
