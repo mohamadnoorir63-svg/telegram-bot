@@ -1,15 +1,16 @@
 import random
 import asyncio
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
-from telegram.ext import ContextTypes, ConversationHandler
+from telegram.ext import ContextTypes, ConversationHandler, MessageHandler, CallbackQueryHandler, filters
 
-ASK_NAME = 1
+ASK_NAME = 1  # حالت دریافت اسم
 
-# ======================= 🎨 تابع اصلی =======================
+# ======================= 🎨 تابع اصلی فونت =======================
 async def font_maker(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
     chat_type = update.effective_chat.type
 
+    # جلوگیری از استفاده در گروه
     if chat_type in ["group", "supergroup"]:
         msg = await update.message.reply_text(
             "✨ لطفاً برای ساخت فونت، به پیوی ربات مراجعه کنید 🙏"
@@ -22,22 +23,17 @@ async def font_maker(update: Update, context: ContextTypes.DEFAULT_TYPE):
             pass
         return ConversationHandler.END
 
-    if text == "فونت":
-        await update.message.reply_text("🌸 چه اسمی رو برات فونت کنم؟")
-        return ASK_NAME
-
     if text.startswith("فونت "):
         name = text.replace("فونت", "").strip()
         return await send_fonts(update, context, name)
 
-    return ConversationHandler.END
-
+    await update.message.reply_text("🌸 چه اسمی رو برات فونت کنم؟")
+    return ASK_NAME
 
 # ======================= 🌸 دریافت اسم =======================
 async def receive_font_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
     name = update.message.text.strip()
     return await send_fonts(update, context, name)
-
 
 # ======================= 💎 ارسال فونت‌ها =======================
 async def send_fonts(update: Update, context: ContextTypes.DEFAULT_TYPE, name: str):
@@ -53,7 +49,6 @@ async def send_fonts(update: Update, context: ContextTypes.DEFAULT_TYPE, name: s
     )
     return ConversationHandler.END
 
-
 # ======================= 🎭 تولید فونت‌های شیک =======================
 def generate_fonts(name: str):
     pre_groups = [
@@ -68,12 +63,10 @@ def generate_fonts(name: str):
     ]
     unicode_styles = [
         (
-            "𝓐𝓑𝓒𝓓𝓔𝓕𝓖𝓗𝓘𝓙𝓚𝓛𝓜𝓝𝓞𝓟𝓠𝓡𝓢𝓣𝓤𝓥𝓦𝓧𝓨𝓩"
-            "𝓪𝓫𝓬𝓭𝓮𝓯𝓰𝓱𝓲𝓳𝓴𝓵𝓶𝓷𝓸𝓹𝓺𝓻𝓼𝓽𝓾𝓿𝔀𝔁𝔂𝔃",
+            "𝓐𝓑𝓒𝓓𝓔𝓕𝓖𝓗𝓘𝓙𝓴𝓛𝓜𝓝𝓞𝓟𝓠𝓡𝓢𝓣𝓤𝓥𝓦𝓧𝓨𝓨",
             "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
         ),
         (
-            "🄰🄱🄲🄳🄴🄵🄶🄷🄸🄹🄺🄻🄼🄽🄾🄿🅀🅁🅂🅃🅄🅅🅆🅇🅈🅉"
             "🄰🄱🄲🄳🄴🄵🄶🄷🄸🄹🄺🄻🄼🄽🄾🄿🅀🅁🅂🅃🅄🅅🅆🅇🅈🅉",
             "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
         )
@@ -86,7 +79,6 @@ def generate_fonts(name: str):
         uname = name.translate(str.maketrans(style[1], style[0]))
         fonts.append(f"{pre}{uname}{post}")
     return fonts
-
 
 # ======================= 📄 ساخت صفحات =======================
 def make_pages(name: str, fonts: list, page_size=10, max_pages=5):
@@ -105,13 +97,13 @@ def make_pages(name: str, fonts: list, page_size=10, max_pages=5):
         if idx > 0: nav.append(InlineKeyboardButton("⬅️ قبلی", callback_data=f"prev_font_{idx-1}"))
         if idx < len(chunks)-1: nav.append(InlineKeyboardButton("➡️ بعدی", callback_data=f"next_font_{idx+1}"))
         if nav: keyboard.append(nav)
+        # دکمه بازگشت مستقیم به پنل اصلی
         keyboard.append([InlineKeyboardButton("🔙 بازگشت", callback_data="feature_back")])
 
         pages.append({"text": text, "keyboard": InlineKeyboardMarkup(keyboard)})
     return pages
 
-
-# ======================= 📋 ارسال فونت انتخاب شده =======================
+# ======================= 📤 ارسال فونت انتخاب شده =======================
 async def send_selected_font(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -122,7 +114,6 @@ async def send_selected_font(update: Update, context: ContextTypes.DEFAULT_TYPE)
     else:
         await query.message.reply_text("❗ فونت پیدا نشد.")
 
-
 # ======================= 🔁 صفحات =======================
 async def next_font(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -132,7 +123,6 @@ async def next_font(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if 0 <= index < len(pages):
         await query.edit_message_text(pages[index]["text"], parse_mode="HTML", reply_markup=pages[index]["keyboard"])
 
-
 async def prev_font(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -141,11 +131,11 @@ async def prev_font(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if 0 <= index < len(pages):
         await query.edit_message_text(pages[index]["text"], parse_mode="HTML", reply_markup=pages[index]["keyboard"])
 
-
-# ======================= 🎛 بازگشت به منوی اصلی =======================
-async def feature_back(update, context):
+# ======================= 🔙 بازگشت به پنل اصلی =======================
+async def feature_back(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
 
-    # به جای show_main_panel مستقیم متن و دکمه ها رو بفرست یا callback به bot.py بسپار
-    await query.message.reply_text("🔙 بازگشت به منوی اصلی (پنل اصلی در bot.py هندل می‌شود)")
+    # ✅ import داخل تابع برای جلوگیری از circular import
+    from bot import show_main_panel
+    await show_main_panel(update, context, edit=True)
