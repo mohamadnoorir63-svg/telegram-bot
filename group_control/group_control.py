@@ -6,11 +6,27 @@ from telegram import Update
 from telegram.ext import ContextTypes
 
 # ─────────────────────────────── تنظیمات دسترسی ───────────────────────────────
-
 SUDO_IDS = [8588347189]  # آیدی سودو
 
+# مسیر فایل VIP
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+VIP_FILE = os.path.join(BASE_DIR, "vips.json")
+
+# بارگذاری VIPها
+VIPS = {}
+if os.path.exists(VIP_FILE):
+    try:
+        with open(VIP_FILE, "r", encoding="utf-8") as f:
+            VIPS = json.load(f)
+    except:
+        VIPS = {}
+
+def _save_vips():
+    with open(VIP_FILE, "w", encoding="utf-8") as f:
+        json.dump(VIPS, f, ensure_ascii=False, indent=2)
+
+# ─────────────────────────────── دسترسی‌ها ───────────────────────────────
 async def _is_admin_or_sudo(context, chat_id: int, user_id: int) -> bool:
-    """بررسی اینکه کاربر مدیر گروه یا سودو هست یا نه"""
     if user_id in SUDO_IDS:
         return True
     try:
@@ -20,13 +36,9 @@ async def _is_admin_or_sudo(context, chat_id: int, user_id: int) -> bool:
         return False
 
 def _is_vip(chat_id: int, user_id: int) -> bool:
-    try:
-        return user_id in VIPS.get(str(chat_id), [])
-    except:
-        return False
+    return user_id in VIPS.get(str(chat_id), [])
 
 async def _has_full_access(context, chat_id: int, user_id: int) -> bool:
-    """سودو + مدیر + ویژه = دسترسی کامل"""
     if user_id in SUDO_IDS:
         return True
     if await _is_admin_or_sudo(context, chat_id, user_id):
@@ -34,6 +46,73 @@ async def _has_full_access(context, chat_id: int, user_id: int) -> bool:
     if _is_vip(chat_id, user_id):
         return True
     return False
+
+# ─────────────────────────────── دستور VIP ───────────────────────────────
+async def set_vip(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """اضافه کردن کاربر به VIP"""
+    chat = update.effective_chat
+    user = update.effective_user
+
+    if not await _has_full_access(context, chat.id, user.id):
+        return await update.message.reply_text("🚫 فقط مدیران یا سودوها مجازند.", quote=True)
+
+    args = (update.message.text or "").split()
+    if len(args) != 2 or not args[1].isdigit():
+        return await update.message.reply_text(
+            "📘 مثال صحیح:\n<code>تنظیم ویژه 123456789</code>",
+            parse_mode="HTML",
+            quote=True
+        )
+
+    target_id = int(args[1])
+    cid = str(chat.id)
+    if cid not in VIPS:
+        VIPS[cid] = []
+
+    if target_id in VIPS[cid]:
+        return await update.message.reply_text("✅ این کاربر از قبل ویژه است.", quote=True)
+
+    VIPS[cid].append(target_id)
+    _save_vips()
+    await update.message.reply_text(f"✅ کاربر <b>{target_id}</b> به ویژه‌ها اضافه شد.", parse_mode="HTML", quote=True)
+
+
+async def remove_vip(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """حذف کاربر از VIP"""
+    chat = update.effective_chat
+    user = update.effective_user
+
+    if not await _has_full_access(context, chat.id, user.id):
+        return await update.message.reply_text("🚫 فقط مدیران یا سودوها مجازند.", quote=True)
+
+    args = (update.message.text or "").split()
+    if len(args) != 2 or not args[1].isdigit():
+        return await update.message.reply_text(
+            "📘 مثال صحیح:\n<code>حذف ویژه 123456789</code>",
+            parse_mode="HTML",
+            quote=True
+        )
+
+    target_id = int(args[1])
+    cid = str(chat.id)
+    if cid not in VIPS or target_id not in VIPS[cid]:
+        return await update.message.reply_text("❌ این کاربر ویژه نیست.", quote=True)
+
+    VIPS[cid].remove(target_id)
+    _save_vips()
+    await update.message.reply_text(f"❎ کاربر <b>{target_id}</b> از ویژه‌ها حذف شد.", parse_mode="HTML", quote=True)
+
+
+async def list_vips(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """نمایش لیست کاربران VIP گروه"""
+    chat = update.effective_chat
+    cid = str(chat.id)
+
+    if cid not in VIPS or not VIPS[cid]:
+        return await update.message.reply_text("ℹ️ هیچ کاربر ویژه‌ای وجود ندارد.", quote=True)
+
+    vip_list = "\n".join([f"• <b>{uid}</b>" for uid in VIPS[cid]])
+    await update.message.reply_text(f"🛡 لیست کاربران ویژه گروه:\n{vip_list}", parse_mode="HTML", quote=True)
 
 # ─────────────────────────────── مسیر فایل و لود قفل‌ها ───────────────────────────────
 
@@ -61,6 +140,19 @@ def _save_json(path, data):
         print(f"[⚠️] خطا در ذخیره {path}: {e}")
 
 LOCKS = _load_json(LOCK_FILE, {})
+async def list_vips(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """نمایش همه کاربران VIP گروه"""
+    chat = update.effective_chat
+    cid = str(chat.id)
+
+    if cid not in VIPS or not VIPS[cid]:
+        return await update.message.reply_text("ℹ️ کاربری در لیست ویژه وجود ندارد.")
+
+    vip_list = "\n".join([f"• <b>{uid}</b>" for uid in VIPS[cid]])
+    await update.message.reply_text(
+        f"🛡 لیست کاربران ویژه گروه:\n{vip_list}",
+        parse_mode="HTML"
+    )
 
 # ─────────────────────────────── لیست کامل قفل‌ها ───────────────────────────────
 
@@ -427,6 +519,15 @@ async def handle_group_message(update: Update, context: ContextTypes.DEFAULT_TYP
 
     if not update.message:
         return
+        # دستورات VIP
+if text.startswith("تنظیم ویژه"):
+    return await set_vip(update, context)
+
+if text.startswith("حذف ویژه"):
+    return await remove_vip(update, context)
+
+if text == "لیست ویژه":
+    return await list_vips(update, context)
 
     text = (update.message.text or update.message.caption or "").strip().lower()
 
