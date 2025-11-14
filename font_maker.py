@@ -3,6 +3,9 @@ import asyncio
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import ContextTypes, ConversationHandler
 
+# ======================= 📌 ایمپورت پنل اصلی =======================
+from bot import show_main_panel  # حتما مسیر درست فایل bot.py را بده
+
 ASK_NAME = 1
 
 # ======================= 🎨 تابع اصلی =======================
@@ -141,10 +144,12 @@ async def prev_font(update: Update, context: ContextTypes.DEFAULT_TYPE):
     pages = context.user_data.get("font_pages", [])
     if 0 <= index < len(pages):
         await query.edit_message_text(pages[index]["text"], parse_mode="HTML", reply_markup=pages[index]["keyboard"])
+
+
 # ======================= 🎛 بازگشت به منوی اصلی =======================
 async def feature_back(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
 
-    # مستقیم به پنل اصلی برمی‌گردد
+    # مستقیم به پنل اصلی برمی‌گردد بدون FakeUpdate
     await show_main_panel(update, context, edit=True)
