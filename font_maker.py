@@ -1,7 +1,7 @@
 import random
 import asyncio
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import ContextTypes, ConversationHandler, CallbackQueryHandler, MessageHandler, filters
+from telegram.ext import ContextTypes, ConversationHandler
 
 ASK_NAME = 1
 
@@ -93,7 +93,6 @@ def make_pages(name, fonts, page_size=10, max_pages=5):
         for i, style in enumerate(chunk, start=1):
             global_index = idx*page_size + (i-1)
             text += f"{i}- {style}\n"
-            # هر دکمه متن فونت است → ارسال مستقیم
             keyboard.append([InlineKeyboardButton(f"{i}- {style}", callback_data=f"send_font_{global_index}")])
         text += f"\n📄 صفحه {idx+1} از {len(chunks)}"
 
@@ -104,7 +103,6 @@ def make_pages(name, fonts, page_size=10, max_pages=5):
             nav.append(InlineKeyboardButton("➡️ بعدی", callback_data=f"next_font_{idx+1}"))
         if nav: keyboard.append(nav)
         keyboard.append([InlineKeyboardButton("🔙 بازگشت", callback_data="feature_back")])
-
         pages.append({"text": text, "keyboard": InlineKeyboardMarkup(keyboard)})
     return pages
 
@@ -121,17 +119,23 @@ async def send_selected_font(update, context: ContextTypes.DEFAULT_TYPE):
 
 # ======================= 🔁 صفحات =======================
 async def next_font(update, context):
-    q = update.callback_query
-    await q.answer()
-    index = int(q.data.replace("next_font_", ""))
+    query = update.callback_query
+    await query.answer()
+    index = int(query.data.replace("next_font_", ""))
     pages = context.user_data.get("font_pages", [])
     if 0 <= index < len(pages):
-        await q.edit_message_text(pages[index]["text"], parse_mode="HTML", reply_markup=pages[index]["keyboard"])
+        await query.edit_message_text(pages[index]["text"], parse_mode="HTML", reply_markup=pages[index]["keyboard"])
 
 async def prev_font(update, context):
-    q = update.callback_query
-    await q.answer()
-    index = int(q.data.replace("prev_font_", ""))
+    query = update.callback_query
+    await query.answer()
+    index = int(query.data.replace("prev_font_", ""))
     pages = context.user_data.get("font_pages", [])
     if 0 <= index < len(pages):
-        await q.edit_message_text(pages[index]["text"], parse_mode="HTML", reply_markup=pages[index]["keyboard"])
+        await query.edit_message_text(pages[index]["text"], parse_mode="HTML", reply_markup=pages[index]["keyboard"])
+
+# ======================= 🔙 بازگشت =======================
+async def feature_back(update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    await query.edit_message_text("🔙 به منوی اصلی بازگشتی انجام شد.")
