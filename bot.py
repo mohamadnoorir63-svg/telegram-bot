@@ -1034,7 +1034,7 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data["custom_handled"] = False
         return
 
-    # 🧩 اطمینان از اینکه پیام معتبره
+    # 🧩 اطمینان از معتبر بودن پیام
     if not update.message or not update.message.text:
         return
 
@@ -1045,8 +1045,6 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # 🧠 ثبت پیام در حافظه کوتاه‌مدت
     context_memory.add_message(uid, text)
-
-    # 🧠 گرفتن کل تاریخچه اخیر کاربر
     recent_context = context_memory.get_context(uid)
     full_context = " ".join(recent_context[-3:]) if recent_context else text
 
@@ -1070,8 +1068,20 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if await handle_group_reply_mode(update, context):
         return
 
-    # ================= پردازش پیام و جلوگیری از پاسخ تکراری =================
-    reply_text = process_group_message(uid, chat_id, text)  # فقط رشته برگردانده شود
+    # ================= ثبت کاربر و گروه =================
+    await register_user(update.effective_user)
+    register_group_activity(chat_id, uid)
+
+    # ================= یادگیری خودکار و سایه =================
+    if not status.get("locked", True):
+        auto_learn_from_text(text)
+
+    if not status.get("active", True):
+        shadow_learn(text, "")
+        return
+
+    # ================= پردازش پیام گروه و جلوگیری از تکرار =================
+    reply_text = process_group_message(uid, chat_id, text)
 
     global _sent_messages_by_chat
     if '_sent_messages_by_chat' not in globals():
@@ -1097,17 +1107,7 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if reply_text:
         await update.message.reply_text(reply_text)
 
-    # ================= ثبت کاربر و گروه =================
-    await register_user(update.effective_user)
-    register_group_activity(chat_id, uid)
-
-    # ================= یادگیری خودکار و سایه =================
-    if not status.get("locked", True):
-        auto_learn_from_text(text)
-
-    if not status.get("active", True):
-        shadow_learn(text, "")
-        return
+    
     # ✅ درصد هوش منطقی
     if text.lower() == "درصد هوش":
         score = 0
