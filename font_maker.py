@@ -2,10 +2,6 @@ import random
 import asyncio
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import ContextTypes, ConversationHandler
-from panels import show_main_panel
-
-# ======================= 📌 ایمپورت پنل اصلی =======================
-from bot import show_main_panel  # حتما مسیر درست فایل bot.py را بده
 
 ASK_NAME = 1
 
@@ -148,12 +144,11 @@ async def prev_font(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 # ======================= 🎛 بازگشت به منوی اصلی =======================
-# ======================= 🎛 بازگشت به منوی اصلی =======================
 async def feature_back(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
 
-    # ایمپورت تاخیری برای جلوگیری از حلقه import
-    from bot import show_main_panel
+    # 🔹 ایمپورت تاخیری برای جلوگیری از ImportError
+    from bot import show_main_panel  # show_main_panel داخل bot.py هست
 
     await show_main_panel(update, context, edit=True)
