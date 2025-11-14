@@ -64,35 +64,40 @@ def generate_fonts(name: str):
         ["⋆","⟡","❋","•","✾","✢","✤"]
     ]
     unicode_styles = [
-        (
-            "𝓐𝓑𝓒𝓓𝓔𝓕𝓖𝓗𝓘𝓙𝓚𝓛𝓜𝓝𝓞𝓟𝓠𝓡𝓢𝓣𝓤𝓥𝓦𝓧𝓨𝓩"
-            "𝓪𝓫𝓬𝓭𝓮𝓯𝓰𝓱𝓲𝓳𝓴𝓵𝓶𝓷𝓸𝓹𝓺𝓻𝓼𝓽𝓾𝓿𝔀𝔁𝔂𝔃",
-            "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
-        ),
-        (
-            "🄰🄱🄲🄳🄴🄵🄶🄷🄸🄹🄺🄻🄼🄽🄾🄿🅀🅁🅂🅃🅄🅅🅆🅇🅈🅉",
-            "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
-        ),
-        (
-            "𝓐𝓑𝓒𝓓𝓔𝓕𝓖𝓗𝓘𝓙𝓚𝓛𝓜𝓝𝓞𝓟𝓠𝓡𝓢𝓣𝓤𝓥𝓦𝓧𝓨𝓩",
-            "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
-        )
+        "𝓐𝓑𝓒𝓓𝓔𝓕𝓖𝓗𝓘𝓙𝓚𝓛𝓜𝓝𝓞𝓟𝓠𝓡𝓢𝓣𝓤𝓥𝓦𝓧𝓨𝓩"
+        "𝓪𝓫𝓬𝓭𝓮𝓯𝓰𝓱𝓲𝓳𝓴𝓵𝓶𝓷𝓸𝓹𝓺𝓻𝓼𝓽𝓾𝓿𝔀𝔁𝔂𝔃",
+        "🄰🄱🄲🄳🄴🄵🄶🄷🄸🄹🄺🄻🄼🄽🄾🄿🅀🅁🅂🅃🅄🅅🅆🅇🅈🅉"
+        "🅐🅑🅒🅓🅔🅕🅖🅗🅘🅙🅚🅛🅜🅝🅞🅟🅠🅡🅢🅣🅤🅥🅦🅧🅨🅩",
+        "ⒶⒷⒸⒹⒺⒻⒼⒽⒾⒿⓀⓁⓂ️ⓃⓄⓅⓆⓇⓈⓉⓊⓋⓌⓍⓎⓏ",
+        "🇦🇧🇨🇩🇪🇫🇬🇭🇮🇯🇰🇱🇲🇳🇴🇵🇶🇷🇸🇹🇺🇻🇼🇽🇾🇿",
+        "𝔸𝔹ℂ𝔻𝔼𝔽𝔾ℍ𝕀𝕁𝕂𝕃𝕄ℕ𝕆ℙℚℝ𝕊𝕋𝕌𝕍𝕎𝕏𝕐ℤ",
+        "𝗔𝗕𝗖𝗗𝗘𝗙𝗚𝗛𝗜𝗝𝗞𝗟𝗠𝗡𝗢𝗣𝗤𝗥𝗦𝗧𝗨𝗩𝗪𝗫𝗬𝗭"
     ]
 
     fonts = []
+
     while len(fonts) < 50:
         pre = "".join(random.choice(group) for group in pre_groups)
         post = "".join(random.choice(group) for group in post_groups)
-        style = random.choice(unicode_styles)
 
-        # فقط استایل‌های با طول برابر
-        if len(style[0]) != len(style[1]):
-            continue
+        uname = ""
+        for ch in name:
+            # فقط حروف انگلیسی جایگزین می‌شوند، بقیه بدون تغییر
+            if ch.lower() in "abcdefghijklmnopqrstuvwxyz":
+                style = random.choice(unicode_styles)
+                idx = "abcdefghijklmnopqrstuvwxyz".index(ch.lower())
+                # اگر طول استایل کمتر از 26 بود از همون حرف استفاده کن
+                if idx < len(style):
+                    uname += style[idx]
+                else:
+                    uname += ch
+            else:
+                uname += ch
 
-        uname = name.translate(str.maketrans(style[1], style[0]))
         fonts.append(f"{pre}{uname}{post}")
 
     return fonts
+
 # ======================= 📄 ساخت صفحات =======================
 def make_pages(name: str, fonts: list, page_size=10, max_pages=5):
     pages = []
