@@ -80,8 +80,8 @@ def process_group_message(user_id: int, chat_id: int, text: str):
     if not isinstance(recent_context, list):
         recent_context = []
 
-    # ترکیب آخرین ۳ پیام یا پیام فعلی
-    full_context = " ".join(recent_context[-3:]) if recent_context else text
+    # استفاده فقط از پیام فعلی برای پردازش (دیگر ترکیب سه پیام آخر انجام نمی‌شود)
+    full_context = text
 
     # تشخیص احساس و ثبت در حافظه احساسی
     current_emotion = detect_emotion(full_context)
