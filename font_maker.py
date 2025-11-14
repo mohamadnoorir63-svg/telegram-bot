@@ -1,18 +1,24 @@
 import random
+import asyncio
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, ConversationHandler
 
 ASK_NAME = 1
 
 
-# ======================= 🎨 شروع کار =======================
+# ======================= 🎨 تابع اصلی =======================
 async def font_maker(update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
     chat_type = update.effective_chat.type
 
-    # جلوگیری از استفاده داخل گروه
     if chat_type in ["group", "supergroup"]:
         msg = await update.message.reply_text("✨ لطفاً برای ساخت فونت، به پیوی ربات مراجعه کنید 🙏")
+        await asyncio.sleep(6)
+        try:
+            await msg.delete()
+            await update.message.delete()
+        except:
+            pass
         return ConversationHandler.END
 
     if text == "فونت":
@@ -32,41 +38,37 @@ async def receive_font_name(update, context: ContextTypes.DEFAULT_TYPE):
     return await send_fonts(update, context, name)
 
 
-# ======================= 💎 ساخت و ارسال فونت =======================
+# ======================= 💎 ارسال فونت‌ها =======================
 async def send_fonts(update, context, name):
     fonts = generate_fonts(name)
 
-    # متن معرفی
-    intro = f"🌺 فونت‌های ساخته‌شده برای «{name}»:\n\n"
-    await update.message.reply_text(intro)
+    context.user_data["all_fonts"] = fonts
+    context.user_data["font_pages"] = make_pages(name, fonts, 10, 5)
 
-    keyboard = []
-
-    # فقط 20 فونت ارسال می‌کنیم (قابل تغییر)
-    for style in fonts[:20]:
-        # دکمه‌ای که متنش همان فونت است
-        keyboard.append([InlineKeyboardButton(text=style, callback_data="copy_font")])
+    pages = context.user_data["font_pages"]
 
     await update.message.reply_text(
-        "روی هر فونت بزنید تا قابل کپی شود 🌸",
-        reply_markup=InlineKeyboardMarkup(keyboard)
+        pages[0]["text"],
+        parse_mode="HTML",
+        reply_markup=pages[0]["keyboard"]
     )
 
     return ConversationHandler.END
 
 
-# ======================= 🎭 تولید فونت =======================
+# ======================= 🎭 تولید فونت‌های شیک =======================
 def generate_fonts(name):
+
     pre_groups = [
-        ["𓄂", "𓆃", "𓃬", "𓋥", "𓄼", "𓂀", "𓅓"],
-        ["ꪰ", "ꪴ", "𝄠", "𝅔", "꧁", "꧂", "ꕥ"],
-        ["⚝", "☬", "☾", "☽", "★", "✦", "✧"]
+        ["𓄂","𓆃","𓃬","𓋥","𓄼","𓂀","𓅓"],
+        ["ꪰ","ꪴ","𝄠","𝅔","꧁","꧂","ꕥ"],
+        ["⚝","☬","☾","☽","★","✦","✧"]
     ]
 
     post_groups = [
-        ["✿", "♡", "❖", "░", "❋", "☯", "❂"],
-        ["✧", "✦", "❂", "★", "✺", "✶", "✸"],
-        ["⋆", "⟡", "❋", "•", "✾", "✢", "✤"]
+        ["✿","♡","❖","░","❋","☯","❂"],
+        ["✧","✦","❂","★","✺","✶","✸"],
+        ["⋆","⟡","❋","•","✾","✢","✤"]
     ]
 
     unicode_styles = [
@@ -84,9 +86,9 @@ def generate_fonts(name):
 
     fonts = []
 
-    for _ in range(30):
-        pre = "".join(random.choice(g) for g in pre_groups)
-        post = "".join(random.choice(g) for g in post_groups)
+    for _ in range(50):
+        pre = "".join(random.choice(group) for group in pre_groups)
+        post = "".join(random.choice(group) for group in post_groups)
 
         style = random.choice(unicode_styles)
         uname = name.translate(str.maketrans(style[1], style[0]))
@@ -94,3 +96,92 @@ def generate_fonts(name):
         fonts.append(f"{pre}{uname}{post}")
 
     return fonts
+
+
+# ======================= 📄 ساخت صفحات =======================
+def make_pages(name, fonts, page_size=10, max_pages=5):
+    pages = []
+    total_chunks = [fonts[i:i + page_size] for i in range(0, len(fonts), page_size)]
+    total_chunks = total_chunks[:max_pages]
+
+    for page_index, chunk in enumerate(total_chunks):
+
+        text = f"<b>↻ {name} ⇦</b>\n:• لیست فونت های پیشنهادی :\n"
+
+        keyboard = []
+
+        for i, style in enumerate(chunk, start=1):
+            global_index = page_index * page_size + (i - 1)
+            text += f"{i}- {style}\n"
+
+            # دکمه = ارسال مستقیم فونت
+            keyboard.append([
+                InlineKeyboardButton(
+                    f"{i}",  # دکمه فقط شماره باشد برای جلوگیری از خطا
+                    callback_data=f"copy_font_id_{global_index}"
+                )
+            ])
+
+        text += f"\n📄 صفحه {page_index + 1} از {len(total_chunks)}"
+
+        nav = []
+        if page_index > 0:
+            nav.append(InlineKeyboardButton("⬅️ قبلی", callback_data=f"prev_font_{page_index - 1}"))
+        if page_index < len(total_chunks) - 1:
+            nav.append(InlineKeyboardButton("➡️ بعدی", callback_data=f"next_font_{page_index + 1}"))
+
+        if nav:
+            keyboard.append(nav)
+
+        keyboard.append([InlineKeyboardButton("🔙 بازگشت", callback_data="feature_back")])
+
+        pages.append({
+            "text": text,
+            "keyboard": InlineKeyboardMarkup(keyboard)
+        })
+
+    return pages
+
+
+# ======================= 📋 هندلر کپی =======================
+async def copy_font(update, context: ContextTypes.DEFAULT_TYPE):
+    q = update.callback_query
+    await q.answer()
+
+    font_id = int(q.data.replace("copy_font_id_", ""))
+
+    all_fonts = context.user_data.get("all_fonts", [])
+
+    if font_id < len(all_fonts):
+        await q.message.reply_text(all_fonts[font_id])
+    else:
+        await q.message.reply_text("❗ فونت پیدا نشد.")
+
+
+# ======================= 🔁 صفحات =======================
+async def next_font(update, context):
+    q = update.callback_query
+    await q.answer()
+
+    index = int(q.data.replace("next_font_", ""))
+    pages = context.user_data["font_pages"]
+
+    await q.edit_message_text(
+        pages[index]["text"],
+        parse_mode="HTML",
+        reply_markup=pages[index]["keyboard"]
+    )
+
+
+async def prev_font(update, context):
+    q = update.callback_query
+    await q.answer()
+
+    index = int(q.data.replace("prev_font_", ""))
+    pages = context.user_data["font_pages"]
+
+    await q.edit_message_text(
+        pages[index]["text"],
+        parse_mode="HTML",
+        reply_markup=pages[index]["keyboard"]
+    )
