@@ -1028,12 +1028,12 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """پاسخ‌دهی اصلی هوش مصنوعی و سیستم یادگیری"""
 
-    # 🚫 جلوگیری از پاسخ هوشمند در صورت اجرای دستور سفارشی
+    # 🚫 جلوگیری از پاسخ در صورت دستور سفارشی
     if context.user_data.get("custom_handled"):
         context.user_data["custom_handled"] = False
         return
 
-    # 🧩 اطمینان از معتبر بودن پیام
+    # 🧩 پیام معتبر
     if not update.message or not update.message.text:
         return
 
@@ -1045,15 +1045,15 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # 🧠 ثبت پیام در حافظه کوتاه‌مدت
     context_memory.add_message(uid, text)
 
-    # 🚫 جلوگیری از پاسخ در پیوی (فقط جوک و فال مجازند)
+    # 🚫 جلوگیری از پاسخ در پیوی (به جز جوک و فال)
     if update.effective_chat.type == "private" and lower_text not in ["جوک", "فال"]:
         return
 
-    # 🚫 جلوگیری از پاسخ به “هوا” و “آب‌وهوا"
+    # 🚫 جلوگیری از پاسخ به هوا و آب‌وهوا
     if re.search(r"(هوای|آب[\s‌]*و[\s‌]*هوا)", text):
         return
 
-    # 🚫 جلوگیری از پاسخ به دستورات خاص
+    # 🚫 جلوگیری از پاسخ به دستورات محافظت‌شده
     protected_words = [
         "راهنما", "ثبت راهنما", "خوشامد", "ثبت خوشامد",
         "ربات", "save", "del", "panel", "backup", "cloudsync", "leave"
@@ -1061,14 +1061,14 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if any(lower_text.startswith(word) for word in protected_words):
         return
 
-    # 🧠 بررسی حالت ریپلی مود گروهی
+    # 🧠 بررسی ریپلی مود گروهی
     if await handle_group_reply_mode(update, context):
         return
 
-    # =============== گرفتن پاسخ اولیه از سیستم یادگیری ===============
+    # =================== تولید پاسخ ===================
     reply_text = process_group_message(uid, chat_id, text)
 
-    # =============== جلوگیری از ارسال پاسخ تکراری ===============
+    # =================== جلوگیری از تکرار ===================
     global _sent_messages_by_chat
     if '_sent_messages_by_chat' not in globals():
         _sent_messages_by_chat = {}
@@ -1076,32 +1076,30 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if chat_id not in _sent_messages_by_chat:
         _sent_messages_by_chat[chat_id] = []
 
-    attempts = 0
-    while reply_text in _sent_messages_by_chat[chat_id] and attempts < 20:
-        reply_text = process_group_message(uid, chat_id, text)
-        attempts += 1
+    # اگر پیام مشابه آخرین پیام ارسال شده است، پاسخ نده
+    if reply_text in _sent_messages_by_chat[chat_id]:
+        return
 
+    # ذخیره پیام جدید در لیست برای جلوگیری از تکرار
     _sent_messages_by_chat[chat_id].append(reply_text)
-
-    # جلوگیری از سنگین شدن
     if len(_sent_messages_by_chat[chat_id]) > 300:
         _sent_messages_by_chat[chat_id] = _sent_messages_by_chat[chat_id][-300:]
 
-    # =============== ارسال پیام نهایی ===============
+    # =================== ارسال پاسخ ===================
     if reply_text:
         await update.message.reply_text(reply_text)
 
-    # =============== ثبت کاربر و گروه ===============
+    # =================== ثبت کاربر و گروه ===================
     await register_user(update.effective_user)
     register_group_activity(chat_id, uid)
 
-    # =============== یادگیری هوشمند ===============
+    # =================== یادگیری هوشمند ===================
     if not status["locked"]:
         auto_learn_from_text(text)
 
     if not status["active"]:
         shadow_learn(text, "")
-        return
+         return
 
     # ✅ درصد هوش منطقی
     if text.lower() == "درصد هوش":
