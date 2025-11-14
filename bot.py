@@ -2325,6 +2325,7 @@ application.add_handler(font_handler, group=2)
 # صفحات
 application.add_handler(CallbackQueryHandler(next_font, pattern=r"^next_font_\d+$"), group=2)
 application.add_handler(CallbackQueryHandler(prev_font, pattern=r"^prev_font_\d+$"), group=2)
+application.add_handler(CallbackQueryHandler(feature_back, pattern=r"^feature_back$"), group=2)
 
 # ارسال فونت مستقیم
 application.add_handler(CallbackQueryHandler(send_selected_font, pattern=r"^send_font_\d+$"), group=2)
