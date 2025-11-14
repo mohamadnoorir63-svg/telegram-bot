@@ -73,25 +73,42 @@ def generate_fonts(name: str):
         "𝗔𝗕𝗖𝗗𝗘𝗙𝗚𝗛𝗜𝗝𝗞𝗟𝗠𝗡𝗢𝗣𝗤𝗥𝗦𝗧𝗨𝗩𝗪𝗫𝗬𝗭"
     ]
 
+    # ✅ اضافه کردن الگوهای ثابت
+    fixed_patterns = [
+        "𓄂{}𓆃",
+        "𓄂ꪴꪰ❨𝄠⃘۪۪۪۪۪۪ٜ♕{}♕𝄠⃘۪۪۪۪۪۪❩",
+        "𓄂ꪴꪰ ♕{}♕𓆃",
+        "𝄠⃘۪۪۪۪۪۪❩{}𝄠⃘۪۪۪۪۪۪❩"
+    ]
+
     fonts = []
 
     while len(fonts) < 50:
+        # 🟢 اول تصمیم بگیریم از ثابت استفاده کنیم یا نه
+        if random.random() < 0.3:  # 30٪ فونت‌ها از ثابت‌ها
+            pattern = random.choice(fixed_patterns)
+            style = random.choice(unicode_styles)
+            uname = ""
+            for ch in name:
+                if ch.lower() in "abcdefghijklmnopqrstuvwxyz":
+                    idx = "abcdefghijklmnopqrstuvwxyz".index(ch.lower())
+                    uname += style[idx]
+                else:
+                    uname += ch
+            fonts.append(pattern.format(uname))
+            continue  # برو سراغ فونت بعدی
+
+        # 🟢 فونت تصادفی با پیش و پس‌وند
         pre = "".join(random.choice(group) for group in pre_groups)
         post = "".join(random.choice(group) for group in post_groups)
-
-        # 🟢 کل اسم با یک استایل یکسان
         style = random.choice(unicode_styles)
         uname = ""
         for ch in name:
             if ch.lower() in "abcdefghijklmnopqrstuvwxyz":
                 idx = "abcdefghijklmnopqrstuvwxyz".index(ch.lower())
-                if idx < len(style):
-                    uname += style[idx]
-                else:
-                    uname += ch
+                uname += style[idx]
             else:
                 uname += ch
-
         fonts.append(f"{pre}{uname}{post}")
 
     return fonts
