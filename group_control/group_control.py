@@ -113,7 +113,6 @@ async def list_vips(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     vip_list = "\n".join([f"• <b>{uid}</b>" for uid in VIPS[cid]])
     await update.message.reply_text(f"🛡 لیست کاربران ویژه گروه:\n{vip_list}", parse_mode="HTML", quote=True)
-
 # ─────────────────────────────── مسیر فایل و لود قفل‌ها ───────────────────────────────
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
