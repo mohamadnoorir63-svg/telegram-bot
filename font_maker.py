@@ -101,20 +101,20 @@ def make_pages(name, fonts, page_size=10, max_pages=5):
     for page_index, chunk in enumerate(total_chunks):
         text = f"<b>↻ {name} ⇦</b>\n:• لیست فونت های پیشنهادی :\n"
 
-        # فقط لیست فونت‌ها بدون دکمه کپی
+        keyboard = []
+        # هر فونت خودش یک دکمه است که وقتی زده شود همان فونت ارسال می‌شود
         for i, style in enumerate(chunk, start=1):
+            global_index = page_index * page_size + (i - 1)
             text += f"{i}- {style}\n"
+            keyboard.append([InlineKeyboardButton(f"{i}", callback_data=f"send_font_{global_index}")])
 
         text += f"\n📄 صفحه {page_index + 1} از {len(total_chunks)}"
 
-        keyboard = []
         nav = []
-
         if page_index > 0:
             nav.append(InlineKeyboardButton("⬅️ قبلی", callback_data=f"prev_font_{page_index - 1}"))
         if page_index < len(total_chunks) - 1:
             nav.append(InlineKeyboardButton("➡️ بعدی", callback_data=f"next_font_{page_index + 1}"))
-
         if nav:
             keyboard.append(nav)
 
@@ -126,6 +126,19 @@ def make_pages(name, fonts, page_size=10, max_pages=5):
         })
 
     return pages
+
+# ======================= 📋 ارسال فونت منتخب =======================
+async def send_selected_font(update, context: ContextTypes.DEFAULT_TYPE):
+    q = update.callback_query
+    await q.answer()
+
+    font_id = int(q.data.replace("send_font_", ""))
+    all_fonts = context.user_data.get("all_fonts", [])
+
+    if font_id < len(all_fonts):
+        await q.message.reply_text(all_fonts[font_id])
+    else:
+        await q.message.reply_text("❗ فونت پیدا نشد.")
 
 # ======================= 🔁 صفحات =======================
 async def next_font(update, context):
