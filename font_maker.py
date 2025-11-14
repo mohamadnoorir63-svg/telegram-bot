@@ -1,7 +1,7 @@
 import random
 import asyncio
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
-from telegram.ext import ContextTypes, ConversationHandler, MessageHandler, CallbackQueryHandler, filters
+from telegram.ext import ContextTypes, ConversationHandler
 
 ASK_NAME = 1
 
@@ -10,7 +10,6 @@ async def font_maker(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
     chat_type = update.effective_chat.type
 
-    # جلوگیری از استفاده در گروه
     if chat_type in ["group", "supergroup"]:
         msg = await update.message.reply_text(
             "✨ لطفاً برای ساخت فونت، به پیوی ربات مراجعه کنید 🙏"
@@ -33,12 +32,10 @@ async def font_maker(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     return ConversationHandler.END
 
-
 # ======================= 🌸 دریافت اسم =======================
 async def receive_font_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
     name = update.message.text.strip()
     return await send_fonts(update, context, name)
-
 
 # ======================= 💎 ارسال فونت‌ها =======================
 async def send_fonts(update: Update, context: ContextTypes.DEFAULT_TYPE, name: str):
@@ -54,11 +51,10 @@ async def send_fonts(update: Update, context: ContextTypes.DEFAULT_TYPE, name: s
     )
     return ConversationHandler.END
 
-
-# ======================= 🎭 تولید فونت‌های شیک =======================
+# ======================= 🎭 تولید فونت‌های حرفه‌ای =======================
 def generate_fonts(name: str):
     pre_groups = [
-        ["𓄂","𓃬","𓋥","𓄼","𓂀","𓅓"],  # اصلاح شد
+        ["𓄂","𓃬","𓋥","𓄼","𓂀","𓅓"],
         ["ꪰ","ꪴ","𝄠","𝅔","꧁","꧂","ꕥ"],
         ["⚝","☬","☾","☽","★","✦","✧"]
     ]
@@ -75,9 +71,9 @@ def generate_fonts(name: str):
         ),
         (
             "🄰🄱🄲🄳🄴🄵🄶🄷🄸🄹🄺🄻🄼🄽🄾🄿🅀🅁🅂🅃🅄🅅🅆🅇🅈🅉"
-            "🄰🄱🄲🄳🄴🄵🄶🄷🄸🄹🄺🄻🄼🄽🄾🄿🅀🅁🅂🅃🅄🅅🅆🅇🅈🅉",
+            "🄰🄱🄲🄳🄴🄵🄶🄷🄸🄹🄺🄻🄼🄽🄾🄿🅀🅁🅂🅃🅄🅅🅆🅇🅈🅉"
+            "🅐🅑🅒🅓🅔🅕🅖🅗🅘🅙🅚🅛🅜🅝🅞🅟🅠🅡🅢🅣🅤🅥🅦🅧🅨🅩",
             "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
-            "🅐🅑🅒🅓🅔🅕🅖🅗🅘🅙🅚🅛🅜🅝🅞🅟🅠🅡🅢🅣🅤🅥🅦🅧🅨🅩"
         ),
         (
             "𝓐𝓑𝓒𝓓𝓔𝓕𝓖𝓗𝓘𝓙𝓚𝓛𝓜𝓝𝓞𝓟𝓠𝓡𝓢𝓣𝓤𝓥𝓦𝓧𝓨𝓩"
@@ -90,19 +86,22 @@ def generate_fonts(name: str):
             "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
         )
     ]
+
     fonts = []
 
     while len(fonts) < 50:
         pre = "".join(random.choice(group) for group in pre_groups)
         post = "".join(random.choice(group) for group in post_groups)
-        style = random.choice(unicode_styles)
-        if len(style[0]) != len(style[1]):
-            continue
-        uname = name.translate(str.maketrans(style[1], style[0]))
+
+        # 🟢 هر حرف یک استایل تصادفی از همه unicode_styles
+        uname = ""
+        for ch in name:
+            style = random.choice(unicode_styles)
+            uname += ch.translate(str.maketrans(style[1], style[0]))
+
         fonts.append(f"{pre}{uname}{post}")
 
     return fonts
-
 
 # ======================= 📄 ساخت صفحات =======================
 def make_pages(name: str, fonts: list, page_size=10, max_pages=5):
@@ -126,7 +125,6 @@ def make_pages(name: str, fonts: list, page_size=10, max_pages=5):
         pages.append({"text": text, "keyboard": InlineKeyboardMarkup(keyboard)})
     return pages
 
-
 # ======================= 📋 ارسال فونت انتخاب شده =======================
 async def send_selected_font(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -138,7 +136,6 @@ async def send_selected_font(update: Update, context: ContextTypes.DEFAULT_TYPE)
     else:
         await query.message.reply_text("❗ فونت پیدا نشد.")
 
-
 # ======================= 🔁 صفحات =======================
 async def next_font(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -148,7 +145,6 @@ async def next_font(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if 0 <= index < len(pages):
         await query.edit_message_text(pages[index]["text"], parse_mode="HTML", reply_markup=pages[index]["keyboard"])
 
-
 async def prev_font(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -156,7 +152,6 @@ async def prev_font(update: Update, context: ContextTypes.DEFAULT_TYPE):
     pages = context.user_data.get("font_pages", [])
     if 0 <= index < len(pages):
         await query.edit_message_text(pages[index]["text"], parse_mode="HTML", reply_markup=pages[index]["keyboard"])
-
 
 # ======================= 🎛 بازگشت به منوی اصلی =======================
 async def feature_back(update: Update, context: ContextTypes.DEFAULT_TYPE):
