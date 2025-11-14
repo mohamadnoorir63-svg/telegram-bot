@@ -149,7 +149,16 @@ async def prev_font(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 # ======================= 🎛 بازگشت به منوی اصلی =======================
+# ======================= 🎛 بازگشت به منوی اصلی =======================
 async def feature_back(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    await query.message.reply_text("🔙 بازگشت به منوی اصلی (پنل اصلی در bot.py هندل می‌شود)")
+
+    # حذف یا ویرایش پیام فعلی فونت
+    try:
+        await query.message.delete()
+    except:
+        pass
+
+    # پایان ConversationHandler (اگه در حین ConversationHandler هستیم)
+    return ConversationHandler.END
