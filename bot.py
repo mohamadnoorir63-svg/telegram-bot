@@ -1426,34 +1426,43 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(list_phrases(), parse_mode="HTML")
         return
         # ✅ حذف جمله یا جملات از حافظه
-    if text.startswith("حذف جمله"):
-        phrase = text.replace("حذف جمله ", "").strip()
-
-        if not phrase:
-            await update.message.reply_text(
-                "❗ لطفاً جمله‌ای برای حذف جمله بنویس.\n\n"
-                "📘 مثال:\n"
-                "<code>حذف جمله سلام</code>\n"
-                "یا برای حذف چند جمله مشابه:\n"
-                "<code>حذف جمله سلام*</code>",
-                parse_mode="HTML"
-            )
-            return
-            # ✅ حذف پاسخ مشخص
-    if text.startswith("حذف پاسخ "):
-        response_text = text.replace("حذف پاسخ ", "").strip()
-        if not response_text:
-            await update.message.reply_text(
-                "❗ لطفاً متنی برای حذف پاسخ بنویس.\n\n"
-                "📘 مثال:\n"
-                "<code>حذف پاسخ علیک</code>",
-                parse_mode="HTML"
-            )
-            return
-
-        msg = delete_response(response_text)  # از تابعی که اضافه کردی
-        await update.message.reply_text(msg, parse_mode="HTML")
+if text.startswith("حذف جمله"):
+    phrase = text[len("حذف جمله"):].strip()  # مطمئن می‌شویم فاصله اضافی حذف شود
+    if not phrase:
+        await update.message.reply_text(
+            "❗ لطفاً جمله‌ای برای حذف جمله بنویس.\n\n"
+            "📘 مثال:\n"
+            "<code>حذف جمله سلام</code>\n"
+            "یا برای حذف چند جمله مشابه:\n"
+            "<code>حذف جمله سلام*</code>",
+            parse_mode="HTML"
+        )
         return
+
+    # بررسی ستاره برای حذف جزئی
+    partial = False
+    if phrase.endswith("*"):
+        partial = True
+        phrase = phrase[:-1].strip()
+
+    msg = delete_phrase(phrase, partial=partial)
+    await update.message.reply_text(msg, parse_mode="HTML")
+    return
+    # ✅ حذف پاسخ مشخص
+if text.startswith("حذف پاسخ "):
+    response_text = text[len("حذف پاسخ"):].strip()
+    if not response_text:
+        await update.message.reply_text(
+            "❗ لطفاً متنی برای حذف پاسخ بنویس.\n\n"
+            "📘 مثال:\n"
+            "<code>حذف پاسخ علیک</code>",
+            parse_mode="HTML"
+        )
+        return
+
+    msg = delete_response(response_text)
+    await update.message.reply_text(msg, parse_mode="HTML")
+    return
 
         # اگر کاربر ستاره گذاشته باشد یعنی حذف جزئی (partial)
         partial = phrase.endswith("*")
