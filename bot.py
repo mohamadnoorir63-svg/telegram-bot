@@ -1046,10 +1046,9 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # 🧠 گرفتن کل تاریخچه اخیر کاربر
     recent_context = context_memory.get_context(uid)
-
-    # 🧩 ترکیب سه پیام آخر برای درک بهتر ادامه گفتگو
-    #full_context = " ".join(recent_context[-3:]) if recent_context else text
-
+    # استفاده فقط از پیام فعلی برای پاسخ، بدون ترکیب
+    full_context = text
+    
     lower_text = text.lower()
 
     # 🚫 جلوگیری از پاسخ در پیوی (فقط جوک و فال مجازند)
