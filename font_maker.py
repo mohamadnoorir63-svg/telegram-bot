@@ -53,52 +53,47 @@ async def send_fonts(update, context, name):
         )
     return ConversationHandler.END
 
-# ======================= 🎭 تولید فونت‌های شلوغ و فانتزی =======================
+# ======================= 🎭 تولید فونت‌های فوق شلوغ =======================
 def generate_fonts(name):
     # ---------------- مجموعه گسترده نمادها ----------------
-    fancy_symbols = [
-        "𓄂", "𓃬", "𓆃", "𓋥", "ꪰ", "ꪴ", "𝅔", "𝆭", "⸨", "⸩", "༒", "⚝", "☬", "❁", "☾", "☽",
-        "✿", "♡", "░", "❖", "★", "✧", "✦", "❂", "✺", "⋆", "⟡", "❋", "•", "★", "♛", "♚", "☯", "⚡",
-        "🜂", "🜄", "🜃", "🜁", "✪", "✯", "✰", "☘", "⚜", "✵", "☀", "☁", "☂", "☃", "☄"
+    symbols = [
+        "𓄂","𓃬","𓆃","𓋥","ꪰ","ꪴ","𝅔","𝆭","⸨","⸩","༒","⚝","☬","❁","☾","☽",
+        "✿","♡","░","❖","★","✧","✦","❂","✺","⋆","⟡","❋","•","★","♛","♚","☯","⚡",
+        "🜂","🜄","🜃","🜁","✪","✯","✰","☘","⚜","✵","☀","☁","☂","☃","☄","❨","❩",
+        "⃘","۪","ٜ","♕","𝄠"
     ]
 
-    # ---------------- فونت فارسی ----------------
-    farsi_fonts = [f"{random.choice(fancy_symbols)} {name} {random.choice(fancy_symbols)}" for _ in range(25)]
-    farsi_fonts += [
-        f"『{name}』", f"〘{name}〙", f"⌜{name}⌝", f"•{name}•", f"{name}ــ",
-        f"︵‿︵‿︵‿{name}", f"𓆩♡𓆪 {name} 𓆩♡𓆪"
+    # ---------------- فونت‌های یونیکد برای اسم ----------------
+    unicode_styles = [
+        ("𝐀𝐁𝐂𝐃𝐄𝐅𝐆𝐇𝐈𝐉𝐊𝐋𝐌𝐍𝐎𝐏𝐐𝐑𝐒𝐓𝐔𝐕𝑾𝑿𝒀𝒁","ABCDEFGHIJKLMNOPQRSTUVWXYZ"),
+        ("𝓐𝓑𝓒𝓓𝓔𝓕𝓖𝓗𝓘𝓙𝓚𝓛𝓜𝓝𝓞𝓟𝓠𝓡𝓢𝓣𝓤𝓥𝓦𝓧𝓨𝓩","ABCDEFGHIJKLMNOPQRSTUVWXYZ"),
+        ("𝔄𝔅ℭ𝔇𝔈𝔉𝔊ℌℑ𝔍𝔎𝔏𝔐𝔑𝔒𝔓𝔔ℜ𝔖𝔗𝔘𝔙𝔚𝔛𝔜ℨ","ABCDEFGHIJKLMNOPQRSTUVWXYZ"),
+        ("🄰🄱🄲🄳🄴🄵🄶🄷🄸🄹🄺🄻🄼🄽🄾🄿🅀🅁🅂🅃🅄🅅🅆🅇🅈🅉","ABCDEFGHIJKLMNOPQRSTUVWXYZ")
     ]
 
-    # ---------------- فونت انگلیسی ----------------
-    english_styles = [
-        ("𝐀𝐁𝐂𝐃𝐄𝐅𝐆𝐇𝐈𝐉𝐊𝐋𝐌𝐍𝐎𝐏𝐐𝐑𝐒𝐓𝐔𝐕𝑾𝑿𝒀𝒁", "ABCDEFGHIJKLMNOPQRSTUVWXYZ"),
-        ("𝓐𝓑𝓒𝓓𝓔𝓕𝓖𝓗𝓘𝓙𝓚𝓛𝓜𝓝𝓞𝓟𝓠𝓡𝓢𝓣𝓤𝓥𝓦𝓧𝓨𝓩", "ABCDEFGHIJKLMNOPQRSTUVWXYZ"),
-        ("𝔄𝔅ℭ𝔇𝔈𝔉𝔊ℌℑ𝔍𝔎𝔏𝔐𝔑𝔒𝔓𝔔ℜ𝔖𝔗𝔘𝔙𝔚𝔛𝔜ℨ", "ABCDEFGHIJKLMNOPQRSTUVWXYZ"),
-        ("🄰🄱🄲🄳🄴🄵🄶🄷🄸🄹🄺🄻🄼🄽🄾🄿🅀🅁🅂🅃🅄🅅🅆🅇🅈🅉", "ABCDEFGHIJKLMNOPQRSTUVWXYZ")
-    ]
+    # ---------------- تولید فونت‌ها ----------------
+    fonts = []
+    for _ in range(50):  # تولید ۵۰ فونت شلوغ
+        # انتخاب چند نماد قبل و بعد اسم
+        pre = "".join(random.choices(symbols, k=random.randint(2,5)))
+        post = "".join(random.choices(symbols, k=random.randint(2,5)))
 
-    english_fonts = []
-    for uni, orig in english_styles:
-        trans = str.maketrans(orig + orig.lower(), uni + orig.lower())
-        translated = name.translate(trans)
-        for _ in range(5):
-            sym1 = random.choice(fancy_symbols)
-            sym2 = random.choice(fancy_symbols)
-            english_fonts.append(f"{sym1}{translated}{sym2}")
-            english_fonts.append(f"{translated}{sym2}")
-        english_fonts.append(translated)
+        # انتخاب فونت یونیکد روی اسم
+        style = random.choice(unicode_styles)
+        trans = str.maketrans(style[1]+style[1].lower(), style[0]+style[1].lower())
+        uname = name.translate(trans)
 
-    # ---------------- ترکیب و شلوغ سازی ----------------
-    all_fonts = farsi_fonts + english_fonts
-    random.shuffle(all_fonts)
+        # ترکیب چندلایه: قبل + اسم یونیکد + بعد
+        final_font = f"{pre}{uname}{post}"
+        fonts.append(final_font)
 
-    # ---------------- تقسیم به صفحات ----------------
-    return make_pages(name, all_fonts, page_size=10, max_pages=5)
+    random.shuffle(fonts)
+    return make_pages(name, fonts, page_size=10, max_pages=5)
 
 # ======================= 📄 تقسیم فونت‌ها به صفحات با دکمه کپی =======================
-def make_pages(name, all_fonts, page_size=10, max_pages=5):
+def make_pages(name, fonts, page_size=10, max_pages=5):
     pages = []
-    chunks = [all_fonts[i:i + page_size] for i in range(0, len(all_fonts), page_size)]
+    chunks = [fonts[i:i + page_size] for i in range(0, len(fonts), page_size)]
     if len(chunks) > max_pages:
         chunks = chunks[:max_pages]
 
@@ -108,7 +103,6 @@ def make_pages(name, all_fonts, page_size=10, max_pages=5):
 
         for i, style in enumerate(chunk, start=1):
             text += f"{i}- {style}\n"
-            # دکمه کپی فوری
             keyboard.append([InlineKeyboardButton(f"📋 کپی {i}", callback_data=f"copy_font:{style}")])
 
         text += f"\n📄 صفحه {idx + 1} از {len(chunks)}"
@@ -136,7 +130,7 @@ async def copy_font(update, context: ContextTypes.DEFAULT_TYPE):
     font_text = query.data.split(":", 1)[1]
     await query.message.reply_text(f"📋 فونت کپی شد:\n{font_text}")
 
-# ======================= 🔁 هندلر صفحات بعدی و قبلی =======================
+# ======================= 🔁 هندلر صفحات =======================
 async def next_font(update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
