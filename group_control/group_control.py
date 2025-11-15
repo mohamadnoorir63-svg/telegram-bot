@@ -48,7 +48,24 @@ async def _has_full_access(context, chat_id: int, user_id: int) -> bool:
     return False
 
 # ─────────────────────────────── دستور VIP ───────────────────────────────
-async def set_vip(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+# ─────────────────────────────── مسیر فایل و لود قفل‌ها ───────────────────────────────
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+LOCK_FILE = os.path.join(BASE_DIR, "group_locks.json")
+
+if not os.path.exists(LOCK_FILE):
+    with open(LOCK_FILE, "w", encoding="utf-8") as f:
+        json.dump({}, f, ensure_ascii=False, indent=2)
+
+def _load_json(path, default=None):
+    try:
+        if os.path.exists(path):
+            with open(path, "r", encoding="utf-8") as f:
+                return json.load(f)
+    except Exception as e:
+        print(f"[⚠️] خطا در خواندن {path}: {e}")
+    return defaasync def set_vip(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """اضافه کردن کاربر به VIP"""
     chat = update.effective_chat
     user = update.effective_user
@@ -56,7 +73,7 @@ async def set_vip(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await _has_full_access(context, chat.id, user.id):
         return await update.message.reply_text("🚫 فقط مدیران یا سودوها مجازند.", quote=True)
 
-    # اگر پیام ریپلی شده است، آیدی از پیام ریپلی گرفته شود
+    # اگر پیام ریپلی شده است
     if update.message.reply_to_message:
         target_id = update.message.reply_to_message.from_user.id
     else:
@@ -78,13 +95,20 @@ async def set_vip(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     VIPS[cid].append(target_id)
     _save_vips()
-    await update.message.reply_text(f"✅ کاربر <b>{target_id}</b> به ویژه‌ها اضافه شد.", parse_mode="HTML", quote=True)
-    async def remove_vip(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    await update.message.reply_text(
+        f"✅ کاربر <b>{target_id}</b> به ویژه‌ها اضافه شد.",
+        parse_mode="HTML",
+        quote=True
+    )
+
+
+
+async def remove_vip(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """حذف کاربر از VIP"""
     chat = update.effective_chat
     user = update.effective_user
 
-    # فقط مدیر / سودو / VIP کامل اجازه دارد
     if not await _has_full_access(context, chat.id, user.id):
         return await update.message.reply_text("🚫 فقط مدیران یا سودوها مجازند.", quote=True)
 
@@ -113,24 +137,7 @@ async def set_vip(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"❎ کاربر <b>{target_id}</b> از لیست ویژه حذف شد.",
         parse_mode="HTML",
         quote=True
-    )
-# ─────────────────────────────── مسیر فایل و لود قفل‌ها ───────────────────────────────
-
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-LOCK_FILE = os.path.join(BASE_DIR, "group_locks.json")
-
-if not os.path.exists(LOCK_FILE):
-    with open(LOCK_FILE, "w", encoding="utf-8") as f:
-        json.dump({}, f, ensure_ascii=False, indent=2)
-
-def _load_json(path, default=None):
-    try:
-        if os.path.exists(path):
-            with open(path, "r", encoding="utf-8") as f:
-                return json.load(f)
-    except Exception as e:
-        print(f"[⚠️] خطا در خواندن {path}: {e}")
-    return default or {}
+    )ult or {}
 
 def _save_json(path, data):
     try:
