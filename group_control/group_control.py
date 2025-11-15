@@ -609,44 +609,62 @@ def _set_lock(chat_id: int, key: str, status: bool):
     LOCKS.setdefault(str(chat_id), {})[key] = bool(status)
     _save_json(LOCK_FILE, LOCKS)
 
-async def handle_lock(update: Update, context: ContextTypes.DEFAULT_TYPE, key: str):
+# ───────────── قفل گروه بدون تغییر سایر پرمیشن‌ها ─────────────
+async def lock_group(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat = update.effective_chat
     user = update.effective_user
 
-    if not await _has_full_access(context, chat.id, user.id):
-        msg = await update.message.reply_text("🚫 فقط مدیران یا سودوها مجازند.")
-        await asyncio.sleep(10)
-        await msg.delete()
-        await update.message.delete()
-        return
+    # فقط پیام‌های متنی رو ببند، بقیه چیزها بدون تغییر بمونن
+    locks = _get_locks(chat.id)
+    can_send_media = not any(locks.get(k, False) for k in ["photos", "videos", "files", "voices", "stickers", "gifs", "media"])
+    
+    permissions = ChatPermissions(
+        can_send_messages=False,        # پیام متنی بسته
+        can_send_media_messages=can_send_media,
+        can_send_polls=True,
+        can_send_other_messages=True,
+        can_add_web_page_previews=True,
+        can_change_info=False,
+        can_invite_users=True,
+        can_pin_messages=False
+    )
 
-    if _is_locked(chat.id, key):
-        msg = await update.message.reply_text(f"🔒 قفل {LOCK_TYPES.get(key, key)} از قبل فعال است.")
-        await asyncio.sleep(10)
-        await msg.delete()
-        await update.message.delete()
-        return
-
-    # فعال کردن قفل
-    _set_lock(chat.id, key, True)
-
-    # اگر قفل مدیا باشد، پرمیشن‌ها را ببند
-    if key in ["photos", "videos", "files", "voices", "stickers", "gifs", "media"]:
-        permissions = ChatPermissions(
-            can_send_messages=True,
-            can_send_media_messages=False,
-            can_send_polls=True,
-            can_send_other_messages=False,
-            can_add_web_page_previews=False,
-            can_change_info=False,
-            can_invite_users=True,
-            can_pin_messages=False
-        )
-        await context.bot.set_chat_permissions(chat.id, permissions)
+    await context.bot.set_chat_permissions(chat.id, permissions)
 
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     msg = await update.message.reply_text(
-        f"🔒 قفل {LOCK_TYPES.get(key, key)} توسط <b>{user.first_name}</b> فعال شد.\n🕓 زمان: {now}",
+        f"🔒 گروه توسط <b>{user.first_name}</b> تا اطلاع ثانوی قفل شد.\n🕓 زمان: {now}",
+        parse_mode="HTML"
+    )
+    await asyncio.sleep(10)
+    await msg.delete()
+    await update.message.delete()
+
+
+async def unlock_group(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat = update.effective_chat
+    user = update.effective_user
+
+    # فقط پیام‌های متنی رو باز کن، بقیه پرمیشن‌ها بدون تغییر بمونن
+    locks = _get_locks(chat.id)
+    can_send_media = not any(locks.get(k, False) for k in ["photos", "videos", "files", "voices", "stickers", "gifs", "media"])
+
+    permissions = ChatPermissions(
+        can_send_messages=True,         # پیام متنی باز
+        can_send_media_messages=can_send_media,
+        can_send_polls=True,
+        can_send_other_messages=True,
+        can_add_web_page_previews=True,
+        can_change_info=False,
+        can_invite_users=True,
+        can_pin_messages=False
+    )
+
+    await context.bot.set_chat_permissions(chat.id, permissions)
+
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    msg = await update.message.reply_text(
+        f"🔓 گروه توسط <b>{user.first_name}</b> باز شد.\n🕓 زمان: {now}",
         parse_mode="HTML"
     )
     await asyncio.sleep(10)
@@ -665,29 +683,36 @@ async def handle_unlock(update: Update, context: ContextTypes.DEFAULT_TYPE, key:
         await update.message.delete()
         return
 
-    if not _is_locked(chat.id, key):
-        msg = await update.message.reply_text(f"🔓 قفل {LOCK_TYPES.get(key, key)} از قبل باز است.")
-        await asyncio.sleep(10)
-        await msg.delete()
-        await update.message.delete()
-        return
-
-    # باز کردن قفل
-    _set_lock(chat.id, key, False)
-
-    # اگر قفل مدیا بود، پرمیشن‌ها را باز کن
+    # اگر مدیاست، حتما پرمیشن را باز کن حتی اگر از قبل باز باشد
     if key in ["photos", "videos", "files", "voices", "stickers", "gifs", "media"]:
-        permissions = ChatPermissions(
-            can_send_messages=True,
-            can_send_media_messages=True,
-            can_send_polls=True,
-            can_send_other_messages=True,
-            can_add_web_page_previews=True,
-            can_change_info=False,
-            can_invite_users=True,
-            can_pin_messages=False
-        )
-        await context.bot.set_chat_permissions(chat.id, permissions)
+        try:
+            chat_member = await context.bot.get_chat(chat.id)
+            current_permissions = chat_member.permissions or ChatPermissions(
+                can_send_messages=True,
+                can_send_media_messages=False,
+                can_send_polls=True,
+                can_send_other_messages=True,
+                can_add_web_page_previews=True,
+                can_change_info=False,
+                can_invite_users=True,
+                can_pin_messages=False
+            )
+            new_permissions = ChatPermissions(
+                can_send_messages=current_permissions.can_send_messages,
+                can_send_media_messages=True,  # حتما مدیا باز شود
+                can_send_polls=current_permissions.can_send_polls,
+                can_send_other_messages=current_permissions.can_send_other_messages,
+                can_add_web_page_previews=current_permissions.can_add_web_page_previews,
+                can_change_info=current_permissions.can_change_info,
+                can_invite_users=current_permissions.can_invite_users,
+                can_pin_messages=current_permissions.can_pin_messages
+            )
+            await context.bot.set_chat_permissions(chat.id, new_permissions)
+        except Exception as e:
+            print(f"[Unlock Media Error] {e}")
+
+    # حالا وضعیت قفل را در حافظه False کن
+    _set_lock(chat.id, key, False)
 
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     msg = await update.message.reply_text(
