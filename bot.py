@@ -581,6 +581,7 @@ async def fullstats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         await update.message.reply_text(f"⚠️ خطا در آمار گروه‌ها:\n{e}")
 # ======================= 👋 سیستم خوشامد پویا برای هر گروه =======================
+# ======================= 👋 سیستم خوشامد پویا برای هر گروه =======================
 
 from telegram import InlineKeyboardMarkup, InlineKeyboardButton, Update
 from telegram.ext import ContextTypes
@@ -590,7 +591,7 @@ import jdatetime  # ✅ برای تاریخ شمسی
 
 WELCOME_FILE = "welcome_settings.json"
 
-# ✅ بارگذاری و ذخیره‌سازی تنظیمات
+# ====================== بارگذاری و ذخیره‌سازی تنظیمات ======================
 def load_welcome_settings():
     if os.path.exists(WELCOME_FILE):
         try:
@@ -606,20 +607,17 @@ def save_welcome_settings(data):
 
 welcome_settings = load_welcome_settings()
 
-# ✅ خوشامد پیش‌فرض
+# ====================== خوشامد پیش‌فرض ======================
 DEFAULT_WELCOME_TEXT = (
     "سلام {name} عزیز 🌻\n"
     "به گروه {group} خوش آمدی!\n\n"
     "⏰ ساعت ›› {time}"
 )
 
-# ✅ تابع کمکی برای ساخت تاریخ شمسی زیبا
+# ====================== تابع کمکی برای ساخت تاریخ شمسی ======================
 def get_persian_time():
     now = jdatetime.datetime.now()
-    days = [
-        "دوشنبه", "سه‌شنبه", "چهارشنبه",
-        "پنج‌شنبه", "جمعه", "شنبه", "یک‌شنبه"
-    ]
+    days = ["دوشنبه", "سه‌شنبه", "چهارشنبه", "پنج‌شنبه", "جمعه", "شنبه", "یک‌شنبه"]
     months = [
         "فروردین", "اردیبهشت", "خرداد", "تیر",
         "مرداد", "شهریور", "مهر", "آبان",
@@ -630,7 +628,7 @@ def get_persian_time():
     time_str = now.strftime("%H:%M")
     return f"{time_str} ( {date_str} )"
 
-# ✅ سازنده کیبورد پنل
+# ====================== سازنده کیبورد پنل ======================
 def build_welcome_keyboard():
     return InlineKeyboardMarkup([
         [
@@ -639,7 +637,7 @@ def build_welcome_keyboard():
         ],
         [
             InlineKeyboardButton("📜 تنظیم متن", callback_data="welcome_text"),
-            InlineKeyboardButton("🖼 تنظیم عکس", callback_data="welcome_media")
+            InlineKeyboardButton("🖼 تنظیم رسانه", callback_data="welcome_media")
         ],
         [
             InlineKeyboardButton("📎 لینک قوانین", callback_data="welcome_rules"),
@@ -653,15 +651,16 @@ def build_welcome_keyboard():
         ]
     ])
 
-# ✅ پنل تنظیم خوشامد
+# ====================== پنل تنظیم خوشامد ======================
 async def open_welcome_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     is_callback = bool(getattr(update, "callback_query", None))
     chat = update.effective_chat if update.effective_chat else update.callback_query.message.chat
     user = update.effective_user
 
+    # بررسی دسترسی (مدیر یا سودو)
     member = await context.bot.get_chat_member(chat.id, user.id)
-    if member.status not in ["administrator", "creator"] and user.id not in SUDO_IDS and user.id != ADMIN_ID:
-        text = "⛔ فقط مدیران، سودوها یا ادمین اصلی می‌تونن خوشامد رو تنظیم کنن!"
+    if member.status not in ["administrator", "creator"]:
+        text = "⛔ فقط مدیران می‌توانند خوشامد را تنظیم کنند!"
         if is_callback:
             return await update.callback_query.answer(text, show_alert=True)
         else:
@@ -678,29 +677,22 @@ async def open_welcome_panel(update: Update, context: ContextTypes.DEFAULT_TYPE)
     save_welcome_settings(welcome_settings)
 
     panel_text = (
-        "👋 <b>پنل تنظیم خوشامد خنگول</b>\n"
+        "👋 <b>پنل تنظیم خوشامد پویا</b>\n"
         "━━━━━━━━━━━━━━━━━━━━━━\n"
         "از گزینه‌های زیر برای تنظیم پیام خوشامد استفاده کن 👇\n\n"
-        "💡 <i>می‌تونی متن، عکس، زمان حذف یا لینک قوانین رو تغییر بدی</i>"
+        "💡 <i>می‌تونی متن، رسانه، زمان حذف یا لینک قوانین را تغییر بدی</i>"
     )
-
     keyboard = build_welcome_keyboard()
 
     if is_callback:
         try:
-            return await update.callback_query.edit_message_text(
-                panel_text, parse_mode="HTML", reply_markup=keyboard
-            )
+            await update.callback_query.edit_message_text(panel_text, parse_mode="HTML", reply_markup=keyboard)
         except:
-            return await context.bot.send_message(
-                chat_id=chat.id, text=panel_text, parse_mode="HTML", reply_markup=keyboard
-            )
+            await context.bot.send_message(chat_id=chat.id, text=panel_text, parse_mode="HTML", reply_markup=keyboard)
     else:
-        return await update.message.reply_text(
-            panel_text, parse_mode="HTML", reply_markup=keyboard
-        )
+        await update.message.reply_text(panel_text, parse_mode="HTML", reply_markup=keyboard)
 
-# ✅ کنترل دکمه‌های پنل خوشامد
+# ====================== کنترل دکمه‌های پنل خوشامد ======================
 async def welcome_panel_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     chat_id = str(query.message.chat.id)
@@ -731,7 +723,7 @@ async def welcome_panel_buttons(update: Update, context: ContextTypes.DEFAULT_TY
         msg = "📜 لطفاً متن جدید خوشامد را ارسال کن.\nمثلاً:\nسلام {name} خوش اومدی 🌻"
         context.user_data["set_mode"] = "text"
     elif data == "welcome_media":
-        msg = "🖼 لطفاً عکس یا گیف خوشامد را بفرست تا ذخیره شود."
+        msg = "🖼 لطفاً عکس، گیف یا ویدیو خوشامد را بفرست تا ذخیره شود."
         context.user_data["set_mode"] = "media"
     elif data == "welcome_rules":
         msg = "📎 لینک قوانین گروه را بفرست (مثلاً https://t.me/example)"
@@ -741,20 +733,10 @@ async def welcome_panel_buttons(update: Update, context: ContextTypes.DEFAULT_TY
         context.user_data["set_mode"] = "timer"
     elif data == "welcome_preview":
         now = get_persian_time()
-        sample = cfg.get("text", DEFAULT_WELCOME_TEXT).format(
-            name="مهران",
-            group="گروه تست",
-            time=now
-        )
+        sample = cfg.get("text", DEFAULT_WELCOME_TEXT).format(name="مهران", group="گروه تست", time=now)
         msg = f"👀 <b>پیش‌نمایش پیام خوشامد:</b>\n\n{sample}"
     elif data == "welcome_back":
         return await open_welcome_panel(update, context)
-    elif data == "Tastatur_back":
-        from panels.panel_menu import panel_menu
-        fake_update = type("FakeUpdate", (), {"message": query.message, "callback_query": query})()
-        return await panel_menu(fake_update, context)
-    elif data == "welcome_close":
-        return await query.message.delete()
 
     save_welcome_settings(welcome_settings)
     try:
@@ -762,7 +744,7 @@ async def welcome_panel_buttons(update: Update, context: ContextTypes.DEFAULT_TY
     except:
         pass
 
-# ✅ دریافت ورودی‌ها
+# ====================== دریافت ورودی‌ها ======================
 async def welcome_input_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = str(update.effective_chat.id)
     mode = context.user_data.get("set_mode")
@@ -786,29 +768,22 @@ async def welcome_input_handler(update: Update, context: ContextTypes.DEFAULT_TY
         except:
             msg = "⚠️ عدد معتبر بفرست!"
     elif mode == "media":
-        elif mode == "media":
-    file_id = None
-    if update.message.photo:
-        file_id = update.message.photo[-1].file_id
-    elif update.message.animation:
-        file_id = update.message.animation.file_id
-    elif update.message.document:
-        if update.message.document.mime_type.startswith("image/") or update.message.document.mime_type == "video/mp4" or update.message.document.mime_type == "image/gif":
-            file_id = update.message.document.file_id
-
-    if not file_id:
-        return await update.message.reply_text("⚠️ فقط عکس، گیف یا ویدیو قابل قبول است!")
-
-    welcome_settings[chat_id]["media"] = file_id
-    msg = "✅ رسانه خوشامد ذخیره شد!"
+        if update.message.photo:
+            file_id = update.message.photo[-1].file_id
+        elif update.message.animation:
+            file_id = update.message.animation.file_id
+        elif update.message.video:
+            file_id = update.message.video.file_id
+        else:
+            return await update.message.reply_text("⚠️ فقط عکس، گیف یا ویدیو قابل قبول است!")
         welcome_settings[chat_id]["media"] = file_id
-        msg = "✅ عکس خوشامد ذخیره شد!"
+        msg = "✅ رسانه خوشامد ذخیره شد!"
 
     save_welcome_settings(welcome_settings)
     context.user_data["set_mode"] = None
     await update.message.reply_text(msg)
 
-# ✅ خوشامد هنگام ورود کاربر (با زمان شمسی)
+# ====================== خوشامد هنگام ورود کاربر ======================
 async def welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = str(update.effective_chat.id)
     cfg = welcome_settings.get(chat_id, {"enabled": True})
@@ -822,36 +797,22 @@ async def welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     for member in update.message.new_chat_members:
         now = get_persian_time()
-        message_text = text.format(
-            name=member.first_name,
-            group=update.effective_chat.title,
-            time=now
-        )
+        message_text = text.format(name=member.first_name, group=update.effective_chat.title, time=now)
 
         if rules:
             message_text += f"\n\n📜 <a href='{rules}'>مشاهده قوانین گروه</a>"
 
         try:
-            msg = None
             if media:
-                # بررسی نوع رسانه
-                if isinstance(media, str):
-                    # اگر فایل ذخیره شده به صورت file_id باشد
-                    # سعی می‌کنیم عکس یا گیف را ارسال کنیم
-                    try:
-                        msg = await update.message.reply_photo(media, caption=message_text, parse_mode="HTML")
-                    except:
-                        try:
-                            msg = await update.message.reply_animation(media, caption=message_text, parse_mode="HTML")
-                        except:
-                            msg = await update.message.reply_video(media, caption=message_text, parse_mode="HTML")
+                # تشخیص نوع رسانه
+                if media.endswith(".mp4") or media.startswith("BQAD"):  # ویدیو یا file_id
+                    msg = await update.message.reply_video(media, caption=message_text, parse_mode="HTML")
                 else:
-                    # اگر media شی دیگری بود
                     msg = await update.message.reply_photo(media, caption=message_text, parse_mode="HTML")
             else:
                 msg = await update.message.reply_text(message_text, parse_mode="HTML")
 
-            if delete_after > 0 and msg:
+            if delete_after > 0:
                 await asyncio.sleep(delete_after)
                 try:
                     await context.bot.delete_message(chat_id=update.effective_chat.id, message_id=msg.message_id)
@@ -859,7 +820,6 @@ async def welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     pass
         except Exception as e:
             print(f"[WELCOME ERROR] {e}")
-
 # ======================= ☁️ بک‌آپ خودکار و دستی (نسخه هماهنگ با bot.py) =======================
 import os
 import zipfile
