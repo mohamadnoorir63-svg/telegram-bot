@@ -3,7 +3,28 @@ from telegram import ChatPermissions, Update
 from telegram.ext import MessageHandler, filters, ContextTypes
 
 
-# ─────────────────────────────── قفل کردن گروه ───────────────────────────────
+def safe_permissions(chat):
+    """
+    اگر chat.permissions خالی بود، یک نسخه پیش‌فرض با تمام True برمی‌گرداند.
+    """
+    p = chat.permissions
+    if p is None:
+        return ChatPermissions(
+            can_send_messages=True,
+            can_send_media_messages=True,
+            can_send_other_messages=True,
+            can_add_web_page_previews=True,
+            can_send_photos=True,
+            can_send_videos=True,
+            can_send_voice_notes=True,
+            can_send_video_notes=True,
+            can_send_documents=True,
+            can_send_audios=True,
+        )
+    return p
+
+
+# ─────────────────────────────── قفل ───────────────────────────────
 async def lock_group(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat = update.effective_chat
     user = update.effective_user
@@ -12,18 +33,17 @@ async def lock_group(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if member.status not in ("administrator", "creator"):
         return await update.message.reply_text("🚫 فقط مدیران می‌توانند گروه را قفل کنند.")
 
-    # پرمیشن فعلی را بگیر
-    current = chat.permissions
+    current = safe_permissions(chat)
 
-    # اگر از قبل قفل است → کاری نکن
-    if current and current.can_send_messages is False:
+    # جلوگیری از قفل دوباره
+    if current.can_send_messages is False:
         msg = await update.message.reply_text("🔒 گروه از قبل قفل است.")
         await asyncio.sleep(3)
         return await msg.delete()
 
-    # فقط can_send_messages را False کن
     new_perms = ChatPermissions(
         can_send_messages=False,
+
         can_send_media_messages=current.can_send_media_messages,
         can_send_other_messages=current.can_send_other_messages,
         can_add_web_page_previews=current.can_add_web_page_previews,
@@ -43,7 +63,7 @@ async def lock_group(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.delete()
 
 
-# ─────────────────────────────── باز کردن گروه ───────────────────────────────
+# ─────────────────────────────── باز کردن ───────────────────────────────
 async def unlock_group(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat = update.effective_chat
     user = update.effective_user
@@ -52,18 +72,17 @@ async def unlock_group(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if member.status not in ("administrator", "creator"):
         return await update.message.reply_text("🚫 فقط مدیران می‌توانند گروه را باز کنند.")
 
-    # پرمیشن فعلی را بگیر
-    current = chat.permissions
+    current = safe_permissions(chat)
 
-    # اگر از قبل باز است → کاری نکن
-    if current and current.can_send_messages is True:
+    # جلوگیری از باز کردن تکراری
+    if current.can_send_messages is True:
         msg = await update.message.reply_text("🔓 گروه از قبل باز است.")
         await asyncio.sleep(3)
         return await msg.delete()
 
-    # فقط can_send_messages را True کن
     new_perms = ChatPermissions(
         can_send_messages=True,
+
         can_send_media_messages=current.can_send_media_messages,
         can_send_other_messages=current.can_send_other_messages,
         can_add_web_page_previews=current.can_add_web_page_previews,
@@ -83,7 +102,7 @@ async def unlock_group(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.delete()
 
 
-# ─────────────────────────────── مدیریت دستورها ───────────────────────────────
+# ─────────────────────────────── روتر ───────────────────────────────
 async def group_lock_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message or not update.message.text:
         return
