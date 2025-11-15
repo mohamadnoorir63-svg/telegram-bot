@@ -26,7 +26,6 @@ def safe_permissions(chat):
         )
     return p
 
-# -------------------- بررسی دسترسی --------------------
 async def is_admin_or_sudo(update: Update):
     user = update.effective_user
     if user.id == SUPERUSER_ID:
@@ -35,55 +34,66 @@ async def is_admin_or_sudo(update: Update):
     return member.status in ['administrator', 'creator']
 
 # -------------------- قفل و باز گروه --------------------
-# نگه داشتن پیام قفل برای حذف بعدی
 LOCK_MESSAGES = {}
 
 async def lock_group(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await is_admin_or_sudo(update):
         return
+    chat = update.effective_chat
+    current_permissions = safe_permissions(chat)
+
+    # بررسی وضعیت فعلی
+    if current_permissions.can_send_messages is False:
+        await update.message.reply_text("⚠️ گروه قبلاً قفل شده است!")
+        return
+
     try:
-        await update.effective_chat.set_permissions(ChatPermissions(can_send_messages=False))
-        # پیام قفل ثابت بمونه و شناسه آن ذخیره شود
+        await chat.set_permissions(ChatPermissions(can_send_messages=False))
         msg = await update.message.reply_text(
             f"🔒 گروه به دستور {update.effective_user.first_name} تا اطلاع ثانوی قفل شد!\n"
             f"🛡️ تمام اعضا تا اطلاع بعدی نمی‌توانند پیام بفرستند."
         )
-        LOCK_MESSAGES[update.effective_chat.id] = msg
+        LOCK_MESSAGES[chat.id] = msg
     except Exception as e:
         await update.message.reply_text(f"❌ خطا: {e}")
 
 async def unlock_group(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await is_admin_or_sudo(update):
         return
+    chat = update.effective_chat
+    current_permissions = safe_permissions(chat)
+
+    # بررسی وضعیت فعلی
+    if current_permissions.can_send_messages is True:
+        await update.message.reply_text("⚠️ گروه قبلاً باز است!")
+        return
+
     try:
-        chat = update.effective_chat
-        current = safe_permissions(chat)
         new_permissions = ChatPermissions(
             can_send_messages=True,
-            can_send_audios=current.can_send_audios,
-            can_send_documents=current.can_send_documents,
-            can_send_photos=current.can_send_photos,
-            can_send_videos=current.can_send_videos,
-            can_send_video_notes=current.can_send_video_notes,
-            can_send_voice_notes=current.can_send_voice_notes,
-            can_send_polls=current.can_send_polls,
-            can_send_other_messages=current.can_send_other_messages,
-            can_add_web_page_previews=current.can_add_web_page_previews,
-            can_invite_users=current.can_invite_users,
-            can_pin_messages=current.can_pin_messages,
-            can_change_info=current.can_change_info
+            can_send_audios=current_permissions.can_send_audios,
+            can_send_documents=current_permissions.can_send_documents,
+            can_send_photos=current_permissions.can_send_photos,
+            can_send_videos=current_permissions.can_send_videos,
+            can_send_video_notes=current_permissions.can_send_video_notes,
+            can_send_voice_notes=current_permissions.can_send_voice_notes,
+            can_send_polls=current_permissions.can_send_polls,
+            can_send_other_messages=current_permissions.can_send_other_messages,
+            can_add_web_page_previews=current_permissions.can_add_web_page_previews,
+            can_invite_users=current_permissions.can_invite_users,
+            can_pin_messages=current_permissions.can_pin_messages,
+            can_change_info=current_permissions.can_change_info
         )
         await chat.set_permissions(new_permissions)
 
-        # حذف پیام قفل قبلی در صورت وجود
-        if update.effective_chat.id in LOCK_MESSAGES:
+        # حذف پیام قفل قبلی
+        if chat.id in LOCK_MESSAGES:
             try:
-                await LOCK_MESSAGES[update.effective_chat.id].delete()
+                await LOCK_MESSAGES[chat.id].delete()
             except:
                 pass
-            LOCK_MESSAGES.pop(update.effective_chat.id)
+            LOCK_MESSAGES.pop(chat.id)
 
-        # پیام باز شدن بعد 10 ثانیه حذف می‌شود
         msg = await update.message.reply_text(
             f"🔓 گروه به دستور {update.effective_user.first_name} باز شد!\n✅ حالا همه می‌توانند پیام بفرستند."
         )
