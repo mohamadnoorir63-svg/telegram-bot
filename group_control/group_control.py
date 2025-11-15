@@ -47,8 +47,7 @@ async def _has_full_access(context, chat_id: int, user_id: int) -> bool:
         return True
     return False
 
-# ─────────────────────────────── دستور VIP ───────────────────────────────
-
+# ─────────────── اضافه کردن VIP ───────────────
 async def set_vip(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """اضافه کردن کاربر به VIP"""
     chat = update.effective_chat
@@ -94,13 +93,11 @@ async def set_vip(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"✅ کاربر <b>{target_id}</b> به ویژه‌ها اضافه شد.",
         parse_mode="HTML", quote=True
     )
-
-    # حذف خودکار پیام‌ها بعد ۵ ثانیه
     await asyncio.sleep(5)
     await update.message.delete()
     await reply.delete()
 
-
+# ─────────────── حذف VIP ───────────────
 async def remove_vip(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """حذف کاربر از VIP"""
     chat = update.effective_chat
@@ -129,7 +126,6 @@ async def remove_vip(update: Update, context: ContextTypes.DEFAULT_TYPE):
         target_id = int(args[1])
 
     cid = str(chat.id)
-
     if cid not in VIPS or target_id not in VIPS[cid]:
         warn = await update.message.reply_text("ℹ️ این کاربر در لیست ویژه نیست.", quote=True)
         await asyncio.sleep(5)
@@ -143,11 +139,26 @@ async def remove_vip(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"❎ کاربر <b>{target_id}</b> از لیست ویژه حذف شد.",
         parse_mode="HTML", quote=True
     )
-
-    # حذف خودکار پیام‌ها بعد ۵ ثانیه
     await asyncio.sleep(5)
     await update.message.delete()
     await reply.delete()
+
+# ─────────────── نمایش لیست VIP ───────────────
+async def list_vips(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """نمایش لیست کاربران VIP گروه"""
+    chat = update.effective_chat
+    cid = str(chat.id)
+    vips = VIPS.get(cid, [])
+
+    if not vips:
+        await update.message.reply_text("ℹ️ هنوز کاربری در لیست ویژه وجود ندارد.")
+        return
+
+    text = "✅ لیست کاربران ویژه:\n"
+    for i, uid in enumerate(vips, 1):
+        text += f"{i}. <b>{uid}</b>\n"
+
+    await update.message.reply_text(text, parse_mode="HTML")
 # ─────────────────────────────── مسیر فایل و لود قفل‌ها ───────────────────────────────
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 LOCK_FILE = os.path.join(BASE_DIR, "group_locks.json")
@@ -175,7 +186,6 @@ def _save_json(path, data):
 LOCKS = _load_json(LOCK_FILE, {})
 
 # ─────────────────────────────── لیست کامل قفل‌ها ───────────────────────────────
-
 LOCK_TYPES = {
     "links": "لینک",
     "photos": "عکس",
@@ -202,6 +212,7 @@ LOCK_TYPES = {
     "poll": "نظرسنجی",
     "bots": "ربات",
     "join": "ورود",
+    
     # ───────────── قفل‌های پیشرفته ─────────────
     "all_links": "همه لینک‌ها",
     "inline_bots": "ربات اینلاین",
@@ -211,10 +222,10 @@ LOCK_TYPES = {
     "new_members": "کاربران جدید",
     "forward_from_bots": "فوروارد از ربات",
     "urls_videos": "لینک ویدیو",
+    "long_text": "پیام بلند",
     "short_links": "لینک کوتاه",
     "spam_repeats": "پیام تکراری",
     "capslock": "حروف بزرگ"
-    "long_text": "پیام بلند"
 }
 
 # ─────────────────────────────── توابع مدیریت فایل قفل ───────────────────────────────
