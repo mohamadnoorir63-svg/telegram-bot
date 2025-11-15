@@ -1,5 +1,6 @@
 import asyncio
 from datetime import datetime, time
+from zoneinfo import ZoneInfo
 from telegram import ChatPermissions, Update
 from telegram.ext import Application, ContextTypes, MessageHandler, filters
 
@@ -8,9 +9,10 @@ SUPERUSER_ID = 8588347189  # آیدی سودو اصلی
 
 # -------------------- وضعیت قفل خودکار --------------------
 AUTO_LOCK_ENABLED = False
-AUTO_LOCK_START = time(0, 0)  # پیش‌فرض 00:00
-AUTO_LOCK_END = time(7, 0)    # پیش‌فرض 07:00
+AUTO_LOCK_START = time(0, 0)
+AUTO_LOCK_END = time(7, 0)
 LOCKED_BY_AUTO = {}           # وضعیت قفل خودکار هر چت
+LOCAL_TZ = "Asia/Tehran"     # منطقه زمانی شما
 
 # -------------------- تابع کمکی --------------------
 def safe_permissions(chat):
@@ -49,11 +51,12 @@ async def lock_group(update: Update, context: ContextTypes.DEFAULT_TYPE, auto=Fa
         await update.effective_chat.set_permissions(ChatPermissions(can_send_messages=False))
         if not auto:
             await update.message.reply_text(
-                f"🔒 گروه به دستور {update.effective_user.first_name} تا اطلاع ثانوی قفل شد!\nلطفاً صبور باشید، همه پیام‌ها موقتاً مسدود شده‌اند."
+                f"🔒 گروه به دستور {update.effective_user.first_name} تا اطلاع ثانوی قفل شد!\n"
+                f"🛡️ تمام اعضا تا اطلاع بعدی نمی‌توانند پیام بفرستند."
             )
     except Exception as e:
         if not auto:
-            await update.message.reply_text(f"خطا: {e}")
+            await update.message.reply_text(f"❌ خطا: {e}")
 
 async def unlock_group(update: Update, context: ContextTypes.DEFAULT_TYPE, auto=False):
     if not auto and not await is_admin_or_sudo(update):
@@ -80,36 +83,45 @@ async def unlock_group(update: Update, context: ContextTypes.DEFAULT_TYPE, auto=
 
         if not auto:
             msg = await update.message.reply_text(
-                f"🔓 گروه به دستور {update.effective_user.first_name} باز شد!\nحالا همه می‌توانند پیام بفرستند."
+                f"🔓 گروه به دستور {update.effective_user.first_name} باز شد!\n"
+                f"✅ حالا همه می‌توانند پیام بفرستند."
             )
             await asyncio.sleep(10)
             await msg.delete()
     except Exception as e:
         if not auto:
-            await update.message.reply_text(f"خطا: {e}")
+            await update.message.reply_text(f"❌ خطا: {e}")
 
 # -------------------- تسک قفل خودکار --------------------
 async def auto_lock_task(app: Application):
-    global AUTO_LOCK_ENABLED, AUTO_LOCK_START, AUTO_LOCK_END, LOCKED_BY_AUTO
+    global AUTO_LOCK_ENABLED, AUTO_LOCK_START, AUTO_LOCK_END, LOCKED_BY_AUTO, LOCAL_TZ
     await app.wait_until_ready()
     while True:
         if AUTO_LOCK_ENABLED:
-            now = datetime.now().time()
-            for chat_id in app.chat_data:  # بررسی تمام چت‌ها
+            # ساعت محلی کاربر
+            now_local = datetime.now(ZoneInfo(LOCAL_TZ)).time()
+            for chat_id in app.chat_data:
                 try:
-                    if AUTO_LOCK_START <= AUTO_LOCK_END:
-                        in_lock_time = AUTO_LOCK_START <= now <= AUTO_LOCK_END
-                    else:
-                        in_lock_time = now >= AUTO_LOCK_START or now <= AUTO_LOCK_END
                     chat = await app.bot.get_chat(chat_id)
+                    # محاسبه وضعیت قفل خودکار
+                    if AUTO_LOCK_START <= AUTO_LOCK_END:
+                        in_lock_time = AUTO_LOCK_START <= now_local <= AUTO_LOCK_END
+                    else:
+                        in_lock_time = now_local >= AUTO_LOCK_START or now_local <= AUTO_LOCK_END
+
                     if in_lock_time and not LOCKED_BY_AUTO.get(chat_id, False):
                         await lock_group_for_auto(chat)
                         LOCKED_BY_AUTO[chat_id] = True
-                        await chat.send_message("🤖 گروه به صورت خودکار قفل شد!")
+                        await chat.send_message(
+                            "🤖 گروه به صورت خودکار قفل شد!\n"
+                            "🛡️ لطفاً صبور باشید، همه پیام‌ها موقتاً مسدود شده‌اند."
+                        )
                     elif not in_lock_time and LOCKED_BY_AUTO.get(chat_id, False):
                         await unlock_group_for_auto(chat)
                         LOCKED_BY_AUTO[chat_id] = False
-                        await chat.send_message("🤖 گروه به صورت خودکار باز شد! همه می‌توانند پیام بفرستند.")
+                        await chat.send_message(
+                            "🤖 گروه به صورت خودکار باز شد!\n✅ حالا همه می‌توانند پیام بفرستند."
+                        )
                 except:
                     pass
         await asyncio.sleep(60)
@@ -162,7 +174,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not await is_admin_or_sudo(update):
             return
         try:
-            # مثال: "تنظیم قفل خودکار 12:00-07:00"
+            # مثال: "تنظیم قفل خودکار 21:00-07:00"
             time_range = text.split()[-1]
             start_str, end_str = time_range.split("-")
             h1, m1 = map(int, start_str.split(":"))
@@ -170,15 +182,17 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             AUTO_LOCK_START = time(h1, m1)
             AUTO_LOCK_END = time(h2, m2)
             await update.message.reply_text(
-                f"⏰ بازه قفل خودکار تنظیم شد: {AUTO_LOCK_START.strftime('%H:%M')} تا {AUTO_LOCK_END.strftime('%H:%M')}"
+                f"⏰ بازه قفل خودکار تنظیم شد: {AUTO_LOCK_START.strftime('%H:%M')} تا {AUTO_LOCK_END.strftime('%H:%M')} "
+                f"(ساعت محلی)"
             )
         except:
-            await update.message.reply_text("❌ فرمت زمان اشتباه است. مثال: تنظیم قفل خودکار 12:00-07:00")
+            await update.message.reply_text(
+                "❌ فرمت زمان اشتباه است. مثال: تنظیم قفل خودکار 12:00-07:00"
+            )
 
 # -------------------- ثبت هندلر --------------------
 def register_group_lock_handlers(app: Application, group: int = 17):
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text), group=group)
-    # اضافه کردن تسک قفل خودکار به صورت امن
     async def start_auto_lock_task(app: Application):
         app.create_task(auto_lock_task(app))
     app.post_init = start_auto_lock_task
