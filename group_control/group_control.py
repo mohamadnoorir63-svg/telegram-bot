@@ -201,7 +201,19 @@ LOCK_TYPES = {
     "contact": "مخاطب",
     "poll": "نظرسنجی",
     "bots": "ربات",
-    "join": "ورود"
+    "join": "ورود",
+    # ───────────── قفل‌های پیشرفته ─────────────
+    "all_links": "همه لینک‌ها",
+    "inline_bots": "ربات اینلاین",
+    "external_media": "رسانه خارجی",
+    "invite_links": "لینک دعوت",
+    "file_types": "فایل‌های خاص",
+    "new_members": "کاربران جدید",
+    "forward_from_bots": "فوروارد از ربات",
+    "urls_videos": "لینک ویدیو",
+    "short_links": "لینک کوتاه",
+    "spam_repeats": "پیام تکراری",
+    "capslock": "حروف بزرگ"
 }
 
 # ─────────────────────────────── توابع مدیریت فایل قفل ───────────────────────────────
@@ -265,12 +277,46 @@ async def check_message_locks(update: Update, context: ContextTypes.DEFAULT_TYPE
     has_anim = bool(msg.animation)
     has_stick = bool(msg.sticker)
     has_fwd = bool(msg.forward_date)
+        # یک دیکشنری جهانی برای ذخیره آخرین پیام هر کاربر
+    LAST_MESSAGES = {}
+
+    # 🚫 پیام تکراری
+    if locks.get("spam_repeats") and text:
+        last_msg = LAST_MESSAGES.get(user.id)
+        if last_msg and last_msg == text:
+            return await _del_msg(update, "🚫 ارسال پیام تکراری ممنوع است.")
+        # ذخیره پیام فعلی برای چک بعدی
+        LAST_MESSAGES[user.id] = text
+
+    # 🚫 همه لینک‌ ها
+    if locks.get("all_links") and any(x in text for x in ["http://", "https://", "t.me", "telegram.me"]):
+        return await _del_msg(update, "🚫 ارسال هرگونه لینک ممنوع است.")
+
+    # 🚫 لینک ویدیو
+    if locks.get("urls_videos") and any(x in text for x in ["youtube.com", "youtu.be", "tiktok.com"]):
+        return await _del_msg(update, "🚫 ارسال لینک ویدیو ممنوع است.")
+
+    # 🚫 لینک کوتاه
+    if locks.get("short_links") and any(x in text for x in ["bit.ly", "tinyurl.com", "t2m.io"]):
+        return await _del_msg(update, "🚫 ارسال لینک کوتاه ممنوع است.")
+
+    # 🚫 ربات تبچی (Inline Bots)
+    if locks.get("inline_bots") and getattr(msg, "via_bot", None):
+        return await _del_msg(update, "🚫 استفاده از ربات اینلاین ممنوع است.")
+
+    # 🚫 کاربران جدید (5 ثانیه اول)
+    if locks.get("new_members") and (datetime.now() - user.date).total_seconds() < 5:
+        return await _del_msg(update, "🚫 کاربران جدید نمی‌توانند پیام دهند.")
+
+    # 🚫 حروف بزرگ
+    if locks.get("capslock") and text.isupper():
+        return await _del_msg(update, "🚫 پیام با حروف بزرگ ممنوع است.")
 
     # 🚫 لینک
     if locks.get("links") and any(x in text for x in ["http://", "https://", "t.me", "telegram.me"]):
         return await _del_msg(update, "🚫 ارسال لینک ممنوع است.")
 
-    # 🚫 تبلیغ
+      # 🚫 تبلیغ
     if locks.get("ads") and any(x in text for x in ["joinchat", "promo", "invite", "bot?start=", "channel"]):
         return await _del_msg(update, "🚫 تبلیغات ممنوع است.")
 
