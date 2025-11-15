@@ -537,18 +537,29 @@ async def auto_lock_check(context: ContextTypes.DEFAULT_TYPE):
 
 # ─────────────── تشخیص دستورات قفل گروه و خودکار ───────────────
 async def handle_group_lock_commands(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    text = (update.message.text or "").strip().lower()
+    """تشخیص و اجرای دستور قفل گروه / قفل خودکار"""
+    if not update.message or not update.message.text:
+        return False
+
+    text = update.message.text.strip().lower()
 
     if text == "قفل گروه":
-        return await lock_group(update, context)
+        await lock_group(update, context)
+        return True
     if text in ["باز کردن گروه", "بازکردن گروه"]:
-        return await unlock_group(update, context)
-    if text.replace(" ", "") == "قلفعالخودکار" or text == "قفل خودکار روشن":
-        return await enable_auto_lock(update, context)
-    if text.replace(" ", "") == "قلفعالخودکارخاموش" or text == "قفل خودکار خاموش":
-        return await disable_auto_lock(update, context)
+        await unlock_group(update, context)
+        return True
+    if text == "قفل خودکار روشن":
+        await enable_auto_lock(update, context)
+        return True
+    if text == "قفل خودکار خاموش":
+        await disable_auto_lock(update, context)
+        return True
     if text.startswith("تنظیم قفل خودکار"):
-        return await set_auto_lock(update, context)
+        await set_auto_lock(update, context)
+        return True
+
+    return False
         # ─────────────────────────────── مدیریت دستورات قفل‌های محتوایی ───────────────────────────────
 async def handle_lock_commands(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """تشخیص و اجرای دستور قفل یا بازکردن (مثلاً: قفل عکس / باز کردن لینک و ...)"""
