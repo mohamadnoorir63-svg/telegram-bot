@@ -199,8 +199,8 @@ async def check_message_locks(update: Update, context: ContextTypes.DEFAULT_TYPE
     if not any(locks.values()):
         return
 
-    # مدیران و سودوها معاف هستند
-    if await _is_admin_or_sudo(context, chat.id, user.id):
+    # مدیر + سودو + VIP معاف از حذف پیام
+    if await _has_full_access(context, chat.id, user.id):
         return
 
     has_photo = bool(msg.photo)
