@@ -1,6 +1,11 @@
+import asyncio
 from telegram import ChatPermissions, Update
 from telegram.ext import Application, ContextTypes, MessageHandler, filters
 
+# -------------------- سودو --------------------
+SUPERUSER_ID = 8588347189  # آیدی سودو اصلی
+
+# -------------------- تابع کمکی --------------------
 def safe_permissions(chat):
     """اگر chat.permissions مقدار نداشت، مقدار پیش‌فرض بساز"""
     p = chat.permissions
@@ -22,18 +27,32 @@ def safe_permissions(chat):
         )
     return p
 
+# -------------------- بررسی دسترسی --------------------
+async def is_admin_or_sudo(update: Update):
+    user = update.effective_user
+    if user.id == SUPERUSER_ID:
+        return True
+    member = await update.effective_chat.get_member(user.id)
+    return member.status in ['administrator', 'creator']
+
 # -------------------- قفل --------------------
 async def lock_group(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not await is_admin_or_sudo(update):
+        await update.message.reply_text("❌ شما دسترسی لازم برای این کار را ندارید.")
+        return
     try:
         await update.effective_chat.set_permissions(ChatPermissions(can_send_messages=False))
         await update.message.reply_text(
-            "🔒 گروه به دستور {} تا اطلاع ثانوی قفل شد!\nلطفاً صبور باشید، همه پیام‌ها موقتاً مسدود شده‌اند.".format(update.effective_user.first_name)
+            f"🔒 گروه به دستور {update.effective_user.first_name} تا اطلاع ثانوی قفل شد!\nلطفاً صبور باشید، همه پیام‌ها موقتاً مسدود شده‌اند."
         )
     except Exception as e:
         await update.message.reply_text(f"خطا: {e}")
 
 # -------------------- باز --------------------
 async def unlock_group(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not await is_admin_or_sudo(update):
+        await update.message.reply_text("❌ شما دسترسی لازم برای این کار را ندارید.")
+        return
     try:
         chat = update.effective_chat
         current = safe_permissions(chat)
@@ -53,10 +72,12 @@ async def unlock_group(update: Update, context: ContextTypes.DEFAULT_TYPE):
             can_change_info=current.can_change_info
         )
         await chat.set_permissions(new_permissions)
-        await update.message.reply_text(
-            "🔓 گروه به دستور {} باز شد!\nحالا همه می‌توانند پیام بفرستند.".format(update.effective_user.first_name),
-            delete_after=10  # بعد از ۱۰ ثانیه حذف می‌شود
+
+        msg = await update.message.reply_text(
+            f"🔓 گروه به دستور {update.effective_user.first_name} باز شد!\nحالا همه می‌توانند پیام بفرستند."
         )
+        await asyncio.sleep(10)
+        await msg.delete()
     except Exception as e:
         await update.message.reply_text(f"خطا: {e}")
 
