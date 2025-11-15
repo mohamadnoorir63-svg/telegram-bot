@@ -27,34 +27,22 @@ def safe_permissions(chat):
 # -------------------- قفل --------------------
 async def lock_group(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
-        chat = update.effective_chat
-        current = safe_permissions(chat)
-
-        new_permissions = ChatPermissions(
-            can_send_messages=False,
-
-            # سایر اجازه‌ها بدون تغییر
-            can_send_audios=current.can_send_audios,
-            can_send_documents=current.can_send_documents,
-            can_send_photos=current.can_send_photos,
-            can_send_videos=current.can_send_videos,
-            can_send_video_notes=current.can_send_video_notes,
-            can_send_voice_notes=current.can_send_voice_notes,
-            can_send_polls=current.can_send_polls,
-            can_send_other_messages=current.can_send_other_messages,
-            can_add_web_page_previews=current.can_add_web_page_previews,
-            can_invite_users=current.can_invite_users,
-            can_pin_messages=current.can_pin_messages,
-            can_change_info=current.can_change_info
+        await update.effective_chat.set_permissions(
+            ChatPermissions(can_send_messages=False)
         )
-
-        await chat.set_permissions(new_permissions)
         await update.message.reply_text("🔒 گروه قفل شد.")
-
     except Exception as e:
         await update.message.reply_text(f"خطا: {e}")
 
 
+async def unlock_group(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    try:
+        await update.effective_chat.set_permissions(
+            ChatPermissions(can_send_messages=True)
+        )
+        await update.message.reply_text("🔓 گروه باز شد.")
+    except Exception as e:
+        await update.message.reply_text(f"خطا: {e}")
 # -------------------- باز --------------------
 async def unlock_group(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
