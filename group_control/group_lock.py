@@ -8,11 +8,9 @@ GROUP_LOCKS = {}  # chat_id: True/False
 
 # ────────────── توابع کمکی ──────────────
 def set_group_lock(chat_id: int, status: bool):
-    """تنظیم وضعیت قفل گروه"""
     GROUP_LOCKS[chat_id] = status
 
 def is_group_locked(chat_id: int) -> bool:
-    """بررسی اینکه گروه قفل است یا نه"""
     return GROUP_LOCKS.get(chat_id, False)
 
 # ────────────── مدیریت پیام‌ها ──────────────
@@ -25,8 +23,9 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_group_locked(chat_id):
         return
 
-    # فقط پیام متنی
-    if update.message.text:
+    # فقط پیام متنی که **دستور نیست**
+    text = update.message.text or ""
+    if text and not text.startswith(("قفل گروه", "باز کردن گروه", "بازکردن گروه")):
         try:
             await update.message.delete()
             warn = await update.message.reply_text(
@@ -70,14 +69,14 @@ async def group_lock_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ────────────── ثبت هندلر ──────────────
 def register_group_lock_handlers(application, group: int = -10):
     """ثبت هندلرهای قفل گروه"""
-    # حذف پیام متنی وقتی قفل است
-    application.add_handler(
-        MessageHandler(filters.TEXT & ~filters.COMMAND, handle_messages),
-        group=group
-    )
-    # مدیریت دستورات قفل و باز کردن
+    # اول هندلر دستورها
     application.add_handler(
         MessageHandler(filters.TEXT & ~filters.COMMAND, group_lock_router),
+        group=group
+    )
+    # بعد هندلر حذف پیام متنی
+    application.add_handler(
+        MessageHandler(filters.TEXT & ~filters.COMMAND, handle_messages),
         group=group
     )
     print(f"✅ هندلرهای قفل گروه ثبت شد (فقط پیام متنی، مدیا بدون محدودیت).")
