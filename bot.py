@@ -585,7 +585,6 @@ async def fullstats(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 from telegram import InlineKeyboardMarkup, InlineKeyboardButton, Update
 from telegram.ext import ContextTypes
-from datetime import datetime
 import json, os, asyncio
 import jdatetime  # ✅ برای تاریخ شمسی
 
@@ -657,7 +656,7 @@ async def open_welcome_panel(update: Update, context: ContextTypes.DEFAULT_TYPE)
     chat = update.effective_chat if update.effective_chat else update.callback_query.message.chat
     user = update.effective_user
 
-    # بررسی دسترسی (مدیر یا سودو)
+    # بررسی دسترسی (مدیر)
     member = await context.bot.get_chat_member(chat.id, user.id)
     if member.status not in ["administrator", "creator"]:
         text = "⛔ فقط مدیران می‌توانند خوشامد را تنظیم کنند!"
@@ -769,14 +768,13 @@ async def welcome_input_handler(update: Update, context: ContextTypes.DEFAULT_TY
             msg = "⚠️ عدد معتبر بفرست!"
     elif mode == "media":
         if update.message.photo:
-            file_id = update.message.photo[-1].file_id
+            welcome_settings[chat_id]["media"] = {"type": "photo", "file_id": update.message.photo[-1].file_id}
         elif update.message.animation:
-            file_id = update.message.animation.file_id
+            welcome_settings[chat_id]["media"] = {"type": "animation", "file_id": update.message.animation.file_id}
         elif update.message.video:
-            file_id = update.message.video.file_id
+            welcome_settings[chat_id]["media"] = {"type": "video", "file_id": update.message.video.file_id}
         else:
             return await update.message.reply_text("⚠️ فقط عکس، گیف یا ویدیو قابل قبول است!")
-        welcome_settings[chat_id]["media"] = file_id
         msg = "✅ رسانه خوشامد ذخیره شد!"
 
     save_welcome_settings(welcome_settings)
@@ -804,11 +802,14 @@ async def welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         try:
             if media:
-                # تشخیص نوع رسانه
-                if media.endswith(".mp4") or media.startswith("BQAD"):  # ویدیو یا file_id
-                    msg = await update.message.reply_video(media, caption=message_text, parse_mode="HTML")
-                else:
-                    msg = await update.message.reply_photo(media, caption=message_text, parse_mode="HTML")
+                m_type = media.get("type")
+                m_file = media.get("file_id")
+                if m_type == "photo":
+                    msg = await update.message.reply_photo(m_file, caption=message_text, parse_mode="HTML")
+                elif m_type == "animation":
+                    msg = await update.message.reply_animation(m_file, caption=message_text, parse_mode="HTML")
+                elif m_type == "video":
+                    msg = await update.message.reply_video(m_file, caption=message_text, parse_mode="HTML")
             else:
                 msg = await update.message.reply_text(message_text, parse_mode="HTML")
 
