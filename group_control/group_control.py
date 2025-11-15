@@ -628,6 +628,39 @@ async def handle_lock(update: Update, context: ContextTypes.DEFAULT_TYPE, key: s
         await update.message.delete()
         return
 
+    # فعال کردن قفل
+    _set_lock(chat.id, key, True)
+
+    # اگر قفل مدیا یا محتوا باشد، دسترسی مربوطه را غیرفعال کن
+    if key in ["photos", "videos", "files", "voices", "stickers", "gifs", "media"]:
+        permissions = ChatPermissions(
+            can_send_messages=True,  # پیام متنی فعال بماند
+            can_send_media_messages=False,  # ارسال مدیا بسته شود
+            can_send_polls=True,
+            can_send_other_messages=False,
+            can_add_web_page_previews=False,
+            can_change_info=False,
+            can_invite_users=True,
+            can_pin_messages=False
+        )
+        await context.bot.set_chat_permissions(chat.id, permissions)
+
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    msg = await update.message.reply_text(
+        f"🔒 قفل {LOCK_TYPES.get(key, key)} توسط <b>{user.first_name}</b> فعال شد.\n🕓 زمان: {now}",
+        parse_mode="HTML"
+    )
+    await asyncio.sleep(10)
+    await msg.delete()
+    await update.message.delete()
+
+    if _is_locked(chat.id, key):
+        msg = await update.message.reply_text(f"🔒 قفل {LOCK_TYPES.get(key, key)} از قبل فعال است.")
+        await asyncio.sleep(10)
+        await msg.delete()
+        await update.message.delete()
+        return
+
     _set_lock(chat.id, key, True)
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     msg = await update.message.reply_text(
@@ -656,6 +689,32 @@ async def handle_unlock(update: Update, context: ContextTypes.DEFAULT_TYPE, key:
         await msg.delete()
         await update.message.delete()
         return
+
+    # باز کردن قفل و فعال کردن پرمیشن مرتبط با مدیا
+    _set_lock(chat.id, key, False)
+
+    # اگر قفل مدیا باز می‌شود، دسترسی مدیا هم فعال شود
+    if key in ["photos", "videos", "files", "voices", "stickers", "gifs", "media"]:
+        permissions = ChatPermissions(
+            can_send_messages=True,
+            can_send_media_messages=True,
+            can_send_polls=True,
+            can_send_other_messages=True,
+            can_add_web_page_previews=True,
+            can_change_info=False,
+            can_invite_users=True,
+            can_pin_messages=False
+        )
+        await context.bot.set_chat_permissions(chat.id, permissions)
+
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    msg = await update.message.reply_text(
+        f"🔓 قفل {LOCK_TYPES.get(key, key)} توسط <b>{user.first_name}</b> باز شد.\n🕓 زمان: {now}",
+        parse_mode="HTML"
+    )
+    await asyncio.sleep(10)
+    await msg.delete()
+    await update.message.delete()
 
     _set_lock(chat.id, key, False)
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
