@@ -601,14 +601,13 @@ async def handle_group_lock_commands(update: Update, context: ContextTypes.DEFAU
 
 
 # ───────────── فعال/غیرفعال کردن قفل محتوا ─────────────
-
-    def _is_locked(chat_id: int, key: str) -> bool:
+def _is_locked(chat_id: int, key: str) -> bool:
     return LOCKS.get(str(chat_id), {}).get(key, False)
+
 
 def _set_lock(chat_id: int, key: str, status: bool):
     LOCKS.setdefault(str(chat_id), {})[key] = bool(status)
     _save_json(LOCK_FILE, LOCKS)
-
 
 async def handle_lock(update: Update, context: ContextTypes.DEFAULT_TYPE, key: str):
     chat = update.effective_chat
