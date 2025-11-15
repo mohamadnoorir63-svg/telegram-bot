@@ -1,5 +1,4 @@
 import os
-import os
 import json
 import re
 import asyncio
@@ -7,7 +6,6 @@ from datetime import datetime, time
 
 from telegram import Update, ChatPermissions
 from telegram.ext import ContextTypes
-
 # ─────────────────────────────── تنظیمات دسترسی ───────────────────────────────
 SUDO_IDS = [8588347189]  # آیدی سودو
 
@@ -163,7 +161,7 @@ async def list_vips(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(text, parse_mode="HTML")
 # ─────────────────────────────── مسیر فایل و لود قفل‌ها ───────────────────────────────
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+BASE_DIR = os.path.dirname(os.path.abspath(file))
 LOCK_FILE = os.path.join(BASE_DIR, "group_locks.json")
 
 if not os.path.exists(LOCK_FILE):
@@ -375,10 +373,234 @@ async def check_message_locks(update, context):
     if locks.get("text") and text and not (has_photo or has_video or has_doc):
         return await _del_msg(update, "🚫 ارسال پیام متنی ممنوع است.")
 
-# =====================================
-#   ابزار پایه قفل‌ها (بدون تغییر)
-# =====================================
+# ─────────────────────────────── فعال‌سازی / غیرفعال‌سازی قفل ───────────────────────────────
+async def handle_lock(update: Update, context: ContextTypes.DEFAULT_TYPE, key: str):
+    chat = update.effective_chat
+    user = update.effective_user
 
+    if not await _has_full_access(context, chat.id, user.id):
+        msg = await update.message.reply_text("🚫 فقط مدیران یا سودوها مجازند.")
+        await asyncio.sleep(10)
+        await msg.delete()
+        await update.message.delete()
+        return
+
+    if key not in LOCK_TYPES:
+        return
+
+    if _is_locked(chat.id, key):
+        msg = await update.message.reply_text(f"🔒 قفل {LOCK_TYPES[key]} از قبل فعال است.")
+        await asyncio.sleep(10)
+        await msg.delete()
+        await update.message.delete()
+        return
+
+    # ثبت قفل در حافظه و فایل
+    _set_lock(chat.id, key, True)
+
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    msg = await update.message.reply_text(
+        f"✅ قفل {LOCK_TYPES[key]} توسط <b>{user.first_name}</b> فعال شد.\n🕓 زمان: {now}",
+        parse_mode="HTML"
+    )
+    await asyncio.sleep(10)
+    await msg.delete()
+    await update.message.delete()
+
+
+async def handle_unlock(update: Update, context: ContextTypes.DEFAULT_TYPE, key: str):
+    chat = update.effective_chat
+    user = update.effective_user
+
+    if not await _has_full_access(context, chat.id, user.id):
+        msg = await update.message.reply_text("🚫 فقط مدیران یا سودوها مجازند.")
+        await asyncio.sleep(10)
+        await msg.delete()
+        await update.message.delete()
+        return
+
+    if key not in LOCK_TYPES:
+        return
+
+    if not _is_locked(chat.id, key):
+        msg = await update.message.reply_text(f"🔓 قفل {LOCK_TYPES[key]} از قبل باز است.")
+        await asyncio.sleep(10)
+        await msg.delete()
+        await update.message.delete()
+        return
+
+    # حذف قفل از حافظه و فایل
+    _set_lock(chat.id, key, False)
+
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    msg = await update.message.reply_text(
+        f"🔓 قفل {LOCK_TYPES[key]} توسط <b>{user.first_name}</b> باز شد.\n🕓 زمان: {now}",
+        parse_mode="HTML"
+    )
+    await asyncio.sleep(10)
+    await msg.delete()
+    await update.message.delete()
+# ───────────── قفل خودکار گروه ─────────────
+async def set_auto_lock(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat = update.effective_chat
+    if not await _has_full_access(context, chat.id, update.effective_user.id):
+        msg = await update.message.reply_text("🚫 فقط مدیران یا سودوها مجازند.")
+        await asyncio.sleep(10)
+        await msg.delete()
+        return
+
+    args = (update.message.text or "").split()
+    if len(args) != 3:
+        msg = await update.message.reply_text(
+            "📘 مثال صحیح:\n<code>تنظیم قفل خودکار 23:00 07:00</code>",
+            parse_mode="HTML"
+        )
+        await asyncio.sleep(10)
+        await msg.delete()
+        return
+
+    start_str, end_str = args[1], args[2]
+    try:
+        time.fromisoformat(start_str)
+        time.fromisoformat(end_str)
+    except:
+        msg = await update.message.reply_text("⚠️ فرمت ساعت نادرست است. (مثلاً 22:30)")
+        await asyncio.sleep(10)
+        await msg.delete()
+        return
+
+    AUTO_LOCKS[str(chat.id)] = {"start": start_str, "end": end_str, "enabled": True}
+    _save_json(AUTO_LOCK_FILE, AUTO_LOCKS)
+
+    msg = await update.message.reply_text(
+        f"✅ قفل خودکار از ساعت <b>{start_str}</b> تا <b>{end_str}</b> تنظیم و فعال شد.",
+        parse_mode="HTML"
+    )
+    await asyncio.sleep(10)
+    await msg.delete()
+
+
+async def enable_auto_lock(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat = update.effective_chat
+    conf = AUTO_LOCKS.get(str(chat.id))
+    if not conf:
+        msg = await update.message.reply_text("⚙️ ابتدا ساعت قفل خودکار را تنظیم کنید.")
+        await asyncio.sleep(10)
+        await msg.delete()
+        return
+
+    conf["enabled"] = True
+    _save_json(AUTO_LOCK_FILE, AUTO_LOCKS)
+
+    msg = await update.message.reply_text(
+        f"✅ قفل خودکار فعال شد.\n🕓 از ساعت <b>{conf['start']}</b> تا <b>{conf['end']}</b>",
+        parse_mode="HTML"
+    )
+    await asyncio.sleep(10)
+    await msg.delete()
+
+
+async def disable_auto_lock(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat = update.effective_chat
+    conf = AUTO_LOCKS.get(str(chat.id))
+    if not conf:
+        msg = await update.message.reply_text("⚙️ قفل خودکار هنوز تنظیم نشده است.")
+        await asyncio.sleep(10)
+        await msg.delete()
+        return
+
+    conf["enabled"] = False
+    _save_json(AUTO_LOCK_FILE, AUTO_LOCKS)
+
+    msg = await update.message.reply_text("❎ قفل خودکار گروه خاموش شد.")
+    await asyncio.sleep(10)
+    await msg.delete()
+
+
+async def auto_lock_check(context: ContextTypes.DEFAULT_TYPE):
+    now = datetime.now().time()
+    for chat_id, conf in AUTO_LOCKS.items():
+        try:
+            if not conf.get("enabled"):
+                continue
+
+            start = time.fromisoformat(conf["start"])
+            end = time.fromisoformat(conf["end"])
+
+            if start <= end:
+                locked = start <= now <= end
+            else:
+                # حالت شبانه که زمان پایان روز بعد است
+                locked = now >= start or now <= end
+
+            await context.bot.set_chat_permissions(
+                int(chat_id),
+                ChatPermissions(can_send_messages=not locked)
+            )
+        except Exception as e:
+            print(f"[AutoLock Error] {e}")
+
+
+# ───────────── دستورات قفل گروه ─────────────
+async def lock_group(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat = update.effective_chat
+    user = update.effective_user
+
+    await context.bot.set_chat_permissions(chat.id, ChatPermissions(can_send_messages=False))
+
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    msg = await update.message.reply_text(
+        f"🔒 گروه توسط <b>{user.first_name}</b> تا اطلاع ثانوی قفل شد.\n🕓 زمان: {now}",
+        parse_mode="HTML"
+    )
+    await asyncio.sleep(10)
+    await msg.delete()
+    await update.message.delete()
+
+
+async def unlock_group(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat = update.effective_chat
+    user = update.effective_user
+
+    await context.bot.set_chat_permissions(chat.id, ChatPermissions(can_send_messages=True))
+
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    msg = await update.message.reply_text(
+        f"🔓 گروه توسط <b>{user.first_name}</b> باز شد.\n🕓 زمان: {now}",
+        parse_mode="HTML"
+    )
+    await asyncio.sleep(10)
+    await msg.delete()
+    await update.message.delete()
+
+
+async def handle_group_lock_commands(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    text = (update.message.text or "").strip().lower()
+
+    if text == "قفل گروه":
+        await lock_group(update, context)
+        return True
+
+    if text in ["باز کردن گروه", "بازکردن گروه"]:
+        await unlock_group(update, context)
+        return True
+
+    if text == "قفل خودکار روشن":
+        await enable_auto_lock(update, context)
+        return True
+
+    if text == "قفل خودکار خاموش":
+        await disable_auto_lock(update, context)
+        return True
+
+    if text.startswith("تنظیم قفل خودکار"):
+        await set_auto_lock(update, context)
+        return True
+
+    return False
+
+
+# ───────────── فعال/غیرفعال کردن قفل محتوا ─────────────
 def _is_locked(chat_id: int, key: str) -> bool:
     return LOCKS.get(str(chat_id), {}).get(key, False)
 
@@ -387,11 +609,6 @@ def _set_lock(chat_id: int, key: str, status: bool):
     LOCKS.setdefault(str(chat_id), {})[key] = bool(status)
     _save_json(LOCK_FILE, LOCKS)
 
-
-
-# =====================================
-#      فعال کردن یک قفل مشخص
-# =====================================
 
 async def handle_lock(update: Update, context: ContextTypes.DEFAULT_TYPE, key: str):
     chat = update.effective_chat
@@ -405,31 +622,22 @@ async def handle_lock(update: Update, context: ContextTypes.DEFAULT_TYPE, key: s
         return
 
     if _is_locked(chat.id, key):
-        msg = await update.message.reply_text(f"🔒 قفل {LOCK_TYPES[key]} از قبل فعال است.")
+        msg = await update.message.reply_text(f"🔒 قفل {LOCK_TYPES.get(key, key)} از قبل فعال است.")
         await asyncio.sleep(10)
         await msg.delete()
         await update.message.delete()
         return
 
     _set_lock(chat.id, key, True)
-
-    # اعمال قفل روی چت
-    await apply_single_lock(context, chat.id, key)
-
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     msg = await update.message.reply_text(
-        f"🔒 قفل {LOCK_TYPES[key]} توسط <b>{user.first_name}</b> فعال شد.\n🕓 زمان: {now}",
+        f"✅ قفل {LOCK_TYPES.get(key, key)} توسط <b>{user.first_name}</b> فعال شد.\n🕓 زمان: {now}",
         parse_mode="HTML"
     )
     await asyncio.sleep(10)
     await msg.delete()
     await update.message.delete()
 
-
-
-# =====================================
-#      غیرفعال کردن یک قفل مشخص
-# =====================================
 
 async def handle_unlock(update: Update, context: ContextTypes.DEFAULT_TYPE, key: str):
     chat = update.effective_chat
@@ -443,20 +651,16 @@ async def handle_unlock(update: Update, context: ContextTypes.DEFAULT_TYPE, key:
         return
 
     if not _is_locked(chat.id, key):
-        msg = await update.message.reply_text(f"🔓 قفل {LOCK_TYPES[key]} از قبل باز است.")
+        msg = await update.message.reply_text(f"🔓 قفل {LOCK_TYPES.get(key, key)} از قبل باز است.")
         await asyncio.sleep(10)
         await msg.delete()
         await update.message.delete()
         return
 
     _set_lock(chat.id, key, False)
-
-    # فقط قفلی را باز می‌کنیم که همین key است
-    await remove_single_lock(context, chat.id, key)
-
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     msg = await update.message.reply_text(
-        f"🔓 قفل {LOCK_TYPES[key]} توسط <b>{user.first_name}</b> باز شد.\n🕓 زمان: {now}",
+        f"🔓 قفل {LOCK_TYPES.get(key, key)} توسط <b>{user.first_name}</b> باز شد.\n🕓 زمان: {now}",
         parse_mode="HTML"
     )
     await asyncio.sleep(10)
@@ -464,98 +668,17 @@ async def handle_unlock(update: Update, context: ContextTypes.DEFAULT_TYPE, key:
     await update.message.delete()
 
 
-
-# =====================================
-#     اعمال یک قفل (کلید به کلید)
-# =====================================
-
-async def apply_single_lock(context, chat_id: int, key: str):
-    """
-    هر قفل به شکل جداگانه روی اجازه‌های تلگرام اعمال می‌شود.
-    """
-    if key == "text":
-        perms = ChatPermissions(can_send_messages=False)
-    elif key == "media":
-        perms = ChatPermissions(can_send_media_messages=False)
-    elif key == "sticker":
-        perms = ChatPermissions(can_send_other_messages=False)
-    elif key == "link":
-        perms = ChatPermissions(can_add_web_page_previews=False)
-    elif key == "group":
-        # قفل کامل گروه
-        perms = ChatPermissions(
-            can_send_messages=False,
-            can_send_media_messages=False,
-            can_send_other_messages=False,
-            can_add_web_page_previews=False
-        )
-    else:
-        return
-
-    await context.bot.set_chat_permissions(chat_id, perms)
-
-
-
-# =====================================
-#    باز کردن همان قفلی که بسته شده
-# =====================================
-
-async def remove_single_lock(context, chat_id: int, key: str):
-
-    # اجازه‌های قبلی را می‌گیریم
-    current = LOCKS.get(str(chat_id), {})
-
-    # از اجازه‌های کامل تلگرام شروع می‌کنیم
-    perms = ChatPermissions(
-        can_send_messages=True,
-        can_send_media_messages=True,
-        can_send_other_messages=True,
-        can_add_web_page_previews=True
-    )
-
-    # دوباره هر قفلی که هنوز فعال است را اعمال می‌کنیم
-    for k, status in current.items():
-        if status:  # اگر هنوز فعال است
-            if k == "text":
-                perms.can_send_messages = False
-            elif k == "media":
-                perms.can_send_media_messages = False
-            elif k == "sticker":
-                perms.can_send_other_messages = False
-            elif k == "link":
-                perms.can_add_web_page_previews = False
-            elif k == "group":
-                perms = ChatPermissions(
-                    can_send_messages=False,
-                    can_send_media_messages=False,
-                    can_send_other_messages=False,
-                    can_add_web_page_previews=False
-                )
-
-    # ست کردن اجازه‌ها
-    await context.bot.set_chat_permissions(chat_id, perms)
-
-
-
-# =====================================
-#     تشخیص دستورهای قفل
-# =====================================
-
 async def handle_lock_commands(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = (update.message.text or "").strip().lower()
-
     for key, fa in LOCK_TYPES.items():
-
         if text == f"قفل {fa}":
             await handle_lock(update, context, key)
             return True
-
         if text in (f"باز کردن {fa}", f"بازکردن {fa}"):
             await handle_unlock(update, context, key)
             return True
-
     return False
-   
+    
 # ─────────────────────────────── هندلر مرکزی گروه ───────────────────────────────
 async def handle_group_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message:
