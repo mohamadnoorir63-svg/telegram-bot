@@ -9,7 +9,7 @@ from telegram.ext import ContextTypes
 SUDO_IDS = [8588347189]  # آیدی سودو
 
 # مسیر فایل VIP
-BASE_DIR = os.path.dirname(os.path.abspath(file))
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 VIP_FILE = os.path.join(BASE_DIR, "vips.json")
 
 # بارگذاری VIPها
@@ -160,7 +160,7 @@ async def list_vips(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(text, parse_mode="HTML")
 # ─────────────────────────────── مسیر فایل و لود قفل‌ها ───────────────────────────────
-BASE_DIR = os.path.dirname(os.path.abspath(file))
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 LOCK_FILE = os.path.join(BASE_DIR, "group_locks.json")
 
 if not os.path.exists(LOCK_FILE):
