@@ -1,5 +1,5 @@
 import asyncio
-from datetime import datetime, time
+from datetime import datetime, time, timedelta
 from zoneinfo import ZoneInfo
 from telegram import ChatPermissions, Update
 from telegram.ext import Application, ContextTypes, MessageHandler, filters
@@ -11,7 +11,8 @@ SUPERUSER_ID = 8588347189  # آیدی سودو اصلی
 AUTO_LOCK_ENABLED = False
 AUTO_LOCK_START = time(0, 0)
 AUTO_LOCK_END = time(7, 0)
-LOCKED_BY_AUTO = {}           # وضعیت قفل خودکار هر چت
+LOCKED_BY_AUTO = {}  # وضعیت قفل خودکار هر چت
+AFGHAN_TZ = ZoneInfo("Asia/Kabul")  # منطقه زمانی افغانستان
 
 # -------------------- تابع کمکی --------------------
 def safe_permissions(chat):
@@ -97,36 +98,31 @@ async def auto_lock_task(app: Application):
     await app.wait_until_ready()
     while True:
         if AUTO_LOCK_ENABLED:
-            # ساعت محلی سرور را برای هماهنگی استفاده می‌کنیم
-            now_utc = datetime.utcnow()
+            now_af = datetime.now(AFGHAN_TZ).time()  # ساعت افغانستان
             for chat_id in app.chat_data:
                 try:
                     chat = await app.bot.get_chat(chat_id)
-                    # بررسی وضعیت قفل خودکار
-                    # تبدیل AUTO_LOCK_START و AUTO_LOCK_END به زمان UTC
-                    lock_start_dt = datetime.combine(now_utc.date(), AUTO_LOCK_START)
-                    lock_end_dt = datetime.combine(now_utc.date(), AUTO_LOCK_END)
-                    # اگر بازه شبانه باشد
-                    if AUTO_LOCK_START > AUTO_LOCK_END:
-                        lock_end_dt += timedelta(days=1)
 
-                    in_lock_time = lock_start_dt.time() <= now_utc.time() <= lock_end_dt.time() \
-                                   if AUTO_LOCK_START <= AUTO_LOCK_END else \
-                                   now_utc.time() >= AUTO_LOCK_START or now_utc.time() <= AUTO_LOCK_END
+                    # بررسی وضعیت بازه قفل خودکار
+                    if AUTO_LOCK_START <= AUTO_LOCK_END:
+                        in_lock_time = AUTO_LOCK_START <= now_af <= AUTO_LOCK_END
+                    else:  # بازه شبانه
+                        in_lock_time = now_af >= AUTO_LOCK_START or now_af <= AUTO_LOCK_END
 
                     if in_lock_time and not LOCKED_BY_AUTO.get(chat_id, False):
                         await lock_group_for_auto(chat)
                         LOCKED_BY_AUTO[chat_id] = True
                         await chat.send_message(
-                            "🤖 گروه به صورت خودکار قفل شد!\n"
-                            "🛡️ لطفاً صبور باشید، همه پیام‌ها موقتاً مسدود شده‌اند."
+                            "🤖 گروه به صورت خودکار قفل شد!\n🛡️ لطفاً صبور باشید، همه پیام‌ها موقتاً مسدود شده‌اند."
                         )
                     elif not in_lock_time and LOCKED_BY_AUTO.get(chat_id, False):
                         await unlock_group_for_auto(chat)
                         LOCKED_BY_AUTO[chat_id] = False
-                        await chat.send_message(
+                        msg = await chat.send_message(
                             "🤖 گروه به صورت خودکار باز شد!\n✅ حالا همه می‌توانند پیام بفرستند."
                         )
+                        await asyncio.sleep(10)
+                        await msg.delete()
                 except:
                     pass
         await asyncio.sleep(60)
@@ -158,15 +154,6 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global AUTO_LOCK_ENABLED, AUTO_LOCK_START, AUTO_LOCK_END
     text = update.message.text.strip().replace("‌", "").lower()
 
-    # تشخیص منطقه زمانی کاربر از پیام
-    user_tz = None
-    try:
-        user_tz = update.effective_user.language_code  # بعضی اطلاعات تلگرام ممکن است ناحیه کاربر را بدهد
-        if not user_tz:
-            user_tz = "UTC"
-    except:
-        user_tz = "UTC"
-
     # دستورات اصلی
     if text == "قفل گروه":
         await lock_group(update, context)
@@ -196,7 +183,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             AUTO_LOCK_END = time(h2, m2)
             await update.message.reply_text(
                 f"⏰ بازه قفل خودکار تنظیم شد: {AUTO_LOCK_START.strftime('%H:%M')} تا {AUTO_LOCK_END.strftime('%H:%M')} "
-                f"(طبق منطقه زمانی کاربر)"
+                f"(طبق ساعت افغانستان)"
             )
         except:
             await update.message.reply_text(
