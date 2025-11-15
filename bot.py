@@ -2186,7 +2186,7 @@ application.add_handler(
 )
 from group_control.group_lock import register_group_lock_handlers
 
-register_group_lock_handlers(application, group=0)  # عدد مثبت
+register_group_lock_handlers(application, group=17)  # عدد مثبت
 # ==========================================================
 # 💡 ثبت ماژول اصل و لقب (در اولویت بالا)
 # ==========================================================
