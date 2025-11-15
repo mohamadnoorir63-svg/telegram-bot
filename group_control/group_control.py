@@ -601,9 +601,9 @@ async def handle_group_lock_commands(update: Update, context: ContextTypes.DEFAU
 
 
 # ───────────── فعال/غیرفعال کردن قفل محتوا ─────────────
-def _is_locked(chat_id: int, key: str) -> bool:
-    return LOCKS.get(str(chat_id), {}).get(key, False)
 
+    def _is_locked(chat_id: int, key: str) -> bool:
+    return LOCKS.get(str(chat_id), {}).get(key, False)
 
 def _set_lock(chat_id: int, key: str, status: bool):
     LOCKS.setdefault(str(chat_id), {})[key] = bool(status)
@@ -631,11 +631,11 @@ async def handle_lock(update: Update, context: ContextTypes.DEFAULT_TYPE, key: s
     # فعال کردن قفل
     _set_lock(chat.id, key, True)
 
-    # اگر قفل مدیا یا محتوا باشد، دسترسی مربوطه را غیرفعال کن
+    # اگر قفل مدیا باشد، پرمیشن‌ها را ببند
     if key in ["photos", "videos", "files", "voices", "stickers", "gifs", "media"]:
         permissions = ChatPermissions(
-            can_send_messages=True,  # پیام متنی فعال بماند
-            can_send_media_messages=False,  # ارسال مدیا بسته شود
+            can_send_messages=True,
+            can_send_media_messages=False,
             can_send_polls=True,
             can_send_other_messages=False,
             can_add_web_page_previews=False,
@@ -648,23 +648,6 @@ async def handle_lock(update: Update, context: ContextTypes.DEFAULT_TYPE, key: s
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     msg = await update.message.reply_text(
         f"🔒 قفل {LOCK_TYPES.get(key, key)} توسط <b>{user.first_name}</b> فعال شد.\n🕓 زمان: {now}",
-        parse_mode="HTML"
-    )
-    await asyncio.sleep(10)
-    await msg.delete()
-    await update.message.delete()
-
-    if _is_locked(chat.id, key):
-        msg = await update.message.reply_text(f"🔒 قفل {LOCK_TYPES.get(key, key)} از قبل فعال است.")
-        await asyncio.sleep(10)
-        await msg.delete()
-        await update.message.delete()
-        return
-
-    _set_lock(chat.id, key, True)
-    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    msg = await update.message.reply_text(
-        f"✅ قفل {LOCK_TYPES.get(key, key)} توسط <b>{user.first_name}</b> فعال شد.\n🕓 زمان: {now}",
         parse_mode="HTML"
     )
     await asyncio.sleep(10)
@@ -690,10 +673,10 @@ async def handle_unlock(update: Update, context: ContextTypes.DEFAULT_TYPE, key:
         await update.message.delete()
         return
 
-    # باز کردن قفل و فعال کردن پرمیشن مرتبط با مدیا
+    # باز کردن قفل
     _set_lock(chat.id, key, False)
 
-    # اگر قفل مدیا باز می‌شود، دسترسی مدیا هم فعال شود
+    # اگر قفل مدیا بود، پرمیشن‌ها را باز کن
     if key in ["photos", "videos", "files", "voices", "stickers", "gifs", "media"]:
         permissions = ChatPermissions(
             can_send_messages=True,
@@ -716,16 +699,6 @@ async def handle_unlock(update: Update, context: ContextTypes.DEFAULT_TYPE, key:
     await msg.delete()
     await update.message.delete()
 
-    _set_lock(chat.id, key, False)
-    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    msg = await update.message.reply_text(
-        f"🔓 قفل {LOCK_TYPES.get(key, key)} توسط <b>{user.first_name}</b> باز شد.\n🕓 زمان: {now}",
-        parse_mode="HTML"
-    )
-    await asyncio.sleep(10)
-    await msg.delete()
-    await update.message.delete()
-
 
 async def handle_lock_commands(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = (update.message.text or "").strip().lower()
@@ -737,7 +710,6 @@ async def handle_lock_commands(update: Update, context: ContextTypes.DEFAULT_TYP
             await handle_unlock(update, context, key)
             return True
     return False
-    
 # ─────────────────────────────── هندلر مرکزی گروه ───────────────────────────────
 async def handle_group_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message:
