@@ -86,7 +86,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip().replace("‌", "").lower()
     if text == "قفل گروه":
         await lock_group(update, context)
-    elif text == "باز کردن گروه":
+    elif text == "بازکردن گروه":
         await unlock_group(update, context)
 
 # -------------------- ثبت هندلر --------------------
