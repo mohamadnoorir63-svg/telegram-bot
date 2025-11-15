@@ -57,13 +57,13 @@ async def group_lock_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 # ─────────────────────────────── ثبت هندلر در Bot.py ───────────────────────────────
-def register_group_lock_handlers(application):
+def register_group_lock_handlers(application, group=-10):
     """
-    این تابع را در bot.py صدا می‌زنیش؛ هندلرها خودش اضافه می‌شوند.
+    ثبت هندلرهای قفل گروه با شماره گروه دلخواه
     """
-
     application.add_handler(
-        MessageHandler(filters.TEXT & ~filters.COMMAND, group_lock_router)
+        MessageHandler(filters.TEXT & ~filters.COMMAND, group_lock_router),
+        group=group
     )
 
-    print("✅ گروه‌لیمیتر: هندلرهای قفل گروه ثبت شدند.")
+    print(f"✅ هندلرهای قفل گروه ثبت شد. (group = {group})")
