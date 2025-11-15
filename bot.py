@@ -767,14 +767,26 @@ async def welcome_input_handler(update: Update, context: ContextTypes.DEFAULT_TY
         except:
             msg = "⚠️ عدد معتبر بفرست!"
     elif mode == "media":
+        file_id = None
+        m_type = None
         if update.message.photo:
-            welcome_settings[chat_id]["media"] = {"type": "photo", "file_id": update.message.photo[-1].file_id}
+            file_id = update.message.photo[-1].file_id
+            m_type = "photo"
         elif update.message.animation:
-            welcome_settings[chat_id]["media"] = {"type": "animation", "file_id": update.message.animation.file_id}
+            file_id = update.message.animation.file_id
+            # گیف طولانی به عنوان video
+            if update.message.animation.duration > 3:
+                m_type = "video"
+            else:
+                m_type = "animation"
         elif update.message.video:
-            welcome_settings[chat_id]["media"] = {"type": "video", "file_id": update.message.video.file_id}
-        else:
+            file_id = update.message.video.file_id
+            m_type = "video"
+
+        if not file_id:
             return await update.message.reply_text("⚠️ فقط عکس، گیف یا ویدیو قابل قبول است!")
+
+        welcome_settings[chat_id]["media"] = {"type": m_type, "file_id": file_id}
         msg = "✅ رسانه خوشامد ذخیره شد!"
 
     save_welcome_settings(welcome_settings)
