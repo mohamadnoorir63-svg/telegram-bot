@@ -3,27 +3,6 @@ from telegram import ChatPermissions, Update
 from telegram.ext import MessageHandler, filters, ContextTypes
 
 
-def safe_permissions(chat):
-    """
-    اگر chat.permissions خالی بود، یک نسخه پیش‌فرض با تمام True برمی‌گرداند.
-    """
-    p = chat.permissions
-    if p is None:
-        return ChatPermissions(
-            can_send_messages=True,
-            can_send_media_messages=True,
-            can_send_other_messages=True,
-            can_add_web_page_previews=True,
-            can_send_photos=True,
-            can_send_videos=True,
-            can_send_voice_notes=True,
-            can_send_video_notes=True,
-            can_send_documents=True,
-            can_send_audios=True,
-        )
-    return p
-
-
 # ─────────────────────────────── قفل ───────────────────────────────
 async def lock_group(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat = update.effective_chat
@@ -33,29 +12,13 @@ async def lock_group(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if member.status not in ("administrator", "creator"):
         return await update.message.reply_text("🚫 فقط مدیران می‌توانند گروه را قفل کنند.")
 
-    current = safe_permissions(chat)
-
-    # جلوگیری از قفل دوباره
-    if current.can_send_messages is False:
+    if chat.permissions and chat.permissions.can_send_messages is False:
         msg = await update.message.reply_text("🔒 گروه از قبل قفل است.")
         await asyncio.sleep(3)
         return await msg.delete()
 
-    new_perms = ChatPermissions(
-        can_send_messages=False,
-
-        can_send_media_messages=current.can_send_media_messages,
-        can_send_other_messages=current.can_send_other_messages,
-        can_add_web_page_previews=current.can_add_web_page_previews,
-        can_send_photos=current.can_send_photos,
-        can_send_videos=current.can_send_videos,
-        can_send_voice_notes=current.can_send_voice_notes,
-        can_send_video_notes=current.can_send_video_notes,
-        can_send_documents=current.can_send_documents,
-        can_send_audios=current.can_send_audios,
-    )
-
-    await context.bot.set_chat_permissions(chat.id, new_perms)
+    perms = ChatPermissions(can_send_messages=False)
+    await context.bot.set_chat_permissions(chat.id, perms)
 
     msg = await update.message.reply_text("🔒 گروه قفل شد.")
     await asyncio.sleep(4)
@@ -72,29 +35,13 @@ async def unlock_group(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if member.status not in ("administrator", "creator"):
         return await update.message.reply_text("🚫 فقط مدیران می‌توانند گروه را باز کنند.")
 
-    current = safe_permissions(chat)
-
-    # جلوگیری از باز کردن تکراری
-    if current.can_send_messages is True:
+    if chat.permissions and chat.permissions.can_send_messages is True:
         msg = await update.message.reply_text("🔓 گروه از قبل باز است.")
         await asyncio.sleep(3)
         return await msg.delete()
 
-    new_perms = ChatPermissions(
-        can_send_messages=True,
-
-        can_send_media_messages=current.can_send_media_messages,
-        can_send_other_messages=current.can_send_other_messages,
-        can_add_web_page_previews=current.can_add_web_page_previews,
-        can_send_photos=current.can_send_photos,
-        can_send_videos=current.can_send_videos,
-        can_send_voice_notes=current.can_send_voice_notes,
-        can_send_video_notes=current.can_send_video_notes,
-        can_send_documents=current.can_send_documents,
-        can_send_audios=current.can_send_audios,
-    )
-
-    await context.bot.set_chat_permissions(chat.id, new_perms)
+    perms = ChatPermissions(can_send_messages=True)
+    await context.bot.set_chat_permissions(chat.id, perms)
 
     msg = await update.message.reply_text("🔓 گروه باز شد.")
     await asyncio.sleep(4)
