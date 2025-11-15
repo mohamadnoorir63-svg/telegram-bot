@@ -640,34 +640,29 @@ async def handle_lock(update: Update, context: ContextTypes.DEFAULT_TYPE, key: s
     await msg.delete()
     await update.message.delete()
 
-
-async def handle_unlock(update: Update, context: ContextTypes.DEFAULT_TYPE, key: str):
+async def unlock_group(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat = update.effective_chat
     user = update.effective_user
 
-    if not await _has_full_access(context, chat.id, user.id):
-        msg = await update.message.reply_text("🚫 فقط مدیران یا سودوها مجازند.")
-        await asyncio.sleep(10)
-        await msg.delete()
-        await update.message.delete()
-        return
+    await context.bot.set_chat_permissions(
+        chat.id,
+        ChatPermissions(
+            can_send_messages=True,
+            can_send_media_messages=True,
+            can_send_other_messages=True,
+            can_add_web_page_previews=True
+        )
+    )
 
-    if not _is_locked(chat.id, key):
-        msg = await update.message.reply_text(f"🔓 قفل {LOCK_TYPES.get(key, key)} از قبل باز است.")
-        await asyncio.sleep(10)
-        await msg.delete()
-        await update.message.delete()
-        return
-
-    _set_lock(chat.id, key, False)
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     msg = await update.message.reply_text(
-        f"🔓 قفل {LOCK_TYPES.get(key, key)} توسط <b>{user.first_name}</b> باز شد.\n🕓 زمان: {now}",
+        f"🔓 گروه توسط <b>{user.first_name}</b> باز شد.\n🕓 زمان: {now}",
         parse_mode="HTML"
     )
     await asyncio.sleep(10)
     await msg.delete()
     await update.message.delete()
+
 
 
 async def handle_lock_commands(update: Update, context: ContextTypes.DEFAULT_TYPE):
