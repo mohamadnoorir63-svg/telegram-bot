@@ -1,13 +1,20 @@
 from telegram import ChatPermissions, Update
 from telegram.ext import Application, ContextTypes, MessageHandler, filters
 
+
 def safe_permissions(chat):
     """اگر chat.permissions مقدار نداشت، مقدار پیش‌فرض بساز"""
     p = chat.permissions
     if p is None:
         return ChatPermissions(
             can_send_messages=True,
-            can_send_media_messages=True,
+            can_send_audios=True,
+            can_send_documents=True,
+            can_send_photos=True,
+            can_send_videos=True,
+            can_send_video_notes=True,
+            can_send_voice_notes=True,
+            can_send_polls=True,
             can_send_other_messages=True,
             can_add_web_page_previews=True,
             can_invite_users=True,
@@ -25,7 +32,15 @@ async def lock_group(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         new_permissions = ChatPermissions(
             can_send_messages=False,
-            can_send_media_messages=current.can_send_media_messages,
+
+            # سایر اجازه‌ها بدون تغییر
+            can_send_audios=current.can_send_audios,
+            can_send_documents=current.can_send_documents,
+            can_send_photos=current.can_send_photos,
+            can_send_videos=current.can_send_videos,
+            can_send_video_notes=current.can_send_video_notes,
+            can_send_voice_notes=current.can_send_voice_notes,
+            can_send_polls=current.can_send_polls,
             can_send_other_messages=current.can_send_other_messages,
             can_add_web_page_previews=current.can_add_web_page_previews,
             can_invite_users=current.can_invite_users,
@@ -48,7 +63,15 @@ async def unlock_group(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         new_permissions = ChatPermissions(
             can_send_messages=True,
-            can_send_media_messages=current.can_send_media_messages,
+
+            # سایر اجازه‌ها بدون تغییر
+            can_send_audios=current.can_send_audios,
+            can_send_documents=current.can_send_documents,
+            can_send_photos=current.can_send_photos,
+            can_send_videos=current.can_send_videos,
+            can_send_video_notes=current.can_send_video_notes,
+            can_send_voice_notes=current.can_send_voice_notes,
+            can_send_polls=current.can_send_polls,
             can_send_other_messages=current.can_send_other_messages,
             can_add_web_page_previews=current.can_add_web_page_previews,
             can_invite_users=current.can_invite_users,
