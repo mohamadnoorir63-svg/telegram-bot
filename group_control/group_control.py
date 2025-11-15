@@ -375,14 +375,6 @@ async def check_message_locks(update, context):
     if locks.get("text") and text and not (has_photo or has_video or has_doc):
         return await _del_msg(update, "🚫 ارسال پیام متنی ممنوع است.")
 
-# ─────────────────────────────── فعال‌سازی / غیرفعال‌سازی قفل ───────────────────────────────
- from datetime import datetime
-from telegram import ChatPermissions, Update
-from telegram.ext import ContextTypes
-import asyncio
-
-
-
 # =====================================
 #   ابزار پایه قفل‌ها (بدون تغییر)
 # =====================================
