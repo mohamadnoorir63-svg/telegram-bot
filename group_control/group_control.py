@@ -608,10 +608,14 @@ async def unlock_group(update, context):
     chat = update.effective_chat
     user = update.effective_user
 
-    # فقط پیام‌های متنی باز شود
+    # فقط پیام متنی باز شود، سایر پرمیشن‌ها دست نخورده باقی می‌مانند
     permissions = ChatPermissions(
-        can_send_messages=True  # پیام متنی باز
-        # سایر پرمیشن‌ها به حالت پیش‌فرض باقی می‌مانند
+        can_send_messages=True,   # پیام متنی باز
+        can_send_media_messages=None,
+        can_send_polls=None,
+        can_send_other_messages=None,
+        can_add_web_page_previews=None,
+        can_invite_users=None
     )
 
     await context.bot.set_chat_permissions(chat.id, permissions)
