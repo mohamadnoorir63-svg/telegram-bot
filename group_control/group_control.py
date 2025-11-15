@@ -587,30 +587,10 @@ async def lock_group(update, context):
     chat = update.effective_chat
     user = update.effective_user
 
-    # گرفتن پرمیشن فعلی
-    current_perms = (await context.bot.get_chat(chat.id)).permissions
+    # فقط پیام متنی بسته شود، بقیه پیش‌فرض می‌مانند
+    perms = ChatPermissions(can_send_messages=False)
 
-    # اگر None بود، یک پرمیشن پیش‌فرض بساز
-    current_perms = current_perms or ChatPermissions(
-        can_send_messages=True,
-        can_send_media_messages=True,
-        can_send_polls=True,
-        can_send_other_messages=True,
-        can_add_web_page_previews=True,
-        can_invite_users=True
-    )
-
-    # ساخت ChatPermissions جدید با تغییر فقط can_send_messages
-    new_perms = ChatPermissions(
-        can_send_messages=False,
-        can_send_media_messages=current_perms.can_send_media_messages,
-        can_send_polls=current_perms.can_send_polls,
-        can_send_other_messages=current_perms.can_send_other_messages,
-        can_add_web_page_previews=current_perms.can_add_web_page_previews,
-        can_invite_users=current_perms.can_invite_users
-    )
-
-    await context.bot.set_chat_permissions(chat.id, new_perms)
+    await context.bot.set_chat_permissions(chat.id, perms)
 
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     msg = await update.message.reply_text(
@@ -626,27 +606,10 @@ async def unlock_group(update, context):
     chat = update.effective_chat
     user = update.effective_user
 
-    current_perms = (await context.bot.get_chat(chat.id)).permissions
+    # فقط پیام متنی باز شود
+    perms = ChatPermissions(can_send_messages=True)
 
-    current_perms = current_perms or ChatPermissions(
-        can_send_messages=False,
-        can_send_media_messages=True,
-        can_send_polls=True,
-        can_send_other_messages=True,
-        can_add_web_page_previews=True,
-        can_invite_users=True
-    )
-
-    new_perms = ChatPermissions(
-        can_send_messages=True,
-        can_send_media_messages=current_perms.can_send_media_messages,
-        can_send_polls=current_perms.can_send_polls,
-        can_send_other_messages=current_perms.can_send_other_messages,
-        can_add_web_page_previews=current_perms.can_add_web_page_previews,
-        can_invite_users=current_perms.can_invite_users
-    )
-
-    await context.bot.set_chat_permissions(chat.id, new_perms)
+    await context.bot.set_chat_permissions(chat.id, perms)
 
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     msg = await update.message.reply_text(
