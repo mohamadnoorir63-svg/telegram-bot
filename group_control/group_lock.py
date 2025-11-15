@@ -84,7 +84,6 @@ async def unlock_group(update: Update, context: ContextTypes.DEFAULT_TYPE, auto=
     except Exception as e:
         if not auto:
             await update.message.reply_text(f"❌ خطا: {e}")
-
 async def auto_lock_task(app: Application):
     global AUTO_LOCK_ENABLED, AUTO_LOCK_START, AUTO_LOCK_END, LOCKED_BY_AUTO
     await app.wait_until_ready()
@@ -92,11 +91,15 @@ async def auto_lock_task(app: Application):
         if AUTO_LOCK_ENABLED:
             now_af = datetime.now(AFGHAN_TZ).time()
             for chat_id in AUTO_LOCK_CHATS:
+                if chat_id not in LOCKED_BY_AUTO:
+                    LOCKED_BY_AUTO[chat_id] = False
                 try:
                     chat = await app.bot.get_chat(chat_id)
+                    
+                    # بررسی بازه قفل خودکار
                     if AUTO_LOCK_START <= AUTO_LOCK_END:
                         in_lock_time = AUTO_LOCK_START <= now_af <= AUTO_LOCK_END
-                    else:
+                    else:  # بازه شبانه
                         in_lock_time = now_af >= AUTO_LOCK_START or now_af <= AUTO_LOCK_END
 
                     if in_lock_time and not LOCKED_BY_AUTO.get(chat_id, False):
@@ -125,9 +128,10 @@ async def auto_lock_task(app: Application):
                         msg = await chat.send_message("🤖 گروه به صورت خودکار باز شد!\n✅ حالا همه می‌توانند پیام بفرستند.")
                         await asyncio.sleep(10)
                         await msg.delete()
-                except:
-                    pass
-        await asyncio.sleep(30)
+                except Exception as e:
+                    print(f"Auto-lock error for chat {chat_id}: {e}")
+        await asyncio.sleep(15)  # هر ۱۵ ثانیه چک می‌کنیم
+
 
 async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global AUTO_LOCK_ENABLED, AUTO_LOCK_START, AUTO_LOCK_END
@@ -166,6 +170,9 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 def register_group_lock_handlers(app: Application, group: int = 17):
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text), group=group)
-    async def start_task(app: Application):
+
+    async def start_auto_lock(app: Application):
         app.create_task(auto_lock_task(app))
-    app.post_init = start_task
+
+    # post_init حتماً باید asyncio.run در app رعایت شود
+    app.post_init = start_auto_lock
