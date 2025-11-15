@@ -586,7 +586,7 @@ async def fullstats(update: Update, context: ContextTypes.DEFAULT_TYPE):
 from telegram import InlineKeyboardMarkup, InlineKeyboardButton, Update
 from telegram.ext import ContextTypes
 import json, os, asyncio
-import jdatetime  # ✅ برای تاریخ شمسی
+import jdatetime
 
 WELCOME_FILE = "welcome_settings.json"
 
@@ -722,7 +722,7 @@ async def welcome_panel_buttons(update: Update, context: ContextTypes.DEFAULT_TY
         msg = "📜 لطفاً متن جدید خوشامد را ارسال کن.\nمثلاً:\nسلام {name} خوش اومدی 🌻"
         context.user_data["set_mode"] = "text"
     elif data == "welcome_media":
-        msg = "🖼 لطفاً عکس، گیف یا ویدیو خوشامد را بفرست تا ذخیره شود."
+        msg = "🖼 لطفاً عکس، گیف، ویدیو یا هر نوع فایل قابل ارسال در تلگرام را بفرست."
         context.user_data["set_mode"] = "media"
     elif data == "welcome_rules":
         msg = "📎 لینک قوانین گروه را بفرست (مثلاً https://t.me/example)"
@@ -767,26 +767,28 @@ async def welcome_input_handler(update: Update, context: ContextTypes.DEFAULT_TY
         except:
             msg = "⚠️ عدد معتبر بفرست!"
     elif mode == "media":
-        file_id = None
-        m_type = None
+        media_info = None
         if update.message.photo:
-            file_id = update.message.photo[-1].file_id
-            m_type = "photo"
+            media_info = {"type": "photo", "file_id": update.message.photo[-1].file_id}
         elif update.message.animation:
-            file_id = update.message.animation.file_id
-            # گیف طولانی به عنوان video
+            # گیف کوتاه یا طولانی
             if update.message.animation.duration > 3:
-                m_type = "video"
+                media_info = {"type": "video", "file_id": update.message.animation.file_id}
             else:
-                m_type = "animation"
+                media_info = {"type": "animation", "file_id": update.message.animation.file_id}
         elif update.message.video:
-            file_id = update.message.video.file_id
-            m_type = "video"
+            media_info = {"type": "video", "file_id": update.message.video.file_id}
+        elif update.message.document:
+            media_info = {"type": "document", "file_id": update.message.document.file_id}
+        elif update.message.audio:
+            media_info = {"type": "audio", "file_id": update.message.audio.file_id}
+        elif update.message.voice:
+            media_info = {"type": "voice", "file_id": update.message.voice.file_id}
 
-        if not file_id:
-            return await update.message.reply_text("⚠️ فقط عکس، گیف یا ویدیو قابل قبول است!")
+        if not media_info:
+            return await update.message.reply_text("⚠️ فقط فایل‌های قابل ارسال در تلگرام قبول می‌شوند!")
 
-        welcome_settings[chat_id]["media"] = {"type": m_type, "file_id": file_id}
+        welcome_settings[chat_id]["media"] = media_info
         msg = "✅ رسانه خوشامد ذخیره شد!"
 
     save_welcome_settings(welcome_settings)
@@ -822,6 +824,12 @@ async def welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     msg = await update.message.reply_animation(m_file, caption=message_text, parse_mode="HTML")
                 elif m_type == "video":
                     msg = await update.message.reply_video(m_file, caption=message_text, parse_mode="HTML")
+                elif m_type == "document":
+                    msg = await update.message.reply_document(m_file, caption=message_text, parse_mode="HTML")
+                elif m_type == "audio":
+                    msg = await update.message.reply_audio(m_file, caption=message_text, parse_mode="HTML")
+                elif m_type == "voice":
+                    msg = await update.message.reply_voice(m_file, caption=message_text, parse_mode="HTML")
             else:
                 msg = await update.message.reply_text(message_text, parse_mode="HTML")
 
