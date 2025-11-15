@@ -251,6 +251,8 @@ async def _del_msg(update: Update, warn_text: str = None):
         print(f"[Delete Error] {e}")
 
 # ─────────────────────────────── بررسی پیام‌ها و اعمال قفل ───────────────────────────────
+# یک دیکشنری سراسری برای ذخیره آخرین پیام هر کاربر
+LAST_MESSAGES = {}
 
 async def check_message_locks(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """بررسی پیام و حذف در صورت نقض قفل‌ها"""
@@ -258,7 +260,7 @@ async def check_message_locks(update: Update, context: ContextTypes.DEFAULT_TYPE
         return
 
     msg = update.message
-    text = (msg.text or msg.caption or "").lower()
+    text = (msg.text or msg.caption or "").strip().lower()
     chat = msg.chat
     user = msg.from_user
 
@@ -270,6 +272,7 @@ async def check_message_locks(update: Update, context: ContextTypes.DEFAULT_TYPE
     if await _has_full_access(context, chat.id, user.id):
         return
 
+    # نوع محتوا
     has_photo = bool(msg.photo)
     has_video = bool(msg.video)
     has_doc = bool(msg.document)
@@ -277,18 +280,15 @@ async def check_message_locks(update: Update, context: ContextTypes.DEFAULT_TYPE
     has_anim = bool(msg.animation)
     has_stick = bool(msg.sticker)
     has_fwd = bool(msg.forward_date)
-        # یک دیکشنری جهانی برای ذخیره آخرین پیام هر کاربر
-    LAST_MESSAGES = {}
 
     # 🚫 پیام تکراری
     if locks.get("spam_repeats") and text:
         last_msg = LAST_MESSAGES.get(user.id)
         if last_msg and last_msg == text:
             return await _del_msg(update, "🚫 ارسال پیام تکراری ممنوع است.")
-        # ذخیره پیام فعلی برای چک بعدی
         LAST_MESSAGES[user.id] = text
 
-    # 🚫 همه لینک‌ ها
+    # 🚫 همه لینک‌ها
     if locks.get("all_links") and any(x in text for x in ["http://", "https://", "t.me", "telegram.me"]):
         return await _del_msg(update, "🚫 ارسال هرگونه لینک ممنوع است.")
 
@@ -316,7 +316,7 @@ async def check_message_locks(update: Update, context: ContextTypes.DEFAULT_TYPE
     if locks.get("links") and any(x in text for x in ["http://", "https://", "t.me", "telegram.me"]):
         return await _del_msg(update, "🚫 ارسال لینک ممنوع است.")
 
-      # 🚫 تبلیغ
+    # 🚫 تبلیغ
     if locks.get("ads") and any(x in text for x in ["joinchat", "promo", "invite", "bot?start=", "channel"]):
         return await _del_msg(update, "🚫 تبلیغات ممنوع است.")
 
@@ -336,7 +336,7 @@ async def check_message_locks(update: Update, context: ContextTypes.DEFAULT_TYPE
     if locks.get("forward") and has_fwd:
         return await _del_msg(update, "🚫 فوروارد پیام ممنوع است.")
 
-    # 🚫 منشن / یوزرنیم
+    # 🚫 منشن / تگ
     if (locks.get("usernames") or locks.get("mention")) and "@" in text:
         return await _del_msg(update, "🚫 استفاده از @ یا منشن ممنوع است.")
 
