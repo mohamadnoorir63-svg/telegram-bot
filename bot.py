@@ -656,7 +656,6 @@ async def open_welcome_panel(update: Update, context: ContextTypes.DEFAULT_TYPE)
     chat = update.effective_chat if update.effective_chat else update.callback_query.message.chat
     user = update.effective_user
 
-    # بررسی دسترسی (مدیر)
     member = await context.bot.get_chat_member(chat.id, user.id)
     if member.status not in ["administrator", "creator"]:
         text = "⛔ فقط مدیران می‌توانند خوشامد را تنظیم کنند!"
@@ -768,27 +767,44 @@ async def welcome_input_handler(update: Update, context: ContextTypes.DEFAULT_TY
             msg = "⚠️ عدد معتبر بفرست!"
     elif mode == "media":
         media_info = None
+        msg_type = None
+
         if update.message.photo:
-            media_info = {"type": "photo", "file_id": update.message.photo[-1].file_id}
-        elif update.message.animation:
-            # گیف کوتاه یا طولانی
-            if update.message.animation.duration > 3:
-                media_info = {"type": "video", "file_id": update.message.animation.file_id}
-            else:
-                media_info = {"type": "animation", "file_id": update.message.animation.file_id}
+            media_info = update.message.photo[-1].file_id
+            msg_type = "photo"
         elif update.message.video:
-            media_info = {"type": "video", "file_id": update.message.video.file_id}
+            media_info = update.message.video.file_id
+            msg_type = "video"
+        elif update.message.animation:
+            # گیف طولانی یا کوتاه
+            if update.message.animation.duration > 3:
+                media_info = update.message.animation.file_id
+                msg_type = "video"
+            else:
+                media_info = update.message.animation.file_id
+                msg_type = "animation"
         elif update.message.document:
-            media_info = {"type": "document", "file_id": update.message.document.file_id}
+            mime = update.message.document.mime_type
+            media_info = update.message.document.file_id
+            if mime.startswith("video/"):
+                msg_type = "video"
+            elif mime.startswith("image/"):
+                msg_type = "photo"
+            elif mime.startswith("audio/"):
+                msg_type = "audio"
+            else:
+                msg_type = "document"
         elif update.message.audio:
-            media_info = {"type": "audio", "file_id": update.message.audio.file_id}
+            media_info = update.message.audio.file_id
+            msg_type = "audio"
         elif update.message.voice:
-            media_info = {"type": "voice", "file_id": update.message.voice.file_id}
+            media_info = update.message.voice.file_id
+            msg_type = "voice"
 
         if not media_info:
             return await update.message.reply_text("⚠️ فقط فایل‌های قابل ارسال در تلگرام قبول می‌شوند!")
 
-        welcome_settings[chat_id]["media"] = media_info
+        welcome_settings[chat_id]["media"] = {"type": msg_type, "file_id": media_info}
         msg = "✅ رسانه خوشامد ذخیره شد!"
 
     save_welcome_settings(welcome_settings)
