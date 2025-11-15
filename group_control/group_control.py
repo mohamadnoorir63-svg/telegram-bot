@@ -639,8 +639,6 @@ async def handle_lock_commands(update: Update, context: ContextTypes.DEFAULT_TYP
     return False
 # ─────────────────────────────── هندلر مرکزی گروه ───────────────────────────────
 async def handle_group_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """هندلر اصلی پیام‌های گروه"""
-
     if not update.message:
         return
 
@@ -656,14 +654,14 @@ async def handle_group_message(update: Update, context: ContextTypes.DEFAULT_TYP
     if text == "لیست ویژه":
         return await list_vips(update, context)
 
-    # ───────────── بررسی دستورات قفل / باز کردن ─────────────
-    if text.startswith("قفل ") or text.startswith("باز کردن ") or text.startswith("بازکردن "):
-        return await handle_lock_commands(update, context)
-
     # ───────────── بررسی دستورات قفل گروه و قفل خودکار ─────────────
     result = await handle_group_lock_commands(update, context)
     if result:
         return
+
+    # ───────────── بررسی دستورات قفل / باز کردن محتوا ─────────────
+    if text.startswith("قفل ") or text.startswith("باز کردن ") or text.startswith("بازکردن "):
+        return await handle_lock_commands(update, context)
 
     # ───────────── در نهایت بررسی پیام‌ها مطابق قفل‌ها ─────────────
     await check_message_locks(update, context)
