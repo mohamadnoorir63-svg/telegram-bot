@@ -542,37 +542,6 @@ async def auto_lock_check(context: ContextTypes.DEFAULT_TYPE):
 
 
 # ───────────── دستورات قفل گروه ─────────────
-async def lock_group(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    chat = update.effective_chat
-    user = update.effective_user
-
-    await context.bot.set_chat_permissions(chat.id, ChatPermissions(can_send_messages=False))
-
-    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    msg = await update.message.reply_text(
-        f"🔒 گروه توسط <b>{user.first_name}</b> تا اطلاع ثانوی قفل شد.\n🕓 زمان: {now}",
-        parse_mode="HTML"
-    )
-    await asyncio.sleep(10)
-    await msg.delete()
-    await update.message.delete()
-
-
-async def unlock_group(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    chat = update.effective_chat
-    user = update.effective_user
-
-    await context.bot.set_chat_permissions(chat.id, ChatPermissions(can_send_messages=True))
-
-    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    msg = await update.message.reply_text(
-        f"🔓 گروه توسط <b>{user.first_name}</b> باز شد.\n🕓 زمان: {now}",
-        parse_mode="HTML"
-    )
-    await asyncio.sleep(10)
-    await msg.delete()
-    await update.message.delete()
-
 
 async def handle_group_lock_commands(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = (update.message.text or "").strip().lower()
