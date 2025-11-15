@@ -75,6 +75,7 @@ def generate_fonts(name: str):
 
     # ✅ اضافه کردن الگوهای ثابت
     fixed_patterns = [
+        "۝ؔؑ❁➹‌❬⃟꯭()꯭꯭‌⃟❭➹❁۝ؔؑ",
         "𓄂{}𓆃",
         "♥️⃝⃭𝄞❉্͜͡▪️𒌍꯭🦋⃝⃡.𝅯.𝅰.꯭𝅱.𝅲.꯭𝅱.𝅰.𝅯.𝅮.꯭.{} 𝄞͡،⚛️",
        "𓄂ꪰ𓁪❥𝄞{}𝄞❥𓀛꯭𓆃ᵐᶠᶰ↬𓃬",
@@ -118,7 +119,7 @@ def generate_fonts(name: str):
     return fonts
 
 # ======================= 📄 ساخت صفحات =======================
-def make_pages(name: str, fonts: list, page_size=10, max_pages=5):
+def make_pages(name: str, fonts: list, page_size=10, max_pages=7):
     pages = []
     chunks = [fonts[i:i+page_size] for i in range(0, len(fonts), page_size)][:max_pages]
     for idx, chunk in enumerate(chunks):
