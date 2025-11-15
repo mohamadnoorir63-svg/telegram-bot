@@ -217,7 +217,6 @@ LOCK_TYPES = {
     "external_media": "رسانه خارجی",
     "invite_links": "لینک دعوت",
     "file_types": "فایل‌های خاص",
-    "new_members": "کاربران جدید",
     "forward_from_bots": "فوروارد از ربات",
     "urls_videos": "لینک ویدیو",
     "short_links": "لینک کوتاه",
@@ -261,9 +260,8 @@ async def _del_msg(update: Update, warn_text: str = None):
         print(f"[Delete Error] {e}")
 
 # ─────────────────────────────── بررسی پیام‌ها و اعمال قفل ───────────────────────────────
-# دیکشنری‌های جهانی
+# دیکشنری برای ذخیره آخرین پیام هر کاربر
 LAST_MESSAGES = {}
-NEW_USERS = {}
 
 async def check_message_locks(update, context):
     """بررسی پیام و حذف در صورت نقض قفل‌ها"""
@@ -292,15 +290,6 @@ async def check_message_locks(update, context):
     has_stick = bool(msg.sticker)
     has_fwd = bool(msg.forward_date)
 
-    # 🚫 کاربران جدید (5 ثانیه اول)
-    if locks.get("new_members"):
-        if user.id not in NEW_USERS:
-            NEW_USERS[user.id] = datetime.now()
-
-        join_time = NEW_USERS[user.id]
-        if (datetime.now() - join_time).total_seconds() < 5:
-            return await _del_msg(update, "🚫 کاربران جدید نمی‌توانند پیام دهند.")
-
     # 🚫 پیام تکراری
     if locks.get("spam_repeats") and text:
         last_msg = LAST_MESSAGES.get(user.id)
@@ -308,7 +297,7 @@ async def check_message_locks(update, context):
             return await _del_msg(update, "🚫 ارسال پیام تکراری ممنوع است.")
         LAST_MESSAGES[user.id] = text
 
-    # ادامه‌ی بررسی بقیه‌ی قفل‌ها مثل قبل...
+    # ادامه بررسی سایر قفل‌ها ...
     # 🚫 همه لینک‌ ها
     if locks.get("all_links") and any(x in text for x in ["http://", "https://", "t.me", "telegram.me"]):
         return await _del_msg(update, "🚫 ارسال هرگونه لینک ممنوع است.")
@@ -328,10 +317,6 @@ async def check_message_locks(update, context):
    # 🚫 پیام طولانی
     if locks.get("long_text") and len(text) > 200:   # اینجا 200 یعنی حد مجاز
         return await _del_msg(update, "🚫 ارسال پیام طولانی ممنوع است.")
-
-    # 🚫 کاربران جدید (5 ثانیه اول)
-    if locks.get("new_members") and (datetime.now() - user.date).total_seconds() < 5:
-        return await _del_msg(update, "🚫 کاربران جدید نمی‌توانند پیام دهند.")
 
     # 🚫 حروف بزرگ
     if locks.get("capslock") and text.isupper():
