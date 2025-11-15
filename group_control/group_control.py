@@ -604,21 +604,41 @@ async def lock_group(update, context):
 
 
 # ───────────── باز کردن گروه بدون تغییر سایر پرمیشن‌ها ─────────────
+async def lock_group(update, context):
+    chat = update.effective_chat
+    user = update.effective_user
+
+    # گرفتن پرمیشن فعلی گروه
+    current_perms = await context.bot.get_chat(chat.id)
+    perms = current_perms.permissions or ChatPermissions(can_send_messages=True)
+
+    # فقط پیام متنی بسته شود
+    perms.can_send_messages = False
+
+    await context.bot.set_chat_permissions(chat.id, perms)
+
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    msg = await update.message.reply_text(
+        f"🔒 گروه توسط <b>{user.first_name}</b> تا اطلاع ثانوی قفل شد.\n🕓 زمان: {now}",
+        parse_mode="HTML"
+    )
+    await asyncio.sleep(10)
+    await msg.delete()
+    await update.message.delete()
+
+
 async def unlock_group(update, context):
     chat = update.effective_chat
     user = update.effective_user
 
-    # فقط پیام متنی باز شود، سایر پرمیشن‌ها دست نخورده باقی می‌مانند
-    permissions = ChatPermissions(
-        can_send_messages=True,   # پیام متنی باز
-        can_send_media_messages=None,
-        can_send_polls=None,
-        can_send_other_messages=None,
-        can_add_web_page_previews=None,
-        can_invite_users=None
-    )
+    # گرفتن پرمیشن فعلی گروه
+    current_perms = await context.bot.get_chat(chat.id)
+    perms = current_perms.permissions or ChatPermissions(can_send_messages=False)
 
-    await context.bot.set_chat_permissions(chat.id, permissions)
+    # فقط پیام متنی باز شود
+    perms.can_send_messages = True
+
+    await context.bot.set_chat_permissions(chat.id, perms)
 
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     msg = await update.message.reply_text(
