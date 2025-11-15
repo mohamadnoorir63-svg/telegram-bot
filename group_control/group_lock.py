@@ -1,16 +1,28 @@
 from telegram import ChatPermissions, Update
 from telegram.ext import Application, ContextTypes, MessageHandler, filters
 
+def safe_permissions(chat):
+    """اگر chat.permissions مقدار نداشت، مقدار پیش‌فرض بساز"""
+    p = chat.permissions
+    if p is None:
+        return ChatPermissions(
+            can_send_messages=True,
+            can_send_media_messages=True,
+            can_send_other_messages=True,
+            can_add_web_page_previews=True,
+            can_invite_users=True,
+            can_pin_messages=False,
+            can_change_info=False
+        )
+    return p
 
-# --------------------- قفل گروه ---------------------
+
+# -------------------- قفل --------------------
 async def lock_group(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         chat = update.effective_chat
+        current = safe_permissions(chat)
 
-        # گرفتن مجوزهای فعلی
-        current = chat.permissions
-
-        # ساختن نسخه‌ی جدید با حفظ همه‌ی گزینه‌ها
         new_permissions = ChatPermissions(
             can_send_messages=False,
             can_send_media_messages=current.can_send_media_messages,
@@ -22,22 +34,18 @@ async def lock_group(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
         await chat.set_permissions(new_permissions)
-
         await update.message.reply_text("🔒 گروه قفل شد.")
 
     except Exception as e:
         await update.message.reply_text(f"خطا: {e}")
 
 
-# --------------------- باز کردن گروه ---------------------
+# -------------------- باز --------------------
 async def unlock_group(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         chat = update.effective_chat
+        current = safe_permissions(chat)
 
-        # گرفتن مجوزهای فعلی
-        current = chat.permissions
-
-        # بازگرداندن فقط ارسال پیام
         new_permissions = ChatPermissions(
             can_send_messages=True,
             can_send_media_messages=current.can_send_media_messages,
@@ -49,14 +57,13 @@ async def unlock_group(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
         await chat.set_permissions(new_permissions)
-
         await update.message.reply_text("🔓 گروه باز شد.")
 
     except Exception as e:
         await update.message.reply_text(f"خطا: {e}")
 
 
-# --------------------- هندلر ---------------------
+# -------------------- هندلر --------------------
 async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip().replace("‌", "").lower()
 
