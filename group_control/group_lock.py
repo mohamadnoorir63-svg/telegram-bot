@@ -1,7 +1,6 @@
 from telegram import ChatPermissions, Update
 from telegram.ext import Application, ContextTypes, MessageHandler, filters
 
-
 def safe_permissions(chat):
     """اگر chat.permissions مقدار نداشت، مقدار پیش‌فرض بساز"""
     p = chat.permissions
@@ -23,24 +22,21 @@ def safe_permissions(chat):
         )
     return p
 
-
 # -------------------- قفل --------------------
 async def lock_group(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
-        await update.effective_chat.set_permissions(
-            ChatPermissions(can_send_messages=False)
+        await update.effective_chat.set_permissions(ChatPermissions(can_send_messages=False))
+        await update.message.reply_text(
+            "🔒 گروه به دستور {} تا اطلاع ثانوی قفل شد!\nلطفاً صبور باشید، همه پیام‌ها موقتاً مسدود شده‌اند.".format(update.effective_user.first_name)
         )
-        await update.message.reply_text("🔒 گروه قفل شد.")
     except Exception as e:
         await update.message.reply_text(f"خطا: {e}")
-
 
 # -------------------- باز --------------------
 async def unlock_group(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         chat = update.effective_chat
         current = safe_permissions(chat)
-
         new_permissions = ChatPermissions(
             can_send_messages=True,
             can_send_audios=current.can_send_audios,
@@ -56,22 +52,21 @@ async def unlock_group(update: Update, context: ContextTypes.DEFAULT_TYPE):
             can_pin_messages=current.can_pin_messages,
             can_change_info=current.can_change_info
         )
-
         await chat.set_permissions(new_permissions)
-        await update.message.reply_text("🔓 گروه باز شد.")
+        await update.message.reply_text(
+            "🔓 گروه به دستور {} باز شد!\nحالا همه می‌توانند پیام بفرستند.".format(update.effective_user.first_name),
+            delete_after=10  # بعد از ۱۰ ثانیه حذف می‌شود
+        )
     except Exception as e:
         await update.message.reply_text(f"خطا: {e}")
-
 
 # -------------------- هندلر --------------------
 async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip().replace("‌", "").lower()
-
     if text == "قفل گروه":
         await lock_group(update, context)
-    elif text == "بازکردن گروه":
+    elif text == "باز کردن گروه":
         await unlock_group(update, context)
-
 
 def register_group_lock_handlers(app: Application, group: int = 17):
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text), group=group)
