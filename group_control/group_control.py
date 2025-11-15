@@ -373,10 +373,7 @@ async def check_message_locks(update, context):
         return await _del_msg(update, "🚫 ارسال پیام متنی ممنوع است.")
 
 # ─────────────────────────────── فعال‌سازی / غیرفعال‌سازی قفل ───────────────────────────────
-
-
 async def handle_lock(update: Update, context: ContextTypes.DEFAULT_TYPE, key: str):
-    """فعال‌سازی قفل"""
     chat = update.effective_chat
     user = update.effective_user
 
@@ -397,9 +394,8 @@ async def handle_lock(update: Update, context: ContextTypes.DEFAULT_TYPE, key: s
         await update.message.delete()
         return
 
+    # ثبت قفل در حافظه و فایل
     _set_lock(chat.id, key, True)
-    global LOCKS
-    LOCKS = _load_json(LOCK_FILE, {})
 
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     msg = await update.message.reply_text(
@@ -412,7 +408,6 @@ async def handle_lock(update: Update, context: ContextTypes.DEFAULT_TYPE, key: s
 
 
 async def handle_unlock(update: Update, context: ContextTypes.DEFAULT_TYPE, key: str):
-    """غیرفعال‌سازی قفل"""
     chat = update.effective_chat
     user = update.effective_user
 
@@ -433,9 +428,8 @@ async def handle_unlock(update: Update, context: ContextTypes.DEFAULT_TYPE, key:
         await update.message.delete()
         return
 
+    # حذف قفل از حافظه و فایل
     _set_lock(chat.id, key, False)
-    global LOCKS
-    LOCKS = _load_json(LOCK_FILE, {})
 
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     msg = await update.message.reply_text(
@@ -445,7 +439,6 @@ async def handle_unlock(update: Update, context: ContextTypes.DEFAULT_TYPE, key:
     await asyncio.sleep(10)
     await msg.delete()
     await update.message.delete()
-
 # ───────────── قفل خودکار گروه ─────────────
 async def set_auto_lock(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat = update.effective_chat
