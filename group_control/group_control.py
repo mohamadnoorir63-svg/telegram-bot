@@ -415,13 +415,12 @@ async def handle_unlock(update: Update, context: ContextTypes.DEFAULT_TYPE, key:
     await update.message.reply_text(f"🔓 قفل {LOCK_TYPES[key]} باز شد.")
     
     # ─────────────────────────────── قفل و قفل خودکار گروه ───────────────────────────────
-import os
-import json
+    import re
 from datetime import datetime, time
 from telegram import ChatPermissions, Update
 from telegram.ext import ContextTypes
 
-# مسیر فایل قفل خودکار
+# ─────────────── فایل قفل خودکار ───────────────
 AUTO_LOCK_FILE = os.path.join(BASE_DIR, "auto_lock.json")
 if not os.path.exists(AUTO_LOCK_FILE):
     with open(AUTO_LOCK_FILE, "w", encoding="utf-8") as f:
@@ -440,49 +439,58 @@ def _save_auto_lock(data):
 
 AUTO_LOCKS = _load_auto_lock()
 
-# ──────────────── تنظیم قفل خودکار ────────────────
-async def set_auto_lock(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """تنظیم ساعت قفل خودکار - مثال: تنظیم قفل خودکار 23:00 07:00"""
-    chat = update.effective_chat
-    user = update.effective_user
+# ─────────────── توابع قفل گروه ───────────────
+async def lock_group(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = update.effective_chat.id
+    if not await _has_full_access(context, chat_id, update.effective_user.id):
+        return await update.message.reply_text("🚫 فقط مدیران یا سودوها مجازند.")
+    await context.bot.set_chat_permissions(chat_id, ChatPermissions(can_send_messages=False))
+    await update.message.reply_text("🔒 گروه قفل شد.")
 
-    if not await _has_full_access(context, chat.id, user.id):
+async def unlock_group(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = update.effective_chat.id
+    if not await _has_full_access(context, chat_id, update.effective_user.id):
+        return await update.message.reply_text("🚫 فقط مدیران یا سودوها مجازند.")
+    await context.bot.set_chat_permissions(chat_id, ChatPermissions(can_send_messages=True))
+    await update.message.reply_text("🔓 گروه باز شد.")
+
+# ─────────────── تنظیم قفل خودکار ───────────────
+async def set_auto_lock(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    text = (update.message.text or "").strip()
+    chat_id = update.effective_chat.id
+
+    if not await _has_full_access(context, chat_id, update.effective_user.id):
         return await update.message.reply_text("🚫 فقط مدیران یا سودوها مجازند.")
 
-    args = (update.message.text or "").split()
-    if len(args) != 3:
+    # بررسی فرمت دستور با Regex
+    match = re.match(r"^تنظیم قفل خودکار\s+(\d{1,2}:\d{2})\s+(\d{1,2}:\d{2})$", text)
+    if not match:
         return await update.message.reply_text(
             "📘 مثال صحیح:\n<code>تنظیم قفل خودکار 23:00 07:00</code>",
             parse_mode="HTML"
         )
 
-    start_str, end_str = args[1], args[2]
+    start_str, end_str = match.groups()
     try:
-        start_time = time.fromisoformat(start_str)
-        end_time = time.fromisoformat(end_str)
+        time.fromisoformat(start_str)
+        time.fromisoformat(end_str)
     except:
         return await update.message.reply_text("⚠️ فرمت ساعت نادرست است. (مثلاً 22:30)")
 
-    AUTO_LOCKS[str(chat.id)] = {
-        "start": start_str,
-        "end": end_str,
-        "enabled": True
-    }
+    AUTO_LOCKS[str(chat_id)] = {"start": start_str, "end": end_str, "enabled": True}
     _save_auto_lock(AUTO_LOCKS)
     await update.message.reply_text(
         f"✅ قفل خودکار از ساعت <b>{start_str}</b> تا <b>{end_str}</b> تنظیم و فعال شد.",
         parse_mode="HTML"
     )
 
-# ──────────────── روشن/خاموش کردن قفل خودکار ────────────────
+# ─────────────── روشن/خاموش کردن قفل خودکار ───────────────
 async def enable_auto_lock(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    chat = update.effective_chat
-    user = update.effective_user
-
-    if not await _has_full_access(context, chat.id, user.id):
+    chat_id = update.effective_chat.id
+    if not await _has_full_access(context, chat_id, update.effective_user.id):
         return await update.message.reply_text("🚫 فقط مدیران یا سودوها مجازند.")
 
-    conf = AUTO_LOCKS.get(str(chat.id))
+    conf = AUTO_LOCKS.get(str(chat_id))
     if not conf:
         return await update.message.reply_text(
             "⚙️ ابتدا ساعت قفل خودکار را با دستور زیر مشخص کنید:\n📘 تنظیم قفل خودکار 23:00 07:00"
@@ -496,13 +504,11 @@ async def enable_auto_lock(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 async def disable_auto_lock(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    chat = update.effective_chat
-    user = update.effective_user
-
-    if not await _has_full_access(context, chat.id, user.id):
+    chat_id = update.effective_chat.id
+    if not await _has_full_access(context, chat_id, update.effective_user.id):
         return await update.message.reply_text("🚫 فقط مدیران یا سودوها مجازند.")
 
-    conf = AUTO_LOCKS.get(str(chat.id))
+    conf = AUTO_LOCKS.get(str(chat_id))
     if not conf:
         return await update.message.reply_text("⚙️ قفل خودکار هنوز تنظیم نشده است.")
 
@@ -510,23 +516,17 @@ async def disable_auto_lock(update: Update, context: ContextTypes.DEFAULT_TYPE):
     _save_auto_lock(AUTO_LOCKS)
     await update.message.reply_text("❎ قفل خودکار گروه خاموش شد.")
 
-# ──────────────── بررسی زمان و اعمال خودکار قفل ────────────────
+# ─────────────── بررسی زمان و اعمال خودکار قفل ───────────────
 async def auto_lock_check(context: ContextTypes.DEFAULT_TYPE):
-    """اجرای خودکار قفل گروه‌ها بر اساس زمان مشخص شده"""
     now = datetime.now().time()
     for chat_id, conf in AUTO_LOCKS.items():
         try:
             if not conf.get("enabled"):
                 continue
-
             start = time.fromisoformat(conf["start"])
             end = time.fromisoformat(conf["end"])
 
-            # تعیین وضعیت قفل
-            if start <= end:  # حالت معمولی
-                locked = start <= now <= end
-            else:  # حالت عبور از نیمه شب (مثلاً 23:00 تا 07:00)
-                locked = now >= start or now <= end
+            locked = start <= end and start <= now <= end or start > end and (now >= start or now <= end)
 
             await context.bot.set_chat_permissions(
                 int(chat_id),
@@ -534,21 +534,18 @@ async def auto_lock_check(context: ContextTypes.DEFAULT_TYPE):
             )
         except Exception as e:
             print(f"[AutoLock Error] {e}")
-# ──────────────── تشخیص دستورات قفل گروه ────────────────
-async def handle_group_lock_commands(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """تشخیص و اجرای دستور قفل گروه / قفل خودکار"""
-    if not update.message or not update.message.text:
-        return
 
-    text = update.message.text.strip().lower()
+# ─────────────── تشخیص دستورات قفل گروه و خودکار ───────────────
+async def handle_group_lock_commands(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    text = (update.message.text or "").strip().lower()
 
     if text == "قفل گروه":
         return await lock_group(update, context)
     if text in ["باز کردن گروه", "بازکردن گروه"]:
         return await unlock_group(update, context)
-    if text == "قفل خودکار روشن":
+    if text.replace(" ", "") == "قلفعالخودکار" or text == "قفل خودکار روشن":
         return await enable_auto_lock(update, context)
-    if text == "قفل خودکار خاموش":
+    if text.replace(" ", "") == "قلفعالخودکارخاموش" or text == "قفل خودکار خاموش":
         return await disable_auto_lock(update, context)
     if text.startswith("تنظیم قفل خودکار"):
         return await set_auto_lock(update, context)
