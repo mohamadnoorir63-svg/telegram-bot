@@ -447,7 +447,6 @@ async def handle_unlock(update: Update, context: ContextTypes.DEFAULT_TYPE, key:
     await update.message.delete()
 
 # ───────────── قفل خودکار گروه ─────────────
-
 async def set_auto_lock(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat = update.effective_chat
     if not await _has_full_access(context, chat.id, update.effective_user.id):
@@ -546,8 +545,9 @@ async def auto_lock_check(context: ContextTypes.DEFAULT_TYPE):
             )
         except Exception as e:
             print(f"[AutoLock Error] {e}")
-# ───────────── دستورات قفل گروه ─────────────
 
+
+# ───────────── دستورات قفل گروه ─────────────
 async def lock_group(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat = update.effective_chat
     user = update.effective_user
@@ -604,17 +604,19 @@ async def handle_group_lock_commands(update: Update, context: ContextTypes.DEFAU
         return True
 
     return False
-# ───────────── فعال/غیرفعال کردن قفل محتوا ─────────────
 
+
+# ───────────── فعال/غیرفعال کردن قفل محتوا ─────────────
 def _is_locked(chat_id: int, key: str) -> bool:
     return LOCKS.get(str(chat_id), {}).get(key, False)
+
 
 def _set_lock(chat_id: int, key: str, status: bool):
     LOCKS.setdefault(str(chat_id), {})[key] = bool(status)
     _save_json(LOCK_FILE, LOCKS)
 
+
 async def handle_lock(update: Update, context: ContextTypes.DEFAULT_TYPE, key: str):
-    """فعال‌سازی قفل با پیام زمان و نام کاربر و پاک شدن خودکار"""
     chat = update.effective_chat
     user = update.effective_user
 
@@ -633,9 +635,6 @@ async def handle_lock(update: Update, context: ContextTypes.DEFAULT_TYPE, key: s
         return
 
     _set_lock(chat.id, key, True)
-    global LOCKS
-    LOCKS = _load_json(LOCK_FILE, {})
-
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     msg = await update.message.reply_text(
         f"✅ قفل {LOCK_TYPES.get(key, key)} توسط <b>{user.first_name}</b> فعال شد.\n🕓 زمان: {now}",
@@ -647,7 +646,6 @@ async def handle_lock(update: Update, context: ContextTypes.DEFAULT_TYPE, key: s
 
 
 async def handle_unlock(update: Update, context: ContextTypes.DEFAULT_TYPE, key: str):
-    """غیرفعال‌سازی قفل با پیام زمان و نام کاربر و پاک شدن خودکار"""
     chat = update.effective_chat
     user = update.effective_user
 
@@ -666,9 +664,6 @@ async def handle_unlock(update: Update, context: ContextTypes.DEFAULT_TYPE, key:
         return
 
     _set_lock(chat.id, key, False)
-    global LOCKS
-    LOCKS = _load_json(LOCK_FILE, {})
-
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     msg = await update.message.reply_text(
         f"🔓 قفل {LOCK_TYPES.get(key, key)} توسط <b>{user.first_name}</b> باز شد.\n🕓 زمان: {now}",
@@ -680,7 +675,6 @@ async def handle_unlock(update: Update, context: ContextTypes.DEFAULT_TYPE, key:
 
 
 async def handle_lock_commands(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """هندلر دستورات قفل و باز کردن محتوا"""
     text = (update.message.text or "").strip().lower()
     for key, fa in LOCK_TYPES.items():
         if text == f"قفل {fa}":
@@ -690,6 +684,7 @@ async def handle_lock_commands(update: Update, context: ContextTypes.DEFAULT_TYP
             await handle_unlock(update, context, key)
             return True
     return False
+    
 # ─────────────────────────────── هندلر مرکزی گروه ───────────────────────────────
 async def handle_group_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message:
