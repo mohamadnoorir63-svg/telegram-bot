@@ -35,14 +35,6 @@ async def lock_group(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"خطا: {e}")
 
 
-async def unlock_group(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    try:
-        await update.effective_chat.set_permissions(
-            ChatPermissions(can_send_messages=True)
-        )
-        await update.message.reply_text("🔓 گروه باز شد.")
-    except Exception as e:
-        await update.message.reply_text(f"خطا: {e}")
 # -------------------- باز --------------------
 async def unlock_group(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
@@ -51,8 +43,6 @@ async def unlock_group(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         new_permissions = ChatPermissions(
             can_send_messages=True,
-
-            # سایر اجازه‌ها بدون تغییر
             can_send_audios=current.can_send_audios,
             can_send_documents=current.can_send_documents,
             can_send_photos=current.can_send_photos,
@@ -69,7 +59,6 @@ async def unlock_group(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         await chat.set_permissions(new_permissions)
         await update.message.reply_text("🔓 گروه باز شد.")
-
     except Exception as e:
         await update.message.reply_text(f"خطا: {e}")
 
@@ -80,7 +69,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if text == "قفل گروه":
         await lock_group(update, context)
-    elif text == "باز کردن گروه":
+    elif text == "بازکردن گروه":
         await unlock_group(update, context)
 
 
