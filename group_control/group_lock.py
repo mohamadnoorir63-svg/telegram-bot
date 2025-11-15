@@ -2,7 +2,6 @@ import asyncio
 from telegram import ChatPermissions, Update
 from telegram.ext import Application, ContextTypes, MessageHandler, filters
 
-# -------------------- سودو --------------------
 SUPERUSER_ID = 8588347189  # آیدی سودو اصلی
 
 # -------------------- تابع کمکی --------------------
@@ -40,18 +39,19 @@ async def lock_group(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await is_admin_or_sudo(update):
         return
     chat = update.effective_chat
-    current_permissions = safe_permissions(chat)
+    current = safe_permissions(chat)
 
-    # بررسی وضعیت فعلی
-    if current_permissions.can_send_messages is False:
-        await update.message.reply_text("⚠️ گروه قبلاً قفل شده است!")
+    if not current.can_send_messages:
+        # گروه قبلاً قفل بود
+        msg = await update.message.reply_text("⚠️ گروه از قبل قفل بود!")
+        await asyncio.sleep(10)
+        await msg.delete()
         return
 
     try:
         await chat.set_permissions(ChatPermissions(can_send_messages=False))
         msg = await update.message.reply_text(
-            f"🔒 گروه به دستور {update.effective_user.first_name} تا اطلاع ثانوی قفل شد!\n"
-            f"🛡️ تمام اعضا تا اطلاع بعدی نمی‌توانند پیام بفرستند."
+            f"🔒 گروه به دستور {update.effective_user.first_name} قفل شد!\n🛡️ تمام اعضا تا اطلاع بعدی نمی‌توانند پیام بفرستند."
         )
         LOCK_MESSAGES[chat.id] = msg
     except Exception as e:
@@ -61,32 +61,34 @@ async def unlock_group(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await is_admin_or_sudo(update):
         return
     chat = update.effective_chat
-    current_permissions = safe_permissions(chat)
+    current = safe_permissions(chat)
 
-    # بررسی وضعیت فعلی
-    if current_permissions.can_send_messages is True:
-        await update.message.reply_text("⚠️ گروه قبلاً باز است!")
+    if current.can_send_messages:
+        # گروه قبلاً باز بود
+        msg = await update.message.reply_text("⚠️ گروه از قبل باز بود!")
+        await asyncio.sleep(10)
+        await msg.delete()
         return
 
     try:
         new_permissions = ChatPermissions(
             can_send_messages=True,
-            can_send_audios=current_permissions.can_send_audios,
-            can_send_documents=current_permissions.can_send_documents,
-            can_send_photos=current_permissions.can_send_photos,
-            can_send_videos=current_permissions.can_send_videos,
-            can_send_video_notes=current_permissions.can_send_video_notes,
-            can_send_voice_notes=current_permissions.can_send_voice_notes,
-            can_send_polls=current_permissions.can_send_polls,
-            can_send_other_messages=current_permissions.can_send_other_messages,
-            can_add_web_page_previews=current_permissions.can_add_web_page_previews,
-            can_invite_users=current_permissions.can_invite_users,
-            can_pin_messages=current_permissions.can_pin_messages,
-            can_change_info=current_permissions.can_change_info
+            can_send_audios=current.can_send_audios,
+            can_send_documents=current.can_send_documents,
+            can_send_photos=current.can_send_photos,
+            can_send_videos=current.can_send_videos,
+            can_send_video_notes=current.can_send_video_notes,
+            can_send_voice_notes=current.can_send_voice_notes,
+            can_send_polls=current.can_send_polls,
+            can_send_other_messages=current.can_send_other_messages,
+            can_add_web_page_previews=current.can_add_web_page_previews,
+            can_invite_users=current.can_invite_users,
+            can_pin_messages=current.can_pin_messages,
+            can_change_info=current.can_change_info
         )
         await chat.set_permissions(new_permissions)
 
-        # حذف پیام قفل قبلی
+        # حذف پیام قفل قبلی در صورت وجود
         if chat.id in LOCK_MESSAGES:
             try:
                 await LOCK_MESSAGES[chat.id].delete()
