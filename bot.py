@@ -2184,7 +2184,9 @@ application.add_handler(
     MessageHandler(filters.ALL & filters.ChatType.GROUPS, handle_group_message),
     group=10
 )
+from group_control.group_lock import register_group_lock_handlers
 
+register_group_lock_handlers(application, group=-10)
 # ==========================================================
 # 💡 ثبت ماژول اصل و لقب (در اولویت بالا)
 # ==========================================================
