@@ -122,6 +122,30 @@ async def remove_vip(update: Update, context: ContextTypes.DEFAULT_TYPE):
         quote=True
     )
 # ─────────────────────────────── مسیر فایل و لود قفل‌ها ───────────────────────────────
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+LOCK_FILE = os.path.join(BASE_DIR, "group_locks.json")
+
+if not os.path.exists(LOCK_FILE):
+    with open(LOCK_FILE, "w", encoding="utf-8") as f:
+        json.dump({}, f, ensure_ascii=False, indent=2)
+
+def _load_json(path, default=None):
+    try:
+        if os.path.exists(path):
+            with open(path, "r", encoding="utf-8") as f:
+                return json.load(f)
+    except Exception as e:
+        print(f"[⚠️] خطا در خواندن {path}: {e}")
+    return default or {}
+
+def _save_json(path, data):
+    try:
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        print(f"[⚠️] خطا در ذخیره {path}: {e}")
+
+LOCKS = _load_json(LOCK_FILE, {})
 
 # ─────────────────────────────── لیست کامل قفل‌ها ───────────────────────────────
 
