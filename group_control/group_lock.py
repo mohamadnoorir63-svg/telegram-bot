@@ -36,5 +36,5 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif text == "باز کردن گروه":
         await unlock_group(update, context)
 
-def register_group_lock_handlers(app: Application, group: int = 0):
+def register_group_lock_handlers(app: Application, group: int =17):
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text), group=group)
