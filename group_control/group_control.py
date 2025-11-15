@@ -212,8 +212,8 @@ LOCK_TYPES = {
     "bots": "ربات",
     "join": "ورود",
     # ───────────── قفل‌های پیشرفته ─────────────
-    "all_links": "همه لینک‌ها",
-    "inline_bots": "ربات اینلاین",
+    "all_links": "همه لینک‌ ها",
+    "inline_bots": "ربات تبچی",
     "external_media": "رسانه خارجی",
     "invite_links": "لینک دعوت",
     "file_types": "فایل‌های خاص",
@@ -261,16 +261,18 @@ async def _del_msg(update: Update, warn_text: str = None):
         print(f"[Delete Error] {e}")
 
 # ─────────────────────────────── بررسی پیام‌ها و اعمال قفل ───────────────────────────────
-# یک دیکشنری سراسری برای ذخیره آخرین پیام هر کاربر
+# دیکشنری‌های جهانی
 LAST_MESSAGES = {}
+NEW_USERS = {}
 
-async def check_message_locks(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def check_message_locks(update, context):
     """بررسی پیام و حذف در صورت نقض قفل‌ها"""
     if not update.message:
         return
 
     msg = update.message
-    text = (msg.text or msg.caption or "").strip().lower()
+    text = (msg.text or msg.caption or "").strip()
+    text_lower = text.lower()
     chat = msg.chat
     user = msg.from_user
 
@@ -282,7 +284,6 @@ async def check_message_locks(update: Update, context: ContextTypes.DEFAULT_TYPE
     if await _has_full_access(context, chat.id, user.id):
         return
 
-    # نوع محتوا
     has_photo = bool(msg.photo)
     has_video = bool(msg.video)
     has_doc = bool(msg.document)
@@ -291,6 +292,15 @@ async def check_message_locks(update: Update, context: ContextTypes.DEFAULT_TYPE
     has_stick = bool(msg.sticker)
     has_fwd = bool(msg.forward_date)
 
+    # 🚫 کاربران جدید (5 ثانیه اول)
+    if locks.get("new_members"):
+        if user.id not in NEW_USERS:
+            NEW_USERS[user.id] = datetime.now()
+
+        join_time = NEW_USERS[user.id]
+        if (datetime.now() - join_time).total_seconds() < 5:
+            return await _del_msg(update, "🚫 کاربران جدید نمی‌توانند پیام دهند.")
+
     # 🚫 پیام تکراری
     if locks.get("spam_repeats") and text:
         last_msg = LAST_MESSAGES.get(user.id)
@@ -298,7 +308,8 @@ async def check_message_locks(update: Update, context: ContextTypes.DEFAULT_TYPE
             return await _del_msg(update, "🚫 ارسال پیام تکراری ممنوع است.")
         LAST_MESSAGES[user.id] = text
 
-    # 🚫 همه لینک‌ها
+    # ادامه‌ی بررسی بقیه‌ی قفل‌ها مثل قبل...
+    # 🚫 همه لینک‌ ها
     if locks.get("all_links") and any(x in text for x in ["http://", "https://", "t.me", "telegram.me"]):
         return await _del_msg(update, "🚫 ارسال هرگونه لینک ممنوع است.")
 
