@@ -7,7 +7,6 @@ SUPERUSER_ID = 8588347189  # آیدی سودو اصلی
 
 # -------------------- تابع کمکی --------------------
 def safe_permissions(chat):
-    """بررسی و برگرداندن مجوزهای چت"""
     p = chat.permissions
     if p is None:
         return ChatPermissions(
@@ -36,16 +35,20 @@ async def is_admin_or_sudo(update: Update):
     return member.status in ['administrator', 'creator']
 
 # -------------------- قفل و باز گروه --------------------
+# نگه داشتن پیام قفل برای حذف بعدی
+LOCK_MESSAGES = {}
+
 async def lock_group(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await is_admin_or_sudo(update):
         return
     try:
         await update.effective_chat.set_permissions(ChatPermissions(can_send_messages=False))
-        # پیام قفل ثابت بمونه
-        await update.message.reply_text(
+        # پیام قفل ثابت بمونه و شناسه آن ذخیره شود
+        msg = await update.message.reply_text(
             f"🔒 گروه به دستور {update.effective_user.first_name} تا اطلاع ثانوی قفل شد!\n"
             f"🛡️ تمام اعضا تا اطلاع بعدی نمی‌توانند پیام بفرستند."
         )
+        LOCK_MESSAGES[update.effective_chat.id] = msg
     except Exception as e:
         await update.message.reply_text(f"❌ خطا: {e}")
 
@@ -71,6 +74,14 @@ async def unlock_group(update: Update, context: ContextTypes.DEFAULT_TYPE):
             can_change_info=current.can_change_info
         )
         await chat.set_permissions(new_permissions)
+
+        # حذف پیام قفل قبلی در صورت وجود
+        if update.effective_chat.id in LOCK_MESSAGES:
+            try:
+                await LOCK_MESSAGES[update.effective_chat.id].delete()
+            except:
+                pass
+            LOCK_MESSAGES.pop(update.effective_chat.id)
 
         # پیام باز شدن بعد 10 ثانیه حذف می‌شود
         msg = await update.message.reply_text(
