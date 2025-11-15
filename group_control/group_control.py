@@ -214,6 +214,7 @@ LOCK_TYPES = {
     "short_links": "لینک کوتاه",
     "spam_repeats": "پیام تکراری",
     "capslock": "حروف بزرگ"
+    "long_text": "پیام بلند"
 }
 
 # ─────────────────────────────── توابع مدیریت فایل قفل ───────────────────────────────
@@ -303,6 +304,10 @@ async def check_message_locks(update: Update, context: ContextTypes.DEFAULT_TYPE
     # 🚫 ربات تبچی (Inline Bots)
     if locks.get("inline_bots") and getattr(msg, "via_bot", None):
         return await _del_msg(update, "🚫 استفاده از ربات اینلاین ممنوع است.")
+        
+   # 🚫 پیام طولانی
+    if locks.get("long_text") and len(text) > 200:   # اینجا 200 یعنی حد مجاز
+        return await _del_msg(update, "🚫 ارسال پیام طولانی ممنوع است.")
 
     # 🚫 کاربران جدید (5 ثانیه اول)
     if locks.get("new_members") and (datetime.now() - user.date).total_seconds() < 5:
