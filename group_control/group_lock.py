@@ -8,13 +8,12 @@ SUPERUSER_ID = 8588347189  # آیدی سودو اصلی
 
 # -------------------- وضعیت قفل خودکار --------------------
 AUTO_LOCK_ENABLED = False
-AUTO_LOCK_START = time(0, 0)  # ساعت شروع پیش‌فرض: 00:00
-AUTO_LOCK_END = time(7, 0)    # ساعت پایان پیش‌فرض: 07:00
-LOCKED_BY_AUTO = {}           # ذخیره وضعیت قفل خودکار هر چت
+AUTO_LOCK_START = time(0, 0)  # پیش‌فرض 00:00
+AUTO_LOCK_END = time(7, 0)    # پیش‌فرض 07:00
+LOCKED_BY_AUTO = {}           # وضعیت قفل خودکار هر چت
 
 # -------------------- تابع کمکی --------------------
 def safe_permissions(chat):
-    """اگر chat.permissions مقدار نداشت، مقدار پیش‌فرض بساز"""
     p = chat.permissions
     if p is None:
         return ChatPermissions(
@@ -89,32 +88,31 @@ async def unlock_group(update: Update, context: ContextTypes.DEFAULT_TYPE, auto=
         if not auto:
             await update.message.reply_text(f"خطا: {e}")
 
-# -------------------- قفل خودکار --------------------
+# -------------------- تسک قفل خودکار --------------------
 async def auto_lock_task(app: Application):
     global AUTO_LOCK_ENABLED, AUTO_LOCK_START, AUTO_LOCK_END, LOCKED_BY_AUTO
     await app.wait_until_ready()
     while True:
         if AUTO_LOCK_ENABLED:
             now = datetime.now().time()
-            for chat_id in app.chat_data:  # بررسی تمام چت‌های ذخیره شده
+            for chat_id in app.chat_data:  # بررسی تمام چت‌ها
                 try:
                     if AUTO_LOCK_START <= AUTO_LOCK_END:
                         in_lock_time = AUTO_LOCK_START <= now <= AUTO_LOCK_END
-                    else:  # حالت شبانه (مثلاً 22:00-07:00)
+                    else:
                         in_lock_time = now >= AUTO_LOCK_START or now <= AUTO_LOCK_END
                     chat = await app.bot.get_chat(chat_id)
-
                     if in_lock_time and not LOCKED_BY_AUTO.get(chat_id, False):
                         await lock_group_for_auto(chat)
                         LOCKED_BY_AUTO[chat_id] = True
-                        await chat.send_message("🤖 گروه به صورت خودکار قفل شد! (سکوت اعضای عادی محفوظ است)")
+                        await chat.send_message("🤖 گروه به صورت خودکار قفل شد!")
                     elif not in_lock_time and LOCKED_BY_AUTO.get(chat_id, False):
                         await unlock_group_for_auto(chat)
                         LOCKED_BY_AUTO[chat_id] = False
                         await chat.send_message("🤖 گروه به صورت خودکار باز شد! همه می‌توانند پیام بفرستند.")
                 except:
                     pass
-        await asyncio.sleep(60)  # هر دقیقه بررسی شود
+        await asyncio.sleep(60)
 
 async def lock_group_for_auto(chat):
     await chat.set_permissions(ChatPermissions(can_send_messages=False))
@@ -143,12 +141,12 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global AUTO_LOCK_ENABLED, AUTO_LOCK_START, AUTO_LOCK_END
     text = update.message.text.strip().replace("‌", "").lower()
 
-    # دستورات اصلی قفل/باز
+    # دستورات اصلی
     if text == "قفل گروه":
         await lock_group(update, context)
-    elif text == "بازکردن گروه":
+    elif text == "باز کردن گروه":
         await unlock_group(update, context)
-    
+
     # دستورات قفل خودکار
     elif text == "قفل خودکار روشن":
         if not await is_admin_or_sudo(update):
@@ -180,9 +178,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # -------------------- ثبت هندلر --------------------
 def register_group_lock_handlers(app: Application, group: int = 17):
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text), group=group)
-
-    # اضافه کردن تسک پس‌زمینه با استفاده از post_init
+    # اضافه کردن تسک قفل خودکار به صورت امن
     async def start_auto_lock_task(app: Application):
         app.create_task(auto_lock_task(app))
-
-    app.post_init(start_auto_lock_task)
+    app.post_init = start_auto_lock_task
