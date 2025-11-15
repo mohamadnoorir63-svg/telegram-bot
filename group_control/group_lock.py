@@ -146,7 +146,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # دستورات اصلی قفل/باز
     if text == "قفل گروه":
         await lock_group(update, context)
-    elif text == "باز کردن گروه":
+    elif text == "بازکردن گروه":
         await unlock_group(update, context)
     
     # دستورات قفل خودکار
@@ -180,4 +180,9 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # -------------------- ثبت هندلر --------------------
 def register_group_lock_handlers(app: Application, group: int = 17):
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text), group=group)
-    app.create_task(auto_lock_task(app))  # اجرای تسک قفل خودکار
+
+    # اضافه کردن تسک پس‌زمینه با استفاده از post_init
+    async def start_auto_lock_task(app: Application):
+        app.create_task(auto_lock_task(app))
+
+    app.post_init(start_auto_lock_task)
