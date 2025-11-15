@@ -10,6 +10,7 @@ SUPERUSER_ID = 8588347189  # آیدی سودو اصلی
 AUTO_LOCK_ENABLED = False
 AUTO_LOCK_START = time(0, 0)  # ساعت شروع پیش‌فرض: 00:00
 AUTO_LOCK_END = time(7, 0)    # ساعت پایان پیش‌فرض: 07:00
+LOCKED_BY_AUTO = {}           # ذخیره وضعیت قفل خودکار هر چت
 
 # -------------------- تابع کمکی --------------------
 def safe_permissions(chat):
@@ -90,7 +91,7 @@ async def unlock_group(update: Update, context: ContextTypes.DEFAULT_TYPE, auto=
 
 # -------------------- قفل خودکار --------------------
 async def auto_lock_task(app: Application):
-    global AUTO_LOCK_ENABLED, AUTO_LOCK_START, AUTO_LOCK_END
+    global AUTO_LOCK_ENABLED, AUTO_LOCK_START, AUTO_LOCK_END, LOCKED_BY_AUTO
     await app.wait_until_ready()
     while True:
         if AUTO_LOCK_ENABLED:
@@ -102,10 +103,15 @@ async def auto_lock_task(app: Application):
                     else:  # حالت شبانه (مثلاً 22:00-07:00)
                         in_lock_time = now >= AUTO_LOCK_START or now <= AUTO_LOCK_END
                     chat = await app.bot.get_chat(chat_id)
-                    if in_lock_time:
+
+                    if in_lock_time and not LOCKED_BY_AUTO.get(chat_id, False):
                         await lock_group_for_auto(chat)
-                    else:
+                        LOCKED_BY_AUTO[chat_id] = True
+                        await chat.send_message("🤖 گروه به صورت خودکار قفل شد! (سکوت اعضای عادی محفوظ است)")
+                    elif not in_lock_time and LOCKED_BY_AUTO.get(chat_id, False):
                         await unlock_group_for_auto(chat)
+                        LOCKED_BY_AUTO[chat_id] = False
+                        await chat.send_message("🤖 گروه به صورت خودکار باز شد! همه می‌توانند پیام بفرستند.")
                 except:
                     pass
         await asyncio.sleep(60)  # هر دقیقه بررسی شود
@@ -165,7 +171,9 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             h2, m2 = map(int, end_str.split(":"))
             AUTO_LOCK_START = time(h1, m1)
             AUTO_LOCK_END = time(h2, m2)
-            await update.message.reply_text(f"⏰ بازه قفل خودکار تنظیم شد: {AUTO_LOCK_START.strftime('%H:%M')} تا {AUTO_LOCK_END.strftime('%H:%M')}")
+            await update.message.reply_text(
+                f"⏰ بازه قفل خودکار تنظیم شد: {AUTO_LOCK_START.strftime('%H:%M')} تا {AUTO_LOCK_END.strftime('%H:%M')}"
+            )
         except:
             await update.message.reply_text("❌ فرمت زمان اشتباه است. مثال: تنظیم قفل خودکار 12:00-07:00")
 
