@@ -1,6 +1,6 @@
 # group_control/group_lock.py
 import asyncio
-from telegram import Update, ChatPermissions
+from telegram import Update
 from telegram.ext import MessageHandler, filters, ContextTypes
 
 # وضعیت قفل گروه (حافظه)
@@ -16,16 +16,22 @@ def is_group_locked(chat_id: int) -> bool:
     return GROUP_LOCKS.get(chat_id, False)
 
 # ────────────── مدیریت پیام‌ها ──────────────
-async def handle_text_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """حذف پیام متنی وقتی گروه قفل است"""
-    if not update.message or not update.message.text:
+async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """حذف پیام متنی وقتی گروه قفل است، بدون تاثیر روی مدیا"""
+    if not update.message:
         return
 
     chat_id = update.effective_chat.id
-    if is_group_locked(chat_id):
+    if not is_group_locked(chat_id):
+        return
+
+    # فقط پیام متنی
+    if update.message.text:
         try:
             await update.message.delete()
-            warn = await update.message.reply_text("🚫 گروه قفل است: ارسال پیام متنی ممنوع.")
+            warn = await update.message.reply_text(
+                "🚫 گروه قفل است: ارسال پیام متنی ممنوع."
+            )
             await asyncio.sleep(3)
             await warn.delete()
         except:
@@ -43,7 +49,9 @@ async def group_lock_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     member = await context.bot.get_chat_member(chat_id, user.id)
     if member.status not in ("administrator", "creator"):
-        return await update.message.reply_text("🚫 فقط مدیران می‌توانند این دستور را اجرا کنند.")
+        return await update.message.reply_text(
+            "🚫 فقط مدیران می‌توانند این دستور را اجرا کنند."
+        )
 
     if text == "قفل گروه":
         set_group_lock(chat_id, True)
@@ -62,12 +70,14 @@ async def group_lock_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ────────────── ثبت هندلر ──────────────
 def register_group_lock_handlers(application, group: int = -10):
     """ثبت هندلرهای قفل گروه"""
+    # حذف پیام متنی وقتی قفل است
     application.add_handler(
-        MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text_messages),
+        MessageHandler(filters.TEXT & ~filters.COMMAND, handle_messages),
         group=group
     )
+    # مدیریت دستورات قفل و باز کردن
     application.add_handler(
         MessageHandler(filters.TEXT & ~filters.COMMAND, group_lock_router),
         group=group
     )
-    print(f"✅ هندلرهای قفل گروه ثبت شد (متن فقط).")
+    print(f"✅ هندلرهای قفل گروه ثبت شد (فقط پیام متنی، مدیا بدون محدودیت).")
