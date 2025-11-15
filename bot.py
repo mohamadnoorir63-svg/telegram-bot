@@ -832,12 +832,26 @@ async def welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
             message_text += f"\n\n📜 <a href='{rules}'>مشاهده قوانین گروه</a>"
 
         try:
+            msg = None
             if media:
-                msg = await update.message.reply_photo(media, caption=message_text, parse_mode="HTML")
+                # بررسی نوع رسانه
+                if isinstance(media, str):
+                    # اگر فایل ذخیره شده به صورت file_id باشد
+                    # سعی می‌کنیم عکس یا گیف را ارسال کنیم
+                    try:
+                        msg = await update.message.reply_photo(media, caption=message_text, parse_mode="HTML")
+                    except:
+                        try:
+                            msg = await update.message.reply_animation(media, caption=message_text, parse_mode="HTML")
+                        except:
+                            msg = await update.message.reply_video(media, caption=message_text, parse_mode="HTML")
+                else:
+                    # اگر media شی دیگری بود
+                    msg = await update.message.reply_photo(media, caption=message_text, parse_mode="HTML")
             else:
                 msg = await update.message.reply_text(message_text, parse_mode="HTML")
 
-            if delete_after > 0:
+            if delete_after > 0 and msg:
                 await asyncio.sleep(delete_after)
                 try:
                     await context.bot.delete_message(chat_id=update.effective_chat.id, message_id=msg.message_id)
@@ -845,7 +859,6 @@ async def welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     pass
         except Exception as e:
             print(f"[WELCOME ERROR] {e}")
-    
 
 # ======================= ☁️ بک‌آپ خودکار و دستی (نسخه هماهنگ با bot.py) =======================
 import os
