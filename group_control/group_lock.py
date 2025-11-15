@@ -2,81 +2,45 @@
 import asyncio
 from telegram import Update
 from telegram.ext import MessageHandler, filters, ContextTypes
+# قفل‌کردن گروه
+async def lock_group(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not update.effective_chat.type.endswith("group"):
+        return await update.message.reply_text("این دستور فقط در گروه کار می‌کند.")
 
-# وضعیت قفل گروه (حافظه)
-GROUP_LOCKS = {}  # chat_id: True/False
-
-# ────────────── توابع کمکی ──────────────
-def set_group_lock(chat_id: int, status: bool):
-    GROUP_LOCKS[chat_id] = status
-
-def is_group_locked(chat_id: int) -> bool:
-    return GROUP_LOCKS.get(chat_id, False)
-
-# ────────────── مدیریت پیام‌ها ──────────────
-async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """حذف پیام متنی وقتی گروه قفل است، بدون تاثیر روی مدیا"""
-    if not update.message:
-        return
-
-    chat_id = update.effective_chat.id
-    if not is_group_locked(chat_id):
-        return
-
-    # فقط پیام متنی که **دستور نیست**
-    text = update.message.text or ""
-    if text and not text.startswith(("قفل گروه", "باز کردن گروه", "بازکردن گروه")):
-        try:
-            await update.message.delete()
-            warn = await update.message.reply_text(
-                "🚫 گروه قفل است: ارسال پیام متنی ممنوع."
+    try:
+        await update.effective_chat.set_permissions(
+            ChatPermissions(     # هیچ‌کس نتواند پیام بدهد
+                can_send_messages=False,
+                can_send_media_messages=False,
+                can_send_other_messages=False,
+                can_add_web_page_previews=False
             )
-            await asyncio.sleep(3)
-            await warn.delete()
-        except:
-            pass
-
-# ────────────── دستورات قفل / باز کردن ──────────────
-async def group_lock_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """مدیریت دستور قفل و باز کردن گروه"""
-    if not update.message or not update.message.text:
-        return
-
-    text = update.message.text.strip()
-    chat_id = update.effective_chat.id
-    user = update.effective_user
-
-    member = await context.bot.get_chat_member(chat_id, user.id)
-    if member.status not in ("administrator", "creator"):
-        return await update.message.reply_text(
-            "🚫 فقط مدیران می‌توانند این دستور را اجرا کنند."
         )
+        await update.message.reply_text("🔒 گروه *قفل* شد.\nاعضا اجازه ارسال پیام ندارند.", parse_mode="Markdown")
 
-    if text == "قفل گروه":
-        set_group_lock(chat_id, True)
-        msg = await update.message.reply_text("🔒 گروه قفل شد (فقط پیام متنی).")
-        await asyncio.sleep(3)
-        await msg.delete()
-        await update.message.delete()
+    except Exception as e:
+        await update.message.reply_text(f"خطا: {e}")
 
-    elif text in ("باز کردن گروه", "بازکردن گروه"):
-        set_group_lock(chat_id, False)
-        msg = await update.message.reply_text("🔓 گروه باز شد.")
-        await asyncio.sleep(3)
-        await msg.delete()
-        await update.message.delete()
+# بازکردن گروه
+async def unlock_group(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not update.effective_chat.type.endswith("group"):
+        return await update.message.reply_text("این دستور فقط در گروه کار می‌کند.")
 
-# ────────────── ثبت هندلر ──────────────
-def register_group_lock_handlers(application, group: int = -10):
-    """ثبت هندلرهای قفل گروه"""
-    # اول هندلر دستورها
-    application.add_handler(
-        MessageHandler(filters.TEXT & ~filters.COMMAND, group_lock_router),
-        group=group
-    )
-    # بعد هندلر حذف پیام متنی
-    application.add_handler(
-        MessageHandler(filters.TEXT & ~filters.COMMAND, handle_messages),
-        group=group
-    )
-    print(f"✅ هندلرهای قفل گروه ثبت شد (فقط پیام متنی، مدیا بدون محدودیت).")
+    try:
+        await update.effective_chat.set_permissions(
+            ChatPermissions(     # اجازه کامل
+                can_send_messages=True,
+                can_send_media_messages=True,
+                can_send_other_messages=True,
+                can_add_web_page_previews=True
+            )
+        )
+        await update.message.reply_text("🔓 گروه *باز* شد.\nاعضا می‌توانند پیام ارسال کنند.", parse_mode="Markdown")
+
+    except Exception as e:
+        await update.message.reply_text(f"خطا: {e}")
+
+# ثبت هندلرها
+def register_handlers(app: Application):
+    app.add_handler(CommandHandler("قفل_گروه", lock_group))
+    app.add_handler(CommandHandler("بازکردن_گروه", unlock_group))
