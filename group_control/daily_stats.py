@@ -1,4 +1,4 @@
-# ======================= 📊 سیستم آمار پیشرفته تلگرام =======================
+# ======================= 📊 سیستم آمار پیشرفته تلگرام + ویسکال =======================
 
 import os
 import json
@@ -11,35 +11,38 @@ from telegram.ext import ContextTypes
 # ------------------- تنظیمات -------------------
 
 STATS_FILE = "advanced_stats.json"
+VOICE_FILE = "voice_stats.json"  # داده فرضی حضور ویسکال
 SUDO_ID = 8588347189  # آیدی سودو شما
 SAVE_INTERVAL = 300  # ذخیره هر 5 دقیقه (ثانیه)
 
 # ------------------- بارگذاری و ذخیره -------------------
 
-def load_stats():
-    if os.path.exists(STATS_FILE):
+def load_json(file):
+    if os.path.exists(file):
         try:
-            with open(STATS_FILE, "r", encoding="utf-8") as f:
+            with open(file, "r", encoding="utf-8") as f:
                 return json.load(f)
         except Exception as e:
-            print(f"⚠️ خطا در خواندن {STATS_FILE}: {e}")
+            print(f"⚠️ خطا در خواندن {file}: {e}")
     return {}
 
-def save_stats(data):
+def save_json(file, data):
     try:
-        with open(STATS_FILE, "w", encoding="utf-8") as f:
+        with open(file, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
     except Exception as e:
-        print(f"⚠️ خطا در ذخیره {STATS_FILE}: {e}")
+        print(f"⚠️ خطا در ذخیره {file}: {e}")
 
-stats = load_stats()
+stats = load_json(STATS_FILE)
+voice_data = load_json(VOICE_FILE)
 save_queue = set()  # صف گروه‌هایی که نیاز به ذخیره دارند
 
 async def periodic_save():
     while True:
         await asyncio.sleep(SAVE_INTERVAL)
         if save_queue:
-            save_stats(stats)
+            save_json(STATS_FILE, stats)
+            save_json(VOICE_FILE, voice_data)
             save_queue.clear()
             print("💾 آمار ذخیره شد (save_queue)")
 
@@ -87,7 +90,6 @@ async def record_message_activity(update: Update, context: ContextTypes.DEFAULT_
     data = stats[chat_id][today]
     msg = update.message
 
-    # نوع پیام
     if msg.forward_from or msg.forward_from_chat:
         data["forwards"] += 1
     elif msg.video:
@@ -108,7 +110,6 @@ async def record_message_activity(update: Update, context: ContextTypes.DEFAULT_
         else:
             data["stickers"] += 1
 
-    # لینک، منشن، هشتگ
     if msg.entities:
         for entity in msg.entities:
             if entity.type == "url":
@@ -118,18 +119,16 @@ async def record_message_activity(update: Update, context: ContextTypes.DEFAULT_
             elif entity.type == "hashtag":
                 data["hashtags"] += 1
 
-    # ریپلای
     if msg.reply_to_message:
         data["replies"] += 1
 
-    # تعداد پیام‌ها و طول پیام
     uid = str(user.id)
     data["messages"][uid] = data["messages"].get(uid, 0) + 1
     data["message_length"][uid] = data["message_length"].get(uid, 0) + len(msg.text or "")
 
     save_queue.add(chat_id)
 
-# ------------------- ثبت ورود اعضا -------------------
+# ------------------- ثبت ورود و خروج اعضا -------------------
 
 async def record_new_members(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message or not update.message.new_chat_members:
@@ -152,8 +151,6 @@ async def record_new_members(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
     save_queue.add(chat_id)
 
-# ------------------- ثبت خروج اعضا -------------------
-
 async def record_left_members(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message or not update.message.left_chat_member:
         return
@@ -161,11 +158,10 @@ async def record_left_members(update: Update, context: ContextTypes.DEFAULT_TYPE
     chat_id = str(update.effective_chat.id)
     today = datetime.now().strftime("%Y-%m-%d")
     init_daily_stats(chat_id, today)
-
     stats[chat_id][today]["lefts"] += 1
     save_queue.add(chat_id)
 
-# ------------------- نمایش آیدی کاربران -------------------
+# ------------------- نمایش آیدی و اطلاعات کاربر با ویسکال -------------------
 
 async def show_user_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
@@ -182,14 +178,24 @@ async def show_user_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
     target = update.message.reply_to_message.from_user if update.message.reply_to_message else user
     jalali_date = jdatetime.datetime.now().strftime("%A %d %B %Y")
     time_str = datetime.now().strftime("%H:%M:%S")
-
     user_link = f"<a href='tg://user?id={target.id}'>{target.first_name}</a>"
+
+    # داده‌های ویسکال
+    user_voice = voice_data.get(str(target.id), {})
+    total_seconds = user_voice.get("total_seconds", 0)
+    voice_time = f"{total_seconds//3600:02}:{(total_seconds%3600)//60:02}" if total_seconds else "00:00"
+    voice_percent = f"{user_voice.get('percent','0%')}"
+    voice_rank = f"{user_voice.get('rank','---')}"
 
     text = (
         f"🧿 <b>اطلاعات کاربر:</b>\n\n"
         f"👤 نام: {user_link}\n"
         f"💬 یوزرنیم: {getattr(target, 'username', '---')}\n"
         f"🆔 آیدی عددی: <code>{target.id}</code>\n"
+        f"─┅━✦━┅─\n"
+        f"◂ زمان حضور در ویسکال: {voice_time}\n"
+        f"◂ درصد حضور در ویسکال: {voice_percent}\n"
+        f"◂ رتبه حضور در ویسکال: {voice_rank}\n"
         f"📆 تاریخ: {jalali_date}\n"
         f"🕒 ساعت: {time_str}"
     )
@@ -198,9 +204,7 @@ async def show_user_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
         photos = await context.bot.get_user_profile_photos(target.id, limit=1)
         if photos.total_count > 0:
             photo = photos.photos[0][-1].file_id
-            msg = await context.bot.send_photo(
-                chat_id, photo=photo, caption=text, parse_mode="HTML"
-            )
+            msg = await context.bot.send_photo(chat_id, photo=photo, caption=text, parse_mode="HTML")
         else:
             msg = await update.message.reply_text(text, parse_mode="HTML")
     except Exception:
@@ -209,7 +213,7 @@ async def show_user_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await asyncio.sleep(15)
     await context.bot.delete_message(chat_id, msg.message_id)
 
-# ------------------- نمایش آمار گروه با عکس نفر اول -------------------
+# ------------------- نمایش آمار گروه با عکس نفر اول و ویسکال -------------------
 
 async def show_group_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
@@ -250,7 +254,17 @@ async def show_group_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     top_first_photo = photos.photos[0][-1].file_id
         except:
             name = "کاربر ناشناس"
+
+        # ویسکال
+        user_voice = voice_data.get(str(uid), {})
+        total_seconds = user_voice.get("total_seconds", 0)
+        voice_time = f"{total_seconds//3600:02}:{(total_seconds%3600)//60:02}" if total_seconds else "00:00"
+        voice_percent = f"{user_voice.get('percent','0%')}"
+        voice_rank = f"{user_voice.get('rank','---')}"
+
         top_today_text += f"◂ نفر {i} {medals[i-1]} :( {count} پیام | {name} )\n"
+        top_today_text += f"   ▸ ویسکال: {voice_time} | {voice_percent} | {voice_rank}\n"
+
     if not top_today_text:
         top_today_text = "◂ اطلاعاتی یافت نشد."
 
@@ -342,5 +356,5 @@ async def send_nightly_stats(context: ContextTypes.DEFAULT_TYPE):
     # پاکسازی آمار قدیمی
     for chat_id in list(stats.keys()):
         stats[chat_id] = {}
-    save_stats(stats)
+    save_json(STATS_FILE, stats)
     print("🧹 آمار روز گذشته پاک شد ✅")
