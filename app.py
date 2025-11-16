@@ -8,7 +8,7 @@ import requests
 # -------------------------
 # تنظیمات اصلی
 # -------------------------
-TOKEN = os.environ.get("TOKEN")  # مطمئن شو Config Var روی Heroku اضافه شده
+TOKEN = os.environ.get("TOKEN")  # توکن ربات در Config Vars Heroku
 bot = Bot(token=TOKEN)
 dp = Dispatcher(bot, None)       # فقط Webhook، Handlerها در bot.py
 
