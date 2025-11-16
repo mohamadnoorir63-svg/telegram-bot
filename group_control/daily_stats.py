@@ -181,6 +181,16 @@ async def show_user_info(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_link = f"<a href='tg://user?id={target.id}'>{target.first_name}</a>"
         username = getattr(target, "username", "---")
 
+        # فقط آمار خود کاربر، نه کل گروه
+        user_msgs = 0
+        user_joins = 0
+        today = datetime.now().strftime("%Y-%m-%d")
+        if chat_id in stats and today in stats[chat_id]:
+            data = stats[chat_id][today]
+            uid = str(target.id)
+            user_msgs = data["messages"].get(uid, 0)
+            user_joins = data["joins_added_per_user"].get(uid, 0)
+
         text = (
             f"🧿 <b>اطلاعات کاربر:</b>\n\n"
             f"🌌 عکس پروفایل\n"
@@ -195,19 +205,10 @@ async def show_user_info(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"◂ رتبه حضور در ویسکال: {voice_rank}\n"
             f"📆 تاریخ: {jalali_date}\n"
             f"🕒 ساعت: {time_str}\n"
+            f"─┅━ آمار امروز ━┅─\n"
+            f"📩 پیام‌های امروز: {user_msgs}\n"
+            f"➕ ادهای امروز: {user_joins}"
         )
-
-        today = datetime.now().strftime("%Y-%m-%d")
-        if chat_id in stats and today in stats[chat_id]:
-            data = stats[chat_id][today]
-            uid = str(target.id)
-            user_msgs = data["messages"].get(uid, 0)
-            user_joins = data["joins_added_per_user"].get(uid, 0)
-            text += (
-                f"─┅━ آمار امروز ━┅─\n"
-                f"📩 پیام‌های امروز: {user_msgs}\n"
-                f"➕ ادهای امروز: {user_joins}"
-            )
 
         try:
             photos = await context.bot.get_user_profile_photos(target.id, limit=1)
@@ -224,7 +225,6 @@ async def show_user_info(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     except Exception as e:
         print(f"⚠️ خطا در show_user_info: {e}")
-
 # ------------------- نمایش آمار گروه -------------------
 async def show_daily_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
