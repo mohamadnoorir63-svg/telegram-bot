@@ -101,7 +101,7 @@ async def remove_vip(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
 
     if not await _has_full_access(context, chat.id, user.id):
-    return
+        return
 
     if update.message.reply_to_message:
         target_id = update.message.reply_to_message.from_user.id
@@ -393,7 +393,7 @@ async def handle_unlock(update: Update, context: ContextTypes.DEFAULT_TYPE, key:
     user = update.effective_user
 
     if not await _has_full_access(context, chat.id, user.id):
-    return
+        return
     if key not in LOCK_TYPES:
         return
 
