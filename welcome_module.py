@@ -179,14 +179,14 @@ def _type_from_document(document):
     # fallback
     return "document"
 
-# ---------------- handle inputs from panel (text/media/rules/timer) ----------------
- async def welcome_panel_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
+# ---------------- handle inputs from panel (text/media/rules/timer) ---------------- 
+async def welcome_panel_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     chat = query.message.chat
     cid = str(chat.id)
     welcome_settings.setdefault(cid, {
-        "enabled": True, "text": DEFAULT_WELCOME_TEXT, "media": None, "rules": None, "delete_after": 0
+    "enabled": True, "text": DEFAULT_WELCOME_TEXT, "media": None, "rules": None, "delete_after": 0
     })
     cfg = welcome_settings[cid]
     data = query.data
