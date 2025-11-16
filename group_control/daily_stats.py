@@ -9,7 +9,6 @@ from telegram import Update
 from telegram.ext import ContextTypes
 from PIL import Image, ImageDraw, ImageFont
 import io
-import requests
 
 # ------------------- تنظیمات -------------------
 
@@ -159,16 +158,69 @@ async def record_left_members(update: Update, context: ContextTypes.DEFAULT_TYPE
     stats[chat_id][today]["lefts"] += 1
     save_queue.add(chat_id)
 
-# ------------------- تابع ایجاد تصویر گرافیکی نفر اول -------------------
+# ------------------- نمایش آیدی کاربران -------------------
+
+async def show_user_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    chat_id = str(update.effective_chat.id)
+
+    if user.id != SUDO_ID:
+        try:
+            member = await context.bot.get_chat_member(chat_id, user.id)
+            if member.status not in ["creator", "administrator"]:
+                return
+        except:
+            return
+
+    target = update.message.reply_to_message.from_user if update.message.reply_to_message else user
+    jalali_date = jdatetime.datetime.now().strftime("%A %d %B %Y")
+    time_str = datetime.now().strftime("%H:%M:%S")
+
+    # ویسکال
+    user_voice = voice_data.get(str(target.id), {})
+    total_seconds = user_voice.get("total_seconds", 0)
+    voice_time = f"{total_seconds//3600:02}:{(total_seconds%3600)//60:02}" if total_seconds else "00:00"
+    voice_percent = f"{user_voice.get('percent','0%')}"
+    voice_rank = f"{user_voice.get('rank','---')}"
+
+    user_link = f"<a href='tg://user?id={target.id}'>{target.first_name}</a>"
+
+    text = (
+        f"🧿 <b>اطلاعات کاربر:</b>\n\n"
+        f"👤 نام: {user_link}\n"
+        f"💬 یوزرنیم: {getattr(target, 'username', '---')}\n"
+        f"🆔 آیدی عددی: <code>{target.id}</code>\n"
+        f"◂ زمان حضور در ویسکال: {voice_time}\n"
+        f"◂ درصد حضور در ویسکال: {voice_percent}\n"
+        f"◂ رتبه حضور در ویسکال: {voice_rank}\n"
+        f"📆 تاریخ: {jalali_date}\n"
+        f"🕒 ساعت: {time_str}"
+    )
+
+    try:
+        photos = await context.bot.get_user_profile_photos(target.id, limit=1)
+        if photos.total_count > 0:
+            photo = photos.photos[0][-1].file_id
+            msg = await context.bot.send_photo(
+                chat_id, photo=photo, caption=text, parse_mode="HTML"
+            )
+        else:
+            msg = await update.message.reply_text(text, parse_mode="HTML")
+    except Exception:
+        msg = await update.message.reply_text(text, parse_mode="HTML")
+
+    await asyncio.sleep(15)
+    await context.bot.delete_message(chat_id, msg.message_id)
+
+# ------------------- ایجاد تصویر گرافیکی نفر اول -------------------
 
 def create_leader_image(user_photo_bytes, top_text: str):
-    base = Image.new("RGB", (600, 350), (30, 30, 30))
+    base = Image.new("RGB", (600, 400), (30, 30, 30))
     draw = ImageDraw.Draw(base)
 
     font_title = ImageFont.truetype(FONT_PATH, 30)
-    font_text = ImageFont.truetype(FONT_PATH, 22)
+    font_text = ImageFont.truetype(FONT_PATH, 20)
 
-    # عکس پروفایل
     try:
         avatar = Image.open(io.BytesIO(user_photo_bytes)).convert("RGBA").resize((150,150))
         base.paste(avatar, (225, 20))
@@ -211,7 +263,7 @@ async def show_group_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
             name = member.user.first_name
         except:
             name = "کاربر ناشناس"
-        # ویسکال
+
         user_voice = voice_data.get(str(uid), {})
         total_seconds = user_voice.get("total_seconds", 0)
         voice_time = f"{total_seconds//3600:02}:{(total_seconds%3600)//60:02}" if total_seconds else "00:00"
@@ -228,7 +280,6 @@ async def show_group_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 file = await context.bot.get_file(file_id)
                 top_first_photo_bytes = await file.download_as_bytearray()
 
-    # ایجاد تصویر گرافیکی
     if top_first_photo_bytes:
         img = create_leader_image(top_first_photo_bytes, top_text)
         bio = io.BytesIO()
