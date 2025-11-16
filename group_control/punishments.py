@@ -122,36 +122,35 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
     if not msg or chat.type not in ("group", "supergroup"):
         return
     text = (msg.text or "").strip()
-    if not text:
-        return
 
-    # دستورات برای نمایش لیست
-    if text.startswith("لیست بن"):
+    # دستورات برای نمایش لیست دقیق
+    if text.strip() == "لیست بن":
         items = list_from_file(BAN_FILE, chat.id)
         reply = await msg.reply_text("🚫 لیست بن شده‌ها:\n" + ("\n".join(items) if items else "هیچ کس"))
         await asyncio.sleep(10)
         await reply.delete()
         return
-    if text.startswith("لیست سکوت"):
+    if text.strip() == "لیست سکوت":
         items = list_from_file(MUTE_FILE, chat.id)
         reply = await msg.reply_text("🤐 لیست سکوت شده‌ها:\n" + ("\n".join(items) if items else "هیچ کس"))
         await asyncio.sleep(10)
         await reply.delete()
         return
 
+    # ================= دقیق سازی regex دستورات =================
     PATTERNS = {
-        "ban": re.compile(r"^بن(?:\s+(\S+))?$"),
-        "unban": re.compile(r"^حذف\s*بن(?:\s+(\S+))?$"),
-        "mute": re.compile(r"^سکوت(?:\s+(\S+))?(?:\s+(\d+)\s*(ثانیه|دقیقه|ساعت)?)?$"),
-        "unmute": re.compile(r"^حذف\s*سکوت(?:\s+(\S+))?$"),
-        "warn": re.compile(r"^اخطار(?:\s+(\S+))?$"),
-        "delwarn": re.compile(r"^حذف\s*اخطار(?:\s+(\S+))?$"),
+        "ban": re.compile(r"^بن(?:\s+(\S+))?$", re.IGNORECASE),
+        "unban": re.compile(r"^حذف\s+بن(?:\s+(\S+))?$", re.IGNORECASE),
+        "mute": re.compile(r"^سکوت(?:\s+(\S+))?(?:\s+(\d+)\s*(ثانیه|دقیقه|ساعت))?$", re.IGNORECASE),
+        "unmute": re.compile(r"^حذف\s+سکوت(?:\s+(\S+))?$", re.IGNORECASE),
+        "warn": re.compile(r"^اخطار(?:\s+(\S+))?$", re.IGNORECASE),
+        "delwarn": re.compile(r"^حذف\s+اخطار(?:\s+(\S+))?$", re.IGNORECASE),
     }
 
     matched = None
     cmd_type = None
     for k, pat in PATTERNS.items():
-        m = pat.match(text)
+        m = pat.fullmatch(text)
         if m:
             cmd_type = k
             matched = m
