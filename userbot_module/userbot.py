@@ -62,7 +62,27 @@ async def tag_users(chat_id, user_ids=None, random_count=None):
             await asyncio.sleep(1)
     except:
         pass
-
+# ================= پاکسازی از یوزربات =================
+async def cleanup_via_userbot(chat_id, count=None, last_msg_id=None):
+    try:
+        if count:
+            # حذف تعداد مشخص
+            for mid in range(last_msg_id, max(1, last_msg_id - count), -1):
+                try:
+                    await client.delete_messages(chat_id, mid)
+                except:
+                    pass
+                await asyncio.sleep(0.1)
+        else:
+            # پاکسازی کامل
+            for mid in range(last_msg_id, 1, -1):
+                try:
+                    await client.delete_messages(chat_id, mid)
+                except:
+                    pass
+                await asyncio.sleep(0.1)
+    except:
+        pass
 # ================= ارسال دستورات تنبیهی روی یوزربات =================
 
 async def punish_via_userbot(chat_id, user_id, action="ban", seconds=None):
@@ -137,6 +157,14 @@ async def handle_commands(event):
                 pass
         if user_id:
             await punish_via_userbot(chat_id, user_id, action="unban")
+            elif action.startswith("cleanup"):
+    # cleanup|chat_id|last_msg_id|count
+    last_msg_id = int(parts[2])
+    count = None
+    if len(parts) == 4 and parts[3].isdigit():
+        count = int(parts[3])
+
+    await cleanup_via_userbot(chat_id, count=count, last_msg_id=last_msg_id)
 
 # ================= استارت یوزربات =================
 
