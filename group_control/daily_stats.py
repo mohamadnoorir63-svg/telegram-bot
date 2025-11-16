@@ -31,7 +31,7 @@ def save_stats(data):
         print(f"⚠️ خطا در ذخیره {STATS_FILE}: {e}")
 
 stats = load_stats()
-save_queue = set()  # صف گروه‌هایی که نیاز به ذخیره دارند
+save_queue = set()
 
 async def periodic_save():
     while True:
@@ -59,7 +59,11 @@ def init_daily_stats(chat_id, today):
 
 # ------------------- تابع دریافت اطلاعات ویسکال -------------------
 async def get_voice_data(user_id):
-    # نمونه داده‌های تستی؛ برای داده واقعی به API یا دیتابیس متصل شود
+    """
+    این تابع باید به API واقعی ویسکال یا دیتابیس شما متصل شود.
+    برای کاربران معمولی داده پیش‌فرض برمی‌گرداند.
+    """
+    # داده تستی برای مدیر/سودو
     return {
         "datacenter_code": 5,
         "role": "مالک گروه",
@@ -175,8 +179,12 @@ async def show_daily_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
             except:
                 pass
 
+        # کاربران غیرمدیر هیچ پاسخی نمی‌بینند
+        if not is_admin:
+            return
+
         # ------------------- حالت آیدی پیشرفته -------------------
-        if text_input in ["آیدی", "id"] and is_admin:
+        if text_input in ["آیدی", "id"]:
             target = update.message.reply_to_message.from_user if update.message.reply_to_message else user
 
             jalali_date = jdatetime.datetime.now().strftime("%A %d %B %Y")
@@ -219,12 +227,9 @@ async def show_daily_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             await asyncio.sleep(15)
             await context.bot.delete_message(update.effective_chat.id, msg.message_id)
-            return  # فقط آیدی و ویسکال نمایش داده شود
+            return
 
-        # ------------------- نمایش آمار روزانه (برای مدیر و سودو) -------------------
-        if not is_admin:
-            return  # کاربران معمولی هیچ پاسخی نمی‌بینند
-
+        # ------------------- نمایش آمار روزانه -------------------
         if chat_id not in stats or today not in stats[chat_id]:
             msg = await update.message.reply_text("ℹ️ هنوز فعالیتی برای امروز ثبت نشده است.")
             await asyncio.sleep(15)
