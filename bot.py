@@ -1995,12 +1995,18 @@ application.add_handler(
 )
 application.add_handler(
     MessageHandler(
-        filters.Regex(r"^(?:آمار|آمار امروز|آیدی|id)$") & filters.TEXT & ~filters.COMMAND,
-        show_daily_stats
+        filters.Regex(r"^(?:آمار|آمار امروز)$") & filters.TEXT & ~filters.COMMAND,
+        show_group_stats  # <--- تغییر داده شد
     ),
     group=20  # بالاتر از همه تا هیچ‌چیز بعدش پاک نشه
 )
-
+application.add_handler(
+    MessageHandler(
+        filters.Regex(r"^(?:آیدی|id)$") & filters.TEXT & ~filters.COMMAND,
+        show_user_id  # <--- جدا برای آیدی
+    ),
+    group=20
+)
 # ==========================================================
 # 🎉 خوشامد پویا و تنظیمات گروه
 # ==========================================================
