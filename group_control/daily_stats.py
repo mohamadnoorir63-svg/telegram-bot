@@ -210,7 +210,7 @@ async def show_user_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await asyncio.sleep(15)
     await context.bot.delete_message(chat_id, msg.message_id)
 
-# ------------------- نمایش آمار گروه -------------------
+# ------------------- نمایش آمار گروه با عکس نفر اول -------------------
 
 async def show_group_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
@@ -241,9 +241,16 @@ async def show_group_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     top_today = sorted(data["messages"].items(), key=lambda x: x[1], reverse=True)[:3]
     medals = ["🥇", "🥈", "🥉"]
     top_today_text = ""
+    top_first_photo = None
     for i, (uid, count) in enumerate(top_today, 1):
         try:
-            name = (await context.bot.get_chat_member(chat_id, uid)).user.first_name
+            member = await context.bot.get_chat_member(chat_id, uid)
+            name = member.user.first_name
+            if i == 1:
+                # عکس نفر اول
+                photos = await context.bot.get_user_profile_photos(uid, limit=1)
+                if photos.total_count > 0:
+                    top_first_photo = photos.photos[0][-1].file_id
         except:
             name = "کاربر ناشناس"
         top_today_text += f"◂ نفر {i} {medals[i-1]} :( {count} پیام | {name} )\n"
@@ -304,7 +311,15 @@ async def show_group_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
 ─┅━ فعال ترین های کل ━┅─ 
 {top_all_text}
 """
-    msg = await update.message.reply_text(text, parse_mode="HTML")
+
+    try:
+        if top_first_photo:
+            msg = await context.bot.send_photo(chat_id, top_first_photo, caption=text, parse_mode="HTML")
+        else:
+            msg = await update.message.reply_text(text, parse_mode="HTML")
+    except:
+        msg = await update.message.reply_text(text, parse_mode="HTML")
+
     await asyncio.sleep(15)
     await context.bot.delete_message(chat_id, msg.message_id)
 
