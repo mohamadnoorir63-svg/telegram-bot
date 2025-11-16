@@ -235,19 +235,25 @@ def _is_locked(chat_id: int, key: str) -> bool:
     return LOCKS.get(str(chat_id), {}).get(key, False)
 
 # ─────────────────────────────── حذف پیام ممنوع ───────────────────────────────
-
-async def _del_msg(update: Update, warn_text: str = None):
-    """حذف پیام و ارسال هشدار موقت"""
+async def _del_msg(update: Update, lock_name: str = None):
+    """حذف پیام و ارسال هشدار شیک با نماد و ساعت"""
     try:
         msg = update.message
         user = update.effective_user
         await msg.delete()
-        if warn_text:
-            warn = await msg.chat.send_message(
-                f"{warn_text}\n👤 {user.first_name}",
-                parse_mode="HTML"
+
+        if lock_name:
+            now = datetime.now().strftime("%H:%M:%S")
+            symbol = "𓄂ꪴꪰ❨𝄠⃘۪۪۪۪۪۪ٜ♕{name}♕𝄠⃘۪۪۪۪۪۪❩"
+            user_symbol = symbol.format(name=user.first_name)
+            text = (
+                f"⚠️ پیام شما به دلیل نقض قوانین حذف شد\n"
+                f"لطفاً از ارسال این نوع محتوا خودداری کنید.\n"
+                f"👤 {user_symbol}\n"
+                f"⏰ {now}"
             )
-            await asyncio.sleep(4)
+            warn = await msg.chat.send_message(text, parse_mode="HTML")
+            await asyncio.sleep(5)
             await warn.delete()
     except Exception as e:
         print(f"[Delete Error] {e}")
