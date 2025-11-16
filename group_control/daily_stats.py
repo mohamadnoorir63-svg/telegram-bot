@@ -319,12 +319,12 @@ async def create_top5_image(context, chat_id, today):
     return out_path
 
 # ------------------- نمایش آمار گروه -------------------
-
 async def show_group_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     chat_id = str(update.effective_chat.id)
     today = datetime.now().strftime("%Y-%m-%d")
 
+    # فقط مدیر یا سودو اجازه دارند
     if user.id != SUDO_ID:
         try:
             member = await context.bot.get_chat_member(chat_id, user.id)
@@ -343,15 +343,7 @@ async def show_group_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     data = stats[chat_id][today]
 
-    img_path = await create_top5_image(context, chat_id, today)
-    if img_path:
-        try:
-            with open(img_path,"rb") as f:
-                await context.bot.send_photo(chat_id,photo=f)
-            os.remove(img_path)
-        except Exception as e:
-            print("Error sending top5 image:",e)
-
+    # --- آماده سازی متن آمار ---
     now = datetime.now()
     time_str = now.strftime("%H:%M:%S")
     jalali_date = jdatetime.datetime.now().strftime("%A %d %B %Y")
@@ -385,7 +377,7 @@ async def show_group_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
         top_all_text += f"◂ نفر {i} {medals[i-1]} :( {count} پیام | {name} )\n"
     if not top_all_text: top_all_text="◂ اطلاعاتی یافت نشد."
 
-    text=f"""
+    stats_text = f"""
 ◄ آمار فعالیت گروه از 00:00 تا این لحظه : • تاریخ : {jalali_date} • ساعت : {time_str}
 
 ─┅━ پیام های امروز ━┅─ 
@@ -411,13 +403,29 @@ async def show_group_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
 ─┅━ فعال ترین های کل ━┅─ 
 {top_all_text}
 """
-    try:
-        msg=await update.message.reply_text(text,parse_mode="HTML")
-        await asyncio.sleep(15)
-        try: await context.bot.delete_message(chat_id,msg.message_id)
-        except: pass
-    except Exception as e: print("Error sending stats text:",e)
 
+    # --- ساخت عکس Top5 ---
+    img_path = await create_top5_image(context, chat_id, today)
+    if img_path:
+        try:
+            with open(img_path, "rb") as f:
+                # ارسال عکس با متن در یک پیام
+                msg = await context.bot.send_photo(
+                    chat_id,
+                    photo=f,
+                    caption=stats_text,
+                    parse_mode="HTML"
+                )
+            # پاکسازی فایل محلی
+            os.remove(img_path)
+            # حذف پیام بعد از ۱۵ ثانیه
+            await asyncio.sleep(15)
+            try:
+                await context.bot.delete_message(chat_id, msg.message_id)
+            except:
+                pass
+        except Exception as e:
+            print("Error sending top5 with caption:", e)
 # ------------------- آمار شبانه و پاکسازی -------------------
 async def send_nightly_stats(context: ContextTypes.DEFAULT_TYPE):
     now = datetime.now()
