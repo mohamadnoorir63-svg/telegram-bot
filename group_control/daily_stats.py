@@ -171,7 +171,6 @@ async def show_user_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     chat_id = str(update.effective_chat.id)
 
-    # فقط مدیر یا سودو اجازه دارند
     if user.id != SUDO_ID:
         try:
             member = await context.bot.get_chat_member(chat_id, user.id)
@@ -217,7 +216,6 @@ async def show_group_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = str(update.effective_chat.id)
     today = datetime.now().strftime("%Y-%m-%d")
 
-    # فقط مدیر یا سودو اجازه دارند
     if user.id != SUDO_ID:
         try:
             member = await context.bot.get_chat_member(chat_id, user.id)
@@ -247,7 +245,6 @@ async def show_group_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
             member = await context.bot.get_chat_member(chat_id, uid)
             name = member.user.first_name
             if i == 1:
-                # عکس نفر اول
                 photos = await context.bot.get_user_profile_photos(uid, limit=1)
                 if photos.total_count > 0:
                     top_first_photo = photos.photos[0][-1].file_id
