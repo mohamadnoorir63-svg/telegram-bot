@@ -14,6 +14,7 @@ STATS_FILE = "advanced_stats.json"
 SUDO_ID = 8588347189  # آیدی سودو
 SAVE_INTERVAL = 300   # ذخیره هر 5 دقیقه
 
+
 # ------------------- بارگذاری و ذخیره -------------------
 
 def load_stats():
@@ -25,6 +26,7 @@ def load_stats():
             print(f"⚠️ خطا در خواندن {STATS_FILE}: {e}")
     return {}
 
+
 def save_stats(data):
     try:
         with open(STATS_FILE, "w", encoding="utf-8") as f:
@@ -32,8 +34,10 @@ def save_stats(data):
     except Exception as e:
         print(f"⚠️ خطا در ذخیره {STATS_FILE}: {e}")
 
+
 stats = load_stats()
 save_queue = set()
+
 
 async def periodic_save():
     while True:
@@ -42,6 +46,7 @@ async def periodic_save():
             save_stats(stats)
             save_queue.clear()
             print("💾 آمار ذخیره شد (save_queue)")
+
 
 # ------------------- ایجاد روز جدید -------------------
 
@@ -73,6 +78,7 @@ def init_daily_stats(chat_id, today):
             "muted": 0,
             "joins_added_per_user": {}
         }
+
 
 # ------------------- ثبت فعالیت پیام -------------------
 
@@ -128,6 +134,7 @@ async def record_message_activity(update: Update, context: ContextTypes.DEFAULT_
 
     save_queue.add(chat_id)
 
+
 # ------------------- ثبت ورودی -------------------
 
 async def record_new_members(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -153,6 +160,7 @@ async def record_new_members(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
     save_queue.add(chat_id)
 
+
 # ------------------- ثبت خروج -------------------
 
 async def record_left_members(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -167,37 +175,41 @@ async def record_left_members(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     save_queue.add(chat_id)
 
-# ------------------- نمایش آمار و آیدی -------------------
+
+# ------------------- ✨ نمایش آمار و دستور آیدی ✨ -------------------
 
 async def show_daily_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         chat_id = str(update.effective_chat.id)
         user = update.effective_user
-        text_input = update.message.text.strip().lower()
+
+        raw_text = update.message.text.strip()        # متن اصلی
+        lower_text = raw_text.lower()                # نسخه انگلیسی/کوچک
+
         today = datetime.now().strftime("%Y-%m-%d")
 
-        # ----------- دسترسی مدیر / سودو -------------
+        # ----------- دسترسی: فقط مدیر + سودو -------------
         try:
             member = await context.bot.get_chat_member(chat_id, user.id)
             is_admin = member.status in ["creator", "administrator"]
         except:
             is_admin = False
 
-        # کاربر عادی آمار یا آیدی بزند → سکوت
         if user.id != SUDO_ID and not is_admin:
             return
 
-        # ==============================
-        # 📌 بخش جدید آیدی
-        # ==============================
+        # ----------------------------------------------------------
+        # 📌 دستور آیدی
+        # ----------------------------------------------------------
 
-        if text_input in ["آیدی", "id"]:
-
+        if raw_text in ["آیدی", "ایدی"] or lower_text in ["id"]:
+            
             target = update.message.reply_to_message.from_user if update.message.reply_to_message else user
 
             jalali_date = jdatetime.datetime.now().strftime("%A %d %B %Y")
             time_str = datetime.now().strftime("%H:%M:%S")
 
+            # دریافت اطلاعات ویس‌کال
             voice_data = await get_voice_data(target.id)
 
             username = getattr(target, "username", "---")
@@ -224,19 +236,14 @@ async def show_daily_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 f"📆 <b>تاریخ:</b> {jalali_date}\n"
                 f"🕒 <b>ساعت:</b> {time_str}\n"
                 f"─┅━✦━┅─\n"
-                f"✨ <b>برای مشاهده ادهای امروز و پیام‌های امروز از دستور آمار استفاده کنید.</b>"
+                f"✨ <b>برای مشاهده ادها و پیام‌های امروز از دستور آمار استفاده کنید.</b>"
             )
 
             try:
                 photos = await context.bot.get_user_profile_photos(target.id, limit=1)
                 if photos.total_count > 0:
                     photo = photos.photos[0][-1].file_id
-                    msg = await context.bot.send_photo(
-                        chat_id,
-                        photo=photo,
-                        caption=text,
-                        parse_mode="HTML"
-                    )
+                    msg = await context.bot.send_photo(chat_id, photo=photo, caption=text, parse_mode="HTML")
                 else:
                     msg = await update.message.reply_text(text, parse_mode="HTML")
             except:
@@ -246,9 +253,9 @@ async def show_daily_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await context.bot.delete_message(chat_id, msg.message_id)
             return
 
-        # ==============================
-        # 📌 ادامه: بخش آمار (بدون تغییر)
-        # ==============================
+        # ----------------------------------------------------------
+        # 📊 نمایش آمار — بدون تغییر
+        # ----------------------------------------------------------
 
         if chat_id not in stats or today not in stats[chat_id]:
             msg = await update.message.reply_text("ℹ️ هنوز فعالیتی برای امروز ثبت نشده است.")
@@ -354,6 +361,7 @@ async def show_daily_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     except Exception as e:
         print(f"⚠️ خطا در show_daily_stats: {e}")
+
 
 # ------------------- آمار شبانه -------------------
 
