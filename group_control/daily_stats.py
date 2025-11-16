@@ -145,7 +145,6 @@ async def record_left_members(update: Update, context: ContextTypes.DEFAULT_TYPE
     save_queue.add(chat_id)
 
 # ------------------- نمایش اطلاعات کاربر با مقام -------------------
-
 async def show_user_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     chat_id = str(update.effective_chat.id)
@@ -155,21 +154,35 @@ async def show_user_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
             member = await context.bot.get_chat_member(chat_id, user.id)
             if member.status not in ["creator","administrator"]:
                 return
-        except: return
+        except:
+            return
 
     target = update.message.reply_to_message.from_user if update.message.reply_to_message else user
     jalali_date = jdatetime.datetime.now().strftime("%A %d %B %Y")
     time_str = datetime.now().strftime("%H:%M:%S")
 
     # مقام کاربر
-    if target.id == SUDO_ID: role = "💎 سودو"
+    if target.id == SUDO_ID: 
+        role = "💎 سودو"
     else:
         try:
             member = await context.bot.get_chat_member(chat_id, target.id)
             if member.status=="creator": role="👑 مالک"
             elif member.status=="administrator": role="🛡️ مدیر"
             else: role="👤 عضو عادی"
-        except: role="👤 عضو عادی"
+        except: 
+            role="👤 عضو عادی"
+
+    # تعداد کل پیام‌های کاربر امروز
+    today = datetime.now().strftime("%Y-%m-%d")
+    total_messages = 0
+    if chat_id in stats and today in stats[chat_id]:
+        total_messages = stats[chat_id][today]["messages"].get(str(target.id), 0)
+
+    # تعداد ادهایی که کاربر امروز اضافه کرده
+    total_added = 0
+    if chat_id in stats and today in stats[chat_id]:
+        total_added = stats[chat_id][today]["joins_added_per_user"].get(str(target.id), 0)
 
     user_link = f"<a href='tg://user?id={target.id}'>{target.first_name}</a>"
     text = (
@@ -178,6 +191,8 @@ async def show_user_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"💬 یوزرنیم: {getattr(target,'username','---')}\n"
         f"🆔 آیدی عددی: <code>{target.id}</code>\n"
         f"🎖 مقام: {role}\n"
+        f"📊 تعداد پیام امروز: {total_messages}\n"
+        f"📌 تعداد اد اضافه‌شده امروز: {total_added}\n"
         f"📆 تاریخ: {jalali_date}\n"
         f"🕒 ساعت: {time_str}"
     )
@@ -193,9 +208,10 @@ async def show_user_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
         msg = await update.message.reply_text(text, parse_mode="HTML")
 
     await asyncio.sleep(15)
-    try: await context.bot.delete_message(chat_id,msg.message_id)
-    except: pass
-
+    try: 
+        await context.bot.delete_message(chat_id,msg.message_id)
+    except: 
+        pass
 # ------------------- ساخت عکس Top5 (سازگار با Pillow 10+) -------------------
 
 async def create_top5_image(context, chat_id, today):
