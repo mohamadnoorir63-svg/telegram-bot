@@ -721,7 +721,7 @@ async def welcome_panel_buttons(update: Update, context: ContextTypes.DEFAULT_TY
         msg = "📜 لطفاً متن جدید خوشامد را ارسال کن.\nمثلاً:\nسلام {name} خوش اومدی 🌻"
         context.user_data["set_mode"] = "text"
     elif data == "welcome_media":
-        msg = "🖼 لطفاً عکس، گیف، ویدیو یا هر نوع فایل قابل ارسال در تلگرام را بفرست."
+        msg = "🖼 لطفاً عکس، گیف، ویدیو، صدا یا هر نوع فایل قابل ارسال در تلگرام را بفرست."
         context.user_data["set_mode"] = "media"
     elif data == "welcome_rules":
         msg = "📎 لینک قوانین گروه را بفرست (مثلاً https://t.me/example)"
@@ -769,35 +769,35 @@ async def welcome_input_handler(update: Update, context: ContextTypes.DEFAULT_TY
         media_info = None
         msg_type = None
 
-        if update.message.photo:
+        # عکس
+        if getattr(update.message, "photo", None):
             media_info = update.message.photo[-1].file_id
             msg_type = "photo"
-        elif update.message.video:
+        # ویدیو
+        elif getattr(update.message, "video", None):
             media_info = update.message.video.file_id
             msg_type = "video"
-        elif update.message.animation:
-            # گیف طولانی یا کوتاه
-            if update.message.animation.duration > 3:
-                media_info = update.message.animation.file_id
-                msg_type = "video"
-            else:
-                media_info = update.message.animation.file_id
-                msg_type = "animation"
-        elif update.message.document:
-            mime = update.message.document.mime_type
+        # گیف (animation)
+        elif getattr(update.message, "animation", None):
+            media_info = update.message.animation.file_id
+            msg_type = "animation"
+        # فایل‌ها (document) → شامل PDF, MP4, GIF طولانی، و غیره
+        elif getattr(update.message, "document", None):
             media_info = update.message.document.file_id
-            if mime.startswith("video/"):
-                msg_type = "video"
-            elif mime.startswith("image/"):
+            mime = update.message.document.mime_type
+            if mime.startswith("image/"):
                 msg_type = "photo"
+            elif mime.startswith("video/"):
+                msg_type = "video"
             elif mime.startswith("audio/"):
                 msg_type = "audio"
             else:
                 msg_type = "document"
-        elif update.message.audio:
+        # صدا و ویس
+        elif getattr(update.message, "audio", None):
             media_info = update.message.audio.file_id
             msg_type = "audio"
-        elif update.message.voice:
+        elif getattr(update.message, "voice", None):
             media_info = update.message.voice.file_id
             msg_type = "voice"
 
