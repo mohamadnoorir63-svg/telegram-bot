@@ -69,7 +69,7 @@ from panels.panel_menu import (
     
 )
 from group_control.origin_title import register_origin_title_handlers
-
+from welcome_module import
 from context_memory import ContextMemory
 from brain_bridge_group import process_group_message
 
