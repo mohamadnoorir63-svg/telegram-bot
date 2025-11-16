@@ -55,7 +55,7 @@ async def set_vip(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
 
     if not await _has_full_access(context, chat.id, user.id):
-    return
+        return
 
     if update.message.reply_to_message:
         target_id = update.message.reply_to_message.from_user.id
