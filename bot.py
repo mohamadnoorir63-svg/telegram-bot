@@ -2126,10 +2126,27 @@ application.add_handler(
 # ==========================================================
 # 🎉 خوشامد پویا و تنظیمات گروه
 # ==========================================================
-application.add_handler(MessageHandler(filters.Regex("^خوشامد$"), open_welcome_panel), group=-1)
-application.add_handler(CallbackQueryHandler(welcome_panel_buttons, pattern="^welcome_"), group=-1)
-application.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome), group=-1)
-application.add_handler(MessageHandler(filters.TEXT | filters.PHOTO | filters.ANIMATION, welcome_input_handler), group=-1)
+application.add_handler(
+    MessageHandler(filters.Regex("^خوشامد$"), open_welcome_panel),
+    group=-1
+)
+
+application.add_handler(
+    CallbackQueryHandler(welcome_panel_buttons, pattern="^welcome_"),
+    group=-1
+)
+
+application.add_handler(
+    MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome),
+    group=-1
+)
+
+# ⛔ مشکل اصلی همین بود → فقط TEXT, PHOTO و ANIMATION
+# ⬇️ نسخه صحیح:
+application.add_handler(
+    MessageHandler(filters.ALL & ~filters.COMMAND, welcome_input_handler),
+    group=-1
+)
 
 # ==========================================================
 from datetime import time, timezone, timedelta
