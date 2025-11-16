@@ -52,7 +52,11 @@ def get_persian_time():
     return f"{time_str} ( {date_str} )"
 
 # ---------------- keyboard ----------------
-def build_welcome_keyboard():
+def build_welcome_keyboard(main_panel: bool = True):
+    # اگر main_panel True باشد، آخرین دکمه "❌ بستن پنل"
+    # در غیر اینصورت "🔙 بازگشت"
+    last_button = InlineKeyboardButton("❌ بستن پنل", callback_data="welcome_close") if main_panel else InlineKeyboardButton("🔙 بازگشت", callback_data="welcome_back")
+    
     return InlineKeyboardMarkup([
         [InlineKeyboardButton("🟢 فعال‌سازی", callback_data="welcome_enable"),
          InlineKeyboardButton("🔴 غیرفعال‌سازی", callback_data="welcome_disable")],
@@ -61,16 +65,14 @@ def build_welcome_keyboard():
         [InlineKeyboardButton("📎 لینک قوانین", callback_data="welcome_rules"),
          InlineKeyboardButton("⏳ حذف خودکار", callback_data="welcome_timer")],
         [InlineKeyboardButton("👀 پیش‌نمایش", callback_data="welcome_preview")],
-        [InlineKeyboardButton("🔙 بازگشت", callback_data="welcome_back")]
+        [last_button]
     ])
-
 # ---------------- panel open ----------------
 async def open_welcome_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     is_cb = bool(getattr(update, "callback_query", None))
     chat = update.effective_chat if update.effective_chat else update.callback_query.message.chat
     user = update.effective_user
 
-    # فقط مدیران و سازنده پنل را باز کنند
     try:
         member = await context.bot.get_chat_member(chat.id, user.id)
         if member.status not in ["administrator", "creator"]:
@@ -80,14 +82,13 @@ async def open_welcome_panel(update: Update, context: ContextTypes.DEFAULT_TYPE)
             else:
                 return await update.message.reply_text(txt)
     except:
-        # اگر get_chat_member خطا داد، اجازه رد شود
         pass
 
     cid = str(chat.id)
     welcome_settings.setdefault(cid, {
         "enabled": True,
         "text": DEFAULT_WELCOME_TEXT,
-        "media": None,       # {"type": "photo"/"video"/"document"/..., "file_id": "..."}
+        "media": None,
         "rules": None,
         "delete_after": 0
     })
@@ -99,7 +100,7 @@ async def open_welcome_panel(update: Update, context: ContextTypes.DEFAULT_TYPE)
         "از گزینه‌ها برای تنظیم پیام خوشامد استفاده کن.\n"
         "می‌تونی متن، رسانه، لینک قوانین و زمان حذف رو تنظیم کنی."
     )
-    keyboard = build_welcome_keyboard()
+    keyboard = build_welcome_keyboard(main_panel=True)  # ← دکمه آخر "❌ بستن پنل"
 
     if is_cb:
         try:
@@ -108,7 +109,6 @@ async def open_welcome_panel(update: Update, context: ContextTypes.DEFAULT_TYPE)
             await context.bot.send_message(chat.id, panel_text, parse_mode=ParseMode.HTML, reply_markup=keyboard)
     else:
         await update.message.reply_text(panel_text, parse_mode=ParseMode.HTML, reply_markup=keyboard)
-
 # ---------------- callback buttons ----------------
 async def welcome_panel_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -120,15 +120,26 @@ async def welcome_panel_buttons(update: Update, context: ContextTypes.DEFAULT_TY
     })
     cfg = welcome_settings[cid]
     data = query.data
+
+    # برای زیرمجموعه‌ها دکمه "بازگشت" نمایش داده شود
     back_btn = InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data="welcome_back")]])
 
-    if data == "welcome_enable":
-        cfg["enabled"] = True
-        msg = "✅ خوشامد فعال شد."
-    elif data == "welcome_disable":
-        cfg["enabled"] = False
-        msg = "🚫 خوشامد غیرفعال شد."
-    elif data == "welcome_text":
+    # --- اصلی ---
+    if data == "welcome_back":
+        return await open_welcome_panel(update, context)  # ← وقتی برگشت، دکمه آخر "❌ بستن پنل"
+    
+    if data == "welcome_close":
+        try:
+            await query.message.edit_text("❌ پنل بسته شد")
+        except:
+            try:
+                await query.message.delete()
+            except:
+                pass
+        return
+
+    # گزینه‌های زیرمجموعه
+    if data == "welcome_text":
         context.user_data["set_mode"] = "text"
         msg = "📜 لطفاً متن جدید خوشامد را ارسال کنید. از {name}، {group} و {time} استفاده کنید."
     elif data == "welcome_media":
@@ -144,17 +155,14 @@ async def welcome_panel_buttons(update: Update, context: ContextTypes.DEFAULT_TY
         now = get_persian_time()
         sample = cfg.get("text", DEFAULT_WELCOME_TEXT).format(name="مهران", group=chat.title or "گروه", time=now)
         msg = f"👀 <b>پیش‌نمایش:</b>\n\n{sample}"
-    elif data == "welcome_back":
-        return await open_welcome_panel(update, context)
     else:
         msg = "⚠️ گزینه نامشخص."
 
     save_welcome_settings(welcome_settings)
     try:
-        await query.message.edit_text(msg, parse_mode=ParseMode.HTML, reply_markup=back_btn)
+        await query.message.edit_text(msg, parse_mode=ParseMode.HTML, reply_markup=back_btn)  # ← زیرمجموعه‌ها با "بازگشت"
     except:
         pass
-
 # ---------------- utility: determine type from document mime/filename ----------------
 def _type_from_document(document):
     # document: telegram.Document
