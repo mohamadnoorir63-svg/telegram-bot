@@ -52,7 +52,7 @@ async def _has_access(context, chat_id: int, user_id: int) -> bool:
     except Exception:
         return False
 
-# ================= 🎯 استخراج هدف مقاوم =================
+# ================= 🎯 استخراج هدف =================
 async def _resolve_target(msg, context, chat_id, explicit_arg: str = None):
     text = (msg.text or "").strip()
     if msg.reply_to_message and getattr(msg.reply_to_message, "from_user", None):
@@ -143,18 +143,20 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
     # ================= دقیق‌سازی regex دستورات =================
     PATTERNS = {
-        "ban": re.compile(r"^بن(?:\s+(\S+))?$"),
-        "unban": re.compile(r"^حذف\s+بن(?:\s+(\S+))?$"),
-        "mute": re.compile(r"^سکوت(?:\s+(\S+))?(?:\s+(\d+)\s*(ثانیه|دقیقه|ساعت))?$"),
-        "unmute": re.compile(r"^حذف\s+سکوت(?:\s+(\S+))?$"),
-        "warn": re.compile(r"^اخطار(?:\s+(\S+))?$"),
-        "delwarn": re.compile(r"^حذف\s+اخطار(?:\s+(\S+))?$"),
+        "ban": re.compile(r"^بن(?:\s+(@?[A-Za-z0-9_]{3,32}|\d{6,15}))?$"),
+        "unban": re.compile(r"^حذف\s+بن(?:\s+(@?[A-Za-z0-9_]{3,32}|\d{6,15}))?$"),
+        "mute": re.compile(
+            r"^سکوت(?:\s+(@?[A-Za-z0-9_]{3,32}|\d{6,15}))?(?:\s+(\d+)\s*(ثانیه|دقیقه|ساعت))?$"
+        ),
+        "unmute": re.compile(r"^حذف\s+سکوت(?:\s+(@?[A-Za-z0-9_]{3,32}|\d{6,15}))?$"),
+        "warn": re.compile(r"^اخطار(?:\s+(@?[A-Za-z0-9_]{3,32}|\d{6,15}))?$"),
+        "delwarn": re.compile(r"^حذف\s+اخطار(?:\s+(@?[A-Za-z0-9_]{3,32}|\d{6,15}))?$"),
     }
 
     matched = None
     cmd_type = None
     for k, pat in PATTERNS.items():
-        m = pat.fullmatch(text)  # ⚠️ فقط متن دقیقاً مطابق دستور
+        m = pat.fullmatch(text)  # فقط متن دقیقاً مطابق دستور
         if m:
             cmd_type = k
             matched = m
@@ -162,21 +164,20 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
     if not cmd_type:
         return
 
+    # بررسی دسترسی مدیر/سودو
     if not await _has_access(context, chat.id, user.id):
         reply = await msg.reply_text("🚫 فقط مدیران یا سودوها مجازند.")
         await asyncio.sleep(10)
         await reply.delete()
         return
 
-    explicit_arg = None
+    explicit_arg = matched.group(1) if matched else None
     extra_time = None
-    if matched:
-        explicit_arg = matched.group(1)
-        if cmd_type == "mute" and matched.lastindex and matched.lastindex >= 3:
-            num = matched.group(2)
-            unit = matched.group(3)
-            if num:
-                extra_time = (int(num), unit)
+    if cmd_type == "mute" and matched.lastindex and matched.lastindex >= 3:
+        num = matched.group(2)
+        unit = matched.group(3)
+        if num:
+            extra_time = (int(num), unit)
 
     target_user = await _resolve_target(msg, context, chat.id, explicit_arg)
     if not target_user:
