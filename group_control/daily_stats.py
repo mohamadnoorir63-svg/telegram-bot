@@ -230,8 +230,14 @@ async def show_daily_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         chat_id = str(update.effective_chat.id)
         user = update.effective_user
+        text_input = update.message.text.strip().lower()
         today = datetime.now().strftime("%Y-%m-%d")
 
+        # فقط وقتی اجرا شود که کاربر دستور آمار بدهد
+        if text_input not in ["آمار", "امار", "stats", "stat"]:
+            return
+
+        # چک سطح دسترسی
         if user.id != SUDO_ID:
             try:
                 member = await context.bot.get_chat_member(chat_id, user.id)
@@ -248,8 +254,10 @@ async def show_daily_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
         time_str = now.strftime("%H:%M:%S")
         jalali_date = jdatetime.datetime.now().strftime("%A %d %B %Y")
 
-        top_today = sorted(data["messages"].items(), key=lambda x: x[1], reverse=True)[:3]
         medals = ["🥇", "🥈", "🥉"]
+
+        # فعال‌ترین‌های امروز
+        top_today = sorted(data["messages"].items(), key=lambda x: x[1], reverse=True)[:3]
         top_today_text = ""
         for i, (uid, count) in enumerate(top_today, 1):
             try:
@@ -260,7 +268,7 @@ async def show_daily_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not top_today_text:
             top_today_text = "◂ اطلاعاتی یافت نشد."
 
-        # نفرات برتر کل
+        # فعال‌ترین‌های کل
         total_msgs_all = {}
         for day_data in stats.get(chat_id, {}).values():
             for uid, count in day_data["messages"].items():
@@ -276,6 +284,7 @@ async def show_daily_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not top_all_text:
             top_all_text = "◂ اطلاعاتی یافت نشد."
 
+        # ادکنندگان امروز
         top_adders = sorted(data["joins_added_per_user"].items(), key=lambda x: x[1], reverse=True)[:3]
         top_adders_text = ""
         for i, (uid, count) in enumerate(top_adders, 1):
@@ -328,7 +337,6 @@ async def show_daily_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     except Exception as e:
         print(f"⚠️ خطا در show_daily_stats: {e}")
-
 # ------------------- آمار شبانه -------------------
 async def send_nightly_stats(context: ContextTypes.DEFAULT_TYPE):
     now = datetime.now()
