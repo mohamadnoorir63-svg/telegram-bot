@@ -5,15 +5,15 @@ import json
 import asyncio
 from datetime import datetime, timedelta
 import jdatetime
+
 from telegram import Update
 from telegram.ext import ContextTypes
 
 # ------------------- تنظیمات -------------------
 
 STATS_FILE = "advanced_stats.json"
-SUDO_ID = 8588347189  # آیدی سودو
-SAVE_INTERVAL = 300   # ذخیره هر 5 دقیقه
-
+SUDO_ID = 8588347189  # آیدی سودو شما
+SAVE_INTERVAL = 300  # ذخیره هر 5 دقیقه (ثانیه)
 
 # ------------------- بارگذاری و ذخیره -------------------
 
@@ -26,7 +26,6 @@ def load_stats():
             print(f"⚠️ خطا در خواندن {STATS_FILE}: {e}")
     return {}
 
-
 def save_stats(data):
     try:
         with open(STATS_FILE, "w", encoding="utf-8") as f:
@@ -36,7 +35,7 @@ def save_stats(data):
 
 
 stats = load_stats()
-save_queue = set()
+save_queue = set()  # صف گروه‌هایی که نیاز به ذخیره دارند
 
 
 async def periodic_save():
@@ -92,6 +91,7 @@ async def record_message_activity(update: Update, context: ContextTypes.DEFAULT_
 
     init_daily_stats(chat_id, today)
     data = stats[chat_id][today]
+
     msg = update.message
 
     # نوع پیام
@@ -115,7 +115,7 @@ async def record_message_activity(update: Update, context: ContextTypes.DEFAULT_
         else:
             data["stickers"] += 1
 
-    # لینک‌ها و...  
+    # لینک، منشن و هشتگ
     if msg.entities:
         for entity in msg.entities:
             if entity.type == "url":
@@ -125,9 +125,11 @@ async def record_message_activity(update: Update, context: ContextTypes.DEFAULT_
             elif entity.type == "hashtag":
                 data["hashtags"] += 1
 
+    # ریپلای
     if msg.reply_to_message:
         data["replies"] += 1
 
+    # تعداد پیام و طول پیام
     uid = str(user.id)
     data["messages"][uid] = data["messages"].get(uid, 0) + 1
     data["message_length"][uid] = data["message_length"].get(uid, 0) + len(msg.text or "")
@@ -135,7 +137,7 @@ async def record_message_activity(update: Update, context: ContextTypes.DEFAULT_
     save_queue.add(chat_id)
 
 
-# ------------------- ثبت ورودی -------------------
+# ------------------- ثبت ورود اعضا -------------------
 
 async def record_new_members(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message or not update.message.new_chat_members:
@@ -151,6 +153,7 @@ async def record_new_members(update: Update, context: ContextTypes.DEFAULT_TYPE)
         if member.is_bot:
             continue
 
+        # اگر توسط کس دیگری اد شده باشد
         if update.message.from_user and update.message.from_user.id != member.id:
             data["joins_added"] += 1
             adder_id = str(update.message.from_user.id)
@@ -161,7 +164,7 @@ async def record_new_members(update: Update, context: ContextTypes.DEFAULT_TYPE)
     save_queue.add(chat_id)
 
 
-# ------------------- ثبت خروج -------------------
+# ------------------- ثبت خروج اعضا -------------------
 
 async def record_left_members(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message or not update.message.left_chat_member:
@@ -176,87 +179,76 @@ async def record_left_members(update: Update, context: ContextTypes.DEFAULT_TYPE
     save_queue.add(chat_id)
 
 
-# ------------------- ✨ نمایش آمار و دستور آیدی ✨ -------------------
+# ------------------- نمایش آمار پیشرفته -------------------
 
 async def show_daily_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         chat_id = str(update.effective_chat.id)
         user = update.effective_user
-
-        raw_text = update.message.text.strip()        # متن اصلی
-        lower_text = raw_text.lower()                # نسخه انگلیسی/کوچک
-
         today = datetime.now().strftime("%Y-%m-%d")
+        text_input = update.message.text.strip().lower()
 
-        # ----------- دسترسی: فقط مدیر + سودو -------------
-        try:
-            member = await context.bot.get_chat_member(chat_id, user.id)
-            is_admin = member.status in ["creator", "administrator"]
-        except:
-            is_admin = False
+        # 🔒 بررسی دسترسی مدیران / سودو
+        if user.id != SUDO_ID:
+            try:
+                member = await context.bot.get_chat_member(chat_id, user.id)
+                if member.status not in ["creator", "administrator"]:
+                    msg = await update.message.reply_text("🚫 فقط مدیران یا سودو مجاز هستند.")
+                    await asyncio.sleep(10)
+                    await context.bot.delete_message(chat_id, msg.message_id)
+                    return
+            except:
+                return
 
-        if user.id != SUDO_ID and not is_admin:
-            return
-
-        # ----------------------------------------------------------
-        # 📌 دستور آیدی
-        # ----------------------------------------------------------
-
-        if raw_text in ["آیدی", "ایدی"] or lower_text in ["id"]:
-            
+        # ------------------- حالت آیدی -------------------
+        if text_input in ["آیدی", "id"]:
             target = update.message.reply_to_message.from_user if update.message.reply_to_message else user
 
+            # تاریخ و زمان
             jalali_date = jdatetime.datetime.now().strftime("%A %d %B %Y")
             time_str = datetime.now().strftime("%H:%M:%S")
 
-            # دریافت اطلاعات ویس‌کال
+            # اطلاعات ویسکال (تابع فرضی)
             voice_data = await get_voice_data(target.id)
 
             username = getattr(target, "username", "---")
-            dc = voice_data.get("datacenter_code", "چ")
-            role = voice_data.get("role", "---")
-            voice_time = voice_data.get("time", "---")
-            voice_percent = voice_data.get("percent", "---")
-            voice_rank = voice_data.get("rank", "---")
-
             user_link = f"<a href='tg://user?id={target.id}'>{target.first_name}</a>"
 
             text = (
-                f"🧿 <b>اطلاعات کاربر:</b>\n"
-                f"🌌 <b>عکس پروفایل کاربر</b>\n\n"
-                f"👤 <b>نام:</b> {user_link}\n"
-                f"💬 <b>یوزرنیم:</b> @{username}\n"
-                f"🆔 <b>آیدی عددی:</b> <code>{target.id}</code>\n"
-                f"💻 <b>کد دیتاسنتر:</b> {dc}\n"
-                f"🎖 <b>مقام کاربر:</b> {role}\n"
+                f"🧿 <b>اطلاعات کاربر:</b>\n\n"
+                f"👤 نام: {user_link}\n"
+                f"💬 یوزرنیم: {username}\n"
+                f"🆔 آیدی عددی: <code>{target.id}</code>\n"
+                f"💻 کد دیتاسنتر: {voice_data.get('datacenter_code','---')}\n"
+                f"🎖 مقام کاربر: {voice_data.get('role','---')}\n"
                 f"─┅━✦━┅─\n"
-                f"◂ <b>زمان حضور در ویسکال:</b> {voice_time}\n"
-                f"◂ <b>درصد حضور در ویسکال:</b> {voice_percent}\n"
-                f"◂ <b>رتبه حضور در ویسکال:</b> {voice_rank}\n"
-                f"📆 <b>تاریخ:</b> {jalali_date}\n"
-                f"🕒 <b>ساعت:</b> {time_str}\n"
-                f"─┅━✦━┅─\n"
-                f"✨ <b>برای مشاهده ادها و پیام‌های امروز از دستور آمار استفاده کنید.</b>"
+                f"◂ زمان حضور در ویسکال: {voice_data.get('time','---')}\n"
+                f"◂ درصد حضور: {voice_data.get('percent','---')}\n"
+                f"◂ رتبه حضور: {voice_data.get('rank','---')}\n"
+                f"📆 تاریخ: {jalali_date}\n"
+                f"🕒 ساعت: {time_str}"
             )
 
             try:
                 photos = await context.bot.get_user_profile_photos(target.id, limit=1)
                 if photos.total_count > 0:
                     photo = photos.photos[0][-1].file_id
-                    msg = await context.bot.send_photo(chat_id, photo=photo, caption=text, parse_mode="HTML")
+                    msg = await context.bot.send_photo(
+                        update.effective_chat.id,
+                        photo=photo,
+                        caption=text,
+                        parse_mode="HTML"
+                    )
                 else:
                     msg = await update.message.reply_text(text, parse_mode="HTML")
-            except:
+
+            except Exception:
                 msg = await update.message.reply_text(text, parse_mode="HTML")
 
             await asyncio.sleep(15)
-            await context.bot.delete_message(chat_id, msg.message_id)
-            return
+            await context.bot.delete_message(update.effective_chat.id, msg.message_id)
 
-        # ----------------------------------------------------------
-        # 📊 نمایش آمار — بدون تغییر
-        # ----------------------------------------------------------
-
+        # ------------------- آمار روزانه -------------------
         if chat_id not in stats or today not in stats[chat_id]:
             msg = await update.message.reply_text("ℹ️ هنوز فعالیتی برای امروز ثبت نشده است.")
             await asyncio.sleep(15)
@@ -271,62 +263,59 @@ async def show_daily_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         # نفرات برتر امروز
         top_today = sorted(data["messages"].items(), key=lambda x: x[1], reverse=True)[:3]
-        top_today_text = ""
         medals = ["🥇", "🥈", "🥉"]
 
+        top_today_text = ""
         for i, (uid, count) in enumerate(top_today, 1):
             try:
                 name = (await context.bot.get_chat_member(chat_id, uid)).user.first_name
             except:
                 name = "کاربر ناشناس"
             top_today_text += f"◂ نفر {i} {medals[i-1]} :( {count} پیام | {name} )\n"
-
         if not top_today_text:
             top_today_text = "◂ اطلاعاتی یافت نشد."
 
-        # مجموع کل
+        # نفرات برتر کل
         total_msgs_all = {}
         for day_data in stats.get(chat_id, {}).values():
             for uid, count in day_data["messages"].items():
                 total_msgs_all[uid] = total_msgs_all.get(uid, 0) + count
 
         top_all = sorted(total_msgs_all.items(), key=lambda x: x[1], reverse=True)[:3]
-        top_all_text = ""
 
+        top_all_text = ""
         for i, (uid, count) in enumerate(top_all, 1):
             try:
                 name = (await context.bot.get_chat_member(chat_id, uid)).user.first_name
             except:
                 name = "کاربر ناشناس"
             top_all_text += f"◂ نفر {i} {medals[i-1]} :( {count} پیام | {name} )\n"
-
         if not top_all_text:
             top_all_text = "◂ اطلاعاتی یافت نشد."
 
-        # بهترین عضو کننده‌ها
+        # بهترین عضوکننده‌ها
         top_adders = sorted(data["joins_added_per_user"].items(), key=lambda x: x[1], reverse=True)[:3]
-        top_adders_text = ""
 
+        top_adders_text = ""
         for i, (uid, count) in enumerate(top_adders, 1):
             try:
                 name = (await context.bot.get_chat_member(chat_id, uid)).user.first_name
             except:
                 name = "کاربر ناشناس"
             top_adders_text += f"◂ نفر {i} {medals[i-1]} :( {count} اد | {name} )\n"
-
         if not top_adders_text:
             top_adders_text = "◂ اطلاعاتی یافت نشد."
 
-        # متن آمار
+        # قالب اصلی متن
         text = f"""
 ◄ آمار فعالیت گروه از 00:00 تا این لحظه :
+
 • تاریخ : {jalali_date}
 • ساعت : {time_str}
 
 ─┅━ پیام های امروز ━┅─
 ◂ کل پیام ها : {sum(data['messages'].values())}
 ◂ پیام فرواردی : {data['forwards']}
-◂ متن : {(sum(data['messages'].values()) - data['forwards'])}
 ◂ استیکر : {data['stickers']}
 ◂ استیکر متحرک : {data['animated_stickers']}
 ◂ گیف : {data['animations']}
@@ -335,7 +324,6 @@ async def show_daily_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
 ◂ موزیک : {data['audios']}
 ◂ فیلم : {data['videos']}
 ◂ فیلم سلفی : {data['video_notes']}
-◂ فایل : {data.get('files', 0)}
 
 ─┅━ فعال ترین های امروز ━┅─
 {top_today_text}
@@ -343,13 +331,10 @@ async def show_daily_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
 ─━ بهترین عضو کننده های امروز ━─
 {top_adders_text}
 
-─┅━ ورودی و خروجی عضو ━┅─
+─┅━ ورودی و خروجی ━┅─
 ◂ اعضای وارد شده با لینک : {data['joins_link']}
 ◂ اعضای اد شده : {data['joins_added']}
 ◂ اعضای لفت داده : {data['lefts']}
-◂ اعضای اخراج شده : {data['kicked']}
-◂ کل اعضای وارد شده : {data['joins_link'] + data['joins_added']}
-◂ کل اعضای خارج شده : {data['lefts'] + data['kicked']}
 
 ─┅━ فعال ترین های کل ━┅─
 {top_all_text}
@@ -363,7 +348,7 @@ async def show_daily_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
         print(f"⚠️ خطا در show_daily_stats: {e}")
 
 
-# ------------------- آمار شبانه -------------------
+# ------------------- آمار شبانه و پاکسازی -------------------
 
 async def send_nightly_stats(context: ContextTypes.DEFAULT_TYPE):
     now = datetime.now()
@@ -372,7 +357,6 @@ async def send_nightly_stats(context: ContextTypes.DEFAULT_TYPE):
     for chat_id, days in stats.items():
         if yesterday in days:
             data = days[yesterday]
-
             total_msgs = sum(data["messages"].values())
 
             report = (
