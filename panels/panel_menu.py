@@ -1,5 +1,5 @@
 # panels/admin_panel.py
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, Message
 from telegram.ext import ContextTypes
 from group_control.group_control import _get_locks, _set_lock, LOCK_TYPES
 from datetime import datetime, timedelta
@@ -38,8 +38,8 @@ async def Tastatur_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return await update.message.reply_text(
             MAIN_TITLE, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(keyboard)
         )
-    return await update.callback_query.edit_message_text(
-        MAIN_TITLE, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(keyboard)
+    return await safe_edit_message(
+        update.callback_query.message, MAIN_TITLE, InlineKeyboardMarkup(keyboard)
     )
 
 # ====================== دسترسی مدیر و سودو ======================
@@ -109,7 +109,7 @@ async def show_settings_menu(query):
          InlineKeyboardButton("⚖️ مجازات کاربر", callback_data="help_punish")],
         [InlineKeyboardButton("🔙 بازگشت", callback_data="Tastatur_back")]
     ]
-    return await query.edit_message_text(text, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(keyboard))
+    return await safe_edit_message(query.message, text, InlineKeyboardMarkup(keyboard))
 
 # ====================== 📘 توضیحات ابزارها ======================
 HELP_TEXTS = {
@@ -163,7 +163,7 @@ async def show_help_info(query):
         return await query.answer("❌ هنوز برای این گزینه راهنما تعریف نشده", show_alert=True)
     text = HELP_TEXTS[data]
     keyboard = [[InlineKeyboardButton("🔙 بازگشت", callback_data="Tastatur_settings")]]
-    await query.edit_message_text(text, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(keyboard))
+    await safe_edit_message(query.message, text, InlineKeyboardMarkup(keyboard))
 
 # ====================== 🔒 قفل‌ها ======================
 async def show_lock_page(query, page: int = 1):
@@ -188,7 +188,7 @@ async def show_lock_page(query, page: int = 1):
 
     keyboard.append([InlineKeyboardButton("🔙 بازگشت", callback_data="Tastatur_admin")])
     text = f"🔐 <b>مدیریت قفل‌ها</b>\nصفحه {page}/{total_pages}\n\nبرای تغییر وضعیت قفل‌ها کلیک کنید 👇"
-    return await query.edit_message_text(text, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(keyboard))
+    return await safe_edit_message(query.message, text, InlineKeyboardMarkup(keyboard))
 
 async def toggle_lock_button(update, context):
     query = update.callback_query
@@ -215,7 +215,8 @@ FUN_TEXTS = {
     "fun_azan": ("🕋 اذان", "با دستور «اذان تهران» یا «اذان مشهد» زمان اذان را ببین 🕌"),
     "fun_weather": ("☁️ آب‌وهوا", "با دستور «آب‌وهوا [شهر]» وضعیت آب‌وهوا را بگیر 🌦"),
     "fun_ramadan": ("🌙 رمضان", "با دستور «رمضان» تاریخ رمضان و روز فعلی ماه را ببین 🌙"),
-    "fun_reply": ("💾 ساخت ریپلای", "روی پیام ریپلای کن و بنویس: <code>/save متن</code>\nبعدا با نوشتن <code>متن</code> پیام ارسال می‌شود 💬"),
+    "fun_reply": ("💾 ساخت ریپلای", "روی پیام ریپلی کن و بنویس: <code>/save متن</code>\nبعدا با نوشتن <code>متن</code> پیام ارسال می‌شود 💬"),
+    "fun_chatgpt": ("🤖 چت چی پی تی", "در پیوی ربات می‌توانید با ChatGPT صحبت کنید 💬")
 }
 
 async def show_fun_menu(query):
@@ -227,14 +228,15 @@ async def show_fun_menu(query):
          InlineKeyboardButton("☁️ آب‌وهوا", callback_data="fun_weather")],
         [InlineKeyboardButton("🌙 رمضان", callback_data="fun_ramadan"),
          InlineKeyboardButton("💾 ساخت ریپلای", callback_data="fun_reply")],
-        [InlineKeyboardButton("🕋 اذان", callback_data="fun_azan")],
+        [InlineKeyboardButton("🕋 اذان", callback_data="fun_azan"),
+         InlineKeyboardButton("🤖 چت چی پی تی", callback_data="fun_chatgpt")],
         [InlineKeyboardButton("🔙 بازگشت", callback_data="Tastatur_back")]
     ]
-    return await query.edit_message_text(text, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(keyboard))
+    return await safe_edit_message(query.message, text, InlineKeyboardMarkup(keyboard))
 
 async def show_fun_info(query, title, desc):
     kb = [[InlineKeyboardButton("🔙 بازگشت", callback_data="Tastatur_fun")]]
-    return await query.edit_message_text(f"{title}\n\n{desc}", parse_mode="HTML", reply_markup=InlineKeyboardMarkup(kb))
+    return await safe_edit_message(query.message, f"{title}\n\n{desc}", InlineKeyboardMarkup(kb))
 
 async def handle_fun_buttons(update, context):
     query = update.callback_query
@@ -252,14 +254,14 @@ async def show_speaker_menu(query):
         "خنگول فقط به پیام‌های ریپلای شده پاسخ می‌دهد."
     )
     keyboard = [[InlineKeyboardButton("🔙 بازگشت", callback_data="Tastatur_back")]]
-    return await query.edit_message_text(text, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(keyboard))
+    return await safe_edit_message(query.message, text, InlineKeyboardMarkup(keyboard))
 
 # ====================== 👮 مدیریت گروه ======================
 async def show_admin_menu(query):
     text = "👮 <b>بخش مدیریت گروه</b>\n\n🔒 برای دیدن لیست قفل‌های فعال، از دکمه زیر استفاده کنید 👇"
     keyboard = [[InlineKeyboardButton("🔒 قفل‌ها", callback_data="Tastatur_locks")],
                 [InlineKeyboardButton("🔙 بازگشت", callback_data="Tastatur_back")]]
-    return await query.edit_message_text(text, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(keyboard))
+    return await safe_edit_message(query.message, text, InlineKeyboardMarkup(keyboard))
 
 # ====================== 💐 خوشامد ======================
 async def show_welcome_menu(query):
@@ -268,4 +270,12 @@ async def show_welcome_menu(query):
         "برای باز کردن پنل خوشامد، دستور <code>خوشامد</code> را ارسال کنید."
     )
     keyboard = [[InlineKeyboardButton("🔙 بازگشت", callback_data="Tastatur_back")]]
-    return await query.edit_message_text(text, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(keyboard))
+    return await safe_edit_message(query.message, text, InlineKeyboardMarkup(keyboard))
+
+# ====================== Safe edit پیام ======================
+async def safe_edit_message(message: Message, text: str, reply_markup=None):
+    try:
+        if message.text != text or (reply_markup and message.reply_markup != reply_markup):
+            return await message.edit_text(text, parse_mode="HTML", reply_markup=reply_markup)
+    except:
+        pass
