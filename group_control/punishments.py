@@ -122,6 +122,39 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
         return
     text = (msg.text or "").strip()
 
+    # ---------- ساخت alias داخل گروه ----------
+    match_alias = re.match(r"افزودن دستور (.+?)\s+(.+)", text)
+    if match_alias:
+        if not await _has_access(context, chat.id, user.id):
+            reply = await msg.reply_text("🚫 فقط مدیران یا سودوها می‌توانند دستور جدید بسازند.")
+            await asyncio.sleep(10)
+            await reply.delete()
+            return
+        alias_name = match_alias.group(1).strip()
+        original_cmd = match_alias.group(2).strip()
+        data = _load_json(ALIAS_FILE)
+        chat_key = str(chat.id)
+        if chat_key not in data:
+            data[chat_key] = {}
+        # ذخیره دستور و متن خروجی دلخواه
+        if " " in original_cmd:
+            parts = original_cmd.split(" ", 1)
+            cmd_type = parts[0].strip()
+            output_text = parts[1].strip()
+        else:
+            cmd_type = original_cmd
+            output_text = "{name}"
+
+        data[chat_key][alias_name] = {
+            "command": cmd_type,
+            "output": output_text
+        }
+        _save_json(ALIAS_FILE, data)
+        reply = await msg.reply_text(f"✅ دستور alias ساخته شد:\n`{alias_name}` → `{cmd_type} | {output_text}`", parse_mode="Markdown")
+        await asyncio.sleep(10)
+        await reply.delete()
+        return
+
     # ---------- لیست‌ها ----------
     if text == "لیست بن":
         items = list_from_file(BAN_FILE, chat.id)
@@ -140,10 +173,12 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
     aliases_all = _load_json(ALIAS_FILE)
     chat_aliases = aliases_all.get(str(chat.id), {})
 
-    for alias_text, alias_cmd in chat_aliases.items():
+    output_text_template = None
+    cmd_type = None
+    for alias_text, alias_info in chat_aliases.items():
         if text.startswith(alias_text):
-            # جایگزینی alias با دستور اصلی
-            text = alias_cmd
+            cmd_type = alias_info["command"]
+            output_text_template = alias_info.get("output", "{name}")
             break
 
     # ---------- regex دستورات ----------
@@ -157,14 +192,13 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
     }
 
     matched = None
-    cmd_type = None
     for k, pat in PATTERNS.items():
-        m = pat.fullmatch(text)
-        if m:
-            cmd_type = k
-            matched = m
-            break
-    if not cmd_type:
+        if cmd_type == k or (cmd_type is None and pat.fullmatch(text)):
+            matched = pat.fullmatch(text)
+            if matched:
+                cmd_type = k
+                break
+    if not cmd_type or not matched:
         return
 
     if not await _has_access(context, chat.id, user.id):
@@ -208,17 +242,19 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
     target_ref = f"@{target_user.username}" if getattr(target_user, "username", None) else str(target_user.id)
 
     try:
+        output_text = output_text_template.replace("{name}", target_user.first_name) if output_text_template else None
+
         if cmd_type == "ban":
             await context.bot.ban_chat_member(chat.id, target_user.id)
             add_to_list(BAN_FILE, chat.id, target_user)
             await punish_via_userbot(chat.id, target_ref, action="ban")
-            reply = await msg.reply_text(f"🚫 {target_user.first_name} از گروه بن شد.")
+            reply = await msg.reply_text(output_text or f"🚫 {target_user.first_name} از گروه بن شد.")
 
         elif cmd_type == "unban":
             await context.bot.unban_chat_member(chat.id, target_user.id)
             remove_from_list(BAN_FILE, chat.id, target_user)
             await punish_via_userbot(chat.id, target_ref, action="unban")
-            reply = await msg.reply_text(f"✅ {target_user.first_name} از بن خارج شد.")
+            reply = await msg.reply_text(output_text or f"✅ {target_user.first_name} از بن خارج شد.")
 
         elif cmd_type == "mute":
             seconds = 3600
@@ -237,14 +273,14 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
                 until_date=until)
             add_to_list(MUTE_FILE, chat.id, target_user)
             await punish_via_userbot(chat.id, target_ref, action="mute", seconds=seconds)
-            reply = await msg.reply_text(f"🤐 {target_user.first_name} برای {seconds} ثانیه سکوت شد.")
+            reply = await msg.reply_text(output_text or f"🤐 {target_user.first_name} برای {seconds} ثانیه سکوت شد.")
 
         elif cmd_type == "unmute":
             await context.bot.restrict_chat_member(chat.id, target_user.id,
                 permissions=ChatPermissions(can_send_messages=True))
             remove_from_list(MUTE_FILE, chat.id, target_user)
             await punish_via_userbot(chat.id, target_ref, action="unmute")
-            reply = await msg.reply_text(f"🔊 {target_user.first_name} از سکوت خارج شد.")
+            reply = await msg.reply_text(output_text or f"🔊 {target_user.first_name} از سکوت خارج شد.")
 
         elif cmd_type == "warn":
             warns = _load_json(WARN_FILE)
@@ -257,9 +293,9 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
                 await punish_via_userbot(chat.id, target_ref, action="ban")
                 warns[key] = 0
                 _save_json(WARN_FILE, warns)
-                reply = await msg.reply_text(f"🚫 {target_user.first_name} به‌دلیل ۳ اخطار بن شد.")
+                reply = await msg.reply_text(output_text or f"🚫 {target_user.first_name} به‌دلیل ۳ اخطار بن شد.")
             else:
-                reply = await msg.reply_text(f"⚠️ {target_user.first_name} اخطار {warns[key]}/3 گرفت.")
+                reply = await msg.reply_text(output_text or f"⚠️ {target_user.first_name} اخطار {warns[key]}/3 گرفت.")
 
         elif cmd_type == "delwarn":
             warns = _load_json(WARN_FILE)
@@ -267,9 +303,9 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
             if key in warns:
                 del warns[key]
                 _save_json(WARN_FILE, warns)
-                reply = await msg.reply_text(f"✅ اخطارهای {target_user.first_name} حذف شد.")
+                reply = await msg.reply_text(output_text or f"✅ اخطارهای {target_user.first_name} حذف شد.")
             else:
-                reply = await msg.reply_text("ℹ️ این کاربر اخطاری نداشت.")
+                reply = await msg.reply_text(output_text or "ℹ️ این کاربر اخطاری نداشت.")
 
         await asyncio.sleep(10)
         await reply.delete()
@@ -279,7 +315,6 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
         reply = await msg.reply_text(f"⚠️ خطا در اجرای دستور: {e}")
         await asyncio.sleep(10)
         await reply.delete()
-
 
 # ================= 🧩 ثبت هندلر =================
 def register_punishment_handlers(application, group_number: int = 12):
