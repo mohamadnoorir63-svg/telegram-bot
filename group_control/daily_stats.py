@@ -166,6 +166,7 @@ async def record_left_members(update: Update, context: ContextTypes.DEFAULT_TYPE
     save_queue.add(chat_id)
 
 # ------------------- نمایش آیدی کاربران -------------------
+# ------------------- نمایش آیدی کاربران -------------------
 
 async def show_user_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
@@ -184,26 +185,18 @@ async def show_user_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
     jalali_date = jdatetime.datetime.now().strftime("%A %d %B %Y")
     time_str = datetime.now().strftime("%H:%M:%S")
 
-    # داده پیش‌فرض ویسکال
-    datacenter_code = "---"
-    role = "---"
-    voice_time = "00:00"
-    voice_percent = "0%"
-    voice_rank = "---"
-
     user_link = f"<a href='tg://user?id={target.id}'>{target.first_name}</a>"
 
+    # پیام بدون اطلاعات ویسکال
     text = (
         f"🧿 <b>اطلاعات کاربر:</b>\n\n"
         f"👤 نام: {user_link}\n"
         f"💬 یوزرنیم: {getattr(target, 'username', '---')}\n"
         f"🆔 آیدی عددی: <code>{target.id}</code>\n"
-        f"💻 کد دیتاسنتر: {datacenter_code}\n"
-        f"🎖 مقام کاربر: {role}\n"
+        f"💻 کد دیتاسنتر: ---\n"
+        f"🎖 مقام کاربر: ---\n"
         f"─┅━✦━┅─\n"
-        f"◂ زمان حضور در ویسکال: {voice_time}\n"
-        f"◂ درصد حضور در ویسکال: {voice_percent}\n"
-        f"◂ رتبه حضور در ویسکال: {voice_rank}\n"
+        f"◂ اطلاعات ویسکال موجود نیست\n"
         f"📆 تاریخ: {jalali_date}\n"
         f"🕒 ساعت: {time_str}"
     )
@@ -222,6 +215,7 @@ async def show_user_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await asyncio.sleep(15)
     await context.bot.delete_message(chat_id, msg.message_id)
+
 
 # ------------------- نمایش آمار گروه -------------------
 
@@ -320,7 +314,6 @@ async def show_group_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = await update.message.reply_text(text, parse_mode="HTML")
     await asyncio.sleep(15)
     await context.bot.delete_message(chat_id, msg.message_id)
-
 # ------------------- آمار شبانه و پاکسازی -------------------
 
 async def send_nightly_stats(context: ContextTypes.DEFAULT_TYPE):
