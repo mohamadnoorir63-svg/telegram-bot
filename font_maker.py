@@ -41,7 +41,7 @@ async def receive_font_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def send_fonts(update: Update, context: ContextTypes.DEFAULT_TYPE, name: str):
     fonts = generate_fonts(name)
     context.user_data["all_fonts"] = fonts
-    context.user_data["font_pages"] = make_pages(name, fonts, page_size=5)
+    context.user_data["font_pages"] = make_pages(name, fonts, page_size=5, max_pages=20)
 
     pages = context.user_data["font_pages"]
     await update.message.reply_text(
@@ -52,7 +52,8 @@ async def send_fonts(update: Update, context: ContextTypes.DEFAULT_TYPE, name: s
     return ConversationHandler.END
 
 # ======================= 🎭 تولید فونت‌های حرفه‌ای =======================
-def generate_fonts(name: str, count: int = 50):
+def generate_fonts(name: str, count: int = 100):
+    """تعداد فونت پیشفرض را 100 کردیم تا حداکثر ۲۰ صفحه با page_size=5 امکان‌پذیر شود"""
     pre_groups = [
         ["𓄂","𓃬","𓋥","𓄼","𓂀","𓅓"],
         ["ꪰ","ꪴ","𝄠","𝅔","꧁","꧂","ꕥ"],
@@ -103,10 +104,10 @@ def generate_fonts(name: str, count: int = 50):
 
     return fonts
 
-# ======================= 📄 ساخت صفحات پویا =======================
-def make_pages(name: str, fonts: list, page_size=5):
+# ======================= 📄 ساخت صفحات پویا با حداکثر 20 صفحه =======================
+def make_pages(name: str, fonts: list, page_size=5, max_pages=20):
     pages = []
-    total_pages = (len(fonts) + page_size - 1) // page_size
+    total_pages = min((len(fonts) + page_size - 1) // page_size, max_pages)
 
     for idx in range(total_pages):
         chunk = fonts[idx*page_size : (idx+1)*page_size]
