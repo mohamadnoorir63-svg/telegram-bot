@@ -1,4 +1,4 @@
-# ======================= 📊 سیستم آمار پیشرفته تلگرام + ویسکال =======================
+# ======================= 📊 سیستم آمار پیشرفته تلگرام + گرافیک =======================
 
 import os
 import json
@@ -7,13 +7,17 @@ from datetime import datetime, timedelta
 import jdatetime
 from telegram import Update
 from telegram.ext import ContextTypes
+from PIL import Image, ImageDraw, ImageFont
+import io
+import requests
 
 # ------------------- تنظیمات -------------------
 
 STATS_FILE = "advanced_stats.json"
-VOICE_FILE = "voice_stats.json"  # داده فرضی حضور ویسکال
-SUDO_ID = 8588347189  # آیدی سودو شما
-SAVE_INTERVAL = 300  # ذخیره هر 5 دقیقه (ثانیه)
+VOICE_FILE = "voice_stats.json"
+SUDO_ID = 8588347189
+SAVE_INTERVAL = 300
+FONT_PATH = "arial.ttf"  # مسیر فونت برای تصویر گرافیکی
 
 # ------------------- بارگذاری و ذخیره -------------------
 
@@ -35,7 +39,7 @@ def save_json(file, data):
 
 stats = load_json(STATS_FILE)
 voice_data = load_json(VOICE_FILE)
-save_queue = set()  # صف گروه‌هایی که نیاز به ذخیره دارند
+save_queue = set()
 
 async def periodic_save():
     while True:
@@ -73,7 +77,7 @@ def init_daily_stats(chat_id, today):
             "lefts": 0,
             "kicked": 0,
             "muted": 0,
-            "joins_added_per_user": {}  # شمارش بهترین عضوکننده‌ها
+            "joins_added_per_user": {}
         }
 
 # ------------------- ثبت فعالیت پیام -------------------
@@ -81,11 +85,9 @@ def init_daily_stats(chat_id, today):
 async def record_message_activity(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message or update.effective_chat.type not in ["group", "supergroup"]:
         return
-
     chat_id = str(update.effective_chat.id)
     user = update.effective_user
     today = datetime.now().strftime("%Y-%m-%d")
-
     init_daily_stats(chat_id, today)
     data = stats[chat_id][today]
     msg = update.message
@@ -133,12 +135,10 @@ async def record_message_activity(update: Update, context: ContextTypes.DEFAULT_
 async def record_new_members(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message or not update.message.new_chat_members:
         return
-
     chat_id = str(update.effective_chat.id)
     today = datetime.now().strftime("%Y-%m-%d")
     init_daily_stats(chat_id, today)
     data = stats[chat_id][today]
-
     for member in update.message.new_chat_members:
         if member.is_bot:
             continue
@@ -148,72 +148,37 @@ async def record_new_members(update: Update, context: ContextTypes.DEFAULT_TYPE)
             data["joins_added_per_user"][adder_id] = data["joins_added_per_user"].get(adder_id, 0) + 1
         else:
             data["joins_link"] += 1
-
     save_queue.add(chat_id)
 
 async def record_left_members(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message or not update.message.left_chat_member:
         return
-
     chat_id = str(update.effective_chat.id)
     today = datetime.now().strftime("%Y-%m-%d")
     init_daily_stats(chat_id, today)
     stats[chat_id][today]["lefts"] += 1
     save_queue.add(chat_id)
 
-# ------------------- نمایش آیدی و اطلاعات کاربر با ویسکال -------------------
+# ------------------- تابع ایجاد تصویر گرافیکی نفر اول -------------------
 
-async def show_user_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user = update.effective_user
-    chat_id = str(update.effective_chat.id)
+def create_leader_image(user_photo_bytes, top_text: str):
+    base = Image.new("RGB", (600, 350), (30, 30, 30))
+    draw = ImageDraw.Draw(base)
 
-    if user.id != SUDO_ID:
-        try:
-            member = await context.bot.get_chat_member(chat_id, user.id)
-            if member.status not in ["creator", "administrator"]:
-                return
-        except:
-            return
+    font_title = ImageFont.truetype(FONT_PATH, 30)
+    font_text = ImageFont.truetype(FONT_PATH, 22)
 
-    target = update.message.reply_to_message.from_user if update.message.reply_to_message else user
-    jalali_date = jdatetime.datetime.now().strftime("%A %d %B %Y")
-    time_str = datetime.now().strftime("%H:%M:%S")
-    user_link = f"<a href='tg://user?id={target.id}'>{target.first_name}</a>"
-
-    # داده‌های ویسکال
-    user_voice = voice_data.get(str(target.id), {})
-    total_seconds = user_voice.get("total_seconds", 0)
-    voice_time = f"{total_seconds//3600:02}:{(total_seconds%3600)//60:02}" if total_seconds else "00:00"
-    voice_percent = f"{user_voice.get('percent','0%')}"
-    voice_rank = f"{user_voice.get('rank','---')}"
-
-    text = (
-        f"🧿 <b>اطلاعات کاربر:</b>\n\n"
-        f"👤 نام: {user_link}\n"
-        f"💬 یوزرنیم: {getattr(target, 'username', '---')}\n"
-        f"🆔 آیدی عددی: <code>{target.id}</code>\n"
-        f"─┅━✦━┅─\n"
-        f"◂ زمان حضور در ویسکال: {voice_time}\n"
-        f"◂ درصد حضور در ویسکال: {voice_percent}\n"
-        f"◂ رتبه حضور در ویسکال: {voice_rank}\n"
-        f"📆 تاریخ: {jalali_date}\n"
-        f"🕒 ساعت: {time_str}"
-    )
-
+    # عکس پروفایل
     try:
-        photos = await context.bot.get_user_profile_photos(target.id, limit=1)
-        if photos.total_count > 0:
-            photo = photos.photos[0][-1].file_id
-            msg = await context.bot.send_photo(chat_id, photo=photo, caption=text, parse_mode="HTML")
-        else:
-            msg = await update.message.reply_text(text, parse_mode="HTML")
-    except Exception:
-        msg = await update.message.reply_text(text, parse_mode="HTML")
+        avatar = Image.open(io.BytesIO(user_photo_bytes)).convert("RGBA").resize((150,150))
+        base.paste(avatar, (225, 20))
+    except:
+        pass
 
-    await asyncio.sleep(15)
-    await context.bot.delete_message(chat_id, msg.message_id)
+    draw.text((50, 200), top_text, fill="white", font=font_text)
+    return base
 
-# ------------------- نمایش آمار گروه با عکس نفر اول و ویسکال -------------------
+# ------------------- نمایش آمار گروه با عکس گرافیکی نفر اول -------------------
 
 async def show_group_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
@@ -235,26 +200,17 @@ async def show_group_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     data = stats[chat_id][today]
-    now = datetime.now()
-    time_str = now.strftime("%H:%M:%S")
-    jalali_date = jdatetime.datetime.now().strftime("%A %d %B %Y")
-
-    # نفرات برتر امروز
     top_today = sorted(data["messages"].items(), key=lambda x: x[1], reverse=True)[:3]
     medals = ["🥇", "🥈", "🥉"]
-    top_today_text = ""
-    top_first_photo = None
+
+    top_first_photo_bytes = None
+    top_text = ""
     for i, (uid, count) in enumerate(top_today, 1):
         try:
             member = await context.bot.get_chat_member(chat_id, uid)
             name = member.user.first_name
-            if i == 1:
-                photos = await context.bot.get_user_profile_photos(uid, limit=1)
-                if photos.total_count > 0:
-                    top_first_photo = photos.photos[0][-1].file_id
         except:
             name = "کاربر ناشناس"
-
         # ویسکال
         user_voice = voice_data.get(str(uid), {})
         total_seconds = user_voice.get("total_seconds", 0)
@@ -262,77 +218,26 @@ async def show_group_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
         voice_percent = f"{user_voice.get('percent','0%')}"
         voice_rank = f"{user_voice.get('rank','---')}"
 
-        top_today_text += f"◂ نفر {i} {medals[i-1]} :( {count} پیام | {name} )\n"
-        top_today_text += f"   ▸ ویسکال: {voice_time} | {voice_percent} | {voice_rank}\n"
+        top_text += f"◂ نفر {i} {medals[i-1]} : {count} پیام | {name}\n"
+        top_text += f"   ▸ ویسکال: {voice_time} | {voice_percent} | {voice_rank}\n"
 
-    if not top_today_text:
-        top_today_text = "◂ اطلاعاتی یافت نشد."
+        if i == 1:
+            photos = await context.bot.get_user_profile_photos(uid, limit=1)
+            if photos.total_count > 0:
+                file_id = photos.photos[0][-1].file_id
+                file = await context.bot.get_file(file_id)
+                top_first_photo_bytes = await file.download_as_bytearray()
 
-    # بهترین عضو کننده‌ها
-    top_adders = sorted(data["joins_added_per_user"].items(), key=lambda x: x[1], reverse=True)[:3]
-    top_adders_text = ""
-    for i, (uid, count) in enumerate(top_adders, 1):
-        try:
-            name = (await context.bot.get_chat_member(chat_id, uid)).user.first_name
-        except:
-            name = "کاربر ناشناس"
-        top_adders_text += f"◂ نفر {i} {medals[i-1]} :( {count} اد | {name} )\n"
-    if not top_adders_text:
-        top_adders_text = "◂ اطلاعاتی یافت نشد."
-
-    # نفرات برتر کل
-    total_msgs_all = {}
-    for day_data in stats.get(chat_id, {}).values():
-        for uid, count in day_data["messages"].items():
-            total_msgs_all[uid] = total_msgs_all.get(uid, 0) + count
-    top_all = sorted(total_msgs_all.items(), key=lambda x: x[1], reverse=True)[:3]
-    top_all_text = ""
-    for i, (uid, count) in enumerate(top_all, 1):
-        try:
-            name = (await context.bot.get_chat_member(chat_id, uid)).user.first_name
-        except:
-            name = "کاربر ناشناس"
-        top_all_text += f"◂ نفر {i} {medals[i-1]} :( {count} پیام | {name} )\n"
-    if not top_all_text:
-        top_all_text = "◂ اطلاعاتی یافت نشد."
-
-    text = f"""
-◄ آمار فعالیت گروه از 00:00 تا این لحظه : • تاریخ : {jalali_date} • ساعت : {time_str}
-
-─┅━ پیام های امروز ━┅─ 
-◂ کل پیام ها : {sum(data['messages'].values())} 
-◂ پیام فرواردی : {data['forwards']} 
-◂ متن : {sum([v for k,v in data['messages'].items()]) - data['forwards']} 
-◂ استیکر : {data['stickers']} 
-◂ استیکر متحرک : {data['animated_stickers']} 
-◂ گیف : {data['animations']} 
-◂ عکس : {data['photos']} 
-◂ ویس : {data['voices']} 
-◂ موزیک : {data['audios']} 
-◂ فیلم : {data['videos']} 
-◂ فیلم سلفی : {data['video_notes']} 
-◂ فایل : {data.get('files',0)}
-
-─┅━ فعال ترین های امروز ━┅─ 
-{top_today_text}
-
-─━ بهترین عضو کننده های امروز ━─ 
-{top_adders_text}
-
-─┅━ فعال ترین های کل ━┅─ 
-{top_all_text}
-"""
-
-    try:
-        if top_first_photo:
-            msg = await context.bot.send_photo(chat_id, top_first_photo, caption=text, parse_mode="HTML")
-        else:
-            msg = await update.message.reply_text(text, parse_mode="HTML")
-    except:
-        msg = await update.message.reply_text(text, parse_mode="HTML")
-
-    await asyncio.sleep(15)
-    await context.bot.delete_message(chat_id, msg.message_id)
+    # ایجاد تصویر گرافیکی
+    if top_first_photo_bytes:
+        img = create_leader_image(top_first_photo_bytes, top_text)
+        bio = io.BytesIO()
+        bio.name = "leader.png"
+        img.save(bio, "PNG")
+        bio.seek(0)
+        await context.bot.send_photo(chat_id, bio)
+    else:
+        await update.message.reply_text(top_text)
 
 # ------------------- آمار شبانه و پاکسازی -------------------
 
@@ -353,7 +258,6 @@ async def send_nightly_stats(context: ContextTypes.DEFAULT_TYPE):
                 await context.bot.send_message(chat_id, report, parse_mode="HTML")
             except:
                 pass
-    # پاکسازی آمار قدیمی
     for chat_id in list(stats.keys()):
         stats[chat_id] = {}
     save_json(STATS_FILE, stats)
