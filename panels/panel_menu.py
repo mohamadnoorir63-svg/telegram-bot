@@ -30,8 +30,7 @@ async def Tastatur_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
          InlineKeyboardButton("🎮 سرگرمی‌ها", callback_data="Tastatur_fun")],
         [InlineKeyboardButton("👮 مدیریت گروه", callback_data="Tastatur_admin"),
          InlineKeyboardButton("💐 خوشامد", callback_data="Tastatur_welcome")],
-        [InlineKeyboardButton("🧩 افزودن دستور سفارشی", callback_data="Tastatur_alias"),
-         InlineKeyboardButton("🗣️ سخنگوی خنگول", callback_data="Tastatur_speaker")],
+        [InlineKeyboardButton("🗣️ سخنگوی خنگول", callback_data="Tastatur_speaker")],
         [InlineKeyboardButton("❌ بستن پنل", callback_data="Tastatur_close")]
     ]
 
@@ -83,8 +82,6 @@ async def Tastatur_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return await show_welcome_menu(query)
     if data == "Tastatur_speaker":
         return await show_speaker_menu(query)
-    if data == "Tastatur_alias":
-        return await show_alias_menu(query)
     if data.startswith("help_"):
         return await show_help_info(query)
     if data == "Tastatur_locks":
@@ -117,11 +114,25 @@ HELP_TEXTS = {
     "help_addadmin": "👑 <b>افزودن یا حذف مدیر گروه</b>\n\n➕ افزودن مدیر: <code>افزودن مدیر</code>\n➖ حذف مدیر: <code>حذف مدیر</code>\n📋 نمایش مدیران: <code>لیست مدیران</code>",
     "help_pin": "📌 <b>پن یا حذف پن پیام</b>\n📍 پن پیام: <code>پن</code>\n❌ حذف پن: <code>حذف پن</code>\n⏰ پن موقت: <code>پن 2 دقیقه</code>",
     "help_filter": "🚫 <b>فیلتر کلمات</b>\n➕ افزودن: <code>فیلتر تست</code>\n⏰ موقت: <code>فیلتر تست 2 ساعت</code>\n➖ حذف: <code>حذف فیلتر تست</code>\n📋 لیست: <code>لیست فیلتر</code>",
-    "help_clean": "🧹 <b>پاکسازی پیام‌ها</b>\n🧾 دستور: <code>پاکسازی 50</code>\n⚠️ فقط برای مدیران یا سودوها مجاز است.",
+    "help_clean": (
+        "🧹 <b>پاکسازی پیام‌ها</b>\n\n"
+        "• پاکسازی کامل: پاکسازی از اول تا آخر\n"
+        "• حذف عددی: پاکسازی تعداد مشخص\n"
+        "• پاک روی پیام فرد: روی پیام ریپلی شده آن فرد\n"
+        "• تمام پیام‌های فرد: تمام پیام‌های کاربر پاک می‌شوند"
+    ),
     "help_asl": "📜 <b>ثبت اصل</b>\n➕ ثبت: <code>ثبت اصل من اهل صداقتم</code>\n👀 نمایش: <code>اصل من</code>\n❌ حذف: <code>حذف اصل</code>",
     "help_laqab": "🏷 <b>ثبت لقب</b>\n➕ ثبت: <code>ثبت لقب قهرمان</code>\n👀 نمایش: <code>لقب من</code>\n❌ حذف: <code>حذف لقب</code>",
-    "help_tag": "🔔 <b>تگ کاربران گروه</b>\n👥 تگ همه: <code>تگ همه</code>\n👮 تگ مدیران: <code>تگ مدیران</code>\n💤 تگ غیرفعال‌ها: <code>تگ غیره فعال</code>\n🔥 تگ فعال‌ها: <code>تگ فعال</code>",
-    "help_grouplock": "🔒 <b>قفل گروه</b>\n📌 با این ویژگی می‌تونی گروه رو قفل یا باز کنی.\n🕐 حالت خودکار: <code>قفل خودکار روشن</code>\n🔓 خاموش: <code>قفل خودکار خاموش</code>"
+    "help_grouplock": "🔒 <b>قفل گروه</b>\n📌 با این ویژگی می‌توان گروه را قفل یا باز کرد.\n🕐 حالت خودکار: <code>قفل خودکار روشن</code>\n🔓 خاموش: <code>قفل خودکار خاموش</code>",
+    "help_tag": (
+        "🔔 <b>تگ کاربران</b>\n\n"
+        "با ارسال دکمه تگ در گروه، پنل تک برای ارسال ایجاد می‌شود.\n"
+        "کاربر می‌تواند انتخاب کند:\n"
+        "• تگ همه مدیران\n"
+        "• تگ ۵۰ کاربر\n"
+        "• تگ ۳۰۰ کاربر\n"
+        "• تگ ۵۰ کاربران دیگر"
+    )
 }
 
 async def show_help_info(query):
@@ -130,18 +141,6 @@ async def show_help_info(query):
         return await query.answer("❌ هنوز برای این گزینه راهنما تعریف نشده", show_alert=True)
     text = HELP_TEXTS[data]
     keyboard = [[InlineKeyboardButton("🔙 بازگشت", callback_data="Tastatur_settings")]]
-    await query.edit_message_text(text, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(keyboard))
-
-# ====================== 🧩 افزودن دستور سفارشی ======================
-async def show_alias_menu(query):
-    text = (
-        "🧩 <b>افزودن دستور سفارشی</b>\n\n"
-        "📘 فرمت ساخت:\n<code>افزودن دستور [نام] [نوع] [متن پاسخ]</code>\n"
-        "💬 برای حذف دستور: <code>حذف دستور [نام]</code>\n"
-        "📜 برای دیدن همه دستورها: <code>لیست دستورها</code>\n"
-        "هر گروه دستورهای خودش را دارد 🔐"
-    )
-    keyboard = [[InlineKeyboardButton("🔙 بازگشت", callback_data="Tastatur_back")]]
     await query.edit_message_text(text, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(keyboard))
 
 # ====================== 🔒 قفل‌ها ======================
