@@ -132,11 +132,14 @@ async def welcome_panel_buttons(update: Update, context: ContextTypes.DEFAULT_TY
     if data == "welcome_back":
         return await open_welcome_panel(update, context)
     if data == "welcome_close":
-    try:
-        await query.message.delete()   # فقط پیام پنل حذف می‌شود
-    except:
-        pass
-    return
+        try:
+            await query.message.edit_text()
+        except:
+            try:
+                await query.message.delete()
+            except:
+                pass
+        return
 
     msg = ""
     keyboard = None
