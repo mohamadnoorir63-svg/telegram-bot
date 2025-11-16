@@ -7,7 +7,7 @@ from telegram import Update, ChatPermissions
 from telegram.ext import ContextTypes, MessageHandler, filters
 
 # ================= ⚙️ تنظیمات اولیه =================
-BASE_DIR = os.path.dirname(os.path.abspath(file))
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 WARN_FILE = os.path.join(BASE_DIR, "warnings.json")
 BAN_FILE = os.path.join(BASE_DIR, "ban_list.json")
@@ -82,7 +82,7 @@ async def _resolve_target(msg, context, chat_id, explicit_arg: str = None):
             try:
                 user_entity = await userbot_client.get_entity(f"@{username}")
                 class DummyUser:
-                    def init(self, id, first_name, username=None):
+                    def __init__(self, id, first_name, username=None):
                         self.id = id
                         self.first_name = first_name
                         self.username = username
@@ -138,7 +138,7 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
             data[chat_key] = {}
         data[chat_key][alias_name] = original_cmd
         _save_json(ALIAS_FILE, data)
-        reply = await msg.reply_text(f"✅ دستور alias ساخته شد:\n{alias_name} → {original_cmd}", parse_mode="Markdown")
+        reply = await msg.reply_text(f"✅ دستور alias ساخته شد:\n`{alias_name}` → `{original_cmd}`", parse_mode="Markdown")
         await asyncio.sleep(10)
         await reply.delete()
         return
