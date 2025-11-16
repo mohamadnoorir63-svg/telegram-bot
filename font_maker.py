@@ -116,7 +116,7 @@ def generate_fonts(name: str):
     return fonts
 
 # ======================= 📄 ساخت صفحات =======================
-def make_pages(name: str, fonts: list, page_size=7, max_pages=15):
+def make_pages(name: str, fonts: list, page_size=5, max_pages=10):
     pages = []
     chunks = [fonts[i:i+page_size] for i in range(0, len(fonts), page_size)][:max_pages]
 
@@ -150,7 +150,9 @@ async def send_selected_font(update: Update, context: ContextTypes.DEFAULT_TYPE)
     font_id = int(query.data.replace("send_font_", ""))
     all_fonts = context.user_data.get("all_fonts", [])
     if 0 <= font_id < len(all_fonts):
-        await query.message.reply_text(all_fonts[font_id])
+        # بررسی مشابهت پیام قبل از ارسال
+        if query.message.text != all_fonts[font_id]:
+            await query.message.reply_text(all_fonts[font_id])
     else:
         await query.message.reply_text("❗ فونت پیدا نشد.")
 
@@ -161,7 +163,10 @@ async def next_font(update: Update, context: ContextTypes.DEFAULT_TYPE):
     index = int(query.data.replace("next_font_", ""))
     pages = context.user_data.get("font_pages", [])
     if 0 <= index < len(pages):
-        await query.edit_message_text(pages[index]["text"], parse_mode="HTML", reply_markup=pages[index]["keyboard"])
+        new_text = pages[index]["text"]
+        new_markup = pages[index]["keyboard"]
+        if query.message.text != new_text or query.message.reply_markup != new_markup:
+            await query.edit_message_text(new_text, parse_mode="HTML", reply_markup=new_markup)
 
 async def prev_font(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -169,7 +174,10 @@ async def prev_font(update: Update, context: ContextTypes.DEFAULT_TYPE):
     index = int(query.data.replace("prev_font_", ""))
     pages = context.user_data.get("font_pages", [])
     if 0 <= index < len(pages):
-        await query.edit_message_text(pages[index]["text"], parse_mode="HTML", reply_markup=pages[index]["keyboard"])
+        new_text = pages[index]["text"]
+        new_markup = pages[index]["keyboard"]
+        if query.message.text != new_text or query.message.reply_markup != new_markup:
+            await query.edit_message_text(new_text, parse_mode="HTML", reply_markup=new_markup)
 
 # ======================= 🎛 بازگشت به منوی اصلی =======================
 async def feature_back(update: Update, context: ContextTypes.DEFAULT_TYPE):
