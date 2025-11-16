@@ -131,25 +131,24 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
             await reply.delete()
             return
         alias_name = match_alias.group(1).strip()
-        original_cmd = match_alias.group(2).strip()
+        original_cmd_text = match_alias.group(2).strip()
+
+        # جدا کردن دستور و متن خروجی
+        if "|" in original_cmd_text:
+            parts = original_cmd_text.split("|", 1)
+            cmd_type = parts[0].strip()
+            output_text = parts[1].strip()
+        else:
+            cmd_type = original_cmd_text
+            output_text = "{name}"
+
         data = _load_json(ALIAS_FILE)
         chat_key = str(chat.id)
         if chat_key not in data:
             data[chat_key] = {}
-        # ذخیره دستور و متن خروجی دلخواه
-        if " " in original_cmd:
-            parts = original_cmd.split(" ", 1)
-            cmd_type = parts[0].strip()
-            output_text = parts[1].strip()
-        else:
-            cmd_type = original_cmd
-            output_text = "{name}"
-
-        data[chat_key][alias_name] = {
-            "command": cmd_type,
-            "output": output_text
-        }
+        data[chat_key][alias_name] = {"command": cmd_type, "output": output_text}
         _save_json(ALIAS_FILE, data)
+
         reply = await msg.reply_text(f"✅ دستور alias ساخته شد:\n`{alias_name}` → `{cmd_type} | {output_text}`", parse_mode="Markdown")
         await asyncio.sleep(10)
         await reply.delete()
@@ -169,16 +168,15 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
         await reply.delete()
         return
 
-    # ---------- aliasها ----------
+    # ---------- بررسی alias اجرا شده ----------
     aliases_all = _load_json(ALIAS_FILE)
     chat_aliases = aliases_all.get(str(chat.id), {})
-
     output_text_template = None
-    cmd_type = None
-    for alias_text, alias_info in chat_aliases.items():
+
+    for alias_text, info in chat_aliases.items():
         if text.startswith(alias_text):
-            cmd_type = alias_info["command"]
-            output_text_template = alias_info.get("output", "{name}")
+            text = info["command"]
+            output_text_template = info.get("output", "{name}")
             break
 
     # ---------- regex دستورات ----------
@@ -192,12 +190,14 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
     }
 
     matched = None
+    cmd_type = None
     for k, pat in PATTERNS.items():
-        if cmd_type == k or (cmd_type is None and pat.fullmatch(text)):
-            matched = pat.fullmatch(text)
-            if matched:
-                cmd_type = k
-                break
+        m = pat.fullmatch(text)
+        if m:
+            cmd_type = k
+            matched = m
+            break
+
     if not cmd_type or not matched:
         return
 
@@ -229,16 +229,6 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
         await reply.delete()
         return
 
-    try:
-        tm = await context.bot.get_chat_member(chat.id, target_user.id)
-        if tm.status in ("creator", "administrator"):
-            reply = await msg.reply_text("🛡 امکان اجرای دستور روی ادمین وجود ندارد.")
-            await asyncio.sleep(10)
-            await reply.delete()
-            return
-    except Exception:
-        pass
-
     target_ref = f"@{target_user.username}" if getattr(target_user, "username", None) else str(target_user.id)
 
     try:
@@ -257,7 +247,7 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
             reply = await msg.reply_text(output_text or f"✅ {target_user.first_name} از بن خارج شد.")
 
         elif cmd_type == "mute":
-            seconds = 3600
+            seconds = 600  # زمان پیش‌فرض ۱۰ دقیقه
             if extra_time:
                 num, unit = extra_time
                 if unit == "ساعت":
@@ -315,6 +305,7 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
         reply = await msg.reply_text(f"⚠️ خطا در اجرای دستور: {e}")
         await asyncio.sleep(10)
         await reply.delete()
+
 
 # ================= 🧩 ثبت هندلر =================
 def register_punishment_handlers(application, group_number: int = 12):
