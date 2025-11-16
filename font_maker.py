@@ -116,7 +116,7 @@ def generate_fonts(name: str):
     return fonts
 
 # ======================= 📄 ساخت صفحات =======================
-def make_pages(name: str, fonts: list, page_size=5, max_pages=10):
+def make_pages(name: str, fonts: list, page_size=7, max_pages=15):
     pages = []
     chunks = [fonts[i:i+page_size] for i in range(0, len(fonts), page_size)][:max_pages]
 
