@@ -105,6 +105,7 @@ async def show_settings_menu(query):
          InlineKeyboardButton("🏷 لقب", callback_data="help_laqab")],
         [InlineKeyboardButton("🔒 قفل گروه", callback_data="help_grouplock"),
          InlineKeyboardButton("🔔 تگ کاربران", callback_data="help_tag")],
+        [InlineKeyboardButton("⭐ کاربران ویژه", callback_data="help_vip")],
         [InlineKeyboardButton("🔙 بازگشت", callback_data="Tastatur_back")]
     ]
     return await query.edit_message_text(text, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(keyboard))
@@ -123,7 +124,11 @@ HELP_TEXTS = {
     ),
     "help_asl": "📜 <b>ثبت اصل</b>\n➕ ثبت: <code>ثبت اصل من اهل صداقتم</code>\n👀 نمایش: <code>اصل من</code>\n❌ حذف: <code>حذف اصل</code>",
     "help_laqab": "🏷 <b>ثبت لقب</b>\n➕ ثبت: <code>ثبت لقب قهرمان</code>\n👀 نمایش: <code>لقب من</code>\n❌ حذف: <code>حذف لقب</code>",
-    "help_grouplock": "🔒 <b>قفل گروه</b>\n📌 با این ویژگی می‌توان گروه را قفل یا باز کرد.\n🕐 حالت خودکار: <code>قفل خودکار روشن</code>\n🔓 خاموش: <code>قفل خودکار خاموش</code>",
+    "help_grouplock": (
+        "🔒 <b>قفل گروه</b>\n"
+        "📌 با این ویژگی می‌توانید بخش‌های مختلف گروه را قفل یا باز کنید.\n"
+        "⚠️ توجه: این قفل‌ها فقط حالت دستی دارند و خودکار نیستند."
+    ),
     "help_tag": (
         "🔔 <b>تگ کاربران</b>\n\n"
         "با ارسال دکمه تگ در گروه، پنل تک برای ارسال ایجاد می‌شود.\n"
@@ -132,6 +137,14 @@ HELP_TEXTS = {
         "• تگ ۵۰ کاربر\n"
         "• تگ ۳۰۰ کاربر\n"
         "• تگ ۵۰ کاربران دیگر"
+    ),
+    "help_vip": (
+        "⭐ <b>کاربران ویژه</b>\n\n"
+        "کاربر ویژه از قفل‌های رسانه معاف می‌شود.\n"
+        "دستورات روی پیام ریپلی شده کاربر اجرا می‌شوند:\n"
+        "• تنظیم ویژه: <code>تنظیم ویژه</code>\n"
+        "• حذف ویژه: <code>حذف ویژه</code>\n"
+        "• لیست ویژه: <code>لیست ویژه</code>"
     )
 }
 
@@ -193,7 +206,7 @@ FUN_TEXTS = {
     "fun_azan": ("🕋 اذان", "با دستور «اذان تهران» یا «اذان مشهد» زمان اذان را ببین 🕌"),
     "fun_weather": ("☁️ آب‌وهوا", "با دستور «آب‌وهوا [شهر]» وضعیت آب‌وهوا را بگیر 🌦"),
     "fun_ramadan": ("🌙 رمضان", "با دستور «رمضان» تاریخ رمضان و روز فعلی ماه را ببین 🌙"),
-    "fun_reply": ("💾 ساخت ریپلای", "روی پیام ریپلای کن و بنویس: <code>/save متن</code>\nبعدا با نوشتن <code>متن</code> پیام ارسال می‌شود 💬"),
+    "fun_reply": ("💾 ساخت ریپلای", "روی پیام ریپلی کن و بنویس: <code>/save متن</code>\nبعدا با نوشتن <code>متن</code> پیام ارسال می‌شود 💬"),
 }
 
 async def show_fun_menu(query):
