@@ -64,8 +64,7 @@ async def get_voice_data(user_id, is_admin=False):
     فقط برای سودو یا مدیران واقعی داده واقعی بازگردانده می‌شود.
     """
     if is_admin:
-        # اینجا باید به API واقعی ویسکال متصل شوید و داده واقعی برگردانید
-        # نمونه داده تستی برای سودو و مدیر
+        # اینجا می‌توانید به API واقعی ویسکال وصل شوید
         return {
             "datacenter_code": 5,
             "role": "مالک گروه",
@@ -171,13 +170,16 @@ async def show_daily_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
         today = datetime.now().strftime("%Y-%m-%d")
         text_input = update.message.text.strip().lower()
 
-        # 🔒 بررسی دسترسی
+        # 🔒 بررسی دسترسی و نقش واقعی
         is_admin = False
+        role = "---"
         if user.id == SUDO_ID:
             is_admin = True
+            role = "مالک اصلی"
         else:
             try:
                 member = await context.bot.get_chat_member(chat_id, user.id)
+                role = member.status  # creator / administrator / member
                 if member.status in ["creator", "administrator"]:
                     is_admin = True
             except:
@@ -192,7 +194,7 @@ async def show_daily_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             username = target.username if target.username else "---"
             datacenter_code = voice_data.get("datacenter_code", "---")
-            role = voice_data.get("role", "---")
+            role_voice = voice_data.get("role", "---")
             voice_time = voice_data.get("time", "---")
             voice_percent = voice_data.get("percent", "---")
             voice_rank = voice_data.get("rank", "---")
@@ -204,7 +206,7 @@ async def show_daily_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 f"💬 یوزرنیم: {username}\n"
                 f"🆔 آیدی عددی: <code>{target.id}</code>\n"
                 f"💻 کد دیتاسنتر: {datacenter_code}\n"
-                f"🎖 مقام کاربر: {role}\n"
+                f"🎖 مقام کاربر: {role_voice}\n"
                 f"─┅━✦━┅─\n"
                 f"◂ زمان حضور در ویسکال: {voice_time}\n"
                 f"◂ درصد حضور در ویسکال: {voice_percent}\n"
