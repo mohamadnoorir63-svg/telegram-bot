@@ -132,14 +132,11 @@ async def welcome_panel_buttons(update: Update, context: ContextTypes.DEFAULT_TY
     if data == "welcome_back":
         return await open_welcome_panel(update, context)
     if data == "welcome_close":
-        try:
-            await query.message.edit_text("❌ پنل بسته شد")
-        except:
-            try:
-                await query.message.delete()
-            except:
-                pass
-        return
+    try:
+        await query.message.delete()   # فقط پیام پنل حذف می‌شود
+    except:
+        pass
+    return
 
     msg = ""
     keyboard = None
@@ -156,7 +153,7 @@ async def welcome_panel_buttons(update: Update, context: ContextTypes.DEFAULT_TY
     # پیش‌نمایش
     elif data == "welcome_preview":
         now = get_persian_time()
-        sample = cfg.get("text", DEFAULT_WELCOME_TEXT).format(name="مهران", group=chat.title or "گروه", time=now)
+        sample = cfg.get("text", DEFAULT_WELCOME_TEXT).format(name="محمد", group=chat.title or "گروه", time=now)
         msg = f"👀 <b>پیش‌نمایش:</b>\n\n{sample}"
         keyboard = build_welcome_keyboard(main_panel=True)
     # زیرمجموعه‌ها
