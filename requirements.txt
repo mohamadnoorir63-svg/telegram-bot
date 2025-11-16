@@ -41,4 +41,5 @@ tenacity==8.3.0
 telethon==1.34.0
 cryptography
 matplotlib==3.8.1
-upgrade Pillow
+
+Pillow>=10.0.0
