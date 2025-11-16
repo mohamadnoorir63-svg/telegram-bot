@@ -367,14 +367,13 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
         await reply.delete()
 
 # ================= اتوماتیک آزادسازی سکوت (Job) =================
-
 async def _auto_unmute_job(context: ContextTypes.DEFAULT_TYPE):
     """
-    این تابع یک بار اجرا می‌شود (job تکرارشونده).
-    اگر زمان until برای هر سکوت گذشته باشد، کاربر آزاد می‌شود و در فایل پاک می‌شود.
+    این تابع به صورت job تکرارشونده اجرا می‌شود.
+    اگر زمان until برای هر سکوت گذشته باشد، کاربر آزاد می‌شود و رکورد از فایل حذف می‌شود.
     """
+    bot = context.bot
     try:
-        bot = context.bot
         mute_data = _load_json(MUTE_FILE)
         now_ts = datetime.utcnow().timestamp()
         changed = False
@@ -382,35 +381,43 @@ async def _auto_unmute_job(context: ContextTypes.DEFAULT_TYPE):
         for chat_id, users in list(mute_data.items()):
             for user_id, info in list(users.items()):
                 until = info.get("until", 0)
-                try:
-                    if now_ts >= until:
-                        # سعی می‌کنیم سکوت را برداریم
-                        try:
-                            full_perms = ChatPermissions(
-                                can_send_messages=True,
-                                can_send_media_messages=True,
-                                can_send_polls=True,
-                                can_send_other_messages=True,
-                                can_add_web_page_previews=True,
-                                can_change_info=False,
-                                can_invite_users=True,
-                                can_pin_messages=False
-                            )
-                            await bot.restrict_chat_member(int(chat_id), int(user_id), permissions=full_perms, until_date=0)
-                        except Exception as e:
-                            # اگر نشد، لاگ کن اما باز هم سعی کن رکورد را حذف کنی
-                            print(f"[auto_unmute] failed to unrestrict {user_id} in {chat_id}: {e}")
+                if now_ts >= until:
+                    # سعی می‌کنیم سکوت را برداریم
+                    try:
+                        full_perms = ChatPermissions(
+                            can_send_messages=True,
+                            can_send_media_messages=True,
+                            can_send_polls=True,
+                            can_send_other_messages=True,
+                            can_add_web_page_previews=True,
+                            can_change_info=False,
+                            can_invite_users=True,
+                            can_pin_messages=False
+                        )
+                        await bot.restrict_chat_member(
+                            int(chat_id),
+                            int(user_id),
+                            permissions=full_perms,
+                            until_date=0
+                        )
+                    except Exception as e:
+                        print(f"[auto_unmute] failed to unrestrict {user_id} in {chat_id}: {e}")
 
-                        # اطلاع‌رسانی در گروه
-                        try:
-                            await bot.send_message(int(chat_id), f"🔊 کاربر <a href='tg://user?id={user_id}'>کاربر</a> از سکوت خارج شد.", parse_mode="HTML")
-                        except Exception as e:
-                            print(f"[auto_unmute] notify failed for {user_id} in {chat_id}: {e}")
+                    # اطلاع‌رسانی در گروه
+                    try:
+                        await bot.send_message(
+                            int(chat_id),
+                            f"🔊 کاربر <a href='tg://user?id={user_id}'>کاربر</a> از سکوت خارج شد.",
+                            parse_mode="HTML"
+                        )
+                    except Exception as e:
+                        print(f"[auto_unmute] notify failed for {user_id} in {chat_id}: {e}")
 
-                        # حذف رکورد
-                        del mute_data[chat_id][user_id]
-                        changed = True
+                    # حذف رکورد
+                    del mute_data[chat_id][user_id]
+                    changed = True
 
+            # پاک کردن چت خالی از mute_data
             if chat_id in mute_data and not mute_data[chat_id]:
                 del mute_data[chat_id]
                 changed = True
@@ -420,7 +427,6 @@ async def _auto_unmute_job(context: ContextTypes.DEFAULT_TYPE):
 
     except Exception as e:
         print("[auto_unmute_job] error:", e)
-
 # ================= 🧩 ثبت هندلر و job =================
 
 def register_punishment_handlers(application, group_number: int = 12):
