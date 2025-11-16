@@ -42,7 +42,6 @@ def _save_json(file, data):
     with open(file, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
-# ================= 🔐 بررسی ادمین / سودو =================
 async def _has_access(context, chat_id: int, user_id: int) -> bool:
     if user_id in SUDO_IDS:
         return True
@@ -52,15 +51,11 @@ async def _has_access(context, chat_id: int, user_id: int) -> bool:
     except Exception:
         return False
 
-# ================= 🎯 استخراج هدف =================
 async def _resolve_target(msg, context, chat_id, explicit_arg: str = None):
-    # اول بررسی ریپلای
     if msg.reply_to_message and getattr(msg.reply_to_message, "from_user", None):
         return msg.reply_to_message.from_user
 
     text = (msg.text or "").strip()
-
-    # بررسی آیدی عددی
     user_id = explicit_arg if explicit_arg and explicit_arg.isdigit() else None
     if not user_id:
         m_id = re.search(r"\b(\d{6,15})\b", text)
@@ -73,7 +68,6 @@ async def _resolve_target(msg, context, chat_id, explicit_arg: str = None):
         except Exception as e:
             print(f"⚠️ خطا در گرفتن آیدی عددی: {e}")
 
-    # بررسی یوزرنیم
     m_username = re.search(r"@([A-Za-z0-9_]{3,32})", text)
     if m_username:
         username = m_username.group(1)
@@ -96,7 +90,6 @@ async def _resolve_target(msg, context, chat_id, explicit_arg: str = None):
                 print(f"⚠️ یوزربات هم نتونست @{username} رو resolve کنه: {e2}")
     return None
 
-# ================= ⚙️ ذخیره لیست بن/سکوت =================
 def add_to_list(file, chat_id, user):
     data = _load_json(file)
     chat_key = str(chat_id)
@@ -128,7 +121,6 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
         return
     text = (msg.text or "").strip()
 
-    # نمایش لیست بن و سکوت
     if text == "لیست بن":
         items = list_from_file(BAN_FILE, chat.id)
         reply = await msg.reply_text("🚫 لیست بن شده‌ها:\n" + ("\n".join(items) if items else "هیچ کس"))
@@ -142,13 +134,10 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
         await reply.delete()
         return
 
-    # ================= دقیق‌سازی regex دستورات =================
     PATTERNS = {
         "ban": re.compile(r"^بن(?:\s+(@?[A-Za-z0-9_]{3,32}|\d{6,15}))?$"),
         "unban": re.compile(r"^حذف\s+بن(?:\s+(@?[A-Za-z0-9_]{3,32}|\d{6,15}))?$"),
-        "mute": re.compile(
-            r"^سکوت(?:\s+(@?[A-Za-z0-9_]{3,32}|\d{6,15}))?(?:\s+(\d+)\s*(ثانیه|دقیقه|ساعت))?$"
-        ),
+        "mute": re.compile(r"^سکوت(?:\s+(@?[A-Za-z0-9_]{3,32}|\d{6,15}))?(?:\s+(\d+)\s*(ثانیه|دقیقه|ساعت))?$"),
         "unmute": re.compile(r"^حذف\s+سکوت(?:\s+(@?[A-Za-z0-9_]{3,32}|\d{6,15}))?$"),
         "warn": re.compile(r"^اخطار(?:\s+(@?[A-Za-z0-9_]{3,32}|\d{6,15}))?$"),
         "delwarn": re.compile(r"^حذف\s+اخطار(?:\s+(@?[A-Za-z0-9_]{3,32}|\d{6,15}))?$"),
@@ -165,7 +154,6 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
     if not cmd_type:
         return
 
-    # بررسی دسترسی مدیر/سودو
     if not await _has_access(context, chat.id, user.id):
         reply = await msg.reply_text("🚫 فقط مدیران یا سودوها مجازند.")
         await asyncio.sleep(10)
@@ -182,9 +170,7 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
     target_user = await _resolve_target(msg, context, chat.id, explicit_arg)
     if not target_user:
-        reply = await msg.reply_text(
-            "⚠️ هدف مشخص نیست.\n• ریپلای روی پیام کاربر\n• یا آیدی عددی/یوزرنیم"
-        )
+        reply = await msg.reply_text("⚠️ هدف مشخص نیست.\n• ریپلای روی پیام کاربر\n• یا آیدی عددی/یوزرنیم")
         await asyncio.sleep(10)
         await reply.delete()
         return
@@ -219,11 +205,13 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
             add_to_list(BAN_FILE, chat.id, target_user)
             await punish_via_userbot(chat.id, target_ref, action="ban")
             reply = await msg.reply_text(f"🚫 {target_user.first_name} از گروه بن شد.")
+
         elif cmd_type == "unban":
             await context.bot.unban_chat_member(chat.id, target_user.id)
             remove_from_list(BAN_FILE, chat.id, target_user)
             await punish_via_userbot(chat.id, target_ref, action="unban")
             reply = await msg.reply_text(f"✅ {target_user.first_name} از بن خارج شد.")
+
         elif cmd_type == "mute":
             seconds = 3600
             if extra_time:
@@ -234,23 +222,34 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
                     seconds = num * 60
                 else:
                     seconds = num
-            until = datetime.utcnow() + timedelta(seconds=seconds)
-            await context.bot.restrict_chat_member(
-                chat.id, target_user.id,
-                permissions=ChatPermissions(can_send_messages=False),
-                until_date=until
-            )
-            add_to_list(MUTE_FILE, chat.id, target_user)
-            await punish_via_userbot(chat.id, target_ref, action="mute", seconds=seconds)
-            reply = await msg.reply_text(f"🤐 {target_user.first_name} برای {seconds} ثانیه سکوت شد.")
+
+            # اگر کمتر از 60 ثانیه، از asyncio.sleep استفاده کن
+            if seconds < 60:
+                await context.bot.restrict_chat_member(chat.id, target_user.id,
+                    permissions=ChatPermissions(can_send_messages=False))
+                add_to_list(MUTE_FILE, chat.id, target_user)
+                await punish_via_userbot(chat.id, target_ref, action="mute", seconds=seconds)
+                reply = await msg.reply_text(f"🤐 {target_user.first_name} برای {seconds} ثانیه سکوت شد.")
+                await asyncio.sleep(seconds)
+                await context.bot.restrict_chat_member(chat.id, target_user.id,
+                    permissions=ChatPermissions(can_send_messages=True))
+                remove_from_list(MUTE_FILE, chat.id, target_user)
+            else:
+                until = datetime.utcnow() + timedelta(seconds=seconds)
+                await context.bot.restrict_chat_member(chat.id, target_user.id,
+                    permissions=ChatPermissions(can_send_messages=False),
+                    until_date=until)
+                add_to_list(MUTE_FILE, chat.id, target_user)
+                await punish_via_userbot(chat.id, target_ref, action="mute", seconds=seconds)
+                reply = await msg.reply_text(f"🤐 {target_user.first_name} برای {seconds} ثانیه سکوت شد.")
+
         elif cmd_type == "unmute":
-            await context.bot.restrict_chat_member(
-                chat.id, target_user.id,
-                permissions=ChatPermissions(can_send_messages=True)
-            )
+            await context.bot.restrict_chat_member(chat.id, target_user.id,
+                permissions=ChatPermissions(can_send_messages=True))
             remove_from_list(MUTE_FILE, chat.id, target_user)
             await punish_via_userbot(chat.id, target_ref, action="unmute")
             reply = await msg.reply_text(f"🔊 {target_user.first_name} از سکوت خارج شد.")
+
         elif cmd_type == "warn":
             warns = _load_json(WARN_FILE)
             key = f"{chat.id}:{target_user.id}"
@@ -265,6 +264,7 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
                 reply = await msg.reply_text(f"🚫 {target_user.first_name} به‌دلیل ۳ اخطار بن شد.")
             else:
                 reply = await msg.reply_text(f"⚠️ {target_user.first_name} اخطار {warns[key]}/3 گرفت.")
+
         elif cmd_type == "delwarn":
             warns = _load_json(WARN_FILE)
             key = f"{chat.id}:{target_user.id}"
@@ -274,13 +274,16 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
                 reply = await msg.reply_text(f"✅ اخطارهای {target_user.first_name} حذف شد.")
             else:
                 reply = await msg.reply_text("ℹ️ این کاربر اخطاری نداشت.")
+
         await asyncio.sleep(10)
         await reply.delete()
+
     except Exception as e:
         print("handle_punishments execution exception:", e)
         reply = await msg.reply_text(f"⚠️ خطا در اجرای دستور: {e}")
         await asyncio.sleep(10)
         await reply.delete()
+
 
 # ================= 🧩 ثبت هندلر =================
 def register_punishment_handlers(application, group_number: int = 12):
