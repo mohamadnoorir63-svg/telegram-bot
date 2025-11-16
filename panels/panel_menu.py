@@ -105,7 +105,8 @@ async def show_settings_menu(query):
          InlineKeyboardButton("🏷 لقب", callback_data="help_laqab")],
         [InlineKeyboardButton("🔒 قفل گروه", callback_data="help_grouplock"),
          InlineKeyboardButton("🔔 تگ کاربران", callback_data="help_tag")],
-        [InlineKeyboardButton("⭐ کاربران ویژه", callback_data="help_vip")],
+        [InlineKeyboardButton("⭐ کاربران ویژه", callback_data="help_vip"),
+         InlineKeyboardButton("⚖️ مجازات کاربر", callback_data="help_punish")],
         [InlineKeyboardButton("🔙 بازگشت", callback_data="Tastatur_back")]
     ]
     return await query.edit_message_text(text, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(keyboard))
@@ -145,6 +146,14 @@ HELP_TEXTS = {
         "• تنظیم ویژه: <code>تنظیم ویژه</code>\n"
         "• حذف ویژه: <code>حذف ویژه</code>\n"
         "• لیست ویژه: <code>لیست ویژه</code>"
+    ),
+    "help_punish": (
+        "⚖️ <b>مجازات کاربر</b>\n\n"
+        "• بن/حذف بن: روی آیدی عددی یا @username\n"
+        "• سکوت: مثلا <code>سکوت 1 دقیقه</code> یا 1 ثانیه/ساعت\n"
+        "• حذف سکوت: <code>حذف سکوت</code>\n"
+        "• اخطار: <code>اخطار</code>\n"
+        "• حذف اخطار: <code>حذف اخطار</code>"
     )
 }
 
@@ -206,7 +215,7 @@ FUN_TEXTS = {
     "fun_azan": ("🕋 اذان", "با دستور «اذان تهران» یا «اذان مشهد» زمان اذان را ببین 🕌"),
     "fun_weather": ("☁️ آب‌وهوا", "با دستور «آب‌وهوا [شهر]» وضعیت آب‌وهوا را بگیر 🌦"),
     "fun_ramadan": ("🌙 رمضان", "با دستور «رمضان» تاریخ رمضان و روز فعلی ماه را ببین 🌙"),
-    "fun_reply": ("💾 ساخت ریپلای", "روی پیام ریپلی کن و بنویس: <code>/save متن</code>\nبعدا با نوشتن <code>متن</code> پیام ارسال می‌شود 💬"),
+    "fun_reply": ("💾 ساخت ریپلای", "روی پیام ریپلای کن و بنویس: <code>/save متن</code>\nبعدا با نوشتن <code>متن</code> پیام ارسال می‌شود 💬"),
 }
 
 async def show_fun_menu(query):
