@@ -56,15 +56,15 @@ from auto_brain.command_manager import (
     list_commands,
     cleanup_group_commands
 )
-
-
 from group_control.daily_stats import (
     record_message_activity,
     record_new_members,
     record_left_members,
-    show_daily_stats,
+    show_user_id,       # تابع آیدی
+    show_group_stats,   # تابع آمار گروه
     send_nightly_stats
 )
+
 
 from panels.panel_menu import (
     Tastatur_menu,
