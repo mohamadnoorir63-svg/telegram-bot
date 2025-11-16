@@ -12,7 +12,7 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 WARN_FILE = os.path.join(BASE_DIR, "warnings.json")
 BAN_FILE = os.path.join(BASE_DIR, "ban_list.json")
-MUTE_FILE = os.path.join(BASE_DIR, "mute_list.json")
+MUTE_FILE = os.path.join(BASE_DIR, "mute_list.json")  # اکنون شامل until timestamps است
 ALIAS_FILE = os.path.join(BASE_DIR, "alias_cmds.json")
 
 SUDO_IDS = [8588347189]  # آیدی سودوها
@@ -118,6 +118,28 @@ def list_from_file(file, chat_id):
         return [f"{uid} ({uname})" if uname else str(uid) for uid, uname in data[chat_key].items()]
     return []
 
+# ---- توابع مخصوص MUTE FILE (ساختار متفاوت) ----
+def save_mute_entry(chat_id: int, user, until_ts: float):
+    data = _load_json(MUTE_FILE)
+    cid = str(chat_id)
+    if cid not in data:
+        data[cid] = {}
+    data[cid][str(user.id)] = {"username": getattr(user, "username", ""), "until": until_ts}
+    _save_json(MUTE_FILE, data)
+
+def remove_mute_entry(chat_id: int, user_id: int):
+    data = _load_json(MUTE_FILE)
+    cid = str(chat_id)
+    uid = str(user_id)
+    if cid in data and uid in data[cid]:
+        del data[cid][uid]
+        if not data[cid]:
+            del data[cid]
+        _save_json(MUTE_FILE, data)
+
+def load_all_mutes():
+    return _load_json(MUTE_FILE)
+
 # ================= 🔐 هندلر تنبیه و alias =================
 
 async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -156,8 +178,22 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
         return
 
     if text == "لیست سکوت":
-        items = list_from_file(MUTE_FILE, chat.id)
-        reply = await msg.reply_text("🤐 لیست سکوت شده‌ها:\n" + ("\n".join(items) if items else "هیچ کس"))
+        # نمایش لیست سکوت‌ها با زمان باقی‌مانده
+        mutes = _load_json(MUTE_FILE).get(str(chat.id), {})
+        if not mutes:
+            reply = await msg.reply_text("🤐 هیچ کسی در لیست سکوت نیست.")
+            await asyncio.sleep(8)
+            await reply.delete()
+            return
+        text_lines = ["🤐 لیست سکوت شده‌ها:"]
+        now_ts = datetime.utcnow().timestamp()
+        for i, (uid, info) in enumerate(mutes.items(), 1):
+            remain = int(info.get("until", 0) - now_ts)
+            if remain > 0:
+                text_lines.append(f"{i}. {uid} — تا {remain} ثانیه")
+            else:
+                text_lines.append(f"{i}. {uid} — در حال انتظار آزادسازی")
+        reply = await msg.reply_text("\n".join(text_lines))
         await asyncio.sleep(10)
         await reply.delete()
         return
@@ -244,6 +280,7 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
             reply = await msg.reply_text(f"✅ {target_user.first_name} از بن خارج شد.")
 
         elif cmd_type == "mute":
+            # محاسبه مدت زمان سکوت به ثانیه
             seconds = 3600
             if extra_time:
                 num, unit = extra_time
@@ -253,18 +290,46 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
                     seconds = num * 60
                 else:
                     seconds = num
+
             until = datetime.utcnow() + timedelta(seconds=seconds)
-            await context.bot.restrict_chat_member(chat.id, target_user.id,
+
+            # اعمال سکوت (تا زمان مشخص)
+            await context.bot.restrict_chat_member(
+                chat.id,
+                target_user.id,
                 permissions=ChatPermissions(can_send_messages=False),
-                until_date=until)
-            add_to_list(MUTE_FILE, chat.id, target_user)
+                until_date=until
+            )
+
+            # ذخیره اطلاعات در فایل mute_list.json
+            save_mute_entry(chat.id, target_user, until.timestamp())
+
             await punish_via_userbot(chat.id, target_ref, action="mute", seconds=seconds)
             reply = await msg.reply_text(f"🤐 {target_user.first_name} برای {seconds} ثانیه سکوت شد.")
 
         elif cmd_type == "unmute":
-            await context.bot.restrict_chat_member(chat.id, target_user.id,
-                permissions=ChatPermissions(can_send_messages=True))
-            remove_from_list(MUTE_FILE, chat.id, target_user)
+            # باز کردن کامل دسترسی‌ها (رفع سکوت دستی)
+            full_perms = ChatPermissions(
+                can_send_messages=True,
+                can_send_media_messages=True,
+                can_send_polls=True,
+                can_send_other_messages=True,
+                can_add_web_page_previews=True,
+                can_change_info=False,
+                can_invite_users=True,
+                can_pin_messages=False
+            )
+
+            await context.bot.restrict_chat_member(
+                chat.id,
+                target_user.id,
+                permissions=full_perms,
+                until_date=0
+            )
+
+            # حذف از فایل mute_list
+            remove_mute_entry(chat.id, target_user.id)
+
             await punish_via_userbot(chat.id, target_ref, action="unmute")
             reply = await msg.reply_text(f"🔊 {target_user.first_name} از سکوت خارج شد.")
 
@@ -301,7 +366,62 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
         await asyncio.sleep(10)
         await reply.delete()
 
-# ================= 🧩 ثبت هندلر =================
+# ================= اتوماتیک آزادسازی سکوت (Job) =================
+
+async def _auto_unmute_job(context: ContextTypes.DEFAULT_TYPE):
+    """
+    این تابع یک بار اجرا می‌شود (job تکرارشونده).
+    اگر زمان until برای هر سکوت گذشته باشد، کاربر آزاد می‌شود و در فایل پاک می‌شود.
+    """
+    try:
+        bot = context.bot
+        mute_data = _load_json(MUTE_FILE)
+        now_ts = datetime.utcnow().timestamp()
+        changed = False
+
+        for chat_id, users in list(mute_data.items()):
+            for user_id, info in list(users.items()):
+                until = info.get("until", 0)
+                try:
+                    if now_ts >= until:
+                        # سعی می‌کنیم سکوت را برداریم
+                        try:
+                            full_perms = ChatPermissions(
+                                can_send_messages=True,
+                                can_send_media_messages=True,
+                                can_send_polls=True,
+                                can_send_other_messages=True,
+                                can_add_web_page_previews=True,
+                                can_change_info=False,
+                                can_invite_users=True,
+                                can_pin_messages=False
+                            )
+                            await bot.restrict_chat_member(int(chat_id), int(user_id), permissions=full_perms, until_date=0)
+                        except Exception as e:
+                            # اگر نشد، لاگ کن اما باز هم سعی کن رکورد را حذف کنی
+                            print(f"[auto_unmute] failed to unrestrict {user_id} in {chat_id}: {e}")
+
+                        # اطلاع‌رسانی در گروه
+                        try:
+                            await bot.send_message(int(chat_id), f"🔊 کاربر <a href='tg://user?id={user_id}'>کاربر</a> از سکوت خارج شد.", parse_mode="HTML")
+                        except Exception as e:
+                            print(f"[auto_unmute] notify failed for {user_id} in {chat_id}: {e}")
+
+                        # حذف رکورد
+                        del mute_data[chat_id][user_id]
+                        changed = True
+
+            if chat_id in mute_data and not mute_data[chat_id]:
+                del mute_data[chat_id]
+                changed = True
+
+        if changed:
+            _save_json(MUTE_FILE, mute_data)
+
+    except Exception as e:
+        print("[auto_unmute_job] error:", e)
+
+# ================= 🧩 ثبت هندلر و job =================
 
 def register_punishment_handlers(application, group_number: int = 12):
     application.add_handler(
@@ -311,3 +431,9 @@ def register_punishment_handlers(application, group_number: int = 12):
         ),
         group=group_number,
     )
+
+    # ثبت job خودکار آزادسازی سکوت (هر 10 ثانیه)
+    try:
+        application.job_queue.run_repeating(_auto_unmute_job, interval=10, first=10)
+    except Exception as e:
+        print("Failed to register auto unmute job:", e)
