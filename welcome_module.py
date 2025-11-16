@@ -121,13 +121,10 @@ async def welcome_panel_buttons(update: Update, context: ContextTypes.DEFAULT_TY
     cfg = welcome_settings[cid]
     data = query.data
 
-    # برای زیرمجموعه‌ها دکمه "بازگشت" نمایش داده شود
     back_btn = InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data="welcome_back")]])
 
-    # --- اصلی ---
     if data == "welcome_back":
-        return await open_welcome_panel(update, context)  # ← وقتی برگشت، دکمه آخر "❌ بستن پنل"
-    
+        return await open_welcome_panel(update, context)
     if data == "welcome_close":
         try:
             await query.message.edit_text("❌ پنل بسته شد")
@@ -138,29 +135,46 @@ async def welcome_panel_buttons(update: Update, context: ContextTypes.DEFAULT_TY
                 pass
         return
 
-    # گزینه‌های زیرمجموعه
-    if data == "welcome_text":
+    msg = ""
+    keyboard = None
+
+    if data == "welcome_enable":
+        cfg["enabled"] = True
+        msg = "✅ خوشامد فعال شد."
+        keyboard = build_welcome_keyboard(main_panel=True)
+    elif data == "welcome_disable":
+        cfg["enabled"] = False
+        msg = "🚫 خوشامد غیرفعال شد."
+        keyboard = build_welcome_keyboard(main_panel=True)
+    elif data == "welcome_preview":
+        now = get_persian_time()
+        sample = cfg.get("text", DEFAULT_WELCOME_TEXT).format(name="مهران", group=chat.title or "گروه", time=now)
+        msg = f"👀 <b>پیش‌نمایش:</b>\n\n{sample}"
+        keyboard = build_welcome_keyboard(main_panel=True)
+    elif data == "welcome_text":
         context.user_data["set_mode"] = "text"
         msg = "📜 لطفاً متن جدید خوشامد را ارسال کنید. از {name}، {group} و {time} استفاده کنید."
+        keyboard = back_btn
     elif data == "welcome_media":
         context.user_data["set_mode"] = "media"
         msg = "🖼 لطفاً رسانه (عکس/فیلم/گیف/صدا/فایل) را ارسال کنید تا به عنوان خوشامد ذخیره شود."
+        keyboard = back_btn
     elif data == "welcome_rules":
         context.user_data["set_mode"] = "rules"
         msg = "📎 لطفاً لینک قوانین را ارسال کنید (مثال: https://t.me/example)"
+        keyboard = back_btn
     elif data == "welcome_timer":
         context.user_data["set_mode"] = "timer"
         msg = "⏳ لطفاً عدد ثانیه برای حذف خودکار پیام خوشامد ارسال کنید (مثلاً 30). صفر برای غیرفعال."
-    elif data == "welcome_preview":
-        now = get_persian_time()
-        sample = cfg.get("text", DEFAULT_WELCOME_TEXT).format(name="محمد", group=chat.title or "گروه", time=now)
-        msg = f"👀 <b>پیش‌نمایش:</b>\n\n{sample}"
+        keyboard = back_btn
     else:
         msg = "⚠️ گزینه نامشخص."
+        keyboard = back_btn
 
     save_welcome_settings(welcome_settings)
+
     try:
-        await query.message.edit_text(msg, parse_mode=ParseMode.HTML, reply_markup=back_btn)  # ← زیرمجموعه‌ها با "بازگشت"
+        await query.message.edit_text(msg, parse_mode=ParseMode.HTML, reply_markup=keyboard)
     except:
         pass
 # ---------------- utility: determine type from document mime/filename ----------------
