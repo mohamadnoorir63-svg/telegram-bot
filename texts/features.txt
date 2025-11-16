@@ -1,17 +1,4 @@
-<!DOCTYPE html>
-<html lang="fa">
-<head>
-<meta charset="UTF-8">
-<title>راهنمای ربات خنگول</title>
-<style>
-body { font-family: Tahoma, sans-serif; line-height: 1.6; direction: rtl; background:#f9f9f9; color:#333; padding:20px; }
-h2 { color:#4a90e2; }
-h3 { color:#e94e77; }
-code { background:#eee; padding:2px 4px; border-radius:3px; }
-hr { border:1px dashed #ccc; }
-</style>
-</head>
-<body>
+
 
 <h2>🧩 قابلیت‌های ربات فارسی 🤖</h2>
 <p>خنگول فقط یه ربات چت نیست، یه همراه باهوشه که هر روز یاد می‌گیره و رشد می‌کنه!</p>
@@ -49,5 +36,3 @@ hr { border:1px dashed #ccc; }
 
 <p>👨‍💻 توسعه‌یافته توسط تیم نوری ✨ خنگول — هوش، احساس و شوخ‌طبعی انسانی 🧠❤️</p>
 
-</body>
-</html>
