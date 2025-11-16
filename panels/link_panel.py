@@ -125,7 +125,7 @@ async def link_panel_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE)
             await context.bot.send_message(user.id, f"🔗 لینک گروه:\n{group['invite']['link']}")
             await query.answer("✅ لینک برای شما در پیام خصوصی ارسال شد.")
         except Exception:
-            await query.answer("⚠️ لطفاً ابتدا به ربات پیام بدهید تا لینک ارسال شود.", show_alert=True)
+            await query.answer("⚠️ لطفاً ابتدا به ربات پیام دهید تا لینک ارسال شود.", show_alert=True)
 
     # ========= ساخت لینک دائمی =========
     if data == "link_create_confirm":
@@ -175,6 +175,19 @@ async def link_panel_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE)
         except Exception as e:
             text = f"⚠️ خطا در ساخت لینک موقت:\n<code>{e}</code>"
 
+        kb = [[InlineKeyboardButton("🔙 بازگشت", callback_data="link_main")]]
+        return await fast_replace(query, text, kb)
+
+    # ========= راهنما =========
+    if data == "link_help":
+        text = (
+            "📘 <b>راهنمای لینک‌ها</b>\n\n"
+            "• ساخت لینک جدید و موقت فقط برای مدیران مجاز است.\n"
+            "• لینک موقت بعد از ۲۴ ساعت یا رسیدن به تعداد مشخص اعضا منقضی می‌شود.\n"
+            "• لینک دائمی همیشه معتبر است تا زمانی که مدیر آن را حذف کند.\n"
+            "• برای دریافت لینک در پیام خصوصی، ابتدا باید به ربات پیام دهید.\n"
+            "• لینک‌ها برای عضویت در گروه استفاده می‌شوند و اشتراک‌گذاری آن مسئولیت شماست."
+        )
         kb = [[InlineKeyboardButton("🔙 بازگشت", callback_data="link_main")]]
         return await fast_replace(query, text, kb)
 
