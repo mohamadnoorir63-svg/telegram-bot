@@ -124,13 +124,13 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
     text = (msg.text or "").strip()
 
     # دستورات برای نمایش لیست دقیق
-    if text == "لیست بن":
+    if text.strip() == "لیست بن":
         items = list_from_file(BAN_FILE, chat.id)
         reply = await msg.reply_text("🚫 لیست بن شده‌ها:\n" + ("\n".join(items) if items else "هیچ کس"))
         await asyncio.sleep(10)
         await reply.delete()
         return
-    if text == "لیست سکوت":
+    if text.strip() == "لیست سکوت":
         items = list_from_file(MUTE_FILE, chat.id)
         reply = await msg.reply_text("🤐 لیست سکوت شده‌ها:\n" + ("\n".join(items) if items else "هیچ کس"))
         await asyncio.sleep(10)
@@ -138,7 +138,6 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
         return
 
     # ================= دقیق سازی regex دستورات =================
-    # fullmatch باعث می‌شود فقط متن دقیق شناسایی شود
     PATTERNS = {
         "ban": re.compile(r"^بن(?:\s+(\S+))?$"),
         "unban": re.compile(r"^حذف\s+بن(?:\s+(\S+))?$"),
@@ -150,14 +149,15 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
     matched = None
     cmd_type = None
+    # ✅ بررسی دقیق ابتدای متن بدون fullmatch
     for k, pat in PATTERNS.items():
-        m = pat.fullmatch(text)
+        m = pat.match(text)  # فقط ابتدای متن
         if m:
             cmd_type = k
             matched = m
             break
     if not cmd_type:
-        return  # متن دقیق دستور نیست
+        return
 
     if not await _has_access(context, chat.id, user.id):
         reply = await msg.reply_text("🚫 فقط مدیران یا سودوها مجازند.")
