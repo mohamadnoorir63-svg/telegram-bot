@@ -34,6 +34,12 @@ from memory_manager import (
     delete_phrase,
     delete_response   # ← این خط اضافه شد
 )
+from welcome_module import (
+    open_welcome_panel,
+    welcome_panel_buttons,
+    welcome_input_handler,
+    welcome
+)
 from jokes_manager import save_joke, delete_joke, list_jokes, send_random_joke
 from fortune_manager import save_fortune, list_fortunes, send_random_fortune, delete_fortune
 from group_manager import register_group_activity, get_group_stats
@@ -69,7 +75,6 @@ from panels.panel_menu import (
     
 )
 from group_control.origin_title import register_origin_title_handlers
-from welcome_module import
 from context_memory import ContextMemory
 from brain_bridge_group import process_group_message
 
