@@ -41,7 +41,7 @@ async def receive_font_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def send_fonts(update: Update, context: ContextTypes.DEFAULT_TYPE, name: str):
     fonts = generate_fonts(name)
     context.user_data["all_fonts"] = fonts
-    context.user_data["font_pages"] = make_pages(name, fonts, page_size=5, max_pages=10)
+    context.user_data["font_pages"] = make_pages(name, fonts, page_size=5)
 
     pages = context.user_data["font_pages"]
     await update.message.reply_text(
@@ -52,7 +52,7 @@ async def send_fonts(update: Update, context: ContextTypes.DEFAULT_TYPE, name: s
     return ConversationHandler.END
 
 # ======================= 🎭 تولید فونت‌های حرفه‌ای =======================
-def generate_fonts(name: str):
+def generate_fonts(name: str, count: int = 50):
     pre_groups = [
         ["𓄂","𓃬","𓋥","𓄼","𓂀","𓅓"],
         ["ꪰ","ꪴ","𝄠","𝅔","꧁","꧂","ꕥ"],
@@ -87,53 +87,43 @@ def generate_fonts(name: str):
 
     fonts = []
 
-    while len(fonts) < 50:
+    while len(fonts) < count:
         if random.random() < 0.3:
             pattern = random.choice(fixed_patterns)
             style = random.choice(unicode_styles)
-            uname = ""
-            for ch in name:
-                if ch.lower() in "abcdefghijklmnopqrstuvwxyz":
-                    idx = "abcdefghijklmnopqrstuvwxyz".index(ch.lower())
-                    uname += style[idx]
-                else:
-                    uname += ch
+            uname = "".join(style["abcdefghijklmnopqrstuvwxyz".index(ch.lower())] if ch.lower() in "abcdefghijklmnopqrstuvwxyz" else ch for ch in name)
             fonts.append(pattern.format(uname))
             continue
 
         pre = "".join(random.choice(group) for group in pre_groups)
         post = "".join(random.choice(group) for group in post_groups)
         style = random.choice(unicode_styles)
-        uname = ""
-        for ch in name:
-            if ch.lower() in "abcdefghijklmnopqrstuvwxyz":
-                idx = "abcdefghijklmnopqrstuvwxyz".index(ch.lower())
-                uname += style[idx]
-            else:
-                uname += ch
+        uname = "".join(style["abcdefghijklmnopqrstuvwxyz".index(ch.lower())] if ch.lower() in "abcdefghijklmnopqrstuvwxyz" else ch for ch in name)
         fonts.append(f"{pre}{uname}{post}")
 
     return fonts
 
-# ======================= 📄 ساخت صفحات =======================
-def make_pages(name: str, fonts: list, page_size=5, max_pages=10):
+# ======================= 📄 ساخت صفحات پویا =======================
+def make_pages(name: str, fonts: list, page_size=5):
     pages = []
-    chunks = [fonts[i:i+page_size] for i in range(0, len(fonts), page_size)][:max_pages]
+    total_pages = (len(fonts) + page_size - 1) // page_size
 
-    for idx, chunk in enumerate(chunks):
+    for idx in range(total_pages):
+        chunk = fonts[idx*page_size : (idx+1)*page_size]
         text = f"**↻ {name} ⇦**\n:• لیست فونت های پیشنهادی :\n"
         keyboard = []
+
         for i, style in enumerate(chunk, start=1):
             global_index = idx*page_size + (i-1)
             text += f"{i}- {style}\n"
             keyboard.append([InlineKeyboardButton(f"{i}- {style}", callback_data=f"send_font_{global_index}")])
 
-        text += f"\n📄 صفحه {idx+1} از {len(chunks)}"
+        text += f"\n📄 صفحه {idx+1} از {total_pages}"
 
         nav = []
         if idx > 0:
             nav.append(InlineKeyboardButton("⬅️ قبلی", callback_data=f"prev_font_{idx-1}"))
-        if idx < len(chunks)-1:
+        if idx < total_pages - 1:
             nav.append(InlineKeyboardButton("➡️ بعدی", callback_data=f"next_font_{idx+1}"))
         if nav:
             keyboard.append(nav)
@@ -150,13 +140,12 @@ async def send_selected_font(update: Update, context: ContextTypes.DEFAULT_TYPE)
     font_id = int(query.data.replace("send_font_", ""))
     all_fonts = context.user_data.get("all_fonts", [])
     if 0 <= font_id < len(all_fonts):
-        # بررسی مشابهت پیام قبل از ارسال
         if query.message.text != all_fonts[font_id]:
             await query.message.reply_text(all_fonts[font_id])
     else:
         await query.message.reply_text("❗ فونت پیدا نشد.")
 
-# ======================= 🔁 صفحات =======================
+# ======================= 🔁 ناوبری صفحات =======================
 async def next_font(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
