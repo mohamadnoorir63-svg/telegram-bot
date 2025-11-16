@@ -129,7 +129,7 @@ async def record_message_activity(update: Update, context: ContextTypes.DEFAULT_
 
     save_queue.add(chat_id)
 
-# ------------------- ثبت ورود اعضا و شمارش عضوکننده ها -------------------
+# ------------------- ثبت ورود اعضا -------------------
 
 async def record_new_members(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message or not update.message.new_chat_members:
@@ -165,7 +165,7 @@ async def record_left_members(update: Update, context: ContextTypes.DEFAULT_TYPE
     stats[chat_id][today]["lefts"] += 1
     save_queue.add(chat_id)
 
-# ------------------- نمایش آمار پیشرفته -------------------
+# ------------------- نمایش آمار و آیدی -------------------
 
 async def show_daily_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
@@ -174,17 +174,16 @@ async def show_daily_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
         today = datetime.now().strftime("%Y-%m-%d")
         text_input = update.message.text.strip().lower()
 
-        # 🔒 بررسی دسترسی
-    if user.id != SUDO_ID:  # اگر سودو نیست
-        try:
-            member = await context.bot.get_chat_member(chat_id, user.id)
-            if member.status not in ["creator", "administrator"]:  # اگر مدیر هم نیست
-                return  # سکوت کامل برای کاربران عادی
-        except:
-            return
+        # 🔒 بررسی دسترسی: اگر سودو یا مدیر نباشد، سکوت
+        if user.id != SUDO_ID:
+            try:
+                member = await context.bot.get_chat_member(chat_id, user.id)
+                if member.status not in ["creator", "administrator"]:
+                    return  # سکوت کامل برای کاربران عادی
+            except:
+                return
 
-        # ادامه کد اصلی بدون تغییر
-        # حالت آیدی پیشرفته با اطلاعات ویسکال و عکس
+        # حالت آیدی پیشرفته
         if text_input in ["آیدی", "id"]:
             target = update.message.reply_to_message.from_user if update.message.reply_to_message else user
 
@@ -192,10 +191,9 @@ async def show_daily_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
             jalali_date = jdatetime.datetime.now().strftime("%A %d %B %Y")
             time_str = datetime.now().strftime("%H:%M:%S")
 
-            # گرفتن اطلاعات ویسکال از API یا دیتابیس
+            # گرفتن اطلاعات ویسکال از API یا دیتابیس (اگر نیاز باشد)
             voice_data = await get_voice_data(target.id)
 
-            # اطلاعات کاربر
             username = getattr(target, "username", "---")
             datacenter_code = voice_data.get("datacenter_code", "---")
             role = voice_data.get("role", "---")
@@ -203,10 +201,8 @@ async def show_daily_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
             voice_percent = voice_data.get("percent", "---")
             voice_rank = voice_data.get("rank", "---")
 
-            # لینک کاربر
             user_link = f"<a href='tg://user?id={target.id}'>{target.first_name}</a>"
 
-            # متن پیام
             text = (
                 f"🧿 <b>اطلاعات کاربر:</b>\n\n"
                 f"👤 نام: {user_link}\n"
@@ -223,7 +219,6 @@ async def show_daily_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
 
             try:
-                # گرفتن عکس پروفایل
                 photos = await context.bot.get_user_profile_photos(target.id, limit=1)
                 if photos.total_count > 0:
                     photo = photos.photos[0][-1].file_id
@@ -235,11 +230,10 @@ async def show_daily_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
             except Exception:
                 msg = await update.message.reply_text(text, parse_mode="HTML")
 
-            # حذف پیام بعد از ۱۵ ثانیه
             await asyncio.sleep(15)
             await context.bot.delete_message(update.effective_chat.id, msg.message_id)
 
-        # ادامه نمایش آمار روزانه و کل بدون تغییر
+        # ادامه نمایش آمار روزانه، نفرات برتر و اعضای جدید بدون تغییر
         if chat_id not in stats or today not in stats[chat_id]:
             msg = await update.message.reply_text("ℹ️ هنوز فعالیتی برای امروز ثبت نشده است.")
             await asyncio.sleep(15)
@@ -292,7 +286,6 @@ async def show_daily_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not top_adders_text:
             top_adders_text = "◂ اطلاعاتی یافت نشد."
 
-        # قالب متن
         text = f"""
 ◄ آمار فعالیت گروه از 00:00 تا این لحظه : • تاریخ : {jalali_date} • ساعت : {time_str}
 
