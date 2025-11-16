@@ -180,7 +180,7 @@ def _type_from_document(document):
     return "document"
 
 # ---------------- handle inputs from panel (text/media/rules/timer) ----------------
-async def welcome_panel_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
+ async def welcome_panel_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     chat = query.message.chat
@@ -207,42 +207,47 @@ async def welcome_panel_buttons(update: Update, context: ContextTypes.DEFAULT_TY
         return
 
     msg = ""
+    keyboard = None
+
     # فعال/غیرفعال
     if data == "welcome_enable":
         cfg["enabled"] = True
         msg = "✅ خوشامد فعال شد."
+        keyboard = build_welcome_keyboard(main_panel=True)
     elif data == "welcome_disable":
         cfg["enabled"] = False
         msg = "🚫 خوشامد غیرفعال شد."
-    # زیرمجموعه‌ها
-    elif data == "welcome_text":
-        context.user_data["set_mode"] = "text"
-        msg = "📜 لطفاً متن جدید خوشامد را ارسال کنید. از {name}، {group} و {time} استفاده کنید."
-    elif data == "welcome_media":
-        context.user_data["set_mode"] = "media"
-        msg = "🖼 لطفاً رسانه (عکس/فیلم/گیف/صدا/فایل) را ارسال کنید تا به عنوان خوشامد ذخیره شود."
-    elif data == "welcome_rules":
-        context.user_data["set_mode"] = "rules"
-        msg = "📎 لطفاً لینک قوانین را ارسال کنید (مثال: https://t.me/example)"
-    elif data == "welcome_timer":
-        context.user_data["set_mode"] = "timer"
-        msg = "⏳ لطفاً عدد ثانیه برای حذف خودکار پیام خوشامد ارسال کنید (مثلاً 30). صفر برای غیرفعال."
+        keyboard = build_welcome_keyboard(main_panel=True)
+    # پیش‌نمایش
     elif data == "welcome_preview":
         now = get_persian_time()
         sample = cfg.get("text", DEFAULT_WELCOME_TEXT).format(name="مهران", group=chat.title or "گروه", time=now)
         msg = f"👀 <b>پیش‌نمایش:</b>\n\n{sample}"
+        keyboard = build_welcome_keyboard(main_panel=True)
+    # زیرمجموعه‌ها
+    elif data == "welcome_text":
+        context.user_data["set_mode"] = "text"
+        msg = "📜 لطفاً متن جدید خوشامد را ارسال کنید. از {name}، {group} و {time} استفاده کنید."
+        keyboard = back_btn
+    elif data == "welcome_media":
+        context.user_data["set_mode"] = "media"
+        msg = "🖼 لطفاً رسانه (عکس/فیلم/گیف/صدا/فایل) را ارسال کنید تا به عنوان خوشامد ذخیره شود."
+        keyboard = back_btn
+    elif data == "welcome_rules":
+        context.user_data["set_mode"] = "rules"
+        msg = "📎 لطفاً لینک قوانین را ارسال کنید (مثال: https://t.me/example)"
+        keyboard = back_btn
+    elif data == "welcome_timer":
+        context.user_data["set_mode"] = "timer"
+        msg = "⏳ لطفاً عدد ثانیه برای حذف خودکار پیام خوشامد ارسال کنید (مثلاً 30). صفر برای غیرفعال."
+        keyboard = back_btn
     else:
         msg = "⚠️ گزینه نامشخص."
+        keyboard = back_btn
 
     save_welcome_settings(welcome_settings)
     
     try:
-        # برای فعال/غیرفعال شدن، همان پنل اصلی را نشان بده
-        if data in ["welcome_enable", "welcome_disable", "welcome_preview"]:
-            keyboard = build_welcome_keyboard(main_panel=True)
-        else:
-            keyboard = back_btn  # زیرمجموعه‌ها با بازگشت
-
         await query.message.edit_text(msg, parse_mode=ParseMode.HTML, reply_markup=keyboard)
     except:
         pass
