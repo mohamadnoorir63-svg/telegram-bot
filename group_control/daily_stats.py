@@ -165,129 +165,133 @@ async def record_left_members(update: Update, context: ContextTypes.DEFAULT_TYPE
     stats[chat_id][today]["lefts"] += 1
     save_queue.add(chat_id)
 
-# ==================== بخش جدا: نمایش آیدی کاربر ====================
+# ------------------- نمایش آیدی کاربران -------------------
 
 async def show_user_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     chat_id = str(update.effective_chat.id)
-    text_input = update.message.text.strip().lower()
 
-    # فقط سودو و مدیران دسترسی دارند
+    # فقط مدیر یا سودو اجازه دارند
     if user.id != SUDO_ID:
         try:
             member = await context.bot.get_chat_member(chat_id, user.id)
             if member.status not in ["creator", "administrator"]:
-                return  # سکوت برای کاربران عادی
+                return
         except:
             return
 
-    if text_input in ["آیدی", "id"]:
-        target = update.message.reply_to_message.from_user if update.message.reply_to_message else user
+    target = update.message.reply_to_message.from_user if update.message.reply_to_message else user
+    jalali_date = jdatetime.datetime.now().strftime("%A %d %B %Y")
+    time_str = datetime.now().strftime("%H:%M:%S")
 
-        jalali_date = jdatetime.datetime.now().strftime("%A %d %B %Y")
-        time_str = datetime.now().strftime("%H:%M:%S")
+    # داده پیش‌فرض ویسکال
+    datacenter_code = "---"
+    role = "---"
+    voice_time = "00:00"
+    voice_percent = "0%"
+    voice_rank = "---"
 
-        voice_data = await get_voice_data(target.id)
+    user_link = f"<a href='tg://user?id={target.id}'>{target.first_name}</a>"
 
-        username = getattr(target, "username", "---")
-        datacenter_code = voice_data.get("datacenter_code", "---")
-        role = voice_data.get("role", "---")
-        voice_time = voice_data.get("time", "---")
-        voice_percent = voice_data.get("percent", "---")
-        voice_rank = voice_data.get("rank", "---")
+    text = (
+        f"🧿 <b>اطلاعات کاربر:</b>\n\n"
+        f"👤 نام: {user_link}\n"
+        f"💬 یوزرنیم: {getattr(target, 'username', '---')}\n"
+        f"🆔 آیدی عددی: <code>{target.id}</code>\n"
+        f"💻 کد دیتاسنتر: {datacenter_code}\n"
+        f"🎖 مقام کاربر: {role}\n"
+        f"─┅━✦━┅─\n"
+        f"◂ زمان حضور در ویسکال: {voice_time}\n"
+        f"◂ درصد حضور در ویسکال: {voice_percent}\n"
+        f"◂ رتبه حضور در ویسکال: {voice_rank}\n"
+        f"📆 تاریخ: {jalali_date}\n"
+        f"🕒 ساعت: {time_str}"
+    )
 
-        user_link = f"<a href='tg://user?id={target.id}'>{target.first_name}</a>"
-
-        text = (
-            f"🧿 <b>اطلاعات کاربر:</b>\n\n"
-            f"👤 نام: {user_link}\n"
-            f"💬 یوزرنیم: {username}\n"
-            f"🆔 آیدی عددی: <code>{target.id}</code>\n"
-            f"💻 کد دیتاسنتر: {datacenter_code}\n"
-            f"🎖 مقام کاربر: {role}\n"
-            f"─┅━✦━┅─\n"
-            f"◂ زمان حضور در ویسکال: {voice_time}\n"
-            f"◂ درصد حضور در ویسکال: {voice_percent}\n"
-            f"◂ رتبه حضور در ویسکال: {voice_rank}\n"
-            f"📆 تاریخ: {jalali_date}\n"
-            f"🕒 ساعت: {time_str}"
-        )
-
-        try:
-            photos = await context.bot.get_user_profile_photos(target.id, limit=1)
-            if photos.total_count > 0:
-                photo = photos.photos[0][-1].file_id
-                msg = await context.bot.send_photo(
-                    chat_id, photo=photo, caption=text, parse_mode="HTML"
-                )
-            else:
-                msg = await update.message.reply_text(text, parse_mode="HTML")
-        except Exception:
+    try:
+        photos = await context.bot.get_user_profile_photos(target.id, limit=1)
+        if photos.total_count > 0:
+            photo = photos.photos[0][-1].file_id
+            msg = await context.bot.send_photo(
+                chat_id, photo=photo, caption=text, parse_mode="HTML"
+            )
+        else:
             msg = await update.message.reply_text(text, parse_mode="HTML")
+    except Exception:
+        msg = await update.message.reply_text(text, parse_mode="HTML")
 
-        await asyncio.sleep(15)
-        await context.bot.delete_message(chat_id, msg.message_id)
+    await asyncio.sleep(15)
+    await context.bot.delete_message(chat_id, msg.message_id)
 
-# ==================== بخش جدا: نمایش آمار گروه ====================
+# ------------------- نمایش آمار گروه -------------------
 
 async def show_group_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    try:
-        chat_id = str(update.effective_chat.id)
-        today = datetime.now().strftime("%Y-%m-%d")
+    user = update.effective_user
+    chat_id = str(update.effective_chat.id)
+    today = datetime.now().strftime("%Y-%m-%d")
 
-        if chat_id not in stats or today not in stats[chat_id]:
-            msg = await update.message.reply_text("ℹ️ هنوز فعالیتی برای امروز ثبت نشده است.")
-            await asyncio.sleep(15)
-            await context.bot.delete_message(chat_id, msg.message_id)
+    # فقط مدیر یا سودو اجازه دارند
+    if user.id != SUDO_ID:
+        try:
+            member = await context.bot.get_chat_member(chat_id, user.id)
+            if member.status not in ["creator", "administrator"]:
+                return
+        except:
             return
 
-        data = stats[chat_id][today]
-        now = datetime.now()
-        time_str = now.strftime("%H:%M:%S")
-        jalali_date = jdatetime.datetime.now().strftime("%A %d %B %Y")
+    if chat_id not in stats or today not in stats[chat_id]:
+        msg = await update.message.reply_text("ℹ️ هنوز فعالیتی برای امروز ثبت نشده است.")
+        await asyncio.sleep(15)
+        await context.bot.delete_message(chat_id, msg.message_id)
+        return
 
-        # نفرات برتر امروز
-        top_today = sorted(data["messages"].items(), key=lambda x: x[1], reverse=True)[:3]
-        top_today_text = ""
-        medals = ["🥇", "🥈", "🥉"]
-        for i, (uid, count) in enumerate(top_today, 1):
-            try:
-                name = (await context.bot.get_chat_member(chat_id, uid)).user.first_name
-            except:
-                name = "کاربر ناشناس"
-            top_today_text += f"◂ نفر {i} {medals[i-1]} :( {count} پیام | {name} )\n"
-        if not top_today_text:
-            top_today_text = "◂ اطلاعاتی یافت نشد."
+    data = stats[chat_id][today]
+    now = datetime.now()
+    time_str = now.strftime("%H:%M:%S")
+    jalali_date = jdatetime.datetime.now().strftime("%A %d %B %Y")
 
-        # نفرات برتر کل
-        total_msgs_all = {}
-        for day_data in stats.get(chat_id, {}).values():
-            for uid, count in day_data["messages"].items():
-                total_msgs_all[uid] = total_msgs_all.get(uid, 0) + count
-        top_all = sorted(total_msgs_all.items(), key=lambda x: x[1], reverse=True)[:3]
-        top_all_text = ""
-        for i, (uid, count) in enumerate(top_all, 1):
-            try:
-                name = (await context.bot.get_chat_member(chat_id, uid)).user.first_name
-            except:
-                name = "کاربر ناشناس"
-            top_all_text += f"◂ نفر {i} {medals[i-1]} :( {count} پیام | {name} )\n"
-        if not top_all_text:
-            top_all_text = "◂ اطلاعاتی یافت نشد."
+    # نفرات برتر امروز
+    top_today = sorted(data["messages"].items(), key=lambda x: x[1], reverse=True)[:3]
+    medals = ["🥇", "🥈", "🥉"]
+    top_today_text = ""
+    for i, (uid, count) in enumerate(top_today, 1):
+        try:
+            name = (await context.bot.get_chat_member(chat_id, uid)).user.first_name
+        except:
+            name = "کاربر ناشناس"
+        top_today_text += f"◂ نفر {i} {medals[i-1]} :( {count} پیام | {name} )\n"
+    if not top_today_text:
+        top_today_text = "◂ اطلاعاتی یافت نشد."
 
-        # بهترین عضو کننده‌ها
-        top_adders = sorted(data["joins_added_per_user"].items(), key=lambda x: x[1], reverse=True)[:3]
-        top_adders_text = ""
-        for i, (uid, count) in enumerate(top_adders, 1):
-            try:
-                name = (await context.bot.get_chat_member(chat_id, uid)).user.first_name
-            except:
-                name = "کاربر ناشناس"
-            top_adders_text += f"◂ نفر {i} {medals[i-1]} :( {count} اد | {name} )\n"
-        if not top_adders_text:
-            top_adders_text = "◂ اطلاعاتی یافت نشد."
+    # بهترین عضو کننده‌ها
+    top_adders = sorted(data["joins_added_per_user"].items(), key=lambda x: x[1], reverse=True)[:3]
+    top_adders_text = ""
+    for i, (uid, count) in enumerate(top_adders, 1):
+        try:
+            name = (await context.bot.get_chat_member(chat_id, uid)).user.first_name
+        except:
+            name = "کاربر ناشناس"
+        top_adders_text += f"◂ نفر {i} {medals[i-1]} :( {count} اد | {name} )\n"
+    if not top_adders_text:
+        top_adders_text = "◂ اطلاعاتی یافت نشد."
 
-        text = f"""
+    # نفرات برتر کل
+    total_msgs_all = {}
+    for day_data in stats.get(chat_id, {}).values():
+        for uid, count in day_data["messages"].items():
+            total_msgs_all[uid] = total_msgs_all.get(uid, 0) + count
+    top_all = sorted(total_msgs_all.items(), key=lambda x: x[1], reverse=True)[:3]
+    top_all_text = ""
+    for i, (uid, count) in enumerate(top_all, 1):
+        try:
+            name = (await context.bot.get_chat_member(chat_id, uid)).user.first_name
+        except:
+            name = "کاربر ناشناس"
+        top_all_text += f"◂ نفر {i} {medals[i-1]} :( {count} پیام | {name} )\n"
+    if not top_all_text:
+        top_all_text = "◂ اطلاعاتی یافت نشد."
+
+    text = f"""
 ◄ آمار فعالیت گروه از 00:00 تا این لحظه : • تاریخ : {jalali_date} • ساعت : {time_str}
 
 ─┅━ پیام های امروز ━┅─ 
@@ -310,23 +314,12 @@ async def show_group_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
 ─━ بهترین عضو کننده های امروز ━─ 
 {top_adders_text}
 
-─┅━ ورودی و خروجی عضو ━┅─ 
-◂ اعضای وارد شده با لینک : {data['joins_link']} 
-◂ اعضای اد شده : {data['joins_added']} 
-◂ اعضای لفت داده : {data['lefts']} 
-◂ اعضای اخراج شده : {data['kicked']} 
-◂ کل اعضای وارد شده : {data['joins_link'] + data['joins_added']} 
-◂ کل اعضای خارج شده : {data['lefts'] + data['kicked']}
-
 ─┅━ فعال ترین های کل ━┅─ 
 {top_all_text}
 """
-        msg = await update.message.reply_text(text, parse_mode="HTML")
-        await asyncio.sleep(15)
-        await context.bot.delete_message(chat_id, msg.message_id)
-
-    except Exception as e:
-        print(f"⚠️ خطا در show_group_stats: {e}")
+    msg = await update.message.reply_text(text, parse_mode="HTML")
+    await asyncio.sleep(15)
+    await context.bot.delete_message(chat_id, msg.message_id)
 
 # ------------------- آمار شبانه و پاکسازی -------------------
 
