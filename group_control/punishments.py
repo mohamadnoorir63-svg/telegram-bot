@@ -124,13 +124,13 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
     text = (msg.text or "").strip()
 
     # دستورات برای نمایش لیست دقیق
-    if text.strip() == "لیست بن":
+    if text == "لیست بن":
         items = list_from_file(BAN_FILE, chat.id)
         reply = await msg.reply_text("🚫 لیست بن شده‌ها:\n" + ("\n".join(items) if items else "هیچ کس"))
         await asyncio.sleep(10)
         await reply.delete()
         return
-    if text.strip() == "لیست سکوت":
+    if text == "لیست سکوت":
         items = list_from_file(MUTE_FILE, chat.id)
         reply = await msg.reply_text("🤐 لیست سکوت شده‌ها:\n" + ("\n".join(items) if items else "هیچ کس"))
         await asyncio.sleep(10)
@@ -138,13 +138,14 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
         return
 
     # ================= دقیق سازی regex دستورات =================
+    # fullmatch باعث می‌شود فقط متن دقیق شناسایی شود
     PATTERNS = {
-        "ban": re.compile(r"^بن(?:\s+(\S+))?$", re.IGNORECASE),
-        "unban": re.compile(r"^حذف\s+بن(?:\s+(\S+))?$", re.IGNORECASE),
-        "mute": re.compile(r"^سکوت(?:\s+(\S+))?(?:\s+(\d+)\s*(ثانیه|دقیقه|ساعت))?$", re.IGNORECASE),
-        "unmute": re.compile(r"^حذف\s+سکوت(?:\s+(\S+))?$", re.IGNORECASE),
-        "warn": re.compile(r"^اخطار(?:\s+(\S+))?$", re.IGNORECASE),
-        "delwarn": re.compile(r"^حذف\s+اخطار(?:\s+(\S+))?$", re.IGNORECASE),
+        "ban": re.compile(r"^بن(?:\s+(\S+))?$"),
+        "unban": re.compile(r"^حذف\s+بن(?:\s+(\S+))?$"),
+        "mute": re.compile(r"^سکوت(?:\s+(\S+))?(?:\s+(\d+)\s*(ثانیه|دقیقه|ساعت))?$"),
+        "unmute": re.compile(r"^حذف\s+سکوت(?:\s+(\S+))?$"),
+        "warn": re.compile(r"^اخطار(?:\s+(\S+))?$"),
+        "delwarn": re.compile(r"^حذف\s+اخطار(?:\s+(\S+))?$"),
     }
 
     matched = None
@@ -156,7 +157,7 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
             matched = m
             break
     if not cmd_type:
-        return
+        return  # متن دقیق دستور نیست
 
     if not await _has_access(context, chat.id, user.id):
         reply = await msg.reply_text("🚫 فقط مدیران یا سودوها مجازند.")
