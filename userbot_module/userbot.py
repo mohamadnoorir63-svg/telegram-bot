@@ -17,7 +17,6 @@ BOT_USER_ID = int(os.environ.get("BOT_USER_ID"))
 client = TelegramClient(sessions.StringSession(SESSION_STRING), API_ID, API_HASH)
 
 # فایل هشدارها
-
 WARN_FILE = "warnings.json"
 SUDO_IDS = [8588347189]
 
@@ -52,7 +51,6 @@ async def tag_users(chat_id, user_ids=None, random_count=None):
         chunk_size = 20
 
         for i in range(0, len(mentions), chunk_size):
-            # ارسال بی‌صدا (silent) تا یوزربات مزاحم نشود
             await client.send_message(
                 chat_id,
                 "👥 " + " ".join(mentions[i:i + chunk_size]),
@@ -62,27 +60,43 @@ async def tag_users(chat_id, user_ids=None, random_count=None):
             await asyncio.sleep(1)
     except:
         pass
-# ================= پاکسازی از یوزربات =================
-async def cleanup_via_userbot(chat_id, count=None, last_msg_id=None):
+
+
+# ================= پاکسازی یوزربات =================
+async def cleanup_via_userbot(chat_id, count=None, last_msg_id=None, mids=None):
     try:
+        # حالت ۳: لیست message_id ها
+        if mids:
+            for mid in mids:
+                try:
+                    await client.delete_messages(chat_id, mid)
+                except:
+                    pass
+                await asyncio.sleep(0.08)
+            return
+
+        # حالت ۱: پاکسازی عددی
         if count:
-            # حذف تعداد مشخص
             for mid in range(last_msg_id, max(1, last_msg_id - count), -1):
                 try:
                     await client.delete_messages(chat_id, mid)
                 except:
                     pass
-                await asyncio.sleep(0.1)
-        else:
-            # پاکسازی کامل
-            for mid in range(last_msg_id, 1, -1):
-                try:
-                    await client.delete_messages(chat_id, mid)
-                except:
-                    pass
-                await asyncio.sleep(0.1)
+                await asyncio.sleep(0.08)
+            return
+
+        # حالت ۲: پاکسازی کامل
+        for mid in range(last_msg_id, 1, -1):
+            try:
+                await client.delete_messages(chat_id, mid)
+            except:
+                pass
+            await asyncio.sleep(0.08)
+
     except:
         pass
+
+
 # ================= ارسال دستورات تنبیهی روی یوزربات =================
 
 async def punish_via_userbot(chat_id, user_id, action="ban", seconds=None):
@@ -101,6 +115,7 @@ async def punish_via_userbot(chat_id, user_id, action="ban", seconds=None):
     except:
         pass
 
+
 # ================= دریافت فرمان از ربات اصلی =================
 
 @client.on(events.NewMessage)
@@ -117,22 +132,28 @@ async def handle_commands(event):
     action = parts[0].strip().lower()
     chat_id = int(parts[1])
 
-    # ---------- تگ همه ----------
+    # ---------- تگ ----------
     if action == "tagall":
         await tag_users(chat_id)
+
     elif action.startswith("tagrandom"):
         count = 5
-        if len(parts) == 3 and parts[2].isdigit():
+        if len(parts) >= 3 and parts[2].isdigit():
             count = int(parts[2])
         await tag_users(chat_id, random_count=count)
+
     elif action.startswith("taglist"):
-        ids = [int(x) for x in parts[2].split(",") if x.isdigit()] if len(parts) > 2 else None
+        if len(parts) >= 3:
+            ids = [int(x) for x in parts[2].split(",") if x.isdigit()]
+        else:
+            ids = None
         await tag_users(chat_id, user_ids=ids)
 
-    # ---------- هماهنگ سازی بن ----------
-    elif action.startswith("ban"):
+    # ---------- بن / آنبن ----------
+    elif action == "ban":
         target = parts[2].strip()
         user_id = None
+
         if target.isdigit():
             user_id = int(target)
         elif target.startswith("@"):
@@ -141,12 +162,14 @@ async def handle_commands(event):
                 user_id = user_obj.id
             except:
                 pass
+
         if user_id:
             await punish_via_userbot(chat_id, user_id, action="ban")
 
-    elif action.startswith("unban"):
+    elif action == "unban":
         target = parts[2].strip()
         user_id = None
+
         if target.isdigit():
             user_id = int(target)
         elif target.startswith("@"):
@@ -155,16 +178,30 @@ async def handle_commands(event):
                 user_id = user_obj.id
             except:
                 pass
+
         if user_id:
             await punish_via_userbot(chat_id, user_id, action="unban")
-            elif action.startswith("cleanup"):
-    # cleanup|chat_id|last_msg_id|count
-    last_msg_id = int(parts[2])
-    count = None
-    if len(parts) == 4 and parts[3].isdigit():
-        count = int(parts[3])
 
-    await cleanup_via_userbot(chat_id, count=count, last_msg_id=last_msg_id)
+    # ---------- پاکسازی ----------
+    elif action == "cleanup":
+        # cleanup|chat_id|last_msg_id|count  یا mids
+        last_msg_id = int(parts[2])
+
+        # اگر آرگومان چهارم عدد است → پاکسازی عددی
+        if len(parts) >= 4 and parts[3].isdigit():
+            count = int(parts[3])
+            await cleanup_via_userbot(chat_id, count=count, last_msg_id=last_msg_id)
+            return
+
+        # اگر لیست بود → پاکسازی انتخابی
+        if len(parts) >= 4 and "," in parts[3]:
+            mids = [int(x) for x in parts[3].split(",") if x.isdigit()]
+            await cleanup_via_userbot(chat_id, mids=mids)
+            return
+
+        # در غیر این صورت → پاکسازی کامل
+        await cleanup_via_userbot(chat_id, last_msg_id=last_msg_id)
+
 
 # ================= استارت یوزربات =================
 
