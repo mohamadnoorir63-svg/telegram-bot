@@ -1,4 +1,4 @@
-# ======================= 📊 سیستم آمار پیشرفته تلگرام =======================
+# ======================= 📊 سیستم آمار پیشرفته تلگرام – نسخه گرافیکی =======================
 
 import os
 import json
@@ -81,7 +81,6 @@ async def record_message_activity(update: Update, context: ContextTypes.DEFAULT_
     data = stats[chat_id][today]
     msg = update.message
 
-    # نوع پیام
     if msg.forward_from or msg.forward_from_chat:
         data["forwards"] += 1
     elif msg.video:
@@ -102,7 +101,6 @@ async def record_message_activity(update: Update, context: ContextTypes.DEFAULT_
         else:
             data["stickers"] += 1
 
-    # لینک، منشن، هشتگ
     if msg.entities:
         for entity in msg.entities:
             if entity.type == "url":
@@ -112,18 +110,15 @@ async def record_message_activity(update: Update, context: ContextTypes.DEFAULT_
             elif entity.type == "hashtag":
                 data["hashtags"] += 1
 
-    # ریپلای
     if msg.reply_to_message:
         data["replies"] += 1
 
-    # تعداد پیام‌ها و طول پیام
     uid = str(user.id)
     data["messages"][uid] = data["messages"].get(uid, 0) + 1
     data["message_length"][uid] = data["message_length"].get(uid, 0) + len(msg.text or "")
-
     save_queue.add(chat_id)
 
-# ------------------- ثبت ورود اعضا -------------------
+# ------------------- ثبت ورود و خروج اعضا -------------------
 async def record_new_members(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message or not update.message.new_chat_members:
         return
@@ -144,7 +139,6 @@ async def record_new_members(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
     save_queue.add(chat_id)
 
-# ------------------- ثبت خروج اعضا -------------------
 async def record_left_members(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message or not update.message.left_chat_member:
         return
@@ -211,8 +205,8 @@ async def show_user_info(update: Update, context: ContextTypes.DEFAULT_TYPE):
             user_joins = data["joins_added_per_user"].get(uid, 0)
             text += (
                 f"─┅━ آمار امروز ━┅─\n"
-                f"◂ پیام‌های امروز: {user_msgs}\n"
-                f"◂ ادهای امروز: {user_joins}"
+                f"📩 پیام‌های امروز: {user_msgs}\n"
+                f"➕ ادهای امروز: {user_joins}"
             )
 
         try:
@@ -242,17 +236,11 @@ async def show_daily_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
             try:
                 member = await context.bot.get_chat_member(chat_id, user.id)
                 if member.status not in ["creator", "administrator"]:
-                    msg = await update.message.reply_text("🚫 فقط مدیران یا سودو مجاز هستند.")
-                    await asyncio.sleep(10)
-                    await context.bot.delete_message(chat_id, msg.message_id)
                     return
             except:
                 return
 
         if chat_id not in stats or today not in stats[chat_id]:
-            msg = await update.message.reply_text("ℹ️ هنوز فعالیتی برای امروز ثبت نشده است.")
-            await asyncio.sleep(15)
-            await context.bot.delete_message(chat_id, msg.message_id)
             return
 
         data = stats[chat_id][today]
@@ -260,10 +248,9 @@ async def show_daily_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
         time_str = now.strftime("%H:%M:%S")
         jalali_date = jdatetime.datetime.now().strftime("%A %d %B %Y")
 
-        # نفرات برتر امروز
         top_today = sorted(data["messages"].items(), key=lambda x: x[1], reverse=True)[:3]
-        top_today_text = ""
         medals = ["🥇", "🥈", "🥉"]
+        top_today_text = ""
         for i, (uid, count) in enumerate(top_today, 1):
             try:
                 name = (await context.bot.get_chat_member(chat_id, uid)).user.first_name
@@ -289,7 +276,6 @@ async def show_daily_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not top_all_text:
             top_all_text = "◂ اطلاعاتی یافت نشد."
 
-        # بهترین عضو کننده‌ها
         top_adders = sorted(data["joins_added_per_user"].items(), key=lambda x: x[1], reverse=True)[:3]
         top_adders_text = ""
         for i, (uid, count) in enumerate(top_adders, 1):
@@ -302,37 +288,38 @@ async def show_daily_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
             top_adders_text = "◂ اطلاعاتی یافت نشد."
 
         text = f"""
-◄ آمار فعالیت گروه از 00:00 تا این لحظه : • تاریخ : {jalali_date} • ساعت : {time_str}
+🌟 <b>آمار گروه</b> 🌟
+📆 تاریخ: {jalali_date} | 🕒 ساعت: {time_str}
 
-─┅━ پیام های امروز ━┅─
-◂ کل پیام ها : {sum(data['messages'].values())}
-◂ پیام فرواردی : {data['forwards']}
-◂ متن : {sum([v for k,v in data['messages'].items()]) - data['forwards']}
-◂ استیکر : {data['stickers']}
-◂ استیکر متحرک : {data['animated_stickers']}
-◂ گیف : {data['animations']}
-◂ عکس : {data['photos']}
-◂ ویس : {data['voices']}
-◂ موزیک : {data['audios']}
-◂ فیلم : {data['videos']}
-◂ فیلم سلفی : {data['video_notes']}
-◂ فایل : {data.get('files',0)}
+─┅━ پیام‌های امروز ━┅─
+◂ کل پیام‌ها: {sum(data['messages'].values())}
+◂ پیام فرواردی: {data['forwards']}
+◂ متن: {sum([v for k,v in data['messages'].items()]) - data['forwards']}
+◂ استیکر: {data['stickers']}
+◂ استیکر متحرک: {data['animated_stickers']}
+◂ گیف: {data['animations']}
+◂ عکس: {data['photos']}
+◂ ویس: {data['voices']}
+◂ موزیک: {data['audios']}
+◂ فیلم: {data['videos']}
+◂ فیلم سلفی: {data['video_notes']}
+◂ فایل: {data.get('files',0)}
 
-─┅━ فعال ترین های امروز ━┅─
+─┅━ فعال‌ترین‌های امروز ━┅─
 {top_today_text}
 
-─━ بهترین عضو کننده های امروز ━─
+─━ بهترین عضوکننده‌های امروز ━─
 {top_adders_text}
 
-─┅━ ورودی و خروجی عضو ━┅─
-◂ اعضای وارد شده با لینک : {data['joins_link']}
-◂ اعضای اد شده : {data['joins_added']}
-◂ اعضای لفت داده : {data['lefts']}
-◂ اعضای اخراج شده : {data['kicked']}
-◂ کل اعضای وارد شده : {data['joins_link'] + data['joins_added']}
-◂ کل اعضای خارج شده : {data['lefts'] + data['kicked']}
+─┅━ ورودی و خروجی ━┅─
+◂ اعضای وارد شده با لینک: {data['joins_link']}
+◂ اعضای اد شده: {data['joins_added']}
+◂ اعضای لفت داده: {data['lefts']}
+◂ اعضای اخراج شده: {data['kicked']}
+◂ کل وارد شده: {data['joins_link'] + data['joins_added']}
+◂ کل خارج شده: {data['lefts'] + data['kicked']}
 
-─┅━ فعال ترین های کل ━┅─
+─┅━ فعال‌ترین‌های کل ━┅─
 {top_all_text}
 """
         msg = await update.message.reply_text(text, parse_mode="HTML")
@@ -342,7 +329,7 @@ async def show_daily_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         print(f"⚠️ خطا در show_daily_stats: {e}")
 
-# ------------------- آمار شبانه و پاکسازی -------------------
+# ------------------- آمار شبانه -------------------
 async def send_nightly_stats(context: ContextTypes.DEFAULT_TYPE):
     now = datetime.now()
     yesterday = (now - timedelta(days=1)).strftime("%Y-%m-%d")
@@ -351,10 +338,10 @@ async def send_nightly_stats(context: ContextTypes.DEFAULT_TYPE):
             data = days[yesterday]
             total_msgs = sum(data["messages"].values())
             report = (
-                f"🌙 **آمار شب گذشته ({yesterday})**\n"
-                f"📩 **کل پیام‌ها:** {total_msgs}\n"
-                f"👥 **اعضا اضافه‌شده:** {data['joins_added']}\n"
-                f"🚪 **اعضا خارج‌شده:** {data['lefts']}"
+                f"🌙 <b>آمار شب گذشته ({yesterday})</b>\n"
+                f"📩 کل پیام‌ها: {total_msgs}\n"
+                f"👥 اعضا اضافه‌شده: {data['joins_added']}\n"
+                f"🚪 اعضا خارج‌شده: {data['lefts']}"
             )
             try:
                 await context.bot.send_message(chat_id, report, parse_mode="HTML")
