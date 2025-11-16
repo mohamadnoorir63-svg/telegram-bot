@@ -1753,127 +1753,7 @@ async def handle_azan_city(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("⚠️ متأسفم، نتوانستم اطلاعات شهر را پیدا کنم!", parse_mode="HTML")
 
         context.user_data["awaiting_azan_city"] = False
-# ======================= 🔐 ثبت فایل‌ها فقط توسط مدیر اصلی =======================
-async def save_panel_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id != ADMIN_ID:
-        return await update.message.reply_text("⛔ فقط مدیر اصلی می‌تونه متن‌ها رو تغییر بده!")
 
-    if not update.message.reply_to_message or not update.message.reply_to_message.text:
-        return await update.message.reply_text("❗ باید روی یک پیام متنی ریپلای بزنی!")
-
-    parts = update.message.text.strip().split(maxsplit=1)
-    if len(parts) < 2:
-        return await update.message.reply_text("❗ بنویس: ثبت درباره یا ثبت تیم")
-
-    cmd = parts[1]
-    filename = None
-    if cmd == "درباره":
-        filename = "about_khengol.txt"
-    elif cmd == "تیم":
-        filename = "team_noori.txt"
-    elif cmd == "قابلیت":
-        filename = "features.txt"
-
-    if filename:
-        os.makedirs(TEXTS_PATH, exist_ok=True)
-        async with aiofiles.open(os.path.join(TEXTS_PATH, filename), "w", encoding="utf-8") as f:
-            await f.write(update.message.reply_to_message.text)
-        await update.message.reply_text(f"✅ متن «{cmd}» ذخیره شد!")
-    else:
-        await update.message.reply_text("❗ دستور اشتباه است — باید یکی از این‌ها باشد:\nثبت درباره / ثبت تیم / ثبت قابلیت")
-# ======================= 🧾 سیستم ثبت دستی راهنما و help =======================
-# بدون نیاز به ویرایش فایل‌ها یا پوشه‌ها
-# ==============================================================
-import os, json
-from telegram import Update
-from telegram.ext import ContextTypes
-
-# 📦 مسیر ذخیره داده‌ها
-DATA_FILE = "help_data.json"
-
-# 🔐 مدیر اصلی
-ADMIN_ID = int(os.getenv("ADMIN_ID", "8588347189"))
-
-# ======================= 📦 توابع کمکی =======================
-def load_help_data():
-    """خواندن فایل help_data.json"""
-    if not os.path.exists(DATA_FILE):
-        return {"help": "", "guide": ""}
-    try:
-        with open(DATA_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except:
-        return {"help": "", "guide": ""}
-
-
-def save_help_data(data):
-    """ذخیره‌سازی help_data.json"""
-    with open(DATA_FILE, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
-
-# ======================= 💾 ثبت help =======================
-async def save_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """ثبت یا تغییر متن /help فقط برای مدیر اصلی"""
-    user_id = update.effective_user.id
-    if user_id != ADMIN_ID:
-        return await update.message.reply_text("😜 فقط مغز اصلی (سودو) می‌تونه help رو تغییر بده!")
-
-    if not update.message.reply_to_message or not update.message.reply_to_message.text:
-        return await update.message.reply_text("ℹ️ لطفاً روی متن جدید help ریپلای کن و بنویس: ثبت help")
-
-    text = update.message.reply_to_message.text
-    data = load_help_data()
-    data["help"] = text
-    save_help_data(data)
-
-    await update.message.reply_text("✅ متن help با موفقیت ذخیره شد، رئیس!")
-
-# ======================= 💾 ثبت راهنما =======================
-async def save_custom_guide(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """ثبت یا تغییر متن 'راهنما' فقط برای مدیر اصلی"""
-    user_id = update.effective_user.id
-    if user_id != ADMIN_ID:
-        return await update.message.reply_text("😎 فقط رئیس خنگول اجازه ویرایش راهنما رو داره!")
-
-    if not update.message.reply_to_message or not update.message.reply_to_message.text:
-        return await update.message.reply_text("ℹ️ لطفاً روی متن جدید راهنما ریپلای کن و بنویس: ثبت راهنما")
-
-    text = update.message.reply_to_message.text
-    data = load_help_data()
-    data["guide"] = text
-    save_help_data(data)
-
-    await update.message.reply_text("✅ متن راهنمای عمومی با موفقیت ذخیره شد 😄")
-
-# ======================= 📖 نمایش help (فقط برای مدیر اصلی) =======================
-async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """نمایش متن /help — فقط برای مدیر اصلی"""
-    user_id = update.effective_user.id
-    if user_id != ADMIN_ID:
-        funny_replies = [
-            "🤖 اوووه نه نه نه! این بخش مخصوص مغز خنگوله 😜",
-            "😎 تو مجاز به دیدن منوی سودو نیستی!",
-            "🧠 فقط رئیس می‌تونه به /help اصلی دسترسی داشته باشه!",
-            "🚫 ورود ممنوع! فقط خنگول اعظم اجازه داره!",
-            "😂 فکر کردی می‌تونی کدهای مخفی منو ببینی؟"
-        ]
-        import random
-        return await update.message.reply_text(random.choice(funny_replies))
-
-    data = load_help_data()
-    text = data.get("help", "")
-    if not text:
-        return await update.message.reply_text("ℹ️ هنوز متنی برای help ثبت نشده.")
-    await update.message.reply_text(text)
-
-# ======================= 📖 نمایش راهنما (برای همه کاربران) =======================
-async def show_custom_guide(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """نمایش متن 'راهنما' برای همه کاربران"""
-    data = load_help_data()
-    text = data.get("guide", "")
-    if not text:
-        return await update.message.reply_text("ℹ️ هنوز متنی برای راهنما ثبت نشده.")
-    await update.message.reply_text(text)
 # ======================= 🚀 اجرای نهایی =======================
 if __name__ == "__main__":
     print("🤖 خنگول فارسی 8.7 Cloud+ Supreme Pro Stable+ آماده به خدمت است ...")
@@ -1982,14 +1862,7 @@ application.add_handler(CommandHandler("del", delete_command))
 application.add_handler(CommandHandler("listcmds", list_commands))
 
 # ==========================================================
-# 🧾 راهنمای قابل ویرایش (بازگردانده‌شده)
-# ==========================================================
-application.add_handler(CommandHandler("help", help_command), group=-6)
-application.add_handler(MessageHandler(filters.Regex("^ثبت help$"), save_help), group=-6)
-application.add_handler(MessageHandler(filters.Regex("^راهنما$"), show_custom_guide), group=-6)
-application.add_handler(MessageHandler(filters.Regex("^ثبت راهنما$"), save_custom_guide), group=-6)
-
-# ✉️ پیام‌های متنی غیر از کامند → هندلر دستورات ذخیره‌شده
+پیام‌های متنی غیر از کامند → هندلر دستورات ذخیره‌شده
 application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_custom_command), group=-4)
 
 # ==========================================================
@@ -2016,7 +1889,7 @@ application.add_handler(CommandHandler("mode", mode_change))
 
 # 🎮 پنل اصلی و دکمه‌ها
 application.add_handler(
-    MessageHandler(filters.TEXT & filters.Regex(r"^پنل$"), Tastatur_menu),
+    MessageHandler(filters.TEXT & filters.Regex(r"^راهنما$"), Tastatur_menu),
     group=-3
 )
 application.add_handler(
