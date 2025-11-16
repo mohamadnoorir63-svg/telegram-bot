@@ -54,25 +54,26 @@ async def _has_access(context, chat_id: int, user_id: int) -> bool:
 
 # ================= 🎯 استخراج هدف =================
 async def _resolve_target(msg, context, chat_id, explicit_arg: str = None):
-    text = (msg.text or "").strip()
+    # اول بررسی ریپلای
     if msg.reply_to_message and getattr(msg.reply_to_message, "from_user", None):
         return msg.reply_to_message.from_user
 
-    # آیدی عددی
-    m_id = None
-    if explicit_arg and explicit_arg.isdigit():
-        m_id = explicit_arg
-    else:
+    text = (msg.text or "").strip()
+
+    # بررسی آیدی عددی
+    user_id = explicit_arg if explicit_arg and explicit_arg.isdigit() else None
+    if not user_id:
         m_id = re.search(r"\b(\d{6,15})\b", text)
-        m_id = m_id.group(1) if m_id else None
-    if m_id:
+        if m_id:
+            user_id = m_id.group(1)
+    if user_id:
         try:
-            cm = await context.bot.get_chat_member(chat_id, int(m_id))
+            cm = await context.bot.get_chat_member(chat_id, int(user_id))
             return cm.user
         except Exception as e:
             print(f"⚠️ خطا در گرفتن آیدی عددی: {e}")
 
-    # یوزرنیم
+    # بررسی یوزرنیم
     m_username = re.search(r"@([A-Za-z0-9_]{3,32})", text)
     if m_username:
         username = m_username.group(1)
@@ -118,7 +119,7 @@ def list_from_file(file, chat_id):
         return [f"{uid} ({uname})" if uname else str(uid) for uid, uname in data[chat_key].items()]
     return []
 
-# ================= ⚙️ هندلر دستورات تنبیهی =================
+# ================= ⚙️ هندلر دقیق دستورات تنبیهی =================
 async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = update.effective_message
     user = update.effective_user
@@ -127,7 +128,7 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
         return
     text = (msg.text or "").strip()
 
-    # نمایش لیست
+    # نمایش لیست بن و سکوت
     if text == "لیست بن":
         items = list_from_file(BAN_FILE, chat.id)
         reply = await msg.reply_text("🚫 لیست بن شده‌ها:\n" + ("\n".join(items) if items else "هیچ کس"))
@@ -156,7 +157,7 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
     matched = None
     cmd_type = None
     for k, pat in PATTERNS.items():
-        m = pat.fullmatch(text)  # فقط متن دقیقاً مطابق دستور
+        m = pat.fullmatch(text)
         if m:
             cmd_type = k
             matched = m
