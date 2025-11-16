@@ -55,11 +55,7 @@ async def set_vip(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
 
     if not await _has_full_access(context, chat.id, user.id):
-        warn = await update.message.reply_text("🚫 فقط مدیران یا سودوها مجازند.", quote=True)
-        await asyncio.sleep(5)
-        await update.message.delete()
-        await warn.delete()
-        return
+    return
 
     if update.message.reply_to_message:
         target_id = update.message.reply_to_message.from_user.id
@@ -105,11 +101,7 @@ async def remove_vip(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
 
     if not await _has_full_access(context, chat.id, user.id):
-        warn = await update.message.reply_text("🚫 فقط مدیران یا سودوها مجازند.", quote=True)
-        await asyncio.sleep(5)
-        await update.message.delete()
-        await warn.delete()
-        return
+    return
 
     if update.message.reply_to_message:
         target_id = update.message.reply_to_message.from_user.id
@@ -401,8 +393,7 @@ async def handle_unlock(update: Update, context: ContextTypes.DEFAULT_TYPE, key:
     user = update.effective_user
 
     if not await _has_full_access(context, chat.id, user.id):
-        return await update.message.reply_text("🚫 فقط مدیران یا سودوها مجازند.")
-
+    return
     if key not in LOCK_TYPES:
         return
 
