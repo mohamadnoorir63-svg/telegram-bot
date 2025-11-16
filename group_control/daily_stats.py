@@ -167,34 +167,60 @@ async def show_daily_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
             except:
                 return
 
-        # حالت آیدی
-        if text_input in ["آیدی", "id"]:
-            target = update.message.reply_to_message.from_user if update.message.reply_to_message else user
-            jalali_date = jdatetime.datetime.now().strftime("%A %d %B %Y")
-            time_str = datetime.now().strftime("%H:%M:%S")
-            user_link = f"<a href='tg://user?id={target.id}'>{target.first_name}</a>"
-            text = (
-                f"🧿 <b>اطلاعات کاربر:</b>\n\n"
-                f"👤 {user_link}\n"
-                f"🆔 <b>ID:</b> <code>{target.id}</code>\n"
-                f"💬 <b>گروه:</b> {update.effective_chat.title}\n"
-                f"📆 <b>تاریخ:</b> {jalali_date}\n"
-                f"🕒 <b>ساعت:</b> {time_str}"
+        # حالت آیدی پیشرفته با اطلاعات ویسکال و عکس
+if text_input in ["آیدی", "id"]:
+    target = update.message.reply_to_message.from_user if update.message.reply_to_message else user
+
+    # تاریخ و زمان
+    jalali_date = jdatetime.datetime.now().strftime("%A %d %B %Y")
+    time_str = datetime.now().strftime("%H:%M:%S")
+
+    # گرفتن اطلاعات ویسکال از API یا دیتابیس
+    voice_data = await get_voice_data(target.id)
+
+    # اطلاعات کاربر
+    username = getattr(target, "username", "---")
+    datacenter_code = voice_data.get("datacenter_code", "---")
+    role = voice_data.get("role", "---")
+    voice_time = voice_data.get("time", "---")
+    voice_percent = voice_data.get("percent", "---")
+    voice_rank = voice_data.get("rank", "---")
+
+    # لینک کاربر
+    user_link = f"<a href='tg://user?id={target.id}'>{target.first_name}</a>"
+
+    # متن پیام
+    text = (
+        f"🧿 <b>اطلاعات کاربر:</b>\n\n"
+        f"👤 نام: {user_link}\n"
+        f"💬 یوزرنیم: {username}\n"
+        f"🆔 آیدی عددی: <code>{target.id}</code>\n"
+        f"💻 کد دیتاسنتر: {datacenter_code}\n"
+        f"🎖 مقام کاربر: {role}\n"
+        f"─┅━✦━┅─\n"
+        f"◂ زمان حضور در ویسکال: {voice_time}\n"
+        f"◂ درصد حضور در ویسکال: {voice_percent}\n"
+        f"◂ رتبه حضور در ویسکال: {voice_rank}\n"
+        f"📆 تاریخ: {jalali_date}\n"
+        f"🕒 ساعت: {time_str}"
+    )
+
+    try:
+        # گرفتن عکس پروفایل
+        photos = await context.bot.get_user_profile_photos(target.id, limit=1)
+        if photos.total_count > 0:
+            photo = photos.photos[0][-1].file_id
+            msg = await context.bot.send_photo(
+                update.effective_chat.id, photo=photo, caption=text, parse_mode="HTML"
             )
-            try:
-                photos = await context.bot.get_user_profile_photos(target.id, limit=1)
-                if photos.total_count > 0:
-                    photo = photos.photos[0][-1].file_id
-                    msg = await context.bot.send_photo(chat_id, photo=photo, caption=text, parse_mode="HTML")
-                else:
-                    msg = await update.message.reply_text(text, parse_mode="HTML")
-                await asyncio.sleep(15)
-                await context.bot.delete_message(chat_id, msg.message_id)
-            except:
-                msg = await update.message.reply_text(text, parse_mode="HTML")
-                await asyncio.sleep(15)
-                await context.bot.delete_message(chat_id, msg.message_id)
-            return
+        else:
+            msg = await update.message.reply_text(text, parse_mode="HTML")
+    except Exception:
+        msg = await update.message.reply_text(text, parse_mode="HTML")
+
+    # حذف پیام بعد از ۱۵ ثانیه
+    await asyncio.sleep(15)
+    await context.bot.delete_message(update.effective_chat.id, msg.message_id)
 
         # نمایش آمار روزانه
         if chat_id not in stats or today not in stats[chat_id]:
