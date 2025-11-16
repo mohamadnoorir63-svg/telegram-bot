@@ -257,21 +257,62 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
         elif cmd_type == "mute":
             seconds = extra_time or 3600
             until = datetime.utcnow() + timedelta(seconds=seconds)
+
+            # محدود کردن همه امکانات پیام‌رسانی
+            permissions = ChatPermissions(
+                can_send_messages=False,
+                can_send_media_messages=False,
+                can_send_polls=False,
+                can_send_other_messages=False,
+                can_add_web_page_previews=False,
+                can_invite_users=True
+            )
+
             await context.bot.restrict_chat_member(
                 chat.id,
                 target_user.id,
-                permissions=ChatPermissions(can_send_messages=False),
+                permissions=permissions,
                 until_date=until
             )
+
             add_to_list(MUTE_FILE, chat.id, target_user)
             await punish_via_userbot(chat.id, target_ref, action="mute", seconds=seconds)
             reply = await msg.reply_text(f"🤐 {target_user.first_name} برای {seconds} ثانیه سکوت شد.")
+
+            # تسک برای آزادسازی بعد از پایان زمان
+            async def unmute_after_delay():
+                await asyncio.sleep(seconds)
+                try:
+                    await context.bot.restrict_chat_member(
+                        chat.id,
+                        target_user.id,
+                        permissions=ChatPermissions(
+                            can_send_messages=True,
+                            can_send_media_messages=True,
+                            can_send_polls=True,
+                            can_send_other_messages=True,
+                            can_add_web_page_previews=True,
+                            can_invite_users=True
+                        )
+                    )
+                    remove_from_list(MUTE_FILE, chat.id, target_user)
+                except Exception as e:
+                    print(f"⚠️ خطا در آزادسازی سکوت {target_user.id}: {e}")
+
+            asyncio.create_task(unmute_after_delay())
 
         elif cmd_type == "unmute":
             await context.bot.restrict_chat_member(
                 chat.id,
                 target_user.id,
-                permissions=ChatPermissions(can_send_messages=True)
+                permissions=ChatPermissions(
+                    can_send_messages=True,
+                    can_send_media_messages=True,
+                    can_send_polls=True,
+                    can_send_other_messages=True,
+                    can_add_web_page_previews=True,
+                    can_invite_users=True
+                )
             )
             remove_from_list(MUTE_FILE, chat.id, target_user)
             await punish_via_userbot(chat.id, target_ref, action="unmute")
