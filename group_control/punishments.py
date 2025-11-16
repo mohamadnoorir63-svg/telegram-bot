@@ -149,17 +149,14 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
         await reply.delete()
         return
 
-    # ---------- لیست‌ها ----------
-    if text == "لیست بن":
-        items = list_from_file(BAN_FILE, chat.id)
-        reply = await msg.reply_text("🚫 لیست بن شده‌ها:\n" + ("\n".join(items) if items else "هیچ کس"))
-        await asyncio.sleep(10)
-        await reply.delete()
-        return
-
-    if text == "لیست سکوت":
-        items = list_from_file(MUTE_FILE, chat.id)
-        reply = await msg.reply_text("🤐 لیست سکوت شده‌ها:\n" + ("\n".join(items) if items else "هیچ کس"))
+    # ---------- لیست‌ها فقط برای مدیران و سودوها ----------
+    if text in ["لیست بن", "لیست سکوت"]:
+        if not await _has_access(context, chat.id, user.id):
+            return  # هیچ پاسخی برای کاربران عادی نده
+        file = BAN_FILE if text == "لیست بن" else MUTE_FILE
+        items = list_from_file(file, chat.id)
+        title = "لیست بن شده‌ها" if file == BAN_FILE else "لیست سکوت شده‌ها"
+        reply = await msg.reply_text(f"{'🚫' if file==BAN_FILE else '🤐'} {title}:\n" + ("\n".join(items) if items else "هیچ کس"))
         await asyncio.sleep(10)
         await reply.delete()
         return
@@ -258,14 +255,11 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
             seconds = extra_time or 3600
             until = datetime.utcnow() + timedelta(seconds=seconds)
 
-            # محدود کردن همه امکانات پیام‌رسانی
+            # محدود کردن ارسال پیام‌ها (سکوت واقعی)
             permissions = ChatPermissions(
                 can_send_messages=False,
-                can_send_media_messages=False,
                 can_send_polls=False,
-                can_send_other_messages=False,
-                can_add_web_page_previews=False,
-                can_invite_users=True
+                can_add_web_page_previews=False
             )
 
             await context.bot.restrict_chat_member(
@@ -288,11 +282,8 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
                         target_user.id,
                         permissions=ChatPermissions(
                             can_send_messages=True,
-                            can_send_media_messages=True,
                             can_send_polls=True,
-                            can_send_other_messages=True,
-                            can_add_web_page_previews=True,
-                            can_invite_users=True
+                            can_add_web_page_previews=True
                         )
                     )
                     remove_from_list(MUTE_FILE, chat.id, target_user)
@@ -307,11 +298,8 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
                 target_user.id,
                 permissions=ChatPermissions(
                     can_send_messages=True,
-                    can_send_media_messages=True,
                     can_send_polls=True,
-                    can_send_other_messages=True,
-                    can_add_web_page_previews=True,
-                    can_invite_users=True
+                    can_add_web_page_previews=True
                 )
             )
             remove_from_list(MUTE_FILE, chat.id, target_user)
