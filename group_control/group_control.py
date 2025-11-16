@@ -373,8 +373,7 @@ async def handle_lock(update: Update, context: ContextTypes.DEFAULT_TYPE, key: s
     user = update.effective_user
 
     if not await _has_full_access(context, chat.id, user.id):
-        return await update.message.reply_text("🚫 فقط مدیران یا سودوها مجازند.")
-
+        return
     if key not in LOCK_TYPES:
         return
 
