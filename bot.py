@@ -1862,7 +1862,7 @@ application.add_handler(CommandHandler("del", delete_command))
 application.add_handler(CommandHandler("listcmds", list_commands))
 
 # ==========================================================
-پیام‌های متنی غیر از کامند → هندلر دستورات ذخیره‌شده
+#پیام‌های متنی غیر از کامند → هندلر دستورات ذخیره‌شده
 application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_custom_command), group=-4)
 
 # ==========================================================
