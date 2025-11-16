@@ -174,14 +174,14 @@ async def show_daily_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
         today = datetime.now().strftime("%Y-%m-%d")
         text_input = update.message.text.strip().lower()
 
-        # 🔒 بررسی دسترسی (اگر کاربر عادی باشد سکوت کنیم)
-        if user.id != SUDO_ID:
-            try:
-                member = await context.bot.get_chat_member(chat_id, user.id)
-                if member.status not in ["creator", "administrator"]:
-                    return  # سکوت کامل
-            except:
-                return
+        # 🔒 بررسی دسترسی
+    if user.id != SUDO_ID:  # اگر سودو نیست
+        try:
+            member = await context.bot.get_chat_member(chat_id, user.id)
+            if member.status not in ["creator", "administrator"]:  # اگر مدیر هم نیست
+                return  # سکوت کامل برای کاربران عادی
+        except:
+            return
 
         # ادامه کد اصلی بدون تغییر
         # حالت آیدی پیشرفته با اطلاعات ویسکال و عکس
