@@ -41,7 +41,7 @@ async def receive_font_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def send_fonts(update: Update, context: ContextTypes.DEFAULT_TYPE, name: str):
     fonts = generate_fonts(name)
     context.user_data["all_fonts"] = fonts
-    context.user_data["font_pages"] = make_pages(name, fonts, 10, 5)
+    context.user_data["font_pages"] = make_pages(name, fonts, page_size=5, max_pages=10)
 
     pages = context.user_data["font_pages"]
     await update.message.reply_text(
@@ -72,12 +72,13 @@ def generate_fonts(name: str):
         "𝔸𝔹ℂ𝔻𝔼𝔽𝔾ℍ𝕀𝕁𝕂𝕃𝕄ℕ𝕆ℙℚℝ𝕊𝕋𝕌𝕍𝕎𝕏𝕐ℤ",
         "𝗔𝗕𝗖𝗗𝗘𝗙𝗚𝗛𝗜𝗝𝗞𝗟𝗠𝗡𝗢𝗣𝗤𝗥𝗦𝗧𝗨𝗩𝗪𝗫𝗬𝗭"
     ]
+
     fixed_patterns = [
         "۝ؔؑ❁➹‌❬⃟꯭({})꯭꯭‌⃟❭➹❁۝ؔؑ",
         "𓄂{}𓆃",
         "♥️⃝⃭𝄞❉্͜͡▪️𒌍꯭🦋⃝⃡.𝅯.𝅰.꯭𝅱.𝅲.꯭𝅱.𝅰.𝅯.𝅮.꯭.{} 𝄞͡،⚛️",
         "𓄂ꪰ𓁪❥𝄞{}𝄞❥𓀛꯭𓆃ᵐᶠᶰ↬𓃬",
-        "➹‌❬⃟꯭💕꯭‌⃟❭꯭ ꯭꯭‌꯭꯭‌{} ꯭ ❬⃟‌꯭꯭🪽꯭꯭‌⃟❭➹", 
+        "➹‌❬⃟꯭💕꯭‌⃟❭꯭ ꯭꯭‌꯭꯭‌{} ꯭ ❬⃟‌꯭꯭🪽꯭꯭‌⃟❭➹",
         "𓄂ꪴꪰ❨💎{}❩↬𓃬",
         "𓄂ꪴꪰ❨𝄠⃘۪۪۪۪۪۪ٜ♕{}♕𝄠⃘۪۪۪۪۪۪❩",
         "𓄂ꪴꪰ ♕{}♕𓆃",
@@ -85,9 +86,11 @@ def generate_fonts(name: str):
     ]
 
     fonts = []
-    # ایجاد ترکیب‌های کامل: همه fixed_patterns × unicode_styles × نام
-    for pattern in fixed_patterns:
-        for style in unicode_styles:
+
+    while len(fonts) < 50:
+        if random.random() < 0.3:
+            pattern = random.choice(fixed_patterns)
+            style = random.choice(unicode_styles)
             uname = ""
             for ch in name:
                 if ch.lower() in "abcdefghijklmnopqrstuvwxyz":
@@ -96,65 +99,48 @@ def generate_fonts(name: str):
                 else:
                     uname += ch
             fonts.append(pattern.format(uname))
+            continue
 
-    # ترکیب پیش و پس‌وندها با استایل‌ها
-    for pre in pre_groups:
-        for post in post_groups:
-            for style in unicode_styles:
-                uname = ""
-                for ch in name:
-                    if ch.lower() in "abcdefghijklmnopqrstuvwxyz":
-                        idx = "abcdefghijklmnopqrstuvwxyz".index(ch.lower())
-                        uname += style[idx]
-                    else:
-                        uname += ch
-                fonts.append("".join(random.choice(pre) for _ in pre) + uname + "".join(random.choice(post) for _ in post))
+        pre = "".join(random.choice(group) for group in pre_groups)
+        post = "".join(random.choice(group) for group in post_groups)
+        style = random.choice(unicode_styles)
+        uname = ""
+        for ch in name:
+            if ch.lower() in "abcdefghijklmnopqrstuvwxyz":
+                idx = "abcdefghijklmnopqrstuvwxyz".index(ch.lower())
+                uname += style[idx]
+            else:
+                uname += ch
+        fonts.append(f"{pre}{uname}{post}")
 
-    # حذف تکراری‌ها و محدود کردن به 1000 فونت برای عملکرد بهتر
-    fonts = list(dict.fromkeys(fonts))
-    return fonts[:1000]
-
-def make_pages(name: str, fonts: list, page_size=10):
-    pages = []
-    chunks = [fonts[i:i+page_size] for i in range(0, len(fonts), page_size)]
-    for idx, chunk in enumerate(chunks):
-        text = f"<b>↻ {name} ⇦</b>\n:• لیست فونت های پیشنهادی :\n"
-        keyboard = []
-        for i, style in enumerate(chunk, start=1):
-            global_index = idx*page_size + (i-1)
-            text += f"{i}- {style}\n"
-            keyboard.append([InlineKeyboardButton(f"{i}- {style}", callback_data=f"send_font_{global_index}")])
-        text += f"\n📄 صفحه {idx+1} از {len(chunks)}"
-
-        nav = []
-        if idx > 0: nav.append(InlineKeyboardButton("⬅️ قبلی", callback_data=f"prev_font_{idx-1}"))
-        if idx < len(chunks)-1: nav.append(InlineKeyboardButton("➡️ بعدی", callback_data=f"next_font_{idx+1}"))
-        if nav: keyboard.append(nav)
-        keyboard.append([InlineKeyboardButton("🔙 بازگشت", callback_data="feature_back")])
-
-        pages.append({"text": text, "keyboard": InlineKeyboardMarkup(keyboard)})
-    return pages
+    return fonts
 
 # ======================= 📄 ساخت صفحات =======================
-def make_pages(name: str, fonts: list, page_size=10, max_pages=7):
+def make_pages(name: str, fonts: list, page_size=5, max_pages=10):
     pages = []
     chunks = [fonts[i:i+page_size] for i in range(0, len(fonts), page_size)][:max_pages]
+
     for idx, chunk in enumerate(chunks):
-        text = f"<b>↻ {name} ⇦</b>\n:• لیست فونت های پیشنهادی :\n"
+        text = f"**↻ {name} ⇦**\n:• لیست فونت های پیشنهادی :\n"
         keyboard = []
         for i, style in enumerate(chunk, start=1):
             global_index = idx*page_size + (i-1)
             text += f"{i}- {style}\n"
             keyboard.append([InlineKeyboardButton(f"{i}- {style}", callback_data=f"send_font_{global_index}")])
+
         text += f"\n📄 صفحه {idx+1} از {len(chunks)}"
 
         nav = []
-        if idx > 0: nav.append(InlineKeyboardButton("⬅️ قبلی", callback_data=f"prev_font_{idx-1}"))
-        if idx < len(chunks)-1: nav.append(InlineKeyboardButton("➡️ بعدی", callback_data=f"next_font_{idx+1}"))
-        if nav: keyboard.append(nav)
+        if idx > 0:
+            nav.append(InlineKeyboardButton("⬅️ قبلی", callback_data=f"prev_font_{idx-1}"))
+        if idx < len(chunks)-1:
+            nav.append(InlineKeyboardButton("➡️ بعدی", callback_data=f"next_font_{idx+1}"))
+        if nav:
+            keyboard.append(nav)
         keyboard.append([InlineKeyboardButton("🔙 بازگشت", callback_data="feature_back")])
 
         pages.append({"text": text, "keyboard": InlineKeyboardMarkup(keyboard)})
+
     return pages
 
 # ======================= 📋 ارسال فونت انتخاب شده =======================
