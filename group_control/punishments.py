@@ -187,12 +187,10 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
             break
     if not cmd_type:
         return
-
     if not await _has_access(context, chat.id, user.id):
-        reply = await msg.reply_text("🚫 فقط مدیران یا سودوها مجازند.")
-        await asyncio.sleep(10)
-        await reply.delete()
+        await msg.reply_text("🚫 فقط مدیران یا سودوها مجازند.")
         return
+    
 
     explicit_arg = matched.group(1) if matched else None
     extra_time = None
