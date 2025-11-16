@@ -8,24 +8,27 @@ from telegram.ext import ContextTypes, MessageHandler, filters
 
 # ================= ⚙️ تنظیمات اولیه =================
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
 WARN_FILE = os.path.join(BASE_DIR, "warnings.json")
-DATA_DIR = os.path.join(BASE_DIR, "group_data")
-os.makedirs(DATA_DIR, exist_ok=True)
+BAN_FILE = os.path.join(BASE_DIR, "ban_list.json")
+MUTE_FILE = os.path.join(BASE_DIR, "mute_list.json")
 
 SUDO_IDS = [8588347189]  # آیدی سودوها
 
-if not os.path.exists(WARN_FILE):
-    with open(WARN_FILE, "w", encoding="utf-8") as f:
-        json.dump({}, f, ensure_ascii=False, indent=2)
+# ساخت فایل‌ها در صورت نبود
+for file in [WARN_FILE, BAN_FILE, MUTE_FILE]:
+    if not os.path.exists(file):
+        with open(file, "w", encoding="utf-8") as f:
+            json.dump({}, f, ensure_ascii=False, indent=2)
 
 # ---------- یوزربات ----------
 try:
-    from userbot_module.userbot import client as userbot_client  # مسیر سشن یوزربات
+    from userbot_module.userbot import client as userbot_client
     from userbot_module.userbot import punish_via_userbot
 except ImportError:
     userbot_client = None
     async def punish_via_userbot(*args, **kwargs):
-        pass  # اگر یوزربات فعال نبود، خطا نده
+        pass
 
 # ================= 📁 توابع کمکی =================
 def _load_json(file):
@@ -38,16 +41,6 @@ def _load_json(file):
 def _save_json(file, data):
     with open(file, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
-
-def _group_file(chat_id, name):
-    os.makedirs(DATA_DIR, exist_ok=True)
-    return os.path.join(DATA_DIR, f"{chat_id}_{name}.json")
-
-def _load_group_list(chat_id, name):
-    return _load_json(_group_file(chat_id, name)) or []
-
-def _save_group_list(chat_id, name, data):
-    _save_json(_group_file(chat_id, name), data)
 
 # ================= 🔐 بررسی ادمین / سودو =================
 async def _has_access(context, chat_id: int, user_id: int) -> bool:
@@ -62,24 +55,20 @@ async def _has_access(context, chat_id: int, user_id: int) -> bool:
 # ================= 🎯 استخراج هدف مقاوم =================
 async def _resolve_target(msg, context, chat_id, explicit_arg: str = None):
     text = (msg.text or "").strip()
-
     if msg.reply_to_message and getattr(msg.reply_to_message, "from_user", None):
         return msg.reply_to_message.from_user
-
     m_id = None
     if explicit_arg and explicit_arg.isdigit():
         m_id = explicit_arg
     else:
         m_id = re.search(r"\b(\d{6,15})\b", text)
         m_id = m_id.group(1) if m_id else None
-
     if m_id:
         try:
             cm = await context.bot.get_chat_member(chat_id, int(m_id))
             return cm.user
         except Exception as e:
             print(f"⚠️ خطا در گرفتن آیدی عددی: {e}")
-
     m_username = re.search(r"@([A-Za-z0-9_]{3,32})", text)
     if m_username:
         username = m_username.group(1)
@@ -89,7 +78,6 @@ async def _resolve_target(msg, context, chat_id, explicit_arg: str = None):
                 return user_obj
         except Exception as e:
             print(f"⚠️ ربات نتونست @{username} رو resolve کنه: {e}")
-
         if userbot_client:
             try:
                 user_entity = await userbot_client.get_entity(f"@{username}")
@@ -101,28 +89,54 @@ async def _resolve_target(msg, context, chat_id, explicit_arg: str = None):
                 return DummyUser(user_entity.id, getattr(user_entity, "first_name", username), username)
             except Exception as e2:
                 print(f"⚠️ یوزربات هم نتونست @{username} رو resolve کنه: {e2}")
-
     return None
 
-# ================= ⚙️ حذف خودکار پیام =================
-async def auto_delete(message, delay=10):
-    await asyncio.sleep(delay)
-    try:
-        await message.delete()
-    except:
-        pass
+# ================= ⚙️ ذخیره لیست بن/سکوت =================
+def add_to_list(file, chat_id, user):
+    data = _load_json(file)
+    chat_key = str(chat_id)
+    if chat_key not in data:
+        data[chat_key] = {}
+    data[chat_key][str(user.id)] = user.username or ""
+    _save_json(file, data)
+
+def remove_from_list(file, chat_id, user):
+    data = _load_json(file)
+    chat_key = str(chat_id)
+    if chat_key in data and str(user.id) in data[chat_key]:
+        del data[chat_key][str(user.id)]
+        _save_json(file, data)
+
+def list_from_file(file, chat_id):
+    data = _load_json(file)
+    chat_key = str(chat_id)
+    if chat_key in data:
+        return [f"{uid} ({uname})" if uname else str(uid) for uid, uname in data[chat_key].items()]
+    return []
 
 # ================= ⚙️ هندلر دستورات تنبیهی =================
 async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = update.effective_message
     user = update.effective_user
     chat = update.effective_chat
-
     if not msg or chat.type not in ("group", "supergroup"):
         return
-
     text = (msg.text or "").strip()
     if not text:
+        return
+
+    # دستورات برای نمایش لیست
+    if text.startswith("لیست بن"):
+        items = list_from_file(BAN_FILE, chat.id)
+        reply = await msg.reply_text("🚫 لیست بن شده‌ها:\n" + ("\n".join(items) if items else "هیچ کس"))
+        await asyncio.sleep(10)
+        await reply.delete()
+        return
+    if text.startswith("لیست سکوت"):
+        items = list_from_file(MUTE_FILE, chat.id)
+        reply = await msg.reply_text("🤐 لیست سکوت شده‌ها:\n" + ("\n".join(items) if items else "هیچ کس"))
+        await asyncio.sleep(10)
+        await reply.delete()
         return
 
     PATTERNS = {
@@ -132,8 +146,6 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
         "unmute": re.compile(r"^حذف\s*سکوت(?:\s+(\S+))?$"),
         "warn": re.compile(r"^اخطار(?:\s+(\S+))?$"),
         "delwarn": re.compile(r"^حذف\s*اخطار(?:\s+(\S+))?$"),
-        "list_ban": re.compile(r"^لیست\s*بن$"),
-        "list_mute": re.compile(r"^لیست\s*سکوت$")
     }
 
     matched = None
@@ -144,13 +156,13 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
             cmd_type = k
             matched = m
             break
-
     if not cmd_type:
         return
 
     if not await _has_access(context, chat.id, user.id):
-        resp = await msg.reply_text("🚫 فقط مدیران یا سودوها مجازند.")
-        await auto_delete(resp)
+        reply = await msg.reply_text("🚫 فقط مدیران یا سودوها مجازند.")
+        await asyncio.sleep(10)
+        await reply.delete()
         return
 
     explicit_arg = None
@@ -163,51 +175,48 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
             if num:
                 extra_time = (int(num), unit)
 
-    target_user = None
-    if cmd_type not in ["list_ban", "list_mute"]:
-        target_user = await _resolve_target(msg, context, chat.id, explicit_arg)
-        if not target_user:
-            resp = await msg.reply_text("⚠️ هدف مشخص نیست.\n• ریپلای روی پیام کاربر\n• یا آیدی عددی/یوزرنیم")
-            await auto_delete(resp)
-            return
+    target_user = await _resolve_target(msg, context, chat.id, explicit_arg)
+    if not target_user:
+        reply = await msg.reply_text("⚠️ هدف مشخص نیست.\n• ریپلای روی پیام کاربر\n• یا آیدی عددی/یوزرنیم")
+        await asyncio.sleep(10)
+        await reply.delete()
+        return
 
-        bot_user = await context.bot.get_me()
-        if target_user.id == bot_user.id:
-            resp = await msg.reply_text("😅 نمی‌تونم خودم رو تنبیه کنم.")
-            await auto_delete(resp)
+    bot_user = await context.bot.get_me()
+    if target_user.id == bot_user.id:
+        reply = await msg.reply_text("😅 نمی‌تونم خودم رو تنبیه کنم.")
+        await asyncio.sleep(10)
+        await reply.delete()
+        return
+    if target_user.id in SUDO_IDS:
+        reply = await msg.reply_text("🚫 این کاربر در لیست سودو است.")
+        await asyncio.sleep(10)
+        await reply.delete()
+        return
+
+    try:
+        tm = await context.bot.get_chat_member(chat.id, target_user.id)
+        if tm.status in ("creator", "administrator"):
+            reply = await msg.reply_text("🛡 امکان اجرای دستور روی ادمین وجود ندارد.")
+            await asyncio.sleep(10)
+            await reply.delete()
             return
-        if target_user.id in SUDO_IDS:
-            resp = await msg.reply_text("🚫 این کاربر در لیست سودو است.")
-            await auto_delete(resp)
-            return
-        try:
-            tm = await context.bot.get_chat_member(chat.id, target_user.id)
-            if tm.status in ("creator", "administrator"):
-                resp = await msg.reply_text("🛡 امکان اجرای دستور روی ادمین وجود ندارد.")
-                await auto_delete(resp)
-                return
-        except Exception:
-            pass
+    except Exception:
+        pass
+
+    target_ref = f"@{target_user.username}" if getattr(target_user, "username", None) else str(target_user.id)
 
     try:
         if cmd_type == "ban":
             await context.bot.ban_chat_member(chat.id, target_user.id)
-            banned_list = _load_group_list(chat.id, "banned")
-            if target_user.id not in banned_list:
-                banned_list.append(target_user.id)
-                _save_group_list(chat.id, "banned", banned_list)
-            resp = await msg.reply_text(f"🚫 {target_user.first_name} از گروه بن شد.")
-            await auto_delete(resp)
-
+            add_to_list(BAN_FILE, chat.id, target_user)
+            await punish_via_userbot(chat.id, target_ref, action="ban")
+            reply = await msg.reply_text(f"🚫 {target_user.first_name} از گروه بن شد.")
         elif cmd_type == "unban":
             await context.bot.unban_chat_member(chat.id, target_user.id)
-            banned_list = _load_group_list(chat.id, "banned")
-            if target_user.id in banned_list:
-                banned_list.remove(target_user.id)
-                _save_group_list(chat.id, "banned", banned_list)
-            resp = await msg.reply_text(f"✅ {target_user.first_name} از بن خارج شد.")
-            await auto_delete(resp)
-
+            remove_from_list(BAN_FILE, chat.id, target_user)
+            await punish_via_userbot(chat.id, target_ref, action="unban")
+            reply = await msg.reply_text(f"✅ {target_user.first_name} از بن خارج شد.")
         elif cmd_type == "mute":
             seconds = 3600
             if extra_time:
@@ -224,25 +233,17 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
                 permissions=ChatPermissions(can_send_messages=False),
                 until_date=until
             )
-            muted_list = _load_group_list(chat.id, "muted")
-            if target_user.id not in muted_list:
-                muted_list.append(target_user.id)
-                _save_group_list(chat.id, "muted", muted_list)
-            resp = await msg.reply_text(f"🤐 {target_user.first_name} برای {seconds} ثانیه سکوت شد.")
-            await auto_delete(resp)
-
+            add_to_list(MUTE_FILE, chat.id, target_user)
+            await punish_via_userbot(chat.id, target_ref, action="mute", seconds=seconds)
+            reply = await msg.reply_text(f"🤐 {target_user.first_name} برای {seconds} ثانیه سکوت شد.")
         elif cmd_type == "unmute":
             await context.bot.restrict_chat_member(
                 chat.id, target_user.id,
                 permissions=ChatPermissions(can_send_messages=True)
             )
-            muted_list = _load_group_list(chat.id, "muted")
-            if target_user.id in muted_list:
-                muted_list.remove(target_user.id)
-                _save_group_list(chat.id, "muted", muted_list)
-            resp = await msg.reply_text(f"🔊 {target_user.first_name} از سکوت خارج شد.")
-            await auto_delete(resp)
-
+            remove_from_list(MUTE_FILE, chat.id, target_user)
+            await punish_via_userbot(chat.id, target_ref, action="unmute")
+            reply = await msg.reply_text(f"🔊 {target_user.first_name} از سکوت خارج شد.")
         elif cmd_type == "warn":
             warns = _load_json(WARN_FILE)
             key = f"{chat.id}:{target_user.id}"
@@ -250,38 +251,29 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
             _save_json(WARN_FILE, warns)
             if warns[key] >= 3:
                 await context.bot.ban_chat_member(chat.id, target_user.id)
+                add_to_list(BAN_FILE, chat.id, target_user)
+                await punish_via_userbot(chat.id, target_ref, action="ban")
                 warns[key] = 0
                 _save_json(WARN_FILE, warns)
-                resp = await msg.reply_text(f"🚫 {target_user.first_name} به‌دلیل ۳ اخطار بن شد.")
+                reply = await msg.reply_text(f"🚫 {target_user.first_name} به‌دلیل ۳ اخطار بن شد.")
             else:
-                resp = await msg.reply_text(f"⚠️ {target_user.first_name} اخطار {warns[key]}/3 گرفت.")
-            await auto_delete(resp)
-
+                reply = await msg.reply_text(f"⚠️ {target_user.first_name} اخطار {warns[key]}/3 گرفت.")
         elif cmd_type == "delwarn":
             warns = _load_json(WARN_FILE)
             key = f"{chat.id}:{target_user.id}"
             if key in warns:
                 del warns[key]
                 _save_json(WARN_FILE, warns)
-                resp = await msg.reply_text(f"✅ اخطارهای {target_user.first_name} حذف شد.")
+                reply = await msg.reply_text(f"✅ اخطارهای {target_user.first_name} حذف شد.")
             else:
-                resp = await msg.reply_text("ℹ️ این کاربر اخطاری نداشت.")
-            await auto_delete(resp)
-
-        elif cmd_type == "list_ban":
-            banned_list = _load_group_list(chat.id, "banned")
-            resp = await msg.reply_text(f"لیست کاربران بن‌شده:\n{banned_list}")
-            await auto_delete(resp)
-
-        elif cmd_type == "list_mute":
-            muted_list = _load_group_list(chat.id, "muted")
-            resp = await msg.reply_text(f"لیست کاربران سکوت‌شده:\n{muted_list}")
-            await auto_delete(resp)
-
+                reply = await msg.reply_text("ℹ️ این کاربر اخطاری نداشت.")
+        await asyncio.sleep(10)
+        await reply.delete()
     except Exception as e:
         print("handle_punishments execution exception:", e)
-        resp = await msg.reply_text(f"⚠️ خطا در اجرای دستور: {e}")
-        await auto_delete(resp)
+        reply = await msg.reply_text(f"⚠️ خطا در اجرای دستور: {e}")
+        await asyncio.sleep(10)
+        await reply.delete()
 
 # ================= 🧩 ثبت هندلر =================
 def register_punishment_handlers(application, group_number: int = 12):
