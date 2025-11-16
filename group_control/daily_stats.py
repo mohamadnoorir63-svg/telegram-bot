@@ -58,19 +58,29 @@ def init_daily_stats(chat_id, today):
         }
 
 # ------------------- تابع دریافت اطلاعات ویسکال -------------------
-async def get_voice_data(user_id):
+async def get_voice_data(user_id, is_admin=False):
     """
-    این تابع باید به API واقعی ویسکال یا دیتابیس شما متصل شود.
-    برای کاربران معمولی داده پیش‌فرض برمی‌گرداند.
+    برای کاربران عادی و تازه وارد داده واقعی ویسکال نشان داده نمی‌شود.
+    فقط برای سودو یا مدیران واقعی داده واقعی بازگردانده می‌شود.
     """
-    # داده تستی برای مدیر/سودو
-    return {
-        "datacenter_code": 5,
-        "role": "مالک گروه",
-        "time": "05:57:53",
-        "percent": "68 %",
-        "rank": 6
-    }
+    if is_admin:
+        # اینجا باید به API واقعی ویسکال متصل شوید و داده واقعی برگردانید
+        # نمونه داده تستی برای سودو و مدیر
+        return {
+            "datacenter_code": 5,
+            "role": "مالک گروه",
+            "time": "05:57:53",
+            "percent": "68 %",
+            "rank": 6
+        }
+    else:
+        return {
+            "datacenter_code": "---",
+            "role": "---",
+            "time": "---",
+            "percent": "---",
+            "rank": "---"
+        }
 
 # ------------------- ثبت فعالیت پیام -------------------
 async def record_message_activity(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -80,12 +90,10 @@ async def record_message_activity(update: Update, context: ContextTypes.DEFAULT_
     chat_id = str(update.effective_chat.id)
     user = update.effective_user
     today = datetime.now().strftime("%Y-%m-%d")
-
     init_daily_stats(chat_id, today)
     data = stats[chat_id][today]
     msg = update.message
 
-    # نوع پیام
     if msg.forward_from or msg.forward_from_chat:
         data["forwards"] += 1
     elif msg.video:
@@ -106,7 +114,6 @@ async def record_message_activity(update: Update, context: ContextTypes.DEFAULT_
         else:
             data["stickers"] += 1
 
-    # لینک، منشن، هشتگ
     if msg.entities:
         for entity in msg.entities:
             if entity.type == "url":
@@ -116,14 +123,12 @@ async def record_message_activity(update: Update, context: ContextTypes.DEFAULT_
             elif entity.type == "hashtag":
                 data["hashtags"] += 1
 
-    # ریپلای
     if msg.reply_to_message:
         data["replies"] += 1
 
     uid = str(user.id)
     data["messages"][uid] = data["messages"].get(uid, 0) + 1
     data["message_length"][uid] = data["message_length"].get(uid, 0) + len(msg.text or "")
-
     save_queue.add(chat_id)
 
 # ------------------- ثبت ورود اعضا -------------------
@@ -152,14 +157,13 @@ async def record_new_members(update: Update, context: ContextTypes.DEFAULT_TYPE)
 async def record_left_members(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message or not update.message.left_chat_member:
         return
-
     chat_id = str(update.effective_chat.id)
     today = datetime.now().strftime("%Y-%m-%d")
     init_daily_stats(chat_id, today)
     stats[chat_id][today]["lefts"] += 1
     save_queue.add(chat_id)
 
-# ------------------- نمایش آمار پیشرفته و آیدی -------------------
+# ------------------- نمایش آمار و آیدی -------------------
 async def show_daily_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         chat_id = str(update.effective_chat.id)
@@ -179,17 +183,12 @@ async def show_daily_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
             except:
                 pass
 
-        # کاربران غیرمدیر هیچ پاسخی نمی‌بینند
-        if not is_admin:
-            return
-
-        # ------------------- حالت آیدی پیشرفته -------------------
-        if text_input in ["آیدی", "id"]:
+        # ------------------- حالت آیدی -------------------
+        if text_input in ["آیدی", "id"] and is_admin:
             target = update.message.reply_to_message.from_user if update.message.reply_to_message else user
-
             jalali_date = jdatetime.datetime.now().strftime("%A %d %B %Y")
             time_str = datetime.now().strftime("%H:%M:%S")
-            voice_data = await get_voice_data(target.id)
+            voice_data = await get_voice_data(target.id, is_admin=is_admin)
 
             username = target.username if target.username else "---"
             datacenter_code = voice_data.get("datacenter_code", "---")
@@ -197,7 +196,6 @@ async def show_daily_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
             voice_time = voice_data.get("time", "---")
             voice_percent = voice_data.get("percent", "---")
             voice_rank = voice_data.get("rank", "---")
-
             user_link = f"<a href='tg://user?id={target.id}'>{target.first_name}</a>"
 
             text = (
@@ -222,14 +220,17 @@ async def show_daily_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     msg = await context.bot.send_photo(update.effective_chat.id, photo=photo, caption=text, parse_mode="HTML")
                 else:
                     msg = await update.message.reply_text(text, parse_mode="HTML")
-            except Exception:
+            except:
                 msg = await update.message.reply_text(text, parse_mode="HTML")
 
             await asyncio.sleep(15)
             await context.bot.delete_message(update.effective_chat.id, msg.message_id)
             return
 
-        # ------------------- نمایش آمار روزانه -------------------
+        # ------------------- نمایش آمار روزانه برای مدیر -------------------
+        if not is_admin:
+            return  # کاربران عادی هیچ چیزی نمی‌بینند
+
         if chat_id not in stats or today not in stats[chat_id]:
             msg = await update.message.reply_text("ℹ️ هنوز فعالیتی برای امروز ثبت نشده است.")
             await asyncio.sleep(15)
