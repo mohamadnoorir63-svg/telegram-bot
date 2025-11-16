@@ -163,10 +163,19 @@ async def record_left_members(update: Update, context: ContextTypes.DEFAULT_TYPE
 
 # ------------------- نمایش آیدی کاربران -------------------
 
+
+    await asyncio.sleep(15)
+    try:
+        await context.bot.delete_message(chat_id, msg.message_id)
+    except:
+        pass
+
+# ------------------- تابع سازگار با textsize -------------------
 async def show_user_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     chat_id = str(update.effective_chat.id)
 
+    # فقط مدیر یا سودو اجازه دارند
     if user.id != SUDO_ID:
         try:
             member = await context.bot.get_chat_member(chat_id, user.id)
@@ -179,12 +188,28 @@ async def show_user_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
     jalali_date = jdatetime.datetime.now().strftime("%A %d %B %Y")
     time_str = datetime.now().strftime("%H:%M:%S")
 
+    # تعیین مقام کاربر
+    if target.id == SUDO_ID:
+        role = "💎 سودو"
+    else:
+        try:
+            member = await context.bot.get_chat_member(chat_id, target.id)
+            if member.status == "creator":
+                role = "👑 مالک"
+            elif member.status == "administrator":
+                role = "🛡️ مدیر"
+            else:
+                role = "👤 عضو عادی"
+        except:
+            role = "👤 عضو عادی"
+
     user_link = f"<a href='tg://user?id={target.id}'>{target.first_name}</a>"
     text = (
         f"🧿 <b>اطلاعات کاربر:</b>\n\n"
         f"👤 نام: {user_link}\n"
         f"💬 یوزرنیم: {getattr(target, 'username', '---')}\n"
         f"🆔 آیدی عددی: <code>{target.id}</code>\n"
+        f"🎖 مقام: {role}\n"
         f"📆 تاریخ: {jalali_date}\n"
         f"🕒 ساعت: {time_str}"
     )
@@ -199,23 +224,12 @@ async def show_user_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception:
         msg = await update.message.reply_text(text, parse_mode="HTML")
 
+    # حذف پیام بعد از ۱۵ ثانیه
     await asyncio.sleep(15)
     try:
         await context.bot.delete_message(chat_id, msg.message_id)
     except:
         pass
-
-# ------------------- تابع سازگار با textsize -------------------
-
-def textsize_compat(draw, text, font):
-    try:
-        return draw.textsize(text, font=font)
-    except AttributeError:
-        bbox = draw.textbbox((0, 0), text, font=font)
-        width = bbox[2] - bbox[0]
-        height = bbox[3] - bbox[1]
-        return width, height
-
 # ------------------- ایجاد تصویر Top5 -------------------
 
 def _load_font(path, size):
