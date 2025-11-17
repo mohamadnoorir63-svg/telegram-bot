@@ -149,54 +149,61 @@ async def show_user_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     chat_id = str(update.effective_chat.id)
 
+    # بررسی دسترسی (سودو یا مدیر/مالک)
     if user.id != SUDO_ID:
         try:
             member = await context.bot.get_chat_member(chat_id, user.id)
-            if member.status not in ["creator","administrator"]:
+            if member.status not in ["creator", "administrator"]:
                 return
         except:
             return
 
+    # هدف: ریپلای شده یا خود کاربر
     target = update.message.reply_to_message.from_user if update.message.reply_to_message else user
+
     jalali_date = jdatetime.datetime.now().strftime("%A %d %B %Y")
     time_str = datetime.now().strftime("%H:%M:%S")
 
     # مقام کاربر
-    if target.id == SUDO_ID: 
+    if target.id == SUDO_ID:
         role = "💎 سودو"
     else:
         try:
             member = await context.bot.get_chat_member(chat_id, target.id)
-            if member.status=="creator": role="👑 مالک"
-            elif member.status=="administrator": role="🛡️ مدیر"
-            else: role="👤 عضو عادی"
-        except: 
-            role="👤 عضو عادی"
+            if member.status == "creator":
+                role = "👑 مالک"
+            elif member.status == "administrator":
+                role = "🛡️ مدیر"
+            else:
+                role = "👤 عضو عادی"
+        except:
+            role = "👤 عضو عادی"
 
-    # تعداد کل پیام‌های کاربر امروز
+    # تعداد پیام‌های امروز
     today = datetime.now().strftime("%Y-%m-%d")
     total_messages = 0
     if chat_id in stats and today in stats[chat_id]:
         total_messages = stats[chat_id][today]["messages"].get(str(target.id), 0)
 
-    # تعداد ادهایی که کاربر امروز اضافه کرده
+    # تعداد اد اضافه شده امروز
     total_added = 0
     if chat_id in stats and today in stats[chat_id]:
         total_added = stats[chat_id][today]["joins_added_per_user"].get(str(target.id), 0)
 
+    # متن پیام
     user_link = f"<a href='tg://user?id={target.id}'>{target.first_name}</a>"
-text = (
-    f"🧿 <b>اطلاعات کاربر:</b>\n\n"
-    f"👤 نام: {user_link}\n"
-    f"💬 یوزرنیم: {getattr(target,'username','---')}\n"
-    f"🆔 آیدی عددی: <code>{target.id}</code>\n"
-    f"🎖 مقام: {role}\n"
-    f"📊 تعداد پیام امروز: {total_messages}\n"
-    f"📌 تعداد اد اضافه‌شده امروز: {total_added}\n"
-    f"📆 تاریخ: {jalali_date}\n"
-    f"🕒 ساعت: {time_str}\n"
-    f"🆔 آیدی عددی گروه: {chat_id}"
-)
+    text = (
+        f"🧿 <b>اطلاعات کاربر:</b>\n\n"
+        f"👤 نام: {user_link}\n"
+        f"💬 یوزرنیم: {getattr(target,'username','---')}\n"
+        f"🆔 آیدی عددی: <code>{target.id}</code>\n"
+        f"🎖 مقام: {role}\n"
+        f"📊 تعداد پیام امروز: {total_messages}\n"
+        f"📌 تعداد اد اضافه‌شده امروز: {total_added}\n"
+        f"📆 تاریخ: {jalali_date}\n"
+        f"🕒 ساعت: {time_str}\n"
+        f"🆔 آیدی عددی گروه: {chat_id}"
+    )
 
     try:
         photos = await context.bot.get_user_profile_photos(target.id, limit=1)
@@ -208,10 +215,11 @@ text = (
     except:
         msg = await update.message.reply_text(text, parse_mode="HTML")
 
+    # حذف پیام بعد از 15 ثانیه
     await asyncio.sleep(15)
-    try: 
-        await context.bot.delete_message(chat_id,msg.message_id)
-    except: 
+    try:
+        await context.bot.delete_message(chat_id, msg.message_id)
+    except:
         pass
 # ------------------- ساخت عکس Top5 (سازگار با Pillow 10+) -------------------
 
