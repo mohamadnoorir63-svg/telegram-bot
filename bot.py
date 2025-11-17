@@ -75,7 +75,6 @@ from panels.panel_menu import (
     
 )
 
-from userbot_module.userbot_manager import add_userbot_to_group
 from group_control.origin_title import register_origin_title_handlers
 from context_memory import ContextMemory
 from brain_bridge_group import process_group_message
@@ -1849,10 +1848,6 @@ register_tag_handlers(application, group_number=14)
 
 from group_control.admin_manager import register_admin_handlers
 register_admin_handlers(application, group_number=15)
-
-
-# ثبت دستور در ربات اصلی
-application.add_handler(CommandHandler("userbot_add", userbot_add_command))
 
 # ==========================================================
 # 👑 مدیریت سودوها
