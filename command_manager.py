@@ -11,14 +11,12 @@ from telegram.ext import ContextTypes
 ADMIN_ID = 8588347189
 
 # ======================== 📁 مسیرهای اصلی ========================
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))  # مسیر پروژه
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))  # مسیر auto_brain
 DATA_DIR = os.path.join(BASE_DIR, "data")
 BACKUP_DIR = os.path.join(DATA_DIR, "backups")
-COMMANDS_MEDIA_DIR = os.path.join(DATA_DIR, "commands_media")  # مدیاهای دستورات
 
 os.makedirs(DATA_DIR, exist_ok=True)
 os.makedirs(BACKUP_DIR, exist_ok=True)
-os.makedirs(COMMANDS_MEDIA_DIR, exist_ok=True)
 
 DATA_FILE = os.path.join(DATA_DIR, "custom_commands.json")
 BACKUP_FILE = os.path.join(BACKUP_DIR, "custom_commands_backup.json")
@@ -38,15 +36,12 @@ required_files = [
 required_dirs = [
     os.path.join(DATA_DIR, "fortunes_media"),
     os.path.join(DATA_DIR, "jokes_media"),
-    os.path.join(DATA_DIR, "group_control"),
-    COMMANDS_MEDIA_DIR
+    os.path.join(DATA_DIR, "group_control")
 ]
 
-# ساخت پوشه‌ها
 for d in required_dirs:
     os.makedirs(d, exist_ok=True)
 
-# ساخت فایل‌های خالی JSON در صورت عدم وجود
 for f in required_files:
     if not os.path.exists(f):
         os.makedirs(os.path.dirname(f), exist_ok=True)
@@ -82,7 +77,6 @@ def backup_all_commands():
     zip_file = os.path.join(BACKUP_DIR, f"full_backup_{now}.zip")
 
     with zipfile.ZipFile(zip_file, 'w', compression=zipfile.ZIP_DEFLATED) as zipf:
-        # بکاپ همه فایل‌ها و پوشه‌ها
         for f in required_files + required_dirs:
             if os.path.exists(f):
                 if os.path.isdir(f):
@@ -94,7 +88,8 @@ def backup_all_commands():
                 else:
                     arcname = os.path.relpath(f, BASE_DIR)
                     zipf.write(f, arcname)
-        # بکاپ تمام فایل‌های .py
+
+        # بکاپ تمام فایل‌های .py داخل auto_brain
         for root, _, files in os.walk(BASE_DIR):
             for file in files:
                 if file.endswith(".py"):
@@ -104,10 +99,7 @@ def backup_all_commands():
 
     print(f"✅ بکاپ کامل گرفته شد → {zip_file}")
 
-# ======================== 📥 ذخیره دستور (به همراه مدیا) ========================
-# ======================== 📥 ذخیره دستور (به همراه مدیا) ========================
-import aiofiles
-
+# ======================== 📥 ذخیره دستور ========================
 async def save_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     chat = update.effective_chat
@@ -133,49 +125,20 @@ async def save_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     entry = {}
     if reply.text:
         entry = {"type": "text", "data": reply.text}
+    elif reply.photo:
+        entry = {"type": "photo", "data": reply.photo[-1].file_id}
+    elif reply.video:
+        entry = {"type": "video", "data": reply.video.file_id}
+    elif reply.document:
+        entry = {"type": "document", "data": reply.document.file_id}
+    elif reply.voice:
+        entry = {"type": "voice", "data": reply.voice.file_id}
+    elif reply.animation:
+        entry = {"type": "animation", "data": reply.animation.file_id}
+    elif reply.sticker:
+        entry = {"type": "sticker", "data": reply.sticker.file_id}
     else:
-        file_id = None
-        local_path = None
-
-        if reply.photo:
-            file = await reply.photo[-1].get_file()
-            local_path = os.path.join(COMMANDS_MEDIA_DIR, f"{name}_{int(datetime.now().timestamp())}.jpg")
-            await file.download_to_drive(local_path)
-            entry = {"type": "photo", "data": file.file_id, "local": os.path.relpath(local_path, BASE_DIR)}
-
-        elif reply.video:
-            file = await reply.video.get_file()
-            local_path = os.path.join(COMMANDS_MEDIA_DIR, f"{name}_{int(datetime.now().timestamp())}.mp4")
-            await file.download_to_drive(local_path)
-            entry = {"type": "video", "data": file.file_id, "local": os.path.relpath(local_path, BASE_DIR)}
-
-        elif reply.document:
-            file = await reply.document.get_file()
-            ext = os.path.splitext(reply.document.file_name)[1] or ".dat"
-            local_path = os.path.join(COMMANDS_MEDIA_DIR, f"{name}_{int(datetime.now().timestamp())}{ext}")
-            await file.download_to_drive(local_path)
-            entry = {"type": "document", "data": file.file_id, "local": os.path.relpath(local_path, BASE_DIR)}
-
-        elif reply.voice:
-            file = await reply.voice.get_file()
-            local_path = os.path.join(COMMANDS_MEDIA_DIR, f"{name}_{int(datetime.now().timestamp())}.ogg")
-            await file.download_to_drive(local_path)
-            entry = {"type": "voice", "data": file.file_id, "local": os.path.relpath(local_path, BASE_DIR)}
-
-        elif reply.animation:
-            file = await reply.animation.get_file()
-            local_path = os.path.join(COMMANDS_MEDIA_DIR, f"{name}_{int(datetime.now().timestamp())}.mp4")
-            await file.download_to_drive(local_path)
-            entry = {"type": "animation", "data": file.file_id, "local": os.path.relpath(local_path, BASE_DIR)}
-
-        elif reply.sticker:
-            file = await reply.sticker.get_file()
-            local_path = os.path.join(COMMANDS_MEDIA_DIR, f"{name}_{int(datetime.now().timestamp())}.webp")
-            await file.download_to_drive(local_path)
-            entry = {"type": "sticker", "data": file.file_id, "local": os.path.relpath(local_path, BASE_DIR)}
-
-        else:
-            return await update.message.reply_text("⚠️ این نوع پیام پشتیبانی نمی‌شود.")
+        return await update.message.reply_text("⚠️ این نوع پیام پشتیبانی نمی‌شود.")
 
     doc["responses"].append(entry)
     if len(doc["responses"]) > 100:
@@ -188,3 +151,102 @@ async def save_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"✅ پاسخ برای دستور <b>{name}</b> ذخیره شد. ({len(doc['responses'])}/100)",
         parse_mode="HTML"
     )
+
+# ======================== 📤 اجرای دستور ========================
+async def handle_custom_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not update.message or not update.message.text:
+        return
+
+    text = update.message.text.strip().lower()
+    commands = load_commands()
+
+    if text not in commands:
+        return
+
+    cmd = commands[text]
+    responses = cmd.get("responses", [])
+    if not responses:
+        return await update.message.reply_text("⚠️ برای این دستور هنوز پاسخی ثبت نشده.")
+
+    response = random.choice(responses)
+    t, d = response["type"], response["data"]
+
+    try:
+        if t == "text":
+            await update.message.reply_text(d)
+        elif t == "photo":
+            await update.message.reply_photo(d)
+        elif t == "video":
+            await update.message.reply_video(d)
+        elif t == "document":
+            await update.message.reply_document(d)
+        elif t == "voice":
+            await update.message.reply_voice(d)
+        elif t == "animation":
+            await update.message.reply_animation(d)
+        elif t == "sticker":
+            await update.message.reply_sticker(d)
+
+        context.user_data["custom_handled"] = True
+
+    except Exception as e:
+        await update.message.reply_text(f"⚠️ خطا در اجرای دستور:\n{e}")
+
+# ======================== ❌ حذف دستور ========================
+async def delete_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+
+    if user.id != ADMIN_ID:
+        return await update.message.reply_text("⛔ فقط مدیر اصلی اجازه این کار را دارد.")
+
+    if not context.args:
+        return await update.message.reply_text("❗ استفاده: /del <نام دستور>")
+
+    name = " ".join(context.args).strip().lower()
+    commands = load_commands()
+
+    if name in commands:
+        del commands[name]
+        save_commands(commands)
+        await update.message.reply_text(f"🗑 دستور '{name}' حذف شد.")
+    else:
+        await update.message.reply_text("⚠️ دستور پیدا نشد.")
+
+# ======================== 📜 لیست همه دستورها ========================
+async def list_commands(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+
+    if user.id != ADMIN_ID:
+        return await update.message.reply_text("⛔ فقط مدیر اصلی مجاز است.")
+
+    commands = load_commands()
+    if not commands:
+        return await update.message.reply_text("📭 هنوز هیچ دستوری ثبت نشده.")
+
+    txt = "📜 <b>لیست دستورها:</b>\n\n"
+    for name, info in commands.items():
+        owner = "👑 سودو" if info.get("owner_id") == ADMIN_ID else f"👤 {info.get('owner_id')}"
+        group = f" | 🏠 {info.get('group_id')}" if info.get("group_id") else ""
+        count = len(info.get("responses", []))
+        txt += f"🔹 <b>{name}</b> ({count}) — {owner}{group}\n"
+
+    await update.message.reply_text(txt[:4000], parse_mode="HTML")
+
+# ======================== 🧹 پاکسازی دستورات یک گروه ========================
+def cleanup_group_commands(chat_id):
+    try:
+        commands = load_commands()
+        new_data = {}
+        removed = 0
+
+        for name, info in commands.items():
+            if info.get("group_id") == chat_id and info.get("owner_id") != ADMIN_ID:
+                removed += 1
+                continue
+            new_data[name] = info
+
+        save_commands(new_data)
+        print(f"🧹 {removed} دستور از گروه {chat_id} حذف شد.")
+
+    except Exception as e:
+        print(f"⚠️ خطا: {e}")
