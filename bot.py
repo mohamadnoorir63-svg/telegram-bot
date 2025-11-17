@@ -74,6 +74,8 @@ from panels.panel_menu import (
     handle_fun_buttons,
     
 )
+from telegram.ext import CommandHandler
+from userbot_module.userbot_manager import add_userbot_to_group
 from group_control.origin_title import register_origin_title_handlers
 from context_memory import ContextMemory
 from brain_bridge_group import process_group_message
@@ -1753,6 +1755,11 @@ async def handle_azan_city(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("⚠️ متأسفم، نتوانستم اطلاعات شهر را پیدا کنم!", parse_mode="HTML")
 
         context.user_data["awaiting_azan_city"] = False
+        # ==========================================================
+        async def userbot_add_command(update, context):
+    chat_id = update.effective_chat.id
+    success, msg = await add_userbot_to_group(context.bot, chat_id)
+    await update.message.reply_text(msg)
 
 # ======================= 🚀 اجرای نهایی =======================
 if __name__ == "__main__":
@@ -1845,6 +1852,8 @@ register_tag_handlers(application, group_number=14)
 
 from group_control.admin_manager import register_admin_handlers
 register_admin_handlers(application, group_number=15)
+# ثبت دستور در ربات اصلی
+application.add_handler(CommandHandler("userbot_add", userbot_add_command))
 
 # ==========================================================
 # 👑 مدیریت سودوها
