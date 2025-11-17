@@ -13,7 +13,7 @@ BATCH_SIZE = 20
 FAST_DELETE_THRESHOLD = 200
 SLEEP_SEC = 0.15
 SUDO_IDS = [8588347189]
-USERBOT_ID = 7411479288  # ⬅ آیدی یوزربات را اینجا بگذار
+USERBOT_ID = 8203554172  # ⬅ آیدی یوزربات را اینجا بگذار
 
 HEAVY_LIMIT = 600        # بالاتر از این مقدار → پاکسازی توسط یوزربات
 
