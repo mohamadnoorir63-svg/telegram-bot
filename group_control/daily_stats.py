@@ -195,6 +195,7 @@ async def show_user_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"📌 تعداد اد اضافه‌شده امروز: {total_added}\n"
         f"📆 تاریخ: {jalali_date}\n"
         f"🕒 ساعت: {time_str}"
+        f"🆔 آیدی عددی گروه: {event.chat_id}"
     )
 
     try:
