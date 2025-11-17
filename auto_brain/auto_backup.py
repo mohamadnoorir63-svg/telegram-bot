@@ -49,15 +49,16 @@ async def cloudsync_internal(bot, reason="Manual Backup"):
         with zipfile.ZipFile(filename, "w", compression=zipfile.ZIP_DEFLATED) as zipf:
             # 🧩 افزودن مسیرهای مهم به‌صورت دستی
             important_files_extra = [
-                "memory.json",
-                "shadow_memory.json",
-                "group_data.json",
-                "fortunes.json",
-                "jokes.json",
-                "fortunes_media",          # پوشه مدیا کامل
-                "group_control/aliases.json",
-                "aliases.json"
-                "custom_commands.json",
+        "memory.json",
+        "shadow_memory.json",
+        "group_data.json",
+        "fortunes.json",
+        "jokes.json",
+        "fortunes_media",          # پوشه مدیا کامل
+        "group_control/aliases.json",
+        "aliases.json",
+        "custom_commands.json",    # دستورهای ذخیره شده
+        "custom_commands_backup.json",  # حتماً اضافه شود
             ]
             for imp in important_files_extra:
                 if os.path.exists(imp):
