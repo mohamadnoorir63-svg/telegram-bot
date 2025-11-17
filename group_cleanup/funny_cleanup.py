@@ -8,7 +8,7 @@ from telegram.ext import ContextTypes, CommandHandler, MessageHandler, filters
 # ================== ⚙️ تنظیمات ==================
 
 MAX_BULK = 10000
-TRACK_BUFFER = 600
+TRACK_BUFFER = 10000  # بزرگتر شد تا همه پیام‌ها ذخیره بشه
 BATCH_SIZE = 20
 FAST_DELETE_THRESHOLD = 200
 SLEEP_SEC = 0.15
@@ -24,7 +24,11 @@ track_map: dict[int, Deque[Tuple[int, int]]] = defaultdict(lambda: deque(maxlen=
 async def track_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = update.effective_message
     if msg and update.effective_chat.type in ("group", "supergroup"):
-        track_map[update.effective_chat.id].append((msg.message_id, getattr(msg.from_user, "id", None)))
+        # ذخیره همه پیام‌ها حتی ربات‌ها
+        user_id = getattr(msg.from_user, "id", None)
+        if not user_id and msg.sender_chat:  # پیام ربات کانال
+            user_id = msg.sender_chat.id
+        track_map[update.effective_chat.id].append((msg.message_id, user_id))
 
 # ================== 🔐 دسترسی ==================
 
@@ -114,11 +118,14 @@ async def funny_cleanup(update: Update, context: ContextTypes.DEFAULT_TYPE):
         deleted = await _delete_all(context, chat.id)
         action_type = "🧼 پاکسازی کامل (همه پیام‌ها بدون استثنا)"
 
-    # 🧍 حذف پیام‌های یک کاربر
+    # 🧍 حذف پیام‌های یک کاربر یا ربات
     elif msg.reply_to_message:
-        target = msg.reply_to_message.from_user
-        deleted = await _delete_by_user_from_buffer(context, chat.id, target.id)
-        action_type = f"🧑‍💻 حذف پیام‌های {target.first_name}"
+        target_user_id = getattr(msg.reply_to_message.from_user, "id", None)
+        if not target_user_id and msg.reply_to_message.sender_chat:
+            target_user_id = msg.reply_to_message.sender_chat.id
+        deleted = await _delete_by_user_from_buffer(context, chat.id, target_user_id)
+        name = getattr(msg.reply_to_message.from_user, "first_name", "ربات")
+        action_type = f"🧑‍💻 حذف پیام‌های {name}"
 
     # 🔢 حذف عددی
     elif text.startswith("حذف") or text.startswith("پاک"):
