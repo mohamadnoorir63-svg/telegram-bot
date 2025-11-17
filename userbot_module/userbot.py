@@ -195,8 +195,15 @@ async def handle_commands(event):
         await cleanup_via_userbot(chat_id, last_msg_id=last_msg_id)
 
     # ---------- پینگ ----------
-    elif action == "ping":
-        await client.send_message(event.chat_id, "✅ Userbot Online")
+    from telethon import events
+
+# هندلر پینگ ساده
+@client.on(events.NewMessage)
+async def simple_ping(event):
+    text = event.raw_text.lower()
+
+    if text == "ping":
+        await event.reply("✅ Userbot Online")
 # ================= استارت یوزربات =================
 async def start_userbot():
     await client.start()
