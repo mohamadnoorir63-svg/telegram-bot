@@ -11,49 +11,42 @@ from telegram.ext import ContextTypes
 ADMIN_ID = 8588347189
 
 # ======================== 📁 مسیرهای اصلی ========================
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))  # مسیر auto_brain
-DATA_DIR = os.path.join(BASE_DIR, "data")
-BACKUP_DIR = os.path.join(DATA_DIR, "backups")
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))  # کنار bot.py
+DATA_FILE = os.path.join(BASE_DIR, "custom_commands.json")
+COMMANDS_MEDIA_DIR = os.path.join(BASE_DIR, "commands_media")
+BACKUP_DIR = os.path.join(BASE_DIR, "backups")
+BACKUP_FILE = os.path.join(BACKUP_DIR, "custom_commands_backup.json")
 
 # ساخت پوشه‌ها در صورت عدم وجود
-os.makedirs(DATA_DIR, exist_ok=True)
+os.makedirs(COMMANDS_MEDIA_DIR, exist_ok=True)
 os.makedirs(BACKUP_DIR, exist_ok=True)
-
-# مسیر فایل اصلی و بکاپ
-DATA_FILE = os.path.join(DATA_DIR, "custom_commands.json")
-BACKUP_FILE = os.path.join(BACKUP_DIR, "custom_commands_backup.json")
 
 # ======================== 🔧 فایل‌ها و پوشه‌های مورد نیاز ========================
 required_files = [
     DATA_FILE,
-    os.path.join(DATA_DIR, "shadow_memory.json"),
-    os.path.join(DATA_DIR, "memory.json"),
-    os.path.join(DATA_DIR, "group_data.json"),
-    os.path.join(DATA_DIR, "fortunes.json"),
-    os.path.join(DATA_DIR, "jokes.json"),
-    os.path.join(DATA_DIR, "aliases.json"),
-    os.path.join(DATA_DIR, "group_control/aliases.json")
+    os.path.join(BASE_DIR, "shadow_memory.json"),
+    os.path.join(BASE_DIR, "memory.json"),
+    os.path.join(BASE_DIR, "group_data.json"),
+    os.path.join(BASE_DIR, "fortunes.json"),
+    os.path.join(BASE_DIR, "jokes.json"),
+    os.path.join(BASE_DIR, "aliases.json"),
+    os.path.join(BASE_DIR, "group_control/aliases.json")
 ]
 
 required_dirs = [
-    os.path.join(DATA_DIR, "fortunes_media"),
-    os.path.join(DATA_DIR, "jokes_media"),
-    os.path.join(DATA_DIR, "group_control")
+    COMMANDS_MEDIA_DIR,
+    os.path.join(BASE_DIR, "jokes_media"),
+    os.path.join(BASE_DIR, "group_control")
 ]
 
-# ساخت پوشه‌ها
 for d in required_dirs:
     os.makedirs(d, exist_ok=True)
 
-# ساخت فایل‌های خالی JSON در صورت عدم وجود
 for f in required_files:
     if not os.path.exists(f):
         os.makedirs(os.path.dirname(f), exist_ok=True)
         with open(f, "w", encoding="utf-8") as fp:
             json.dump({}, fp, ensure_ascii=False, indent=2)
-        print(f"[DEBUG] فایل ساخته شد: {f}")
-    else:
-        print(f"[DEBUG] فایل موجود است: {f}")
 
 # ======================== 📦 حافظه دستورات ========================
 def load_commands():
@@ -77,12 +70,11 @@ def save_commands(data):
 
 # ======================== 💾 بکاپ ZIP جامع ========================
 def backup_all_commands():
-    """بکاپ تمام فایل‌ها و پوشه‌های مورد نیاز"""
+    """نسخه بکاپ جامع از فایل‌ها و پوشه‌های مهم"""
     now = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     zip_file = os.path.join(BACKUP_DIR, f"full_backup_{now}.zip")
 
     with zipfile.ZipFile(zip_file, 'w', compression=zipfile.ZIP_DEFLATED) as zipf:
-        # بکاپ فایل‌ها و پوشه‌ها
         for f in required_files + required_dirs:
             if os.path.exists(f):
                 if os.path.isdir(f):
@@ -94,10 +86,9 @@ def backup_all_commands():
                 else:
                     arcname = os.path.relpath(f, BASE_DIR)
                     zipf.write(f, arcname)
-
     print(f"✅ بکاپ کامل گرفته شد → {zip_file}")
 
-# ======================== 📥 ذخیره دستور (به همراه مدیا داخل required_dirs) ========================
+# ======================== 📥 ذخیره دستور (به همراه مدیا) ========================
 async def save_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     chat = update.effective_chat
@@ -127,44 +118,40 @@ async def save_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         file_id = None
         local_path = None
 
-        # برای مدیا، همه داخل jokes_media یا fortunes_media ذخیره می‌کنیم
-        media_dir = os.path.join(DATA_DIR, "fortunes_media")  # می‌تونی براساس نوع دستور تغییر بدی
-        os.makedirs(media_dir, exist_ok=True)
-
         if reply.photo:
             file = await reply.photo[-1].get_file()
-            local_path = os.path.join(media_dir, f"{name}_{int(datetime.now().timestamp())}.jpg")
+            local_path = os.path.join(COMMANDS_MEDIA_DIR, f"{name}_{int(datetime.now().timestamp())}.jpg")
             await file.download_to_drive(local_path)
             entry = {"type": "photo", "data": file.file_id, "local": os.path.relpath(local_path, BASE_DIR)}
 
         elif reply.video:
             file = await reply.video.get_file()
-            local_path = os.path.join(media_dir, f"{name}_{int(datetime.now().timestamp())}.mp4")
+            local_path = os.path.join(COMMANDS_MEDIA_DIR, f"{name}_{int(datetime.now().timestamp())}.mp4")
             await file.download_to_drive(local_path)
             entry = {"type": "video", "data": file.file_id, "local": os.path.relpath(local_path, BASE_DIR)}
 
         elif reply.document:
             file = await reply.document.get_file()
             ext = os.path.splitext(reply.document.file_name)[1] or ".dat"
-            local_path = os.path.join(media_dir, f"{name}_{int(datetime.now().timestamp())}{ext}")
+            local_path = os.path.join(COMMANDS_MEDIA_DIR, f"{name}_{int(datetime.now().timestamp())}{ext}")
             await file.download_to_drive(local_path)
             entry = {"type": "document", "data": file.file_id, "local": os.path.relpath(local_path, BASE_DIR)}
 
         elif reply.voice:
             file = await reply.voice.get_file()
-            local_path = os.path.join(media_dir, f"{name}_{int(datetime.now().timestamp())}.ogg")
+            local_path = os.path.join(COMMANDS_MEDIA_DIR, f"{name}_{int(datetime.now().timestamp())}.ogg")
             await file.download_to_drive(local_path)
             entry = {"type": "voice", "data": file.file_id, "local": os.path.relpath(local_path, BASE_DIR)}
 
         elif reply.animation:
             file = await reply.animation.get_file()
-            local_path = os.path.join(media_dir, f"{name}_{int(datetime.now().timestamp())}.mp4")
+            local_path = os.path.join(COMMANDS_MEDIA_DIR, f"{name}_{int(datetime.now().timestamp())}.mp4")
             await file.download_to_drive(local_path)
             entry = {"type": "animation", "data": file.file_id, "local": os.path.relpath(local_path, BASE_DIR)}
 
         elif reply.sticker:
             file = await reply.sticker.get_file()
-            local_path = os.path.join(media_dir, f"{name}_{int(datetime.now().timestamp())}.webp")
+            local_path = os.path.join(COMMANDS_MEDIA_DIR, f"{name}_{int(datetime.now().timestamp())}.webp")
             await file.download_to_drive(local_path)
             entry = {"type": "sticker", "data": file.file_id, "local": os.path.relpath(local_path, BASE_DIR)}
 
