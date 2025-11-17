@@ -1,4 +1,4 @@
-# ======================== ⚙️ command_manager.py (نسخه اصلاح‌شده کامل) ========================
+# ======================== ⚙️ command_manager.py (نسخه یکپارچه) ========================
 import os
 import json
 import random
@@ -11,13 +11,14 @@ from telegram.ext import ContextTypes
 ADMIN_ID = 8588347189
 
 # ======================== 📁 مسیرهای اصلی ========================
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))  # مسیر auto_brain
-DATA_DIR = os.path.join(BASE_DIR, "data")
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # مسیر ریشه ربات
+DATA_DIR = os.path.join(BASE_DIR, "data")  # همه فایل‌ها اینجا قرار می‌گیرند
 BACKUP_DIR = os.path.join(DATA_DIR, "backups")
 
 os.makedirs(DATA_DIR, exist_ok=True)
 os.makedirs(BACKUP_DIR, exist_ok=True)
 
+# فایل دستورات
 DATA_FILE = os.path.join(DATA_DIR, "custom_commands.json")
 BACKUP_FILE = os.path.join(BACKUP_DIR, "custom_commands_backup.json")
 
@@ -82,20 +83,21 @@ def backup_all_commands():
     zip_file = os.path.join(BACKUP_DIR, f"full_backup_{now}.zip")
 
     with zipfile.ZipFile(zip_file, 'w', compression=zipfile.ZIP_DEFLATED) as zipf:
-        # بکاپ همه فایل‌ها و پوشه‌ها
+        # بکاپ فایل‌ها و پوشه‌ها
         for f in files_to_backup:
             if os.path.exists(f):
                 if os.path.isdir(f):
                     for root, _, files in os.walk(f):
                         for file in files:
                             full_path = os.path.join(root, file)
-                            arcname = os.path.relpath(full_path, BASE_DIR)
+                            arcname = os.path.relpath(full_path, DATA_DIR)
                             zipf.write(full_path, arcname)
                 else:
-                    arcname = os.path.relpath(f, BASE_DIR)
+                    arcname = os.path.relpath(f, DATA_DIR)
                     zipf.write(f, arcname)
         # بکاپ تمام فایل‌های .py داخل auto_brain
-        for root, _, files in os.walk(BASE_DIR):
+        auto_brain_dir = os.path.join(BASE_DIR, "auto_brain")
+        for root, _, files in os.walk(auto_brain_dir):
             for file in files:
                 if file.endswith(".py"):
                     full_path = os.path.join(root, file)
