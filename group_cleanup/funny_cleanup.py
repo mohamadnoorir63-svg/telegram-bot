@@ -19,14 +19,12 @@ HEAVY_LIMIT = 600           # پاکسازی سنگین → یوزربات
 
 # ================== 🧠 بافر پیام‌ها ==================
 
-# ذخیره تمام پیام‌ها شامل ربات‌ها و مدیران
 track_map: dict[int, Deque[Tuple[int, int]]] = defaultdict(lambda: deque(maxlen=TRACK_BUFFER))
 
 async def track_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = update.effective_message
-    if msg and update.effective_chat.type in ("group", "supergroup"):
-        # ذخیره همه پیام‌ها حتی ربات‌ها و مدیران
-        track_map[update.effective_chat.id].append((msg.message_id, msg.from_user.id if msg.from_user else None))
+    if msg and msg.from_user and update.effective_chat.type in ("group", "supergroup"):
+        track_map[update.effective_chat.id].append((msg.message_id, msg.from_user.id))
 
 # ================== 🔐 دسترسی ==================
 
@@ -39,7 +37,7 @@ async def _has_access(context, chat_id, user_id):
     except:
         return False
 
-# ================== ⚡ حذف پیام‌ها ==================
+# ================== ⚡ حذف محلی ==================
 
 async def _batch_delete(context, chat_id, ids, fast=False):
     if not ids:
@@ -70,10 +68,10 @@ async def _delete_last_n(context, chat_id, last_id, n):
     return await _delete_messages(context, chat_id, mids)
 
 async def _delete_by_user(context, chat_id, user_id):
-    mids = [mid for mid, uid in reversed(track_map[chat_id]) if uid == user_id or uid is None]
+    mids = [mid for mid, uid in reversed(track_map[chat_id]) if uid == user_id]
     return await _delete_messages(context, chat_id, mids)
 
-# ================== 🤝 هماهنگی با یوزربات ==================
+# ================== 🤝 ارسال فرمان به یوزربات ==================
 
 async def send_cleanup_to_userbot(context, chat_id, last_id, count_or_list):
     if isinstance(count_or_list, list):
@@ -96,6 +94,7 @@ async def funny_cleanup(update, context):
     chat = update.effective_chat
     msg = update.effective_message
     user = update.effective_user
+
     text = (msg.text or "").strip().lower()
     args = context.args
 
@@ -112,15 +111,20 @@ async def funny_cleanup(update, context):
         if msg.message_id > HEAVY_LIMIT:
             if await send_cleanup_to_userbot(context, chat.id, msg.message_id, None):
                 return await msg.reply_text("🧹 پاکسازی سنگین توسط یوزربات انجام می‌شود…")
+
         deleted = await _delete_all_messages(context, chat.id, msg.message_id)
 
-    # --- حذف پیام‌های یک کاربر ---
+    # --- حذف پیام‌های شخص ---
     elif msg.reply_to_message and (text.startswith("پاک") or text.startswith("حذف")):
         target = msg.reply_to_message.from_user
-        mids = [mid for mid, uid in reversed(track_map[chat.id]) if uid == target.id or uid is None]
+
+        mids = [mid for mid, uid in reversed(track_map[chat.id]) if uid == target.id]
+
+        # اگر زیاد بود → بده یوزربات
         if len(mids) > HEAVY_LIMIT:
             if await send_cleanup_to_userbot(context, chat.id, msg.message_id, mids):
                 return await msg.reply_text("🧑‍💻 حذف پیام‌های کاربر توسط یوزربات انجام شد")
+
         deleted = await _delete_by_user(context, chat.id, target.id)
 
     # --- حذف عددی ---
@@ -129,10 +133,13 @@ async def funny_cleanup(update, context):
             n = int(args[0]) if args else int(text.split()[1])
         except:
             return await msg.reply_text("فرمت صحیح: حذف 100")
+
         n = max(1, min(n, MAX_BULK))
+
         if n > HEAVY_LIMIT:
             if await send_cleanup_to_userbot(context, chat.id, msg.message_id, n):
                 return await msg.reply_text(f"🧹 حذف {n} پیام توسط یوزربات انجام می‌شود")
+
         deleted = await _delete_last_n(context, chat.id, msg.message_id, n)
 
     else:
