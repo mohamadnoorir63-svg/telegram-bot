@@ -193,17 +193,18 @@ async def handle_commands(event):
 
         # در غیر این صورت → پاکسازی کامل
         await cleanup_via_userbot(chat_id, last_msg_id=last_msg_id)
+
 # ---------- پینگ ----------
 @client.on(events.NewMessage)
 async def simple_ping(event):
     text = event.raw_text.lower()
     if text == "ping":
         await event.reply("✅ Userbot Online")
-        @client.on(events.NewMessage)
+
+# ---------- لفت ----------
+@client.on(events.NewMessage)
 async def simple_left(event):
     text = event.raw_text.lower()
-
-    # دستور لفت خودش از همان گروه
     if text == "left":
         try:
             chat_id = event.chat_id
