@@ -74,7 +74,8 @@ from panels.panel_menu import (
     handle_fun_buttons,
     
 )
-
+from auto_brain.command_manager import backup_all_commands
+backup_all_commands()
 from group_control.origin_title import register_origin_title_handlers
 from context_memory import ContextMemory
 from brain_bridge_group import process_group_message
