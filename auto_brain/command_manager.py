@@ -1,4 +1,4 @@
-# ======================== ⚙️ command_manager.py ========================
+# ======================== ⚙️ command_manager.py (نسخه اصلاح‌شده) ========================
 import os
 import json
 import random
@@ -10,8 +10,9 @@ from telegram.ext import ContextTypes
 
 ADMIN_ID = 8588347189
 
-# ======================== 📁 مسیرهای استاندارد ========================
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+# ======================== 📁 مسیرهای اصلی ========================
+# مسیر ریشه ربات (یک سطح بالاتر از auto_brain)
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA_DIR = os.path.join(BASE_DIR, "data")
 BACKUP_DIR = os.path.join(DATA_DIR, "backups")
 
@@ -21,7 +22,7 @@ os.makedirs(BACKUP_DIR, exist_ok=True)
 DATA_FILE = os.path.join(DATA_DIR, "custom_commands.json")
 BACKUP_FILE = os.path.join(BACKUP_DIR, "custom_commands_backup.json")
 
-# ======================== 🔧 اطمینان از وجود فایل‌ها ========================
+# ======================== 🔧 فایل‌ها و پوشه‌های مورد نیاز ========================
 required_files = [
     DATA_FILE,
     os.path.join(DATA_DIR, "shadow_memory.json"),
@@ -39,7 +40,7 @@ required_dirs = [
     os.path.join(DATA_DIR, "group_control")
 ]
 
-# ساخت پوشه‌های لازم
+# ساخت پوشه‌ها
 for d in required_dirs:
     os.makedirs(d, exist_ok=True)
 
@@ -61,20 +62,22 @@ def load_commands():
 def save_commands(data):
     """ذخیره فایل + بکاپ JSON + بکاپ ZIP کامل"""
     try:
+        # بکاپ JSON قبل از ذخیره
         if os.path.exists(DATA_FILE):
             shutil.copy2(DATA_FILE, BACKUP_FILE)
             print(f"[DEBUG] بکاپ JSON ذخیره شد → {BACKUP_FILE}")
     except Exception as e:
         print(f"[WARN] بکاپ JSON ذخیره نشد: {e}")
 
+    # ذخیره فایل اصلی
     with open(DATA_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
     print(f"[DEBUG] فایل اصلی ذخیره شد → {DATA_FILE}")
 
-    # بکاپ کامل ZIP
+    # بکاپ ZIP کامل
     backup_all_commands()
 
-# ======================== 💾 بکاپ کامل ZIP ========================
+# ======================== 💾 بکاپ ZIP جامع ========================
 def backup_all_commands():
     """نسخه بکاپ جامع از فایل‌ها و پوشه‌های مهم"""
     files_to_backup = required_files + required_dirs
