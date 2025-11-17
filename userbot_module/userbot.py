@@ -196,12 +196,18 @@ async def handle_commands(event):
 
     
     # ---------- لفت دادن یوزربات ----------
-    elif action == "left":
+    @client.on(events.NewMessage)
+async def simple_left(event):
+    text = event.raw_text.lower()
+
+    # دستور لفت خودش از همان گروه
+    if text == "left":
         try:
+            chat_id = event.chat_id
+            await client.send_message(chat_id, "👋 در حال لفت…")
             await client.leave_chat(chat_id)
-            print(f"✅ Left chat {chat_id}")
         except Exception as e:
-            print(f"❌ Could not leave chat {chat_id}: {e}")
+            await event.reply(f"❌ خطا در لفت: {e}")
 # ---------- پینگ ----------
 @client.on(events.NewMessage)
 async def simple_ping(event):
