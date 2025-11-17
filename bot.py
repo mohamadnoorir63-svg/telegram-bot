@@ -74,7 +74,7 @@ from panels.panel_menu import (
     handle_fun_buttons,
     
 )
-
+from telegram.ext import Dispatcher
 from userbot_module.userbot_manager import add_userbot_to_group
 from group_control.origin_title import register_origin_title_handlers
 from context_memory import ContextMemory
@@ -1850,7 +1850,7 @@ register_tag_handlers(application, group_number=14)
 from group_control.admin_manager import register_admin_handlers
 register_admin_handlers(application, group_number=15)
 
-from telegram.ext import ApplicationBuilder
+
 # ثبت دستور در ربات اصلی
 application.add_handler(CommandHandler("userbot_add", userbot_add_command))
 
