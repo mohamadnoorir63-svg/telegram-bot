@@ -193,24 +193,22 @@ async def handle_commands(event):
 
         # در غیر این صورت → پاکسازی کامل
         await cleanup_via_userbot(chat_id, last_msg_id=last_msg_id)
-        # ---------- لفت دادن یوزربات ----------
-elif action == "left":
-    try:
-        await client.leave_chat(chat_id)
-        print(f"✅ Left chat {chat_id}")
-    except Exception as e:
-        print(f"❌ Could not leave chat {chat_id}: {e}")
 
-    # ---------- پینگ ----------
-    from telethon import events
+    # ---------- لفت دادن یوزربات ----------
+    elif action == "left":
+        try:
+            await client.leave_chat(chat_id)
+            await event.reply(f"✅ Userbot left chat {chat_id}")
+        except Exception as e:
+            await event.reply(f"❌ Could not leave chat {chat_id}: {e}")
 
-# هندلر پینگ ساده
+# ---------- پینگ ----------
 @client.on(events.NewMessage)
 async def simple_ping(event):
     text = event.raw_text.lower()
-
     if text == "ping":
         await event.reply("✅ Userbot Online")
+
 # ================= استارت یوزربات =================
 async def start_userbot():
     await client.start()
