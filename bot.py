@@ -1846,7 +1846,8 @@ register_tag_handlers(application, group_number=14)
 from group_control.admin_manager import register_admin_handlers
 register_admin_handlers(application, group_number=15)
 
-
+from mafia_module import register_mafia_handlers
+register_mafia_handlers(application, group_number=6)  # عدد گروه دلخواه
 # ==========================================================
 # 👑 مدیریت سودوها
 # ==========================================================
