@@ -1,49 +1,41 @@
 # ==============================
-# app.py — Fast Heroku Webhook
+# app.py — Fast Heroku Webhook (Optimized)
 # ==============================
 
+import os, asyncio
 from flask import Flask, request
-from telegram import Update, Bot
-from telegram.ext import Application
-import os
-import threading
+from telegram import Bot, Update
+from telegram.ext import Application, ContextTypes
+from bot import register_handlers, init_files, start_userbot, notify_admin_on_startup, auto_backup, start_auto_brain_loop
 
 # -------------------------
-# 1) TOKEN از Config Vars
+# 1) Config Vars
 # -------------------------
-
 TOKEN = os.environ.get("BOT_TOKEN")
-if not TOKEN:
-    raise ValueError("❌ خطا: BOT_TOKEN در Heroku تنظیم نشده!")
+WEBHOOK_URL = os.environ.get("WEBHOOK_URL")  # https://yourapp.herokuapp.com/webhook
 
-WEBHOOK_URL = os.environ.get("WEBHOOK_URL")  
-# مثل: https://mybot2.herokuapp.com/webhook
-
-if not WEBHOOK_URL:
-    raise ValueError("❌ WEBHOOK_URL در Heroku تنظیم نشده!")
+if not TOKEN or not WEBHOOK_URL:
+    raise ValueError("❌ BOT_TOKEN یا WEBHOOK_URL تنظیم نشده!")
 
 # -------------------------
-# 2) ساخت Bot + Application
+# 2) Init bot & application
 # -------------------------
-
 bot = Bot(token=TOKEN)
-
-application = Application.builder() \
-    .token(TOKEN) \
-    .concurrent_updates(True) \
-    .build()
+application = Application.builder().token(TOKEN).concurrent_updates(True).build()
 
 # -------------------------
-# 3) بارگذاری Handlerها
+# 3) Initialize required files
 # -------------------------
+init_files()
 
-from bot import register_handlers
+# -------------------------
+# 4) Register handlers
+# -------------------------
 register_handlers(application)
 
 # -------------------------
-# 4) Webhook با Flask
+# 5) Flask webhook server
 # -------------------------
-
 app = Flask(__name__)
 
 @app.route("/", methods=["GET"])
@@ -51,34 +43,31 @@ def home():
     return "🤖 Bot is running!", 200
 
 @app.route("/webhook", methods=["POST"])
-def webhook():
+async def webhook():
     try:
         data = request.get_json(force=True)
         update = Update.de_json(data, bot)
-
-        # پیام می‌رود داخل صف — فوق سریع
-        application.update_queue.put_nowait(update)
-
+        await application.update_queue.put(update)
     except Exception as e:
         print("❌ Webhook Error:", e)
         return "Error", 500
-
     return "OK", 200
 
+# -------------------------
+# 6) Startup tasks (async)
+# -------------------------
+async def on_startup(app):
+    await notify_admin_on_startup(app)
+    app.create_task(auto_backup(app.bot))
+    app.create_task(start_auto_brain_loop(app.bot))
+    app.create_task(start_userbot())  # یوزربات جانبی
+    print("🌙 Startup tasks scheduled ✅")
+
+application.post_init = on_startup
 
 # -------------------------
-# 5) اجرای Application در Thread جدا
+# 7) Run Flask server (Heroku)
 # -------------------------
-
-def run_application():
-    application.run_polling(stop_signals=None)
-
-threading.Thread(target=run_application, daemon=True).start()
-
-# -------------------------
-# 6) اجرای Flask روی Heroku
-# -------------------------
-
 if __name__ == "__main__":
     print("🚀 Starting Fast Webhook Server...")
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
