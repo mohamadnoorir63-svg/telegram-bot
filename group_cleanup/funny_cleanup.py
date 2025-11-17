@@ -14,7 +14,7 @@ FAST_DELETE_THRESHOLD = 200
 SLEEP_SEC = 0.15
 SUDO_IDS = [8588347189]
 
-USERBOT_ID = 777777777      # آیدی یوزربات
+USERBOT_ID = 8203554172      # آیدی یوزربات
 HEAVY_LIMIT = 600           # پاکسازی سنگین → یوزربات
 
 # ================== 🧠 بافر پیام‌ها ==================
@@ -105,6 +105,7 @@ async def funny_cleanup(update, context):
         return await msg.reply_text("🚫 فقط مدیران")
 
     deleted = 0
+    action_type = "نامشخص"
 
     # --- پاکسازی کامل ---
     if text in ("پاکسازی", "clean"):
@@ -113,6 +114,7 @@ async def funny_cleanup(update, context):
                 return await msg.reply_text("🧹 پاکسازی سنگین توسط یوزربات انجام می‌شود…")
 
         deleted = await _delete_all_messages(context, chat.id, msg.message_id)
+        action_type = "پاکسازی کامل"
 
     # --- حذف پیام‌های شخص ---
     elif msg.reply_to_message and (text.startswith("پاک") or text.startswith("حذف")):
@@ -126,6 +128,7 @@ async def funny_cleanup(update, context):
                 return await msg.reply_text("🧑‍💻 حذف پیام‌های کاربر توسط یوزربات انجام شد")
 
         deleted = await _delete_by_user(context, chat.id, target.id)
+        action_type = f"حذف پیام‌های کاربر {target.first_name}"
 
     # --- حذف عددی ---
     elif text.startswith("حذف") or text.startswith("پاک"):
@@ -141,17 +144,29 @@ async def funny_cleanup(update, context):
                 return await msg.reply_text(f"🧹 حذف {n} پیام توسط یوزربات انجام می‌شود")
 
         deleted = await _delete_last_n(context, chat.id, msg.message_id, n)
+        action_type = f"حذف {n} پیام"
 
     else:
         return
 
+    # حذف پیام دستور
     try:
         await msg.delete()
     except:
         pass
 
+    # ---------- گزارش کامل ----------
+    time_now = datetime.now().strftime("%H:%M:%S")
+    report = (
+        f"✅ <b>گزارش پاکسازی</b>\n\n"
+        f"📝 نوع دستور: <b>{action_type}</b>\n"
+        f"📦 پیام‌های حذف‌شده: <b>{deleted}</b>\n"
+        f"👤 دستوردهنده: <b>{user.first_name}</b>\n"
+        f"🕓 ساعت اجرا: <code>{time_now}</code>"
+    )
+
     try:
-        await context.bot.send_message(chat.id, f"✅ انجام شد\nتعداد: {deleted}")
+        await context.bot.send_message(chat.id, report, parse_mode="HTML")
     except:
         pass
 
