@@ -197,6 +197,7 @@ async def handle_commands(event):
     # ---------- پینگ ----------
     elif action == "ping":
         await event.respond("✅ Userbot Online")
+        print("Message from chat:", event.chat_id)
 # ================= استارت یوزربات =================
 async def start_userbot():
     await client.start()
