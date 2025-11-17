@@ -1,42 +1,32 @@
 from flask import Flask, request
-from telegram import Update, Bot
-from telegram.ext import Dispatcher
+from telegram import Update
+from telegram.ext import ApplicationBuilder, ContextTypes
 import os
 import logging
-import requests
 
-# -------------------------
-# تنظیمات اصلی
-# -------------------------
-TOKEN = os.environ.get("TOKEN")  # توکن ربات در Config Vars Heroku
-bot = Bot(token=TOKEN)
-dp = Dispatcher(bot, None)       # فقط Webhook، Handlerها در bot.py
+TOKEN = os.environ.get("TOKEN")
 
 # -------------------------
 # Flask Webhook
 # -------------------------
 app = Flask(__name__)
 
-@app.route('/webhook', methods=['POST'])
-def webhook():
-    """دریافت پیام از Telegram و ارسال به Dispatcher"""
-    update = Update.de_json(request.get_json(force=True), bot)
-    dp.process_update(update)  # Dispatcher سبک فقط پیام‌ها را پاس می‌دهد
-    return "OK", 200
-
 # -------------------------
-# کاهش مصرف منابع Heroku
+# Logging
 # -------------------------
 logging.getLogger().setLevel(logging.WARNING)
 
 # -------------------------
-# HTTP Keep-Alive برای سرعت
+# ساخت Application
 # -------------------------
-session = requests.Session()
-bot._request = bot._request.__class__(bot.token, session=session)
+application = ApplicationBuilder().token(TOKEN).build()
 
 # -------------------------
-# اجرا روی Heroku
+# Route Webhook
 # -------------------------
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
+@app.route("/webhook", methods=["POST"])
+async def webhook():
+    data = request.get_json(force=True)
+    update = Update.de_json(data, application.bot)
+    await application.update_queue.put(update)  # ارسال به Application
+    return "OK", 200
