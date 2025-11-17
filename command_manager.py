@@ -11,34 +11,38 @@ from telegram.ext import ContextTypes
 ADMIN_ID = 8588347189
 
 # ======================== 📁 مسیرهای اصلی ========================
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))  # کنار bot.py
-DATA_FILE = os.path.join(BASE_DIR, "custom_commands.json")
-COMMANDS_MEDIA_DIR = os.path.join(BASE_DIR, "commands_media")
-BACKUP_DIR = os.path.join(BASE_DIR, "backups")
-BACKUP_FILE = os.path.join(BACKUP_DIR, "custom_commands_backup.json")
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))  # مسیر auto_brain
+DATA_DIR = os.path.join(BASE_DIR, "data")
+BACKUP_DIR = os.path.join(DATA_DIR, "backups")
+COMMANDS_MEDIA_DIR = os.path.join(DATA_DIR, "commands_media")
 
 # ساخت پوشه‌ها در صورت عدم وجود
-os.makedirs(COMMANDS_MEDIA_DIR, exist_ok=True)
-os.makedirs(BACKUP_DIR, exist_ok=True)
+for d in [DATA_DIR, BACKUP_DIR, COMMANDS_MEDIA_DIR]:
+    os.makedirs(d, exist_ok=True)
+
+# فایل اصلی دستورات
+DATA_FILE = os.path.join(DATA_DIR, "custom_commands.json")
+BACKUP_FILE = os.path.join(BACKUP_DIR, "custom_commands_backup.json")
 
 # ======================== 🔧 فایل‌ها و پوشه‌های مورد نیاز ========================
 required_files = [
     DATA_FILE,
-    os.path.join(BASE_DIR, "shadow_memory.json"),
-    os.path.join(BASE_DIR, "memory.json"),
-    os.path.join(BASE_DIR, "group_data.json"),
-    os.path.join(BASE_DIR, "fortunes.json"),
-    os.path.join(BASE_DIR, "jokes.json"),
-    os.path.join(BASE_DIR, "aliases.json"),
-    os.path.join(BASE_DIR, "group_control/aliases.json")
+    os.path.join(DATA_DIR, "shadow_memory.json"),
+    os.path.join(DATA_DIR, "memory.json"),
+    os.path.join(DATA_DIR, "group_data.json"),
+    os.path.join(DATA_DIR, "fortunes.json"),
+    os.path.join(DATA_DIR, "jokes.json"),
+    os.path.join(DATA_DIR, "aliases.json"),
+    os.path.join(DATA_DIR, "group_control/aliases.json")
 ]
 
 required_dirs = [
     COMMANDS_MEDIA_DIR,
-    os.path.join(BASE_DIR, "jokes_media"),
-    os.path.join(BASE_DIR, "group_control")
+    os.path.join(DATA_DIR, "jokes_media"),
+    os.path.join(DATA_DIR, "group_control")
 ]
 
+# ساخت فایل‌ها و پوشه‌های مورد نیاز
 for d in required_dirs:
     os.makedirs(d, exist_ok=True)
 
@@ -70,7 +74,6 @@ def save_commands(data):
 
 # ======================== 💾 بکاپ ZIP جامع ========================
 def backup_all_commands():
-    """نسخه بکاپ جامع از فایل‌ها و پوشه‌های مهم"""
     now = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     zip_file = os.path.join(BACKUP_DIR, f"full_backup_{now}.zip")
 
@@ -86,9 +89,18 @@ def backup_all_commands():
                 else:
                     arcname = os.path.relpath(f, BASE_DIR)
                     zipf.write(f, arcname)
+
+        # بکاپ تمام فایل‌های .py داخل auto_brain
+        for root, _, files in os.walk(BASE_DIR):
+            for file in files:
+                if file.endswith(".py"):
+                    full_path = os.path.join(root, file)
+                    arcname = os.path.relpath(full_path, BASE_DIR)
+                    zipf.write(full_path, arcname)
+
     print(f"✅ بکاپ کامل گرفته شد → {zip_file}")
 
-# ======================== 📥 ذخیره دستور (به همراه مدیا) ========================
+# ======================== 📥 ذخیره دستور ========================
 async def save_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     chat = update.effective_chat
