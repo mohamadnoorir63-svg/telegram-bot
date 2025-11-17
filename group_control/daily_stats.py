@@ -185,18 +185,18 @@ async def show_user_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
         total_added = stats[chat_id][today]["joins_added_per_user"].get(str(target.id), 0)
 
     user_link = f"<a href='tg://user?id={target.id}'>{target.first_name}</a>"
-    text = (
-        f"🧿 <b>اطلاعات کاربر:</b>\n\n"
-        f"👤 نام: {user_link}\n"
-        f"💬 یوزرنیم: {getattr(target,'username','---')}\n"
-        f"🆔 آیدی عددی: <code>{target.id}</code>\n"
-        f"🎖 مقام: {role}\n"
-        f"📊 تعداد پیام امروز: {total_messages}\n"
-        f"📌 تعداد اد اضافه‌شده امروز: {total_added}\n"
-        f"📆 تاریخ: {jalali_date}\n"
-        f"🕒 ساعت: {time_str}"
-        f"🆔 آیدی عددی گروه: {event.chat_id}"
-    )
+text = (
+    f"🧿 <b>اطلاعات کاربر:</b>\n\n"
+    f"👤 نام: {user_link}\n"
+    f"💬 یوزرنیم: {getattr(target,'username','---')}\n"
+    f"🆔 آیدی عددی: <code>{target.id}</code>\n"
+    f"🎖 مقام: {role}\n"
+    f"📊 تعداد پیام امروز: {total_messages}\n"
+    f"📌 تعداد اد اضافه‌شده امروز: {total_added}\n"
+    f"📆 تاریخ: {jalali_date}\n"
+    f"🕒 ساعت: {time_str}\n"
+    f"🆔 آیدی عددی گروه: {chat_id}"
+)
 
     try:
         photos = await context.bot.get_user_profile_photos(target.id, limit=1)
