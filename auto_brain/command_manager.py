@@ -37,17 +37,23 @@ def load_commands():
         return json.load(f)
 
 def save_commands(data):
-    """ذخیره فایل + تولید بکاپ"""
+    """ذخیره فایل اصلی + بکاپ خودکار"""
     try:
         if os.path.exists(DATA_FILE):
+            # بکاپ با تاریخ
+            now = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+            backup_file = os.path.join(BACKUP_DIR, f"custom_commands_backup_{now}.json")
+            shutil.copy2(DATA_FILE, backup_file)
+            print(f"[DEBUG] بکاپ تاریخی ذخیره شد → {backup_file}")
+
+            # بروزرسانی بکاپ ساده
             shutil.copy2(DATA_FILE, BACKUP_FILE)
-            print(f"[DEBUG] بکاپ ذخیره شد → {BACKUP_FILE}")
+            print(f"[DEBUG] بکاپ ساده بروزرسانی شد → {BACKUP_FILE}")
     except Exception as e:
         print(f"[WARN] بکاپ ذخیره نشد: {e}")
 
     with open(DATA_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
-
     print(f"[DEBUG] فایل اصلی ذخیره شد → {DATA_FILE}")
 
 # ======================== 📥 ذخیره دستور ========================
