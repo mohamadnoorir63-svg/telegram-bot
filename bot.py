@@ -1754,9 +1754,7 @@ async def handle_azan_city(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("⚠️ متأسفم، نتوانستم اطلاعات شهر را پیدا کنم!", parse_mode="HTML")
 
         context.user_data["awaiting_azan_city"] = False
-        # ==========================================================
-        async def userbot_add_command(update, context):
-        chat_id = update.effective_chat.id
+    
 # ======================= 🚀 اجرای نهایی =======================
 if __name__ == "__main__":
     print("🤖 خنگول فارسی 8.7 Cloud+ Supreme Pro Stable+ آماده به خدمت است ...")
