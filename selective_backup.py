@@ -16,6 +16,9 @@ ICONS = {
     "shadow_memory.json": "👥",
     "group_data.json": "💬",
     "users.json": "👤",
+    "custom_commands.json": "📜",
+    "custom_commands_backup.json": "🗄️",
+    "fortunes_media": "🖼️",  # پوشه رسانه فال‌ها
     "fortunes.json": "🔮",
     "jokes_manager.py": "😂",
     "custom_help.txt": "📘",
@@ -26,6 +29,8 @@ ICONS = {
 BACKUP_TARGETS = {
     "memory.json": "حافظه اصلی",
     "shadow_memory.json": "حافظه سایه",
+    "custom_commands.json": "دستورهای ذخیره‌شده",
+    "custom_commands_backup.json": "بک‌آپ دستورها",
     "group_data.json": "داده‌های گروه‌ها",
     "users.json": "کاربران",
     "fortunes.json": "فال‌ها",
