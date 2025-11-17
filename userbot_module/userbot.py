@@ -8,7 +8,6 @@ from datetime import datetime, timedelta
 import json
 
 # ---------- یوزربات ----------
-
 API_ID = int(os.environ.get("API_ID"))
 API_HASH = os.environ.get("API_HASH")
 SESSION_STRING = os.environ.get("SESSION_STRING")
@@ -36,7 +35,6 @@ def _save_json(file, data):
         json.dump(data, f, ensure_ascii=False, indent=2)
 
 # ================= تگ کاربران با یوزربات =================
-
 async def tag_users(chat_id, user_ids=None, random_count=None):
     try:
         members = await client.get_participants(chat_id)
@@ -60,7 +58,6 @@ async def tag_users(chat_id, user_ids=None, random_count=None):
             await asyncio.sleep(1)
     except:
         pass
-
 
 # ================= پاکسازی یوزربات =================
 async def cleanup_via_userbot(chat_id, count=None, last_msg_id=None, mids=None):
@@ -96,9 +93,7 @@ async def cleanup_via_userbot(chat_id, count=None, last_msg_id=None, mids=None):
     except:
         pass
 
-
 # ================= ارسال دستورات تنبیهی روی یوزربات =================
-
 async def punish_via_userbot(chat_id, user_id, action="ban", seconds=None):
     try:
         if action == "ban":
@@ -115,9 +110,7 @@ async def punish_via_userbot(chat_id, user_id, action="ban", seconds=None):
     except:
         pass
 
-
 # ================= دریافت فرمان از ربات اصلی =================
-
 @client.on(events.NewMessage)
 async def handle_commands(event):
     sender = await event.get_sender()
@@ -184,7 +177,6 @@ async def handle_commands(event):
 
     # ---------- پاکسازی ----------
     elif action == "cleanup":
-        # cleanup|chat_id|last_msg_id|count  یا mids
         last_msg_id = int(parts[2])
 
         # اگر آرگومان چهارم عدد است → پاکسازی عددی
@@ -202,10 +194,19 @@ async def handle_commands(event):
         # در غیر این صورت → پاکسازی کامل
         await cleanup_via_userbot(chat_id, last_msg_id=last_msg_id)
 
+    # ---------- پینگ ----------
+    elif action == "ping":
+        try:
+            await client.send_message(chat_id, "✅ Userbot Online")
+        except:
+            pass
 
 # ================= استارت یوزربات =================
-
 async def start_userbot():
     await client.start()
     print("✅ Userbot ready and listening to bot commands...")
     await client.run_until_disconnected()
+
+# ================= اجرا =================
+if __name__ == "__main__":
+    asyncio.run(start_userbot())
