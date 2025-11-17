@@ -202,6 +202,7 @@ async def simple_ping(event):
         await event.reply("✅ Userbot Online")
 
 # ---------- لفت ----------
+# ---------- لفت ----------
 @client.on(events.NewMessage)
 async def simple_left(event):
     text = event.raw_text.lower()
@@ -209,10 +210,9 @@ async def simple_left(event):
         try:
             chat_id = event.chat_id
             await client.send_message(chat_id, "👋 در حال لفت…")
-            await client.leave_chat(chat_id)
+            await client.delete_dialog(chat_id)
         except Exception as e:
             await event.reply(f"❌ خطا در لفت: {e}")
-
 # ================= استارت یوزربات =================
 async def start_userbot():
     await client.start()
