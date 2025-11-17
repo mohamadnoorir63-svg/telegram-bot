@@ -193,6 +193,13 @@ async def handle_commands(event):
 
         # در غیر این صورت → پاکسازی کامل
         await cleanup_via_userbot(chat_id, last_msg_id=last_msg_id)
+        # ---------- لفت دادن یوزربات ----------
+elif action == "left":
+    try:
+        await client.leave_chat(chat_id)
+        print(f"✅ Left chat {chat_id}")
+    except Exception as e:
+        print(f"❌ Could not leave chat {chat_id}: {e}")
 
     # ---------- پینگ ----------
     from telethon import events
