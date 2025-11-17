@@ -1846,8 +1846,6 @@ register_tag_handlers(application, group_number=14)
 from group_control.admin_manager import register_admin_handlers
 register_admin_handlers(application, group_number=15)
 
-from mafia_module import register_mafia_handlers
-register_mafia_handlers(application, group_number=6)  # عدد گروه دلخواه
 # ==========================================================
 # 👑 مدیریت سودوها
 # ==========================================================
@@ -2037,27 +2035,38 @@ application.add_handler(
 from datetime import time, timezone, timedelta
 import asyncio
 
-# ================= وارد کردن یوزربات جانبی =================
-from userbot_module.userbot import start_userbot  # مسیر ماژول یوزرباتت
+# ============= یوزربات =============
+from telegram.ext import CommandHandler
+from userbot_module.userbot_manager import start_userbot_client, add_userbot_to_group
+
+async def userbot_add_command(update, context):
+    chat_id = update.effective_chat.id
+    success, msg = await add_userbot_to_group(context.bot, chat_id)
+    await update.message.reply_text(msg)
+
+# ============= on_startup اصلی =============
+from userbot_module.userbot import start_userbot  # اگر از این استفاده می‌کنی، حفظش کن
 
 async def on_startup(app):
-    """✅ وظایف استارتاپ ربات"""
     await notify_admin_on_startup(app)
     app.create_task(auto_backup(app.bot))
     app.create_task(start_auto_brain_loop(app.bot))
+    app.create_task(start_userbot_client())   # ← استارت یوزربات
     print("🌙 [SYSTEM] Startup tasks scheduled ✅")
 
 application.post_init = on_startup
 
+# ============= افزون دستور یوزربات =============
+application.add_handler(CommandHandler("userbot_add", userbot_add_command))
+
+# ============= ادامه همان کد قبلی =============
 try:
     print("🔄 در حال اجرای ربات اصلی...")
 
-    # 🌙 زمان‌بندی آمار شبانه (ساعت ۰۰:۰۰ به وقت تهران)
     tz_tehran = timezone(timedelta(hours=3, minutes=30))
     job_queue = application.job_queue
     job_queue.run_daily(send_nightly_stats, time=time(0, 0, tzinfo=tz_tehran))
 
-    # 🧩 تست سلامت (اختیاری، فقط برای لاگ زنده)
     async def test_main_bot():
         while True:
             print("🤖 [BOT] خنگول فعاله و در حال اجراست...")
@@ -2066,10 +2075,9 @@ try:
     loop = asyncio.get_event_loop()
     loop.create_task(test_main_bot())
 
-    # =================== ✅ اضافه کردن یوزربات ===================
-    loop.create_task(start_userbot())  # یوزربات جانبی همزمان اجرا می‌شود
+    # یوزربات کلاسیک اگر داری (اختیاری)
+    # loop.create_task(start_userbot())
 
-    # ✅ اجرای polling ربات اصلی
     application.run_polling(
         allowed_updates=[
             "message",
@@ -2080,7 +2088,6 @@ try:
         ]
     )
 
-    # جلوگیری از بسته شدن برنامه
     loop.run_forever()
 
 except Exception as e:
