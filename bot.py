@@ -714,17 +714,21 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         # 🧩 فایل‌ها و پوشه‌های مهم برای بازیابی
         important_files = [
-            "memory.json",
-            "group_data.json",
-            "jokes.json",
-            "fortunes.json",
-            "aliases.json",
-            # مسیر اصلی
-            "group_control/aliases.json",
-            # مسیر داخل پوشه
-            "fortunes_media",
-            # پوشه رسانه فال‌ها
-            "custom_commands.json",  # دستورهای ذخیره شده
+        "memory.json",
+        "group_data.json",
+        "jokes.json",
+        "fortunes.json",
+        "aliases.json",
+
+        # مسیر اصلی
+        "group_control/aliases.json",
+
+        # پوشه رسانه فال‌ها
+        "fortunes_media",
+
+        # دستورهای ذخیره‌شده
+        "custom_commands.json",
+        "custom_commands_backup.json",
         ]
 
         moved_any = False
