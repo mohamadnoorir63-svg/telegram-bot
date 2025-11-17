@@ -100,6 +100,9 @@ def backup_all_commands():
     print(f"✅ بکاپ کامل گرفته شد → {zip_file}")
 
 # ======================== 📥 ذخیره دستور ========================
+# ======================== 📥 ذخیره دستور (به همراه مدیا) ========================
+
+
 async def save_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     chat = update.effective_chat
@@ -125,20 +128,49 @@ async def save_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     entry = {}
     if reply.text:
         entry = {"type": "text", "data": reply.text}
-    elif reply.photo:
-        entry = {"type": "photo", "data": reply.photo[-1].file_id}
-    elif reply.video:
-        entry = {"type": "video", "data": reply.video.file_id}
-    elif reply.document:
-        entry = {"type": "document", "data": reply.document.file_id}
-    elif reply.voice:
-        entry = {"type": "voice", "data": reply.voice.file_id}
-    elif reply.animation:
-        entry = {"type": "animation", "data": reply.animation.file_id}
-    elif reply.sticker:
-        entry = {"type": "sticker", "data": reply.sticker.file_id}
     else:
-        return await update.message.reply_text("⚠️ این نوع پیام پشتیبانی نمی‌شود.")
+        file_id = None
+        local_path = None
+
+        if reply.photo:
+            file = await reply.photo[-1].get_file()
+            local_path = os.path.join(COMMANDS_MEDIA_DIR, f"{name}_{int(datetime.now().timestamp())}.jpg")
+            await file.download_to_drive(local_path)
+            entry = {"type": "photo", "data": file.file_id, "local": os.path.relpath(local_path, BASE_DIR)}
+
+        elif reply.video:
+            file = await reply.video.get_file()
+            local_path = os.path.join(COMMANDS_MEDIA_DIR, f"{name}_{int(datetime.now().timestamp())}.mp4")
+            await file.download_to_drive(local_path)
+            entry = {"type": "video", "data": file.file_id, "local": os.path.relpath(local_path, BASE_DIR)}
+
+        elif reply.document:
+            file = await reply.document.get_file()
+            ext = os.path.splitext(reply.document.file_name)[1] or ".dat"
+            local_path = os.path.join(COMMANDS_MEDIA_DIR, f"{name}_{int(datetime.now().timestamp())}{ext}")
+            await file.download_to_drive(local_path)
+            entry = {"type": "document", "data": file.file_id, "local": os.path.relpath(local_path, BASE_DIR)}
+
+        elif reply.voice:
+            file = await reply.voice.get_file()
+            local_path = os.path.join(COMMANDS_MEDIA_DIR, f"{name}_{int(datetime.now().timestamp())}.ogg")
+            await file.download_to_drive(local_path)
+            entry = {"type": "voice", "data": file.file_id, "local": os.path.relpath(local_path, BASE_DIR)}
+
+        elif reply.animation:
+            file = await reply.animation.get_file()
+            local_path = os.path.join(COMMANDS_MEDIA_DIR, f"{name}_{int(datetime.now().timestamp())}.mp4")
+            await file.download_to_drive(local_path)
+            entry = {"type": "animation", "data": file.file_id, "local": os.path.relpath(local_path, BASE_DIR)}
+
+        elif reply.sticker:
+            file = await reply.sticker.get_file()
+            local_path = os.path.join(COMMANDS_MEDIA_DIR, f"{name}_{int(datetime.now().timestamp())}.webp")
+            await file.download_to_drive(local_path)
+            entry = {"type": "sticker", "data": file.file_id, "local": os.path.relpath(local_path, BASE_DIR)}
+
+        else:
+            return await update.message.reply_text("⚠️ این نوع پیام پشتیبانی نمی‌شود.")
 
     doc["responses"].append(entry)
     if len(doc["responses"]) > 100:
@@ -151,7 +183,6 @@ async def save_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"✅ پاسخ برای دستور <b>{name}</b> ذخیره شد. ({len(doc['responses'])}/100)",
         parse_mode="HTML"
     )
-
 # ======================== 📤 اجرای دستور ========================
 async def handle_custom_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message or not update.message.text:
