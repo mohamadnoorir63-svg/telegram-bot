@@ -49,7 +49,7 @@ from emotion_memory import init_emotion_memory, remember_emotion, get_last_emoti
 from auto_brain.auto_brain import start_auto_brain_loop
 from selective_backup import selective_backup_menu, selective_backup_buttons
 from auto_brain import auto_backup
-from auto_brain.command_manager import (
+from command_manager import (
     save_command,
     delete_command,
     handle_custom_command,
