@@ -1861,17 +1861,7 @@ application.add_handler(CommandHandler("listsudo", list_sudos))
 # ==========================================================
 # 💾 دستورات شخصی (ذخیره، حذف، اجرای دستورها)
 # ==========================================================
-from telegram.ext import CommandHandler, MessageHandler, CallbackQueryHandler, filters
 
-def register_handlers(app):
-    # دستورات شخصی
-    app.add_handler(CommandHandler("save", save_command))
-    app.add_handler(CommandHandler("del", delete_command))
-    app.add_handler(CommandHandler("listcmds", list_commands))
-
-    # اینجا می‌تونی بقیه هندلرها رو هم اضافه کنی
-    # مثل هندلر پیام‌ها یا callbackها
-    # app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, some_function))
 # ==========================================================
 #پیام‌های متنی غیر از کامند → هندلر دستورات ذخیره‌شده
 application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_custom_command), group=-4)
