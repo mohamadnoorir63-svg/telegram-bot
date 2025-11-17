@@ -195,12 +195,8 @@ async def handle_commands(event):
         await cleanup_via_userbot(chat_id, last_msg_id=last_msg_id)
 
     # ---------- پینگ ----------
-    # ---------- پینگ بدون نیاز به chat_id ----------
     elif action == "ping":
-        try:
-            await event.respond("✅ Userbot Online")
-        except:
-            pass
+        await event.respond("✅ Userbot Online")
 # ================= استارت یوزربات =================
 async def start_userbot():
     await client.start()
