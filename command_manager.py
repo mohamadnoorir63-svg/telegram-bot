@@ -105,6 +105,9 @@ def backup_all_commands():
     print(f"✅ بکاپ کامل گرفته شد → {zip_file}")
 
 # ======================== 📥 ذخیره دستور (به همراه مدیا) ========================
+# ======================== 📥 ذخیره دستور (به همراه مدیا) ========================
+import aiofiles
+
 async def save_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     chat = update.effective_chat
@@ -133,24 +136,46 @@ async def save_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         file_id = None
         local_path = None
-        if reply.photo:
-            file_id = reply.photo[-1].file_id
-        elif reply.video:
-            file_id = reply.video.file_id
-        elif reply.document:
-            file_id = reply.document.file_id
-        elif reply.voice:
-            file_id = reply.voice.file_id
-        elif reply.animation:
-            file_id = reply.animation.file_id
-        elif reply.sticker:
-            file_id = reply.sticker.file_id
 
-        if file_id:
-            # ذخیره مسیر محلی در commands_media
-            local_path = os.path.join(COMMANDS_MEDIA_DIR, f"{name}_{int(datetime.now().timestamp())}.dat")
-            # توجه: در تلگرام می‌توان مستقیم file_id را نگه داشت؛ اینجا فقط مسیر placeholder است
-            entry = {"type": "file", "data": file_id, "local": os.path.relpath(local_path, BASE_DIR)}
+        if reply.photo:
+            file = await reply.photo[-1].get_file()
+            local_path = os.path.join(COMMANDS_MEDIA_DIR, f"{name}_{int(datetime.now().timestamp())}.jpg")
+            await file.download_to_drive(local_path)
+            entry = {"type": "photo", "data": file.file_id, "local": os.path.relpath(local_path, BASE_DIR)}
+
+        elif reply.video:
+            file = await reply.video.get_file()
+            local_path = os.path.join(COMMANDS_MEDIA_DIR, f"{name}_{int(datetime.now().timestamp())}.mp4")
+            await file.download_to_drive(local_path)
+            entry = {"type": "video", "data": file.file_id, "local": os.path.relpath(local_path, BASE_DIR)}
+
+        elif reply.document:
+            file = await reply.document.get_file()
+            ext = os.path.splitext(reply.document.file_name)[1] or ".dat"
+            local_path = os.path.join(COMMANDS_MEDIA_DIR, f"{name}_{int(datetime.now().timestamp())}{ext}")
+            await file.download_to_drive(local_path)
+            entry = {"type": "document", "data": file.file_id, "local": os.path.relpath(local_path, BASE_DIR)}
+
+        elif reply.voice:
+            file = await reply.voice.get_file()
+            local_path = os.path.join(COMMANDS_MEDIA_DIR, f"{name}_{int(datetime.now().timestamp())}.ogg")
+            await file.download_to_drive(local_path)
+            entry = {"type": "voice", "data": file.file_id, "local": os.path.relpath(local_path, BASE_DIR)}
+
+        elif reply.animation:
+            file = await reply.animation.get_file()
+            local_path = os.path.join(COMMANDS_MEDIA_DIR, f"{name}_{int(datetime.now().timestamp())}.mp4")
+            await file.download_to_drive(local_path)
+            entry = {"type": "animation", "data": file.file_id, "local": os.path.relpath(local_path, BASE_DIR)}
+
+        elif reply.sticker:
+            file = await reply.sticker.get_file()
+            local_path = os.path.join(COMMANDS_MEDIA_DIR, f"{name}_{int(datetime.now().timestamp())}.webp")
+            await file.download_to_drive(local_path)
+            entry = {"type": "sticker", "data": file.file_id, "local": os.path.relpath(local_path, BASE_DIR)}
+
+        else:
+            return await update.message.reply_text("⚠️ این نوع پیام پشتیبانی نمی‌شود.")
 
     doc["responses"].append(entry)
     if len(doc["responses"]) > 100:
