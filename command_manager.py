@@ -1,4 +1,4 @@
-# ======================== ⚙️ command_manager.py (نسخه یکپارچه) ========================
+# ======================== ⚙️ command_manager.py ========================
 import os
 import json
 import random
@@ -11,14 +11,13 @@ from telegram.ext import ContextTypes
 ADMIN_ID = 8588347189
 
 # ======================== 📁 مسیرهای اصلی ========================
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # مسیر ریشه ربات
-DATA_DIR = os.path.join(BASE_DIR, "data")  # همه فایل‌ها اینجا قرار می‌گیرند
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))  # مسیر auto_brain
+DATA_DIR = os.path.join(BASE_DIR, "data")
 BACKUP_DIR = os.path.join(DATA_DIR, "backups")
 
 os.makedirs(DATA_DIR, exist_ok=True)
 os.makedirs(BACKUP_DIR, exist_ok=True)
 
-# فایل دستورات
 DATA_FILE = os.path.join(DATA_DIR, "custom_commands.json")
 BACKUP_FILE = os.path.join(BACKUP_DIR, "custom_commands_backup.json")
 
@@ -40,11 +39,9 @@ required_dirs = [
     os.path.join(DATA_DIR, "group_control")
 ]
 
-# ساخت پوشه‌ها
 for d in required_dirs:
     os.makedirs(d, exist_ok=True)
 
-# ساخت فایل‌های خالی JSON در صورت عدم وجود
 for f in required_files:
     if not os.path.exists(f):
         os.makedirs(os.path.dirname(f), exist_ok=True)
@@ -76,33 +73,30 @@ def save_commands(data):
 
 # ======================== 💾 بکاپ ZIP جامع ========================
 def backup_all_commands():
-    """نسخه بکاپ جامع از فایل‌ها و پوشه‌های مهم"""
-    files_to_backup = required_files + required_dirs
-
     now = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     zip_file = os.path.join(BACKUP_DIR, f"full_backup_{now}.zip")
 
     with zipfile.ZipFile(zip_file, 'w', compression=zipfile.ZIP_DEFLATED) as zipf:
-        # بکاپ فایل‌ها و پوشه‌ها
-        for f in files_to_backup:
+        for f in required_files + required_dirs:
             if os.path.exists(f):
                 if os.path.isdir(f):
                     for root, _, files in os.walk(f):
                         for file in files:
                             full_path = os.path.join(root, file)
-                            arcname = os.path.relpath(full_path, DATA_DIR)
+                            arcname = os.path.relpath(full_path, BASE_DIR)
                             zipf.write(full_path, arcname)
                 else:
-                    arcname = os.path.relpath(f, DATA_DIR)
+                    arcname = os.path.relpath(f, BASE_DIR)
                     zipf.write(f, arcname)
+
         # بکاپ تمام فایل‌های .py داخل auto_brain
-        auto_brain_dir = os.path.join(BASE_DIR, "auto_brain")
-        for root, _, files in os.walk(auto_brain_dir):
+        for root, _, files in os.walk(BASE_DIR):
             for file in files:
                 if file.endswith(".py"):
                     full_path = os.path.join(root, file)
                     arcname = os.path.relpath(full_path, BASE_DIR)
                     zipf.write(full_path, arcname)
+
     print(f"✅ بکاپ کامل گرفته شد → {zip_file}")
 
 # ======================== 📥 ذخیره دستور ========================
