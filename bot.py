@@ -1861,6 +1861,9 @@ application.add_handler(CommandHandler("listsudo", list_sudos))
 # ==========================================================
 # 💾 دستورات شخصی (ذخیره، حذف، اجرای دستورها)
 # ==========================================================
+application.add_handler(CommandHandler("save", save_command))
+application.add_handler(CommandHandler("del", delete_command))
+application.add_handler(CommandHandler("listcmds", list_commands))
 
 # ==========================================================
 #پیام‌های متنی غیر از کامند → هندلر دستورات ذخیره‌شده
