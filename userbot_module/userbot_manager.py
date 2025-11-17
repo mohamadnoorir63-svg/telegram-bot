@@ -1,36 +1,23 @@
-import os
-import asyncio
-from telethon import TelegramClient, sessions
 from telethon.tl.functions.messages import ImportChatInviteRequest
-from telegram import Update
-from telegram.ext import ContextTypes
+from telethon.errors import UserAlreadyParticipantError
+from userbot import client, BOT_USER_ID  # یوزرباتت
 
-# ---------------- یوزربات ----------------
-API_ID = int(os.environ.get("API_ID"))
-API_HASH = os.environ.get("API_HASH")   # ✔ پرانتز اضافی حذف شد
-SESSION_STRING = os.environ.get("SESSION_STRING")
-USERBOT_ID = int(os.environ.get("USERBOT_ID"))
-
-userbot_client = TelegramClient(sessions.StringSession(SESSION_STRING), API_ID, API_HASH)
-
-async def start_userbot_client():
-    await userbot_client.start()
-    print("✅ Userbot started and ready")
-
-# ---------------- اضافه کردن یوزربات به گروه ----------------
 async def add_userbot_to_group(bot, chat_id: int):
-    # بررسی دسترسی ربات اصلی
+    """✅ اضافه کردن یوزربات به گروه با لینک دعوت و ارتقا ادمین"""
+    # بررسی اینکه ربات اصلی ادمین است
     member = await bot.get_chat_member(chat_id, bot.id)
     if member.status not in ("administrator", "creator"):
         return False, "❌ ربات اصلی دسترسی ادمین ندارد!"
 
-    # ساخت لینک دعوت
+    # گرفتن لینک دعوت
     invite_link = await bot.export_chat_invite_link(chat_id)
 
-    # یوزربات با لینک وارد گروه می‌شود
+    # یوزربات وارد گروه شود
     try:
         hash_part = invite_link.split("/")[-1]
-        await userbot_client(ImportChatInviteRequest(hash_part))
+        await client(ImportChatInviteRequest(hash_part))
+    except UserAlreadyParticipantError:
+        pass
     except Exception as e:
         return False, f"❌ خطا در ورود یوزربات: {e}"
 
@@ -38,7 +25,7 @@ async def add_userbot_to_group(bot, chat_id: int):
     try:
         await bot.promote_chat_member(
             chat_id=chat_id,
-            user_id=USERBOT_ID,
+            user_id=BOT_USER_ID,
             can_change_info=True,
             can_delete_messages=True,
             can_invite_users=True,
@@ -50,4 +37,4 @@ async def add_userbot_to_group(bot, chat_id: int):
     except Exception as e:
         return False, f"❌ خطا در دادن دسترسی ادمین: {e}"
 
-    return True, "✅ یوزربات وارد شد و مدیر گروه شد!"
+    return True, "✅ یوزربات وارد شد و ادمین گروه شد!"
