@@ -1969,6 +1969,7 @@ application.add_handler(
 from farsi_commands import register_all_farsi
 
 register_all_farsi(application)
+
 application.add_handler(CommandHandler("stats", stats))
 application.add_handler(CommandHandler("fullstats", fullstats))
 application.add_handler(CommandHandler("backup", backup))
