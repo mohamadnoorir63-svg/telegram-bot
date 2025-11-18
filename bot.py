@@ -1961,15 +1961,10 @@ application.add_handler(
     group=-3
 )
 # ────────────── سخنگو فارسی ──────────────
-application.add_handler(
-    MessageHandler(filters.Regex(r"^سخنگو_خاموش$"), mute_speaker),
-    group=-4
-    # گروه مشخص بالاتر از reply
-)
-application.add_handler(
-    MessageHandler(filters.Regex(r"^سخنگو_روشن$"), unmute_speaker),
-    group=-4
-)
+from farsi_commands.speaker import register_speaker_commands
+
+# ثبت هندلرهای سخنگوی فارسی
+register_speaker_commands(application, get_group_status:"),group=-4
 # ==========================================================
 # 📊 آمار، بک‌آپ و کنترل
 # ==========================================================
