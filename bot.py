@@ -865,9 +865,13 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not status["locked"]:
         auto_learn_from_text(text)
 
+    # اگر سخنگو خاموش است → فقط پاسخ هوش مصنوعی غیرفعال شود
     if not status["active"]:
-        shadow_learn(text, "")
+    # دستورات (جوک، فال، یادبگیر، مدیریت،…) همچنان کار می‌کنند
+    # اما پیام‌های عمومی پاسخ داده نمی‌شوند
+    if text not in ["جوک", "فال"]:
         return
+        
     # ✅ درصد هوش منطقی
     if text.lower() == "درصد هوش":
         score = 0
