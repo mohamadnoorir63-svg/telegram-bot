@@ -50,8 +50,8 @@ async def send_fonts(update: Update, context: ContextTypes.DEFAULT_TYPE, name: s
         reply_markup=pages[0]["keyboard"]
     )
     return ConversationHandler.END
+
 # ======================= 🎭 تولید فونت‌های حرفه‌ای =======================
-# استایل‌های انگلیسی و fixed patterns
 unicode_styles = [
     "𝓐𝓑𝓒𝓓𝓔𝓕𝓖𝓗𝓘𝓙𝓚𝓛𝓜𝓝𝓞𝓟𝓠𝓡𝓢𝓣𝓤𝓥𝓦𝓧𝓨𝓩"
     "𝓪𝓫𝓬𝓭𝓮𝓯𝓰𝓱𝓲𝓳𝓴𝓵𝓶𝓷𝓸𝓹𝓺𝓻𝓼𝓽𝓾𝓿𝔀𝔁𝔂𝔃",
@@ -80,7 +80,6 @@ fixed_patterns = [
     "𝄠⃘۪۪۪۪۪۪❩{}𝄠⃘۪۪۪۪۪۪❩"
 ]
 
-# استایل‌های فارسی
 farsi_styles = [
     lambda s: "ـ".join(s),
     lambda s: "ۘۘ".join([c+"ـ" for c in s]),
@@ -93,7 +92,7 @@ farsi_styles = [
     lambda s: "ؒؔـٓٓـؒؔ◌‌◌".join([c+"ـ" for c in s])
 ]
 
-# ------------------ لیست کامل 69 قالب فارسی ------------------
+# ------------------ لیست 69 قالب فارسی ------------------
 templates = [
 "{0}ـ {1}ـ {2}ـ {3}",
 "{0}❈ۣۣـ🍁ـ{1}❈ۣۣـ🍁ـ{2}❈ۣۣـ🍁ـ{3}❈ۣۣـ🍁ـ",
@@ -138,29 +137,7 @@ templates = [
 "{0}ـٜٜঊٌٍـ↯ـٜٜـٍٍـ{1}ـٜٜঊٌٍـ↯ـٜٜـٍٍـ{2}ـٜٜঊٌٍـ↯ـٜٜـٍٍـ{3}ٜٜঊٌٍ",
 ]
 
-# ------------------ تولید فونت ------------------
-# ======================= تولید فونت ===================
-
-# تبدیل اسم به استایل یونیکد انگلیسی
-def apply_unicode_style(name: str, style: str) -> str:
-    upper_letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-    lower_letters = "abcdefghijklmnopqrstuvwxyz"
-    styled_name = ""
-    # سبک باید شامل 26 حرف بزرگ + 26 حرف کوچک باشد
-    upper_style = style[:26]
-    lower_style = style[26:52] if len(style) >= 52 else style[:26]  # fallback
-    for c in name:
-        if c.isupper():
-            idx = upper_letters.find(c)
-            styled_name += upper_style[idx] if idx != -1 else c
-        elif c.islower():
-            idx = lower_letters.find(c)
-            styled_name += lower_style[idx] if idx != -1 else c
-        else:
-            styled_name += c
-    return styled_name
-
-# تولید 69 فونت فارسی (unchanged)
+# ======================= تولید فونت =======================
 def generate_69_fonts(name):
     letters = list(name)
     while len(letters) < 4:
@@ -171,36 +148,26 @@ def generate_69_fonts(name):
             fonts.append(template.format(*letters))
         except:
             fonts.append(template)
+    # اضافه کردن تمام farsi_styles
     for style in farsi_styles:
-        try:
-            fonts.append(style(name))
-        except:
-            pass
+        fonts.append(style(name))
     return fonts
 
-# تابع اصلی تولید فونت‌ها
 def generate_fonts(name: str):
+    # بررسی فارسی بودن
     is_farsi = any("\u0600" <= c <= "\u06FF" for c in name)
-    fonts = []
-
     if is_farsi:
-        fonts = generate_69_fonts(name)
+        return generate_69_fonts(name)
     else:
-        # استایل‌های یونیکد انگلیسی
-        for style in unicode_styles:
-            fonts.append(apply_unicode_style(name, style))
-        # الگوهای ثابت
+        fonts = [random.choice(unicode_styles)(name) for _ in range(5)]
         fonts += [fp.format(name) for fp in fixed_patterns]
-
-    # اطمینان از حداقل 30 صفحه × 10 فونت = 300 فونت
-    while len(fonts) < 300:
-        fonts += fonts
-    return fonts[:300]
+        return fonts
 
 # ======================= 📄 ساخت صفحات پویا =======================
 def make_pages(name: str, fonts: list, page_size=10, max_pages=30):
     pages = []
     total_pages = min((len(fonts) + page_size - 1) // page_size, max_pages)
+    
     for idx in range(total_pages):
         chunk = fonts[idx*page_size : (idx+1)*page_size]
         text = f"**↻ {name} ⇦**\n:• لیست فونت های پیشنهادی :\n"
@@ -209,8 +176,10 @@ def make_pages(name: str, fonts: list, page_size=10, max_pages=30):
             global_index = idx*page_size + (i-1)
             text += f"{i}- {style}\n"
             keyboard.append([InlineKeyboardButton(f"{i}- {style}", callback_data=f"send_font_{global_index}")])
+        
         text += f"\n📄 صفحه {idx+1} از {total_pages}"
-
+        
+        # دکمه‌های ناوبری
         nav = []
         if idx > 0:
             nav.append(InlineKeyboardButton("⬅️ قبلی", callback_data=f"prev_font_{idx-1}"))
@@ -218,8 +187,12 @@ def make_pages(name: str, fonts: list, page_size=10, max_pages=30):
             nav.append(InlineKeyboardButton("➡️ بعدی", callback_data=f"next_font_{idx+1}"))
         if nav:
             keyboard.append(nav)
+        
+        # دکمه بازگشت
         keyboard.append([InlineKeyboardButton("🔙 بازگشت", callback_data="feature_back")])
+        
         pages.append({"text": text, "keyboard": InlineKeyboardMarkup(keyboard)})
+    
     return pages
 
 # ======================= 📋 ارسال فونت انتخاب شده =======================
@@ -259,3 +232,17 @@ async def feature_back(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except:
         pass
     return ConversationHandler.END
+
+# ======================= 🧪 تست فونت =======================
+if __name__ == "__main__":
+    # تست انگلیسی
+    name_en = "Ali"
+    fonts_en = generate_fonts(name_en)
+    for i, f in enumerate(fonts_en, 1):
+        print(f"{i}. {f}")
+
+    # تست فارسی
+    name_fa = "علی"
+    fonts_fa = generate_fonts(name_fa)
+    for i, f in enumerate(fonts_fa, 1):
+        print(f"{i}. {f}")
