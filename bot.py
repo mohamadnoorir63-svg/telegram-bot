@@ -1963,11 +1963,12 @@ application.add_handler(
 # ────────────── سخنگو فارسی ──────────────
 application.add_handler(
     MessageHandler(filters.Regex(r"^سخنگو_خاموش$"), mute_speaker),
-    group=4  # گروه مشخص بالاتر از reply
+    group=-4
+    # گروه مشخص بالاتر از reply
 )
 application.add_handler(
     MessageHandler(filters.Regex(r"^سخنگو_روشن$"), unmute_speaker),
-    group=4
+    group=-4
 )
 # ==========================================================
 # 📊 آمار، بک‌آپ و کنترل
