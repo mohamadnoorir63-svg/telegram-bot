@@ -5,7 +5,17 @@ from telegram.ext import ContextTypes, ConversationHandler
 
 ASK_NAME = 1
 
+# ======================= 🔎 تشخیص فارسی =======================
+
+def is_persian(text: str):
+    for ch in text:
+        if '\u0600' <= ch <= '\u06FF' or '\u0750' <= ch <= '\u077F' or '\u08A0' <= ch <= '\u08FF':
+            return True
+    return False
+
+
 # ======================= 🎨 تابع اصلی =======================
+
 async def font_maker(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
     chat_type = update.effective_chat.type
@@ -32,26 +42,16 @@ async def font_maker(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     return ConversationHandler.END
 
+
 # ======================= 🌸 دریافت اسم =======================
+
 async def receive_font_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
     name = update.message.text.strip()
     return await send_fonts(update, context, name)
 
-# ======================= 💎 ارسال فونت‌ها =======================
-async def send_fonts(update: Update, context: ContextTypes.DEFAULT_TYPE, name: str):
-    fonts = generate_fonts(name, count=240)
-    context.user_data["all_fonts"] = fonts
-    context.user_data["font_pages"] = make_pages(name, fonts, page_size=8, max_pages=30)
 
-    pages = context.user_data["font_pages"]
-    await update.message.reply_text(
-        pages[0]["text"],
-        parse_mode="HTML",
-        reply_markup=pages[0]["keyboard"]
-    )
-    return ConversationHandler.END
+# ======================= 🎭 تولید فونت‌های انگلیسی =======================
 
-# ======================= 🎨 تابع کمکی جایگزینی استایل =======================
 def apply_style(name, style):
     result = ""
     for ch in name:
@@ -71,17 +71,18 @@ def apply_style(name, style):
             result += ch
     return result
 
-# ======================= 🎭 تولید فونت‌های حرفه‌ای =======================
+
 def generate_fonts(name: str, count: int = 240):
     pre_groups = [
-        ["𓄂","𓃬","𓋥","𓄼","𓂀","𓅓"],
-        ["ꪰ","ꪴ","𝄠","𝅔","꧁","꧂","ꕥ"],
-        ["⚝","☬","☾","☽","★","✦","✧"]
+        ["𓄂", "𓃬", "𓋥", "𓄼", "𓂀", "𓅓"],
+        ["ꪰ", "ꪴ", "𝄠", "𝅔", "꧁", "꧂", "ꕥ"],
+        ["⚝", "☬", "☾", "☽", "★", "✦", "✧"]
     ]
+
     post_groups = [
-        ["✿","♡","❖","░","❋","☯","❂"],
-        ["✧","✦","❂","★","✺","✶","✸"],
-        ["⋆","⟡","❋","•","✾","✢","✤"]
+        ["✿", "♡", "❖", "░", "❋", "☯", "❂"],
+        ["✧", "✦", "❂", "★", "✺", "✶", "✸"],
+        ["⋆", "⟡", "❋", "•", "✾", "✢", "✤"]
     ]
 
     unicode_styles = [
@@ -102,17 +103,7 @@ def generate_fonts(name: str, count: int = 240):
         "⋆𝅦𝆉𓄂ꪰ☾︎⃝꯭🪩{}◆⃝🪩",
         "ـ‌‌ـ‌‌‌༊‌꯭ـ{}🐲ـ‌‌ـ‌‌‌‌‌༊‌꯭ـ",
         "┏┅┅🌸⃝⃭.  {}🌸⃝⃭❤━┅┅┓",
-        " ᷤ‌‌➠🌼⃟🍃{}✿⃟⃘݊💞",
-        "𝄟♔꯭⃮⃝⃮ 🦋 ꯭⃝⃮ ☾︎⃝ 𓄂{}𓆃☾︎⃝⋆♔꯭⃮⃝⃮ 🦋 ꯭⃝⃮ 𝄟",
-        "𓋜𔘓❀{}❀𔒝",
-        "🎀ꕥ✧»{}«✧ꕥ🎀",
-        "♥️⃝⃭𝄞❉্͜͡▪️𒌍꯭🦋⃝⃡.𝅯.𝅰.꯭𝅱.𝅲.꯭𝅱.𝅰.𝅯.𝅮.꯭.{} 𝄞͡،⚛️",
-        "𓄂ꪰ𓁪❥𝄞{}𝄞❥𓀛꯭𓆃ᵐᶠᶰ↬𓃬",
-        "➹‌❬⃟꯭💕꯭‌⃟❭꯭ ꯭꯭‌꯭꯭‌{} ꯭ ❬⃟‌꯭꯭🪽꯭꯭‌⃟❭➹",
-        "𓄂ꪴꪰ❨💎{}❩↬𓃬",
-        "𓄂ꪴꪰ❨𝄠⃘۪۪۪۪۪۪ٜ♕{}♕𝄠⃘۪۪۪۪۪۪❩",
-        "𓄂ꪴꪰ ♕{}♕𓆃",
-        "𝄠⃘۪۪۪۪۪۪❩{}𝄠⃘۪۪۪۪۪۪❩"
+        " ᷤ‌‌➠🌼⃟🍃{}✿⃟⃘݊💞"
     ]
 
     fonts = set()
@@ -133,20 +124,72 @@ def generate_fonts(name: str, count: int = 240):
 
     return list(fonts)
 
-# ======================= 📄 ساخت صفحات پویا =======================
+
+# ======================= 🎭 فونت فارسی =======================
+
+templates = [
+    "{0}ـ {1}ـ {2}ـ {3}",
+    "{0}❈ۣۣـ🍁ـ{1}❈ۣۣـ🍁ـ{2}❈ۣۣـ🍁ـ{3}❈ۣۣـ🍁ـ",
+    "↜{0}ٍٍـُِ➲ِِனُِ↜ٍٍ{1}ـُِ➲ِِனُِ↜{2}ـُِ➲ِِனُِ↜ٍٍـُِ{3}➲ِِனُِ",
+    "{0}ــ{1}ــ{2}ــ{3}",
+    "{0}✘{1}✘{2}✘{3}✘",
+    "{0}✓{1}✓{2}✓{3}✓"
+]
+
+def generate_persian_fonts(name: str):
+    results = []
+    chars = list(name)
+
+    while len(chars) < 4:
+        chars.append(chars[-1])
+
+    a, b, c, d = chars[:4]
+
+    for temp in templates:
+        try:
+            results.append(temp.format(a, b, c, d))
+        except:
+            pass
+
+    return results
+
+
+# ======================= ✨ ارسال فونت =======================
+
+async def send_fonts(update: Update, context: ContextTypes.DEFAULT_TYPE, name: str):
+
+    if is_persian(name):
+        fonts = generate_persian_fonts(name)
+    else:
+        fonts = generate_fonts(name, count=240)
+
+    context.user_data["all_fonts"] = fonts
+    context.user_data["font_pages"] = make_pages(name, fonts, page_size=8, max_pages=30)
+
+    pages = context.user_data["font_pages"]
+    await update.message.reply_text(
+        pages[0]["text"],
+        parse_mode="HTML",
+        reply_markup=pages[0]["keyboard"]
+    )
+    return ConversationHandler.END
+
+
+# ======================= 📄 ساخت صفحات =======================
+
 def make_pages(name: str, fonts: list, page_size=8, max_pages=30):
     pages = []
     total_pages = min((len(fonts) + page_size - 1) // page_size, max_pages)
 
     for idx in range(total_pages):
         chunk = fonts[idx*page_size : (idx+1)*page_size]
-        text = f"**↻ {name} ⇦**\n:• لیست فونت های پیشنهادی :\n"
+        text = f"<b>↻ {name}</b>\n\n• لیست فونت‌ها:\n"
         keyboard = []
 
         for i, style in enumerate(chunk, start=1):
             global_index = idx*page_size + (i-1)
             text += f"{i}- {style}\n"
-            keyboard.append([InlineKeyboardButton(f"{i}- {style}", callback_data=f"send_font_{global_index}")])
+            keyboard.append([InlineKeyboardButton(f"{i}", callback_data=f"send_font_{global_index}")])
 
         text += f"\n📄 صفحه {idx+1} از {total_pages}"
 
@@ -157,45 +200,60 @@ def make_pages(name: str, fonts: list, page_size=8, max_pages=30):
             nav.append(InlineKeyboardButton("➡️ بعدی", callback_data=f"next_font_{idx+1}"))
         if nav:
             keyboard.append(nav)
+
         keyboard.append([InlineKeyboardButton("🔙 بازگشت", callback_data="feature_back")])
 
         pages.append({"text": text, "keyboard": InlineKeyboardMarkup(keyboard)})
 
     return pages
 
-# ======================= 📋 ارسال فونت انتخاب شده =======================
+
+# ======================= 📋 ارسال گزینه انتخاب‌شده =======================
+
 async def send_selected_font(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     font_id = int(query.data.replace("send_font_", ""))
     all_fonts = context.user_data.get("all_fonts", [])
+
     if 0 <= font_id < len(all_fonts):
         await query.message.reply_text(all_fonts[font_id])
     else:
         await query.message.reply_text("❗ فونت پیدا نشد.")
 
-# ======================= 🔁 ناوبری صفحات =======================
+
+# ======================= 🔁 ناوبری =======================
+
 async def next_font(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     index = int(query.data.replace("next_font_", ""))
     pages = context.user_data.get("font_pages", [])
+
     if 0 <= index < len(pages):
-        new_text = pages[index]["text"]
-        new_markup = pages[index]["keyboard"]
-        await query.edit_message_text(new_text, parse_mode="HTML", reply_markup=new_markup)
+        await query.edit_message_text(
+            pages[index]["text"],
+            parse_mode="HTML",
+            reply_markup=pages[index]["keyboard"]
+        )
+
 
 async def prev_font(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     index = int(query.data.replace("prev_font_", ""))
     pages = context.user_data.get("font_pages", [])
-    if 0 <= index < len(pages):
-        new_text = pages[index]["text"]
-        new_markup = pages[index]["keyboard"]
-        await query.edit_message_text(new_text, parse_mode="HTML", reply_markup=new_markup)
 
-# ======================= 🎛 بازگشت به منوی اصلی =======================
+    if 0 <= index < len(pages):
+        await query.edit_message_text(
+            pages[index]["text"],
+            parse_mode="HTML",
+            reply_markup=pages[index]["keyboard"]
+        )
+
+
+# ======================= 🎛 بازگشت =======================
+
 async def feature_back(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
