@@ -41,7 +41,7 @@ async def receive_font_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def send_fonts(update: Update, context: ContextTypes.DEFAULT_TYPE, name: str):
     fonts = generate_fonts(name)
     context.user_data["all_fonts"] = fonts
-    context.user_data["font_pages"] = make_pages(name, fonts, page_size=10, max_pages=30)
+    context.user_data["font_pages"] = make_pages(name, fonts, page_size=8, max_pages=30)
 
     pages = context.user_data["font_pages"]
     await update.message.reply_text(
@@ -52,23 +52,17 @@ async def send_fonts(update: Update, context: ContextTypes.DEFAULT_TYPE, name: s
     return ConversationHandler.END
 
 # ======================= 🎭 تولید فونت‌های حرفه‌ای =======================
-# استایل‌های انگلیسی و fixed patterns
+# استایل‌های انگلیسی
 unicode_styles = [
     "𝓐𝓑𝓒𝓓𝓔𝓕𝓖𝓗𝓘𝓙𝓚𝓛𝓜𝓝𝓞𝓟𝓠𝓡𝓢𝓣𝓤𝓥𝓦𝓧𝓨𝓩"
     "𝓪𝓫𝓬𝓭𝓮𝓯𝓰𝓱𝓲𝓳𝓴𝓵𝓶𝓷𝓸𝓹𝓺𝓻𝓼𝓽𝓾𝓿𝔀𝔁𝔂𝔃",
-    "ᎯᏰℭⅅ℮ℱᏩℋᏐℐӃℒℳℕᎾ⅌ℚℜᏕƬƲᏉᏔℵᎽℤ"
-    "ᎪᏋᏟᎠᎬᎡᏀᎻᎥᏠᏦᏞᎷᏁᎾᏢᏣᏒᏕᏖᏙᏉᏔᏧᏃᏃ",
+    "ᎯᏰℭⅅ℮ℱᏩℋᏐℐӃℒℳℕᎾ⅌ℚℜᏕƬƲᏉᏔℵᎽℤ",
     "🄰🄱🄲🄳🄴🄵🄶🄷🄸🄹🄺🄻🄼🄽🄾🄿🅀🅁🅂🅃🅄🅅🅆🅇🅈🅉"
     "🅐🅑🅒🅓🅔🅕🅖🅗🅘🅙🅚🅛🅜🅝🅞🅟🅠🅡🅢🅣🅤🅥🅦🅧🅨🅩",
-]
-
-fixed_patterns = [
-    "۝ؔؑ❁➹‌❬⃟꯭({})꯭꯭‌⃟❭➹❁۝ؔؑ",
-    "𓄂{}𓆃",
-    "【♫❀꯭͞༄꯭͞𝄞_{}___❀꯭͞͞༄꯭͞𝄞",
-    "⋆𝅦𝆉𓄂ꪰ☾︎⃝꯭🪩{}◆⃝🪩",
-    "ـ‌‌ـ‌‌‌༊‌꯭ـ{}🐲ـ‌‌ـ‌‌‌‌‌༊‌꯭ـ",
-    "┏┅┅🌸⃝⃭.  {}🌸⃝⃭❤━┅┅┓",
+    "ⒶⒷⒸⒹⒺⒻⒼⒽⒾⒿⓀⓁⓂⓃⓄⓅⓆⓇⓈⓉⓊⓋⓌⓍⓎⓏ",
+    "𝔸𝔹ℂ𝔻𝔼𝔽𝔾ℍ𝕀𝕁𝕂𝕃𝕄ℕ𝕆ℙℚℝ𝕊𝕋𝕌𝕍𝕎𝕏𝕐ℤ",
+    "𝗔𝗕𝗖𝗗𝗘𝗙𝗚𝗛𝗜𝗝𝗞𝗟𝗠𝗡𝗢𝗣𝗤𝗥𝗦𝗧𝗨𝗩𝗪𝗫𝗬𝗭",
+    "【ᴀ】【ʙ】【ᴄ】【ᴅ】【ᴇ】【ꜰ】【ɢ】【ʜ】【ɪ】【ᴊ】【ᴋ】【ʟ】【ᴍ】【ɴ】【ᴏ】【ᴘ】【Q】【ʀ】【ꜱ】【ᴛ】【ᴜ】【ᴠ】【ᴡ】【x】【ʏ】【ᴢ】"
 ]
 
 # استایل‌های فارسی
@@ -84,79 +78,78 @@ farsi_styles = [
     lambda s: "ؒؔـٓٓـؒؔ◌‌◌".join([c+"ـ" for c in s])
 ]
 
-# ------------------ لیست کامل 69 قالب فارسی ------------------
-templates = [
-"{0}ـ {1}ـ {2}ـ {3}",
-"{0}❈ۣۣـ🍁ـ{1}❈ۣۣـ🍁ـ{2}❈ۣۣـ🍁ـ{3}❈ۣۣـ🍁ـ",
-"{0}ـٰٰـٰٰـפ{1}ـٰٰـٰٰــ{2}ـٰٰـٰٰــ{3}ٍٕ",
-"{0}ــ{1}ــ{2}ّ{3}",
-"{0}✘{1}✘{2}✘{3}✘",
-"{0}✓{1}✓{2}✓{3}✓",
-"{0}✿{1}✿{2}✿{3}",
-]
+# حروف رگی انگلیسی برای نمونه
+regional_letters = ["A","B","C","D","E","F","G","H","I","J","K","L","M","N","O","P","Q","R","S","T","U","V","W","X","Y","Z"]
 
-# ------------------ تولید فونت فارسی ------------------
-def generate_69_fonts(name):
-    letters = list(name)
-    while len(letters) < 4:
-        letters.append('')
+# تولید فونت فارسی
+def generate_farsi_fonts(name, count=8):
     fonts = []
-    for template in templates:
-        try:
-            fonts.append(template.format(*letters))
-        except:
-            fonts.append(template)
-    for style in farsi_styles:
-        try:
-            fonts.append(style(name))
-        except:
-            pass
+    for _ in range(count):
+        style = random.choice(farsi_styles)
+        fonts.append(style(name))
     return fonts
 
-# ------------------ اعمال استایل انگلیسی پویا ------------------
-def apply_unicode_style(name: str, style: str) -> str:
-    upper_letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-    lower_letters = "abcdefghijklmnopqrstuvwxyz"
-    upper_style = style[:26]
-    lower_style = style[26:52]
-    styled_name = ""
-    for c in name:
-        if c.isupper():
-            idx = upper_letters.find(c)
-            styled_name += upper_style[idx] if idx != -1 else c
-        elif c.islower():
-            idx = lower_letters.find(c)
-            styled_name += lower_style[idx] if idx != -1 else c
-        else:
-            styled_name += c
-    return styled_name
-
-# ------------------ تولید همه فونت‌ها ------------------
-def generate_fonts(name: str):
-    is_farsi = any("\u0600" <= c <= "\u06FF" for c in name)
+# تولید فونت ترکیبی
+def generate_fonts(name: str, count: int = 100):
+    # اگر فارسی بود
+    if any("\u0600" <= c <= "\u06FF" for c in name):
+        return generate_farsi_fonts(name, count)
+    
+    # برای انگلیسی
+    pre_groups = [
+        ["𓄂","𓃬","𓋥","𓄼","𓂀","𓅓"],
+        ["ꪰ","ꪴ","𝄠","𝅔","꧁","꧂","ꕥ"],
+        ["⚝","☬","☾","☽","★","✦","✧"]
+    ]
+    post_groups = [
+        ["✿","♡","❖","░","❋","☯","❂"],
+        ["✧","✦","❂","★","✺","✶","✸"],
+        ["⋆","⟡","❋","•","✾","✢","✤"]
+    ]
+    fixed_patterns = [
+        "۝ؔؑ❁➹‌❬⃟꯭({})꯭꯭‌⃟❭➹❁۝ؔؑ",
+        "𓄂{}𓆃",
+        "【♫❀꯭͞༄꯭͞𝄞_{}___❀꯭͞͞༄꯭͞𝄞",
+        "⋆𝅦𝆉𓄂ꪰ☾︎⃝꯭🪩{}◆⃝🪩",
+        "ـ‌‌ـ‌‌‌༊‌꯭ـ{}🐲ـ‌‌ـ‌‌‌‌‌༊‌꯭ـ",
+        "┏┅┅🌸⃝⃭.  {}🌸⃝⃭❤━┅┅┓",
+        " ᷤ‌‌➠🌼⃟🍃{}✿⃟⃘݊💞",
+        "𝄟♔꯭⃮⃝⃮ 🦋 ꯭⃝⃮ ☾︎⃝ 𓄂{}𓆃☾︎⃝⋆♔꯭⃮⃝⃮ 🦋 ꯭⃝⃮ 𝄟",
+        "𓋜𔘓❀{}❀𔒝",
+        "🎀ꕥ✧»{}«✧ꕥ🎀"
+    ]
     fonts = []
-    if is_farsi:
-        fonts = generate_69_fonts(name)
-    else:
-        for style in unicode_styles:
-            fonts.append(apply_unicode_style(name, style))
-        fonts += [fp.format(name) for fp in fixed_patterns]
-    while len(fonts) < 300:
-        fonts += fonts
-    return fonts[:300]
+
+    while len(fonts) < count:
+        if random.random() < 0.3:
+            pattern = random.choice(fixed_patterns)
+            style = random.choice(unicode_styles)
+            uname = "".join(style["abcdefghijklmnopqrstuvwxyz".index(ch.lower())] if ch.lower() in "abcdefghijklmnopqrstuvwxyz" else ch for ch in name)
+            fonts.append(pattern.format(uname))
+            continue
+        pre = "".join(random.choice(group) for group in pre_groups)
+        post = "".join(random.choice(group) for group in post_groups)
+        style = random.choice(unicode_styles)
+        uname = "".join(style["abcdefghijklmnopqrstuvwxyz".index(ch.lower())] if ch.lower() in "abcdefghijklmnopqrstuvwxyz" else ch for ch in name)
+        fonts.append(f"{pre}{uname}{post}")
+
+    return fonts
 
 # ======================= 📄 ساخت صفحات پویا =======================
-def make_pages(name: str, fonts: list, page_size=10, max_pages=30):
+def make_pages(name: str, fonts: list, page_size=8, max_pages=30):
     pages = []
     total_pages = min((len(fonts) + page_size - 1) // page_size, max_pages)
+
     for idx in range(total_pages):
         chunk = fonts[idx*page_size : (idx+1)*page_size]
         text = f"**↻ {name} ⇦**\n:• لیست فونت های پیشنهادی :\n"
         keyboard = []
+
         for i, style in enumerate(chunk, start=1):
             global_index = idx*page_size + (i-1)
             text += f"{i}- {style}\n"
             keyboard.append([InlineKeyboardButton(f"{i}- {style}", callback_data=f"send_font_{global_index}")])
+
         text += f"\n📄 صفحه {idx+1} از {total_pages}"
 
         nav = []
@@ -167,7 +160,9 @@ def make_pages(name: str, fonts: list, page_size=10, max_pages=30):
         if nav:
             keyboard.append(nav)
         keyboard.append([InlineKeyboardButton("🔙 بازگشت", callback_data="feature_back")])
+
         pages.append({"text": text, "keyboard": InlineKeyboardMarkup(keyboard)})
+
     return pages
 
 # ======================= 📋 ارسال فونت انتخاب شده =======================
@@ -188,7 +183,9 @@ async def next_font(update: Update, context: ContextTypes.DEFAULT_TYPE):
     index = int(query.data.replace("next_font_", ""))
     pages = context.user_data.get("font_pages", [])
     if 0 <= index < len(pages):
-        await query.edit_message_text(pages[index]["text"], parse_mode="HTML", reply_markup=pages[index]["keyboard"])
+        new_text = pages[index]["text"]
+        new_markup = pages[index]["keyboard"]
+        await query.edit_message_text(new_text, parse_mode="HTML", reply_markup=new_markup)
 
 async def prev_font(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -196,7 +193,9 @@ async def prev_font(update: Update, context: ContextTypes.DEFAULT_TYPE):
     index = int(query.data.replace("prev_font_", ""))
     pages = context.user_data.get("font_pages", [])
     if 0 <= index < len(pages):
-        await query.edit_message_text(pages[index]["text"], parse_mode="HTML", reply_markup=pages[index]["keyboard"])
+        new_text = pages[index]["text"]
+        new_markup = pages[index]["keyboard"]
+        await query.edit_message_text(new_text, parse_mode="HTML", reply_markup=new_markup)
 
 # ======================= 🎛 بازگشت به منوی اصلی =======================
 async def feature_back(update: Update, context: ContextTypes.DEFAULT_TYPE):
