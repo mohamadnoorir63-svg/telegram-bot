@@ -139,6 +139,28 @@ templates = [
 ]
 
 # ------------------ تولید فونت ------------------
+# ======================= تولید فونت ===================
+
+# تبدیل اسم به استایل یونیکد انگلیسی
+def apply_unicode_style(name: str, style: str) -> str:
+    upper_letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    lower_letters = "abcdefghijklmnopqrstuvwxyz"
+    styled_name = ""
+    # سبک باید شامل 26 حرف بزرگ + 26 حرف کوچک باشد
+    upper_style = style[:26]
+    lower_style = style[26:52] if len(style) >= 52 else style[:26]  # fallback
+    for c in name:
+        if c.isupper():
+            idx = upper_letters.find(c)
+            styled_name += upper_style[idx] if idx != -1 else c
+        elif c.islower():
+            idx = lower_letters.find(c)
+            styled_name += lower_style[idx] if idx != -1 else c
+        else:
+            styled_name += c
+    return styled_name
+
+# تولید 69 فونت فارسی (unchanged)
 def generate_69_fonts(name):
     letters = list(name)
     while len(letters) < 4:
@@ -156,6 +178,7 @@ def generate_69_fonts(name):
             pass
     return fonts
 
+# تابع اصلی تولید فونت‌ها
 def generate_fonts(name: str):
     is_farsi = any("\u0600" <= c <= "\u06FF" for c in name)
     fonts = []
@@ -163,10 +186,10 @@ def generate_fonts(name: str):
     if is_farsi:
         fonts = generate_69_fonts(name)
     else:
-        # Unicode styles
+        # استایل‌های یونیکد انگلیسی
         for style in unicode_styles:
-            fonts.append(name)  # می‌توانید تغییرات استایل اعمال کنید
-        # Fixed patterns
+            fonts.append(apply_unicode_style(name, style))
+        # الگوهای ثابت
         fonts += [fp.format(name) for fp in fixed_patterns]
 
     # اطمینان از حداقل 30 صفحه × 10 فونت = 300 فونت
