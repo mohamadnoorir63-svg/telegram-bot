@@ -869,8 +869,8 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not status["active"]:
     # دستورات (جوک، فال، یادبگیر، مدیریت،…) همچنان کار می‌کنند
     # اما پیام‌های عمومی پاسخ داده نمی‌شوند
-    if text not in ["جوک", "فال"]:
-        return
+        if text not in ["جوک", "فال"]:
+            return
         
     # ✅ درصد هوش منطقی
     if text.lower() == "درصد هوش":
