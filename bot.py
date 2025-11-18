@@ -184,19 +184,6 @@ status = {
     "welcome": True,
     "locked": False
 }
-# ======================= 🎤 حالت سخنگو پیش‌فرض خاموش =======================
-voice_status = {}  # وضعیت پیش‌فرض سخنگو: خاموش
-
-async def voice_on(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    chat_id = update.effective_chat.id
-    voice_status[chat_id] = True
-    await update.message.reply_text("🔊 سخنگو روشن شد!")
-
-async def voice_off(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    chat_id = update.effective_chat.id
-    voice_status[chat_id] = False
-    await update.message.reply_text("🔇 سخنگو خاموش شد!")
-
 # ======================= 🧠 جلوگیری از پاسخ تکراری و پاسخ به خودش =======================
 def is_valid_message(update):
     """فیلتر برای جلوگیری از پاسخ تکراری یا پاسخ به پیام‌های ربات"""
@@ -1893,9 +1880,6 @@ application.add_handler(
     group=-8
 )
 
-# اضافه کردن handler ها
-application.add_handler(CommandHandler("voice_on", voice_on))
-application.add_handler(CommandHandler("voice_off", voice_off))
 # ==========================================================
 # 🔹 دستورات اصلی سیستم
 # ==========================================================
