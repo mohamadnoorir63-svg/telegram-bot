@@ -169,3 +169,72 @@ def make_pages(name: str, fonts: list, page_size=10, max_pages=30):
     for idx in range(total_pages):
         chunk = fonts[idx*page_size : (idx+1)*page_size]
         text = f"**↻ {name} ⇦**\n:• لیست فونت های پیشنهادی :\
+        keyboard = []
+        for i, style in enumerate(chunk, start=1):
+            global_index = idx*page_size + (i-1)
+            text += f"{i}- {style}\n"
+            keyboard.append([InlineKeyboardButton(f"{i}- {style}", callback_data=f"send_font_{global_index}")])
+        text += f"\n📄 صفحه {idx+1} از {total_pages}"
+        
+        # دکمه‌های ناوبری
+        nav = []
+        if idx > 0:
+            nav.append(InlineKeyboardButton("⬅️ قبلی", callback_data=f"prev_font_{idx-1}"))
+        if idx < total_pages - 1:
+            nav.append(InlineKeyboardButton("➡️ بعدی", callback_data=f"next_font_{idx+1}"))
+        if nav:
+            keyboard.append(nav)
+        
+        keyboard.append([InlineKeyboardButton("🔙 بازگشت", callback_data="feature_back")])
+        pages.append({"text": text, "keyboard": InlineKeyboardMarkup(keyboard)})
+    return pages
+
+# ======================= 📋 ارسال فونت انتخاب شده =======================
+async def send_selected_font(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    font_id = int(query.data.replace("send_font_", ""))
+    all_fonts = context.user_data.get("all_fonts", [])
+    if 0 <= font_id < len(all_fonts):
+        await query.message.reply_text(all_fonts[font_id])
+    else:
+        await query.message.reply_text("❗ فونت پیدا نشد.")
+
+# ======================= 🔁 ناوبری صفحات =======================
+async def next_font(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    index = int(query.data.replace("next_font_", ""))
+    pages = context.user_data.get("font_pages", [])
+    if 0 <= index < len(pages):
+        await query.edit_message_text(pages[index]["text"], parse_mode="HTML", reply_markup=pages[index]["keyboard"])
+
+async def prev_font(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    index = int(query.data.replace("prev_font_", ""))
+    pages = context.user_data.get("font_pages", [])
+    if 0 <= index < len(pages):
+        await query.edit_message_text(pages[index]["text"], parse_mode="HTML", reply_markup=pages[index]["keyboard"])
+
+# ======================= 🎛 بازگشت به منوی اصلی =======================
+async def feature_back(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    try:
+        await query.message.delete()
+    except:
+        pass
+    return ConversationHandler.END
+
+# ======================= 🧪 تست فونت =======================
+if __name__ == "__main__":
+    name = "Ali"
+    fonts = generate_fonts(name)
+    for i, f in enumerate(fonts, 1):
+        print(f"{i}. {f}")
+    
+    name_fa = "علی"
+    fonts_fa = generate_fonts(name_fa)
+    for i, f in enumerate(fonts_fa, 1):
+        print(f"{i}. {f}")
