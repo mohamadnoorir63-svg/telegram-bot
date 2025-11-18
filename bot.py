@@ -460,6 +460,7 @@ def get_group_status(chat_id: int):
         GROUP_STATUS[chat_id] = {"active": True, "welcome": True, "locked": False}
     return GROUP_STATUS[chat_id]
 
+# ────────────── خاموش/روشن سخنگو برای هر گروه ──────────────
 async def mute_speaker(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """خاموش کردن سخنگو فقط برای این گروه"""
     chat_id = update.effective_chat.id
@@ -1921,8 +1922,8 @@ application.add_handler(
 # 🔹 دستورات اصلی سیستم
 # ==========================================================
 application.add_handler(CommandHandler("start", start))
-application.add_handler(CommandHandler("روشن_سخنگو", unmute_speaker))
-application.add_handler(CommandHandler("خاموش_سخنگو", mute_speaker))
+application.add_handler(CommandHandler("mute", mute_bot))
+application.add_handler(CommandHandler("unmute", unmute_bot))
 application.add_handler(CommandHandler("welcome", toggle_welcome))
 application.add_handler(CommandHandler("lock", lock_learning))
 application.add_handler(CommandHandler("unlock", unlock_learning))
