@@ -39,7 +39,7 @@ async def receive_font_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ======================= 💎 ارسال فونت‌ها =======================
 async def send_fonts(update: Update, context: ContextTypes.DEFAULT_TYPE, name: str):
-    fonts = generate_fonts(name, count=240)  # 30 صفحه * 8 فونت
+    fonts = generate_fonts(name, count=240)
     context.user_data["all_fonts"] = fonts
     context.user_data["font_pages"] = make_pages(name, fonts, page_size=8, max_pages=30)
 
@@ -92,8 +92,8 @@ def generate_fonts(name: str, count: int = 240):
         "🅐🅑🅒🅓🅔🅕🅖🅗🅘🅙🅚🅛🅜🅝🅞🅟🅠🅡🅢🅣🅤🅥🅦🅧🅨🅩",
         "ⒶⒷⒸⒹⒺⒻⒼⒽⒾⒿⓀⓁⓂⓃⓄⓅⓆⓇⓈⓉⓊⓋⓌⓍⓎⓏ",
         "𝔸𝔹ℂ𝔻𝔼𝔽𝔾ℍ𝕀𝕁𝕂𝕃𝕄ℕ𝕆ℙℚℝ𝕊𝕋𝕌𝕍𝕎𝕏𝕐ℤ",
-        "𝗔𝗕𝗖𝗗𝗘𝗙𝗚𝗛𝗜𝗝𝗞𝗟𝗠𝗡𝗢𝗣𝗤𝗥𝗦𝗧𝗨𝗩𝗪𝗫𝗬𝗭",
-        
+        "𝗔𝗕𝗖𝗗𝗘𝗙𝗚𝗛𝗜𝗝𝗞𝗟𝗠𝗡𝗢𝗣𝗤𝗥𝗦𝗧𝗨𝗩𝗪𝗫𝗬𝗭"
+    ]
 
     fixed_patterns = [
         "۝ؔؑ❁➹‌❬⃟꯭({})꯭꯭‌⃟❭➹❁۝ؔؑ",
@@ -113,10 +113,9 @@ def generate_fonts(name: str, count: int = 240):
         "𓄂ꪴꪰ❨𝄠⃘۪۪۪۪۪۪ٜ♕{}♕𝄠⃘۪۪۪۪۪۪❩",
         "𓄂ꪴꪰ ♕{}♕𓆃",
         "𝄠⃘۪۪۪۪۪۪❩{}𝄠⃘۪۪۪۪۪۪❩"
-    
-
     ]
-        fonts = set()
+
+    fonts = set()
 
     while len(fonts) < count:
         if random.random() < 0.4:
