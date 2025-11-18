@@ -1921,8 +1921,8 @@ application.add_handler(
 # 🔹 دستورات اصلی سیستم
 # ==========================================================
 application.add_handler(CommandHandler("start", start))
-application.add_handler(CommandHandler("mute", mute_speaker))
-application.add_handler(CommandHandler("unmute", unmute_speaker))
+application.add_handler(CommandHandler("روشن_سخنگو", unmute_speaker))
+application.add_handler(CommandHandler("خاموش_سخنگو", mute_speaker))
 application.add_handler(CommandHandler("welcome", toggle_welcome))
 application.add_handler(CommandHandler("lock", lock_learning))
 application.add_handler(CommandHandler("unlock", unlock_learning))
