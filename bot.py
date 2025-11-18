@@ -888,12 +888,15 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not status["locked"]:
         auto_learn_from_text(text)
 
-    # اگر سخنگو خاموش است → فقط پاسخ هوش مصنوعی غیرفعال شود
-    if not status["active"]:
-    # دستورات (جوک، فال، یادبگیر، مدیریت،…) همچنان کار می‌کنند
-    # اما پیام‌های عمومی پاسخ داده نمی‌شوند
-        if text not in ["جوک", "فال"]:
-            return
+    chat_id = update.effective_chat.id
+status = get_group_status(chat_id)
+
+# اگر سخنگو خاموش است → فقط پاسخ هوش مصنوعی غیرفعال شود
+# دستورات (جوک، فال، یادبگیر، مدیریت،…) همچنان کار می‌کنند
+# اما پیام‌های عمومی پاسخ داده نمی‌شوند
+if not status["active"]:
+    if text not in ["جوک", "فال"]:
+        return
         
     # ✅ درصد هوش منطقی
     if text.lower() == "درصد هوش":
