@@ -39,9 +39,9 @@ async def receive_font_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ======================= 💎 ارسال فونت‌ها =======================
 async def send_fonts(update: Update, context: ContextTypes.DEFAULT_TYPE, name: str):
-    fonts = generate_fonts(name)
+    fonts = generate_fonts(name, count=240)  # 30 صفحه * 8 فونت
     context.user_data["all_fonts"] = fonts
-    context.user_data["font_pages"] = make_pages(name, fonts, page_size=5, max_pages=20)
+    context.user_data["font_pages"] = make_pages(name, fonts, page_size=8, max_pages=30)
 
     pages = context.user_data["font_pages"]
     await update.message.reply_text(
@@ -53,7 +53,6 @@ async def send_fonts(update: Update, context: ContextTypes.DEFAULT_TYPE, name: s
 
 # ======================= 🎭 تولید فونت‌های حرفه‌ای =======================
 def generate_fonts(name: str, count: int = 100):
-    """تعداد فونت پیشفرض را 100 کردیم تا حداکثر ۲۰ صفحه با page_size=5 امکان‌پذیر شود"""
     pre_groups = [
         ["𓄂","𓃬","𓋥","𓄼","𓂀","𓅓"],
         ["ꪰ","ꪴ","𝄠","𝅔","꧁","꧂","ꕥ"],
@@ -64,20 +63,21 @@ def generate_fonts(name: str, count: int = 100):
         ["✧","✦","❂","★","✺","✶","✸"],
         ["⋆","⟡","❋","•","✾","✢","✤"]
     ]
+    
+    # 10 استایل جداگانه (8 اصلی + 2 اختیاری)
     unicode_styles = [
-        "𝓐𝓑𝓒𝓓𝓔𝓕𝓖𝓗𝓘𝓙𝓚𝓛𝓜𝓝𝓞𝓟𝓠𝓡𝓢𝓣𝓤𝓥𝓦𝓧𝓨𝓩"
+        "𝓐𝓑𝓒𝓓𝓔𝓕𝓖𝓗𝓘𝓙𝓚𝓛𝓜𝓝𝓞𝓟𝓠𝓡𝓢𝓣𝓤𝓥𝓦𝓧𝓨𝓩",
         "𝓪𝓫𝓬𝓭𝓮𝓯𝓰𝓱𝓲𝓳𝓴𝓵𝓶𝓷𝓸𝓹𝓺𝓻𝓼𝓽𝓾𝓿𝔀𝔁𝔂𝔃",
-        "ᎯᏰℭⅅ℮ℱᏩℋᏐℐӃℒℳℕᎾ⅌ℚℜᏕƬƲᏉᏔℵᎽℤ"
-        "🄰🄱🄲🄳🄴🄵🄶🄷🄸🄹🄺🄻🄼🄽🄾🄿🅀🅁🅂🅃🅄🅅🅆🅇🅈🅉"
+        "ᎯᏰℭⅅ℮ℱᏩℋᏐℐӃℒℳℕᎾ⅌ℚℜᏕƬƲᏉᏔℵᎽℤ",
+        "🄰🄱🄲🄳🄴🄵🄶🄷🄸🄹🄺🄻🄼🄽🄾🄿🅀🅁🅂🅃🅄🅅🅆🅇🅈🅉",
         "🅐🅑🅒🅓🅔🅕🅖🅗🅘🅙🅚🅛🅜🅝🅞🅟🅠🅡🅢🅣🅤🅥🅦🅧🅨🅩",
-        "ⒶⒷⒸⒹⒺⒻⒼⒽⒾⒿⓀⓁⓜⓃⓄⓅⓆⓇⓈⓉⓊⓋⓌⓍⓎⓏ",
+        "ⒶⒷⒸⒹⒺⒻⒼⒽⒾⒿⓀⓁⓂⓃⓄⓅⓆⓇⓈⓉⓊⓋⓌⓍⓎⓏ",
         "𝔸𝔹ℂ𝔻𝔼𝔽𝔾ℍ𝕀𝕁𝕂𝕃𝕄ℕ𝕆ℙℚℝ𝕊𝕋𝕌𝕍𝕎𝕏𝕐ℤ",
-        "𝗔𝗕𝗖𝗗𝗘𝗙𝗚𝗛𝗜𝗝𝗞𝗟𝗠𝗡𝗢𝗣𝗤𝗥𝗦𝗧𝗨𝗩𝗪𝗫𝗬𝗭"
+        "𝗔𝗕𝗖𝗗𝗘𝗙𝗚𝗛𝗜𝗝𝗞𝗟𝗠𝗡𝗢𝗣𝗤𝗥𝗦𝗧𝗨𝗩𝗪𝗫𝗬𝗭",
         "【ᴀ】【ʙ】【ᴄ】【ᴅ】【ᴇ】【ꜰ】【ɢ】【ʜ】【ɪ】【ᴊ】【ᴋ】【ʟ】【ᴍ】【ɴ】【ᴏ】【ᴘ】【Q】【ʀ】【ꜱ】【ᴛ】【ᴜ】【ᴠ】【ᴡ】【x】【ʏ】【ᴢ】",
-        
+        "🇦","🇧","🇨","🇩","🇪","🇫","🇬","🇭","🇮","🇯","🇰","🇱","🇲","🇳","🇴","🇵","🇶","🇷","🇸","🇹","🇺","🇻","🇼","🇽","🇾","🇿",
     ]
-    regional_letters = ["🇦","🇧","🇨","🇩","🇪","🇫","🇬","🇭","🇮","🇯","🇰","🇱","🇲","🇳","🇴","🇵","🇶","🇷","🇸","🇹","🇺","🇻","🇼","🇽","🇾","🇿"]
-
+    
     fixed_patterns = [
         "۝ؔؑ❁➹‌❬⃟꯭({})꯭꯭‌⃟❭➹❁۝ؔؑ",
         "𓄂{}𓆃",
@@ -89,35 +89,34 @@ def generate_fonts(name: str, count: int = 100):
         "𝄟♔꯭⃮⃝⃮ 🦋 ꯭⃝⃮ ☾︎⃝ 𓄂{}𓆃☾︎⃝⋆♔꯭⃮⃝⃮ 🦋 ꯭⃝⃮ 𝄟",
         "𓋜𔘓❀{}❀𔒝",
         "🎀ꕥ✧»{}«✧ꕥ🎀",
-        "♥️⃝⃭𝄞❉্͜͡▪️𒌍꯭🦋⃝⃡.𝅯.𝅰.꯭𝅱.𝅲.꯭𝅱.𝅰.𝅯.𝅮.꯭.{} 𝄞͡،⚛️",
-        "𓄂ꪰ𓁪❥𝄞{}𝄞❥𓀛꯭𓆃ᵐᶠᶰ↬𓃬",
-        "➹‌❬⃟꯭💕꯭‌⃟❭꯭ ꯭꯭‌꯭꯭‌{} ꯭ ❬⃟‌꯭꯭🪽꯭꯭‌⃟❭➹",
-        "𓄂ꪴꪰ❨💎{}❩↬𓃬",
-        "𓄂ꪴꪰ❨𝄠⃘۪۪۪۪۪۪ٜ♕{}♕𝄠⃘۪۪۪۪۪۪❩",
-        "𓄂ꪴꪰ ♕{}♕𓆃",
-        "𝄠⃘۪۪۪۪۪۪❩{}𝄠⃘۪۪۪۪۪۪❩"
     ]
 
-    fonts = []
+    fonts = set()  # استفاده از set برای جلوگیری از تکرار
 
     while len(fonts) < count:
-        if random.random() < 0.3:
+        if random.random() < 0.4:
             pattern = random.choice(fixed_patterns)
             style = random.choice(unicode_styles)
-            uname = "".join(style["abcdefghijklmnopqrstuvwxyz".index(ch.lower())] if ch.lower() in "abcdefghijklmnopqrstuvwxyz" else ch for ch in name)
-            fonts.append(pattern.format(uname))
+            uname = "".join(
+                style["abcdefghijklmnopqrstuvwxyz".index(ch.lower())] if ch.lower() in "abcdefghijklmnopqrstuvwxyz" else ch
+                for ch in name
+            )
+            fonts.add(pattern.format(uname))
             continue
 
         pre = "".join(random.choice(group) for group in pre_groups)
         post = "".join(random.choice(group) for group in post_groups)
         style = random.choice(unicode_styles)
-        uname = "".join(style["abcdefghijklmnopqrstuvwxyz".index(ch.lower())] if ch.lower() in "abcdefghijklmnopqrstuvwxyz" else ch for ch in name)
-        fonts.append(f"{pre}{uname}{post}")
+        uname = "".join(
+            style["abcdefghijklmnopqrstuvwxyz".index(ch.lower())] if ch.lower() in "abcdefghijklmnopqrstuvwxyz" else ch
+            for ch in name
+        )
+        fonts.add(f"{pre}{uname}{post}")
 
-    return fonts
+    return list(fonts)
 
-# ======================= 📄 ساخت صفحات پویا با حداکثر 20 صفحه =======================
-def make_pages(name: str, fonts: list, page_size=5, max_pages=20):
+# ======================= 📄 ساخت صفحات پویا =======================
+def make_pages(name: str, fonts: list, page_size=8, max_pages=30):
     pages = []
     total_pages = min((len(fonts) + page_size - 1) // page_size, max_pages)
 
@@ -153,8 +152,7 @@ async def send_selected_font(update: Update, context: ContextTypes.DEFAULT_TYPE)
     font_id = int(query.data.replace("send_font_", ""))
     all_fonts = context.user_data.get("all_fonts", [])
     if 0 <= font_id < len(all_fonts):
-        if query.message.text != all_fonts[font_id]:
-            await query.message.reply_text(all_fonts[font_id])
+        await query.message.reply_text(all_fonts[font_id])
     else:
         await query.message.reply_text("❗ فونت پیدا نشد.")
 
@@ -167,8 +165,7 @@ async def next_font(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if 0 <= index < len(pages):
         new_text = pages[index]["text"]
         new_markup = pages[index]["keyboard"]
-        if query.message.text != new_text or query.message.reply_markup != new_markup:
-            await query.edit_message_text(new_text, parse_mode="HTML", reply_markup=new_markup)
+        await query.edit_message_text(new_text, parse_mode="HTML", reply_markup=new_markup)
 
 async def prev_font(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -178,8 +175,7 @@ async def prev_font(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if 0 <= index < len(pages):
         new_text = pages[index]["text"]
         new_markup = pages[index]["keyboard"]
-        if query.message.text != new_text or query.message.reply_markup != new_markup:
-            await query.edit_message_text(new_text, parse_mode="HTML", reply_markup=new_markup)
+        await query.edit_message_text(new_text, parse_mode="HTML", reply_markup=new_markup)
 
 # ======================= 🎛 بازگشت به منوی اصلی =======================
 async def feature_back(update: Update, context: ContextTypes.DEFAULT_TYPE):
