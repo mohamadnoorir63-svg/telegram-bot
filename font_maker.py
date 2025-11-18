@@ -81,52 +81,54 @@ def generate_fonts(name: str, count: int = 240):
         "◇", "◕", "◔", "ʊ", "ϟ", "ღ", "₪", "✓", "✔️", "✕", "☥", "™", "©", "®", "¿", "¡", "№", "⇨"
     ]
 
-    # تقسیم symbols به گروه‌های پیشوند و پسوند
-    pre_groups = [symbols[i:i+5] for i in range(0, len(symbols), 5)]
-    post_groups = [symbols[i:i+5] for i in range(0, len(symbols), 5)]
+    # تقسیم symbols به گروه‌های پیشوند و پسوند  
+    pre_groups = [symbols[i:i+5] for i in range(0, len(symbols), 5)]  
+    post_groups = [symbols[i:i+5] for i in range(0, len(symbols), 5)]  
 
-    unicode_styles = [
-        "𝓐𝓑𝓒𝓓𝓔𝓕𝓖𝓗𝓘𝓙𝓚𝓛𝓜𝓝𝓞𝓟𝓠𝓡𝓢𝓣𝓤𝓥𝓦𝓧𝓨𝓩",
-        "𝓪𝓫𝓬𝓭𝓮𝓯𝓰𝓱𝓲𝓳𝓴𝓵𝓶𝓷𝓸𝓹𝓺𝓻𝓼𝓽𝓾𝓿𝔀𝔁𝔂𝔃",
-        "ᎯᏰℭⅅ℮ℱᏩℋᏐℐӃℒℳℕᎾ⅌ℚℜᏕƬƲᏉᏔℵᎽℤ",
-        "🄰🄱🄲🄳🄴🄵🄶🄷🄸🄹🄺🄻🄼🄽🄾🄿🅀🅁🅂🅃🅄🅅🅆🅇🅈🅉",
-        "🅐🅑🅒🅓🅔🅕🅖🅗🅘🅙🅚🅛🅜🅝🅞🅟🅠🅡🅢🅣🅤🅥🅦🅧🅨🅩"
-        "𝔸𝔹ℂ𝔻𝔼𝔽𝔾ℍ𝕀𝕁𝕂𝕃𝕄ℕ𝕆ℙℚℝ𝕊𝕋𝕌𝕍𝕎𝕏𝕐ℤ",
-        "𝗔𝗕𝗖𝗗𝗘𝗙𝗚𝗛𝗜𝗝𝗞𝗟𝗠𝗡𝗢𝗣𝗤𝗥𝗦𝗧𝗨𝗩𝗪𝗫𝗬𝗭"
+    unicode_styles = [  
+        "𝓐𝓑𝓒𝓓𝓔𝓕𝓖𝓗𝓘𝓙𝓚𝓛𝓜𝓝𝓞𝓟𝓠𝓡𝓢𝓣𝓤𝓥𝓦𝓧𝓨𝓩",  
+        "𝓪𝓫𝓬𝓭𝓮𝓯𝓰𝓱𝓲𝓳𝓴𝓵𝓶𝓷𝓸𝓹𝓺𝓻𝓼𝓽𝓾𝓿𝔀𝔁𝔂𝔃",  
+        "ᎯᏰℭⅅ℮ℱᏩℋᏐℐӃℒℳℕᎾ⅌ℚℜᏕƬƲᏉᏔℵᎽℤ",  
+        "🄰🄱🄲🄳🄴🄵🄶🄷🄸🄹🄺🄻🄼🄽🄾🄿🅀🅁🅂🅃🅄🅅🅆🅇🅈🅉",  
+        "🅐🅑🅒🅓🅔🅕🅖🅗🅘🅙🅚🅛🅜🅝🅞🅟🅠🅡🅢🅣🅤🅥🅦🅧🅨🅩",  
+        "𝔸𝔹ℂ𝔻𝔼𝔽𝔾ℍ𝕀𝕁𝕂𝕃𝕄ℕ𝕆ℙℚℝ𝕊𝕋𝕌𝕍𝕎𝕏𝕐ℤ",  
+        "𝗔𝗕𝗖𝗗𝗘𝗙𝗚𝗛𝗜𝗝𝗞𝗟𝗠𝗡𝗢𝗣𝗤𝗥𝗦𝗧𝗨𝗩𝗪𝗫𝗬𝗭"  
+    ]  
+
+    decorated_templates = [  
+        "۝ؔؑ❁➹‌❬⃟꯭({})꯭꯭‌⃟❭➹❁۝ؔؑ",  
+        "𓄂{}𓆃",  
+        "【♫❀꯭͞༄꯭͞𝄞_{}___❀꯭͞͞༄꯭͞𝄞",  
+        "⋆𝅦𝆉𓄂ꪰ☾︎⃝꯭🪩{}◆⃝🪩",  
+        "ـ‌‌ـ‌‌‌༊‌꯭ـ{}🐲ـ‌‌ـ‌‌‌‌‌༊‌꯭ـ",  
+        "┏┅┅🌸⃝⃭.  {}🌸⃝⃭❤━┅┅┓",  
+        " ᷤ‌‌➠🌼⃟🍃{}✿⃟⃘݊💞",  
+        "𝄟♔꯭⃮⃝⃮ 🦋 ꯭⃝⃮ ☾︎⃝ 𓄂{}𓆃☾︎⃝⋆♔꯭⃮⃝⃮ 🦋 ꯭⃝⃮ 𝄟",  
+        "𓋜𔘓❀{}❀𔒝",  
+        "🎀ꕥ✧»{}«✧ꕥ🎀",  
+        "♥️⃝⃭𝄞❉্͜͡▪️𒌍꯭🦋⃝⃡.𝅯.𝅰.꯭𝅱.𝅲.꯭𝅱.𝅰.𝅯.𝅮.꯭.{} 𝄞͡،⚛️",  
+        "𓄂ꪰ𓁪❥𝄞{}𝄞❥𓀛꯭𓆃ᵐᶠᶰ↬𓃬",  
+        "➹‌❬⃟꯭💕꯭‌⃟❭꯭ ꯭꯭‌꯭꯭‌{} ꯭ ❬⃟‌꯭꯭🪽꯭꯭‌⃟❭➹",  
+        "𓄂ꪴꪰ❨💎{}❩↬𓃬"
     ]
 
-    decorated_templates = [
-    "۝ؔؑ❁➹‌❬⃟꯭({})꯭꯭‌⃟❭➹❁۝ؔؑ",
-    "𓄂{}𓆃",
-    "【♫❀꯭͞༄꯭͞𝄞_{}___❀꯭͞͞༄꯭͞𝄞",
-    "⋆𝅦𝆉𓄂ꪰ☾︎⃝꯭🪩{}◆⃝🪩",
-    "ـ‌‌ـ‌‌‌༊‌꯭ـ{}🐲ـ‌‌ـ‌‌‌‌‌༊‌꯭ـ",
-    "┏┅┅🌸⃝⃭.  {}🌸⃝⃭❤━┅┅┓",
-    " ᷤ‌‌➠🌼⃟🍃{}✿⃟⃘݊💞",
-    "𝄟♔꯭⃮⃝⃮ 🦋 ꯭⃝⃮ ☾︎⃝ 𓄂{}𓆃☾︎⃝⋆♔꯭⃮⃝⃮ 🦋 ꯭⃝⃮ 𝄟",
-    "𓋜𔘓❀{}❀𔒝",
-    "🎀ꕥ✧»{}«✧ꕥ🎀",
-    "♥️⃝⃭𝄞❉্͜͡▪️𒌍꯭🦋⃝⃡.𝅯.𝅰.꯭𝅱.𝅲.꯭𝅱.𝅰.𝅯.𝅮.꯭.{} 𝄞͡،⚛️",
-    "𓄂ꪰ𓁪❥𝄞{}𝄞❥𓀛꯭𓆃ᵐᶠᶰ↬𓃬",
-    "➹‌❬⃟꯭💕꯭‌⃟❭꯭ ꯭꯭‌꯭꯭‌{} ꯭ ❬⃟‌꯭꯭🪽꯭꯭‌⃟❭➹",
-    "𓄂ꪴꪰ❨💎{}❩↬𓃬",
-]
+    fixed_patterns = decorated_templates  # اصلاح شده: استفاده از decorated_templates
 
-    fonts = set()
+    fonts = set()  
 
-    while len(fonts) < count:
-        if random.random() < 0.4:
-            pattern = random.choice(fixed_patterns)
-            style = random.choice(unicode_styles)
-            uname = apply_style(name, style)
-            fonts.add(pattern.format(uname))
-            continue
+    while len(fonts) < count:  
+        if random.random() < 0.4:  
+            pattern = random.choice(fixed_patterns)  
+            style = random.choice(unicode_styles)  
+            uname = apply_style(name, style)  
+            fonts.add(pattern.format(uname))  
+            continue  
 
-        pre = "".join(random.choice(group) for group in pre_groups)
-        post = "".join(random.choice(group) for group in post_groups)
-        style = random.choice(unicode_styles)
-        uname = apply_style(name, style)
-        fonts.add(f"{pre}{uname}{post}")
+        pre = "".join(random.choice(group) for group in pre_groups)  
+        post = "".join(random.choice(group) for group in post_groups)  
+        style = random.choice(unicode_styles)  
+        uname = apply_style(name, style)  
+        fonts.add(f"{pre}{uname}{post}")  
 
     return list(fonts)
         
