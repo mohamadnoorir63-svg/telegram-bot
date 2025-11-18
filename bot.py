@@ -1960,12 +1960,18 @@ application.add_handler(
     CallbackQueryHandler(handle_fun_buttons, pattern=r"^fun_"),
     group=-3
 )
-
+# ────────────── سخنگو فارسی ──────────────
+application.add_handler(
+    MessageHandler(filters.Regex(r"^سخنگو_خاموش$"), mute_speaker),
+    group=4  # گروه مشخص بالاتر از reply
+)
+application.add_handler(
+    MessageHandler(filters.Regex(r"^سخنگو_روشن$"), unmute_speaker),
+    group=4
+)
 # ==========================================================
 # 📊 آمار، بک‌آپ و کنترل
 # ==========================================================
-application.add_handler(MessageHandler(filters.Regex(r"^سخنگو_خاموش$"), mute_speaker))
-application.add_handler(MessageHandler(filters.Regex(r"^سخنگو_روشن$"), unmute_speaker))
 
 application.add_handler(CommandHandler("stats", stats))
 application.add_handler(CommandHandler("fullstats", fullstats))
