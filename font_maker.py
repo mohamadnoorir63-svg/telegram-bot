@@ -139,7 +139,7 @@ templates = [
 ]
 
 # ------------------ تولید فونت ------------------
-    def generate_69_fonts(name):
+def generate_69_fonts(name):
     letters = list(name)
     while len(letters) < 4:
         letters.append('')
