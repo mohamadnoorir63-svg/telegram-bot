@@ -113,9 +113,10 @@ def generate_fonts(name: str, count: int = 240):
         "𓄂ꪴꪰ❨𝄠⃘۪۪۪۪۪۪ٜ♕{}♕𝄠⃘۪۪۪۪۪۪❩",
         "𓄂ꪴꪰ ♕{}♕𓆃",
         "𝄠⃘۪۪۪۪۪۪❩{}𝄠⃘۪۪۪۪۪۪❩"
-    ]
+    
 
-    fonts = set()
+    ]
+        fonts = set()
 
     while len(fonts) < count:
         if random.random() < 0.4:
