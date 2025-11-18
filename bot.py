@@ -1964,7 +1964,7 @@ application.add_handler(
 from farsi_commands.speaker import register_speaker_commands
 
 # ثبت هندلرهای سخنگوی فارسی
-register_speaker_commands(application, get_group_status),group=-4
+register_speaker_commands(application, get_group_status)
 # ==========================================================
 # 📊 آمار، بک‌آپ و کنترل
 # ==========================================================
