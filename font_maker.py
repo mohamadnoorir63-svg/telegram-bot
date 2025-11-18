@@ -163,19 +163,23 @@ def generate_fonts(name: str):
         return fonts
 
 # ======================= 📄 ساخت صفحات پویا =======================
+# ======================= 📄 ساخت صفحات پویا =======================
 def make_pages(name: str, fonts: list, page_size=10, max_pages=30):
     pages = []
     total_pages = min((len(fonts) + page_size - 1) // page_size, max_pages)
+
     for idx in range(total_pages):
         chunk = fonts[idx*page_size : (idx+1)*page_size]
-        text = f"**↻ {name} ⇦**\n:• لیست فونت های پیشنهادی :\
+        text = f"**↻ {name} ⇦**\n:• لیست فونت های پیشنهادی :\n"
         keyboard = []
+
         for i, style in enumerate(chunk, start=1):
             global_index = idx*page_size + (i-1)
             text += f"{i}- {style}\n"
             keyboard.append([InlineKeyboardButton(f"{i}- {style}", callback_data=f"send_font_{global_index}")])
+
         text += f"\n📄 صفحه {idx+1} از {total_pages}"
-        
+
         # دکمه‌های ناوبری
         nav = []
         if idx > 0:
@@ -184,9 +188,12 @@ def make_pages(name: str, fonts: list, page_size=10, max_pages=30):
             nav.append(InlineKeyboardButton("➡️ بعدی", callback_data=f"next_font_{idx+1}"))
         if nav:
             keyboard.append(nav)
-        
+
+        # دکمه بازگشت
         keyboard.append([InlineKeyboardButton("🔙 بازگشت", callback_data="feature_back")])
+
         pages.append({"text": text, "keyboard": InlineKeyboardMarkup(keyboard)})
+
     return pages
 
 # ======================= 📋 ارسال فونت انتخاب شده =======================
