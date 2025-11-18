@@ -452,9 +452,6 @@ async def mode_change(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ======================= ⚙️ کنترل وضعیت =======================
 
-# وضعیت ربات
-# status = {"active": True, "welcome": True, "locked": False}
-
 async def mute_speaker(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """خاموش کردن سخنگو"""
     status["active"] = False
