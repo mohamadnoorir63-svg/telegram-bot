@@ -451,6 +451,15 @@ async def mode_change(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ مود نامعتبر است!")
 
 # ======================= ⚙️ کنترل وضعیت =======================
+# حافظه وضعیت گروه‌ها
+GROUP_STATUS = {}  # chat_id: {"active": True, "welcome": True, "locked": False}
+
+# تابع کمکی برای گرفتن یا ساخت وضعیت گروه
+def get_group_status(chat_id: int):
+    if chat_id not in GROUP_STATUS:
+        GROUP_STATUS[chat_id] = {"active": True, "welcome": True, "locked": False}
+    return GROUP_STATUS[chat_id]
+
 async def mute_speaker(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """خاموش کردن سخنگو فقط برای این گروه"""
     chat_id = update.effective_chat.id
