@@ -451,23 +451,37 @@ async def mode_change(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ مود نامعتبر است!")
 
 # ======================= ⚙️ کنترل وضعیت =======================
-async def toggle(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    status["active"] = not status["active"]
-    await update.message.reply_text("✅ فعال شد!" if status["active"] else "😴 خاموش شد!")
+
+# وضعیت ربات
+# status = {"active": True, "welcome": True, "locked": False}
+
+async def mute_speaker(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """خاموش کردن سخنگو"""
+    status["active"] = False
+    await update.message.reply_text("😴 سخنگو خاموش شد!\n(جوک و فال همچنان فعال هستند)")
+
+
+async def unmute_speaker(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """روشن کردن سخنگو"""
+    status["active"] = True
+    await update.message.reply_text("✅ سخنگو روشن شد!\n(همه پیام‌ها پاسخ داده می‌شوند)")
+
 
 async def toggle_welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
     status["welcome"] = not status["welcome"]
-    await update.message.reply_text("👋 خوشامد فعال شد!" if status["welcome"] else "🚫 خوشامد غیرفعال شد!")
+    await update.message.reply_text(
+        "👋 خوشامد فعال شد!" if status["welcome"] else "🚫 خوشامد غیرفعال شد!"
+    )
+
 
 async def lock_learning(update: Update, context: ContextTypes.DEFAULT_TYPE):
     status["locked"] = True
     await update.message.reply_text("🔒 یادگیری قفل شد!")
 
+
 async def unlock_learning(update: Update, context: ContextTypes.DEFAULT_TYPE):
     status["locked"] = False
     await update.message.reply_text("🔓 یادگیری باز شد!")
-
-
 # ======================= 📊 آمار ربات واقعی =======================
 async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """نمایش آمار کلی — فقط برای مدیر اصلی یا سودوها"""
@@ -1884,7 +1898,8 @@ application.add_handler(
 # 🔹 دستورات اصلی سیستم
 # ==========================================================
 application.add_handler(CommandHandler("start", start))
-application.add_handler(CommandHandler("toggle", toggle))
+application.add_handler(CommandHandler("mute", mute_speaker))
+application.add_handler(CommandHandler("unmute", unmute_speaker))
 application.add_handler(CommandHandler("welcome", toggle_welcome))
 application.add_handler(CommandHandler("lock", lock_learning))
 application.add_handler(CommandHandler("unlock", unlock_learning))
@@ -2063,7 +2078,7 @@ try:
     # 🧩 تست سلامت (اختیاری، فقط برای لاگ زنده)
     async def test_main_bot():
         while True:
-            print("🤖 [BOT] خنگول فعاله و در حال اجراست...")
+            print("🤖 [BOT] ربات فعاله و در حال اجراست...")
             await asyncio.sleep(10)
 
     loop = asyncio.get_event_loop()
