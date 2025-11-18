@@ -1924,9 +1924,11 @@ application.add_handler(
 # ==========================================================
 # 🔹 دستورات اصلی سیستم
 # ==========================================================
+# 🔊 سخنگوی فارسی بدون اسلش
+application.add_handler(MessageHandler(filters.Regex(r"^سخنگو_خاموش$"), mute_speaker))
+application.add_handler(MessageHandler(filters.Regex(r"^سخنگو_روشن$"), unmute_speaker))
+
 application.add_handler(CommandHandler("start", start))
-application.add_handler(CommandHandler("mute", mute_speaker))
-application.add_handler(CommandHandler("unmute", unmute_speaker))
 application.add_handler(CommandHandler("welcome", toggle_welcome))
 application.add_handler(CommandHandler("lock", lock_learning))
 application.add_handler(CommandHandler("unlock", unlock_learning))
@@ -1966,9 +1968,6 @@ application.add_handler(
 # ==========================================================
 # 📊 آمار، بک‌آپ و کنترل
 # ==========================================================
-from farsi_commands import register_all_farsi
-
-register_all_farsi(application)
 
 application.add_handler(CommandHandler("stats", stats))
 application.add_handler(CommandHandler("fullstats", fullstats))
