@@ -139,7 +139,7 @@ templates = [
 ]
 
 # ------------------ تولید فونت ------------------
-def generate_69_fonts(name):
+    def generate_69_fonts(name):
     letters = list(name)
     while len(letters) < 4:
         letters.append('')
@@ -149,20 +149,30 @@ def generate_69_fonts(name):
             fonts.append(template.format(*letters))
         except:
             fonts.append(template)
+    for style in farsi_styles:
+        try:
+            fonts.append(style(name))
+        except:
+            pass
     return fonts
 
 def generate_fonts(name: str):
     is_farsi = any("\u0600" <= c <= "\u06FF" for c in name)
+    fonts = []
+
     if is_farsi:
-        return generate_69_fonts(name)
+        fonts = generate_69_fonts(name)
     else:
-        fonts = []
-        # Unicode styles: فقط رشته‌ها
+        # Unicode styles
         for style in unicode_styles:
-            fonts.append(name)  # یا می‌توانید استایل‌های مختلف را اعمال کنید
+            fonts.append(name)  # می‌توانید تغییرات استایل اعمال کنید
         # Fixed patterns
         fonts += [fp.format(name) for fp in fixed_patterns]
-        return fonts[:300]  # حداکثر 30 صفحه × 10 فونت
+
+    # اطمینان از حداقل 30 صفحه × 10 فونت = 300 فونت
+    while len(fonts) < 300:
+        fonts += fonts
+    return fonts[:300]
 
 # ======================= 📄 ساخت صفحات پویا =======================
 def make_pages(name: str, fonts: list, page_size=10, max_pages=30):
@@ -178,7 +188,6 @@ def make_pages(name: str, fonts: list, page_size=10, max_pages=30):
             keyboard.append([InlineKeyboardButton(f"{i}- {style}", callback_data=f"send_font_{global_index}")])
         text += f"\n📄 صفحه {idx+1} از {total_pages}"
 
-        # دکمه‌های ناوبری
         nav = []
         if idx > 0:
             nav.append(InlineKeyboardButton("⬅️ قبلی", callback_data=f"prev_font_{idx-1}"))
@@ -227,15 +236,3 @@ async def feature_back(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except:
         pass
     return ConversationHandler.END
-
-# ======================= 🧪 تست فونت =======================
-if __name__ == "__main__":
-    name_en = "Ali"
-    fonts_en = generate_fonts(name_en)
-    for i, f in enumerate(fonts_en, 1):
-        print(f"{i}. {f}")
-
-    name_fa = "علی"
-    fonts_fa = generate_fonts(name_fa)
-    for i, f in enumerate(fonts_fa, 1):
-        print(f"{i}. {f}")
