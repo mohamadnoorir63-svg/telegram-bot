@@ -830,6 +830,9 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
     lower_text = text.lower()
 
+    # 🧠 گرفتن وضعیت گروه (قبل از هر استفاده)
+    status = get_group_status(chat_id)
+
     # 🧠 ثبت پیام در حافظه کوتاه‌مدت
     context_memory.add_message(uid, text)
 
@@ -851,8 +854,7 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if "LAST_MESSAGES" not in globals():
         LAST_MESSAGES = {}
 
-    user_id = update.effective_user.id
-    last_msg = LAST_MESSAGES.get(user_id)
+    last_msg = LAST_MESSAGES.get(uid)
     if last_msg == text:
         return False  # پیام تکراری → پاسخ نده
 
@@ -888,15 +890,13 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not status["locked"]:
         auto_learn_from_text(text)
 
-    chat_id = update.effective_chat.id
-    status = get_group_status(chat_id)
-
-# اگر سخنگو خاموش است → فقط پاسخ هوش مصنوعی غیرفعال شود
-# دستورات (جوک، فال، یادبگیر، مدیریت،…) همچنان کار می‌کنند
-# اما پیام‌های عمومی پاسخ داده نمی‌شوند
+    # اگر سخنگو خاموش است → فقط پاسخ هوش مصنوعی غیرفعال شود
+    # دستورات (جوک، فال، یادبگیر، مدیریت،…) همچنان کار می‌کنند
     if not status["active"]:
-        if text not in ["جوک", "فال"]:
+        if lower_text not in ["جوک", "فال"]:
             return
+
+    # ادامه‌ی منطق پاسخ‌دهی هوش مصنوعی...
         
     # ✅ درصد هوش منطقی
     if text.lower() == "درصد هوش":
