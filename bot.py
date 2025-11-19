@@ -756,6 +756,7 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "jokes.json",
         "fortunes.json",
         "aliases.json",
+        "data/members.json",
 
         # مسیر اصلی
         "group_control/aliases.json",
@@ -1391,7 +1392,7 @@ async def reset_memory(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "🌙 نهایی‌سازی سیستم هوش مصنوعی..."
     ]
 
-    files_to_remove = ["memory.json", "group_data.json", "stickers.json", "jokes.json", "fortunes.json", "users.json"]
+    files_to_remove = ["memory.json", "group_data.json","data/custom_commands.json", "stickers.json", "jokes.json", "fortunes.json", "users.json"]
 
     for i, step in enumerate(steps, start=1):
         percent = int((i / len(steps)) * 100)
