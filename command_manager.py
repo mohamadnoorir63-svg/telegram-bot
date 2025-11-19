@@ -117,8 +117,8 @@ async def save_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("⚠️ این پاسخ قبلا ذخیره شده و تکراری نمی‌شود.")
 
 
-# اجرای دستور با انتخاب حداقل 100 پاسخ بدون تکرار
-# اجرای دستور با ارسال حداقل 100 پاسخ بدون تکرار
+
+# اجرای دستور با ارسال فقط 1 پاسخ تصادفی
 async def handle_custom_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message or not update.message.text:
         return
@@ -134,32 +134,25 @@ async def handle_custom_command(update: Update, context: ContextTypes.DEFAULT_TY
     if not responses:
         return await update.message.reply_text("⚠️ هنوز پاسخی برای این دستور ثبت نشده.")
 
-    total_responses = len(responses)
-    # اگر کمتر از 100 پاسخ هست، همه را انتخاب کن
-    if total_responses <= 100:
-        sampled_responses = responses.copy()
-    else:
-        # اگر بیشتر از 100 هست، 100 پاسخ تصادفی بدون تکرار انتخاب کن
-        sampled_responses = random.sample(responses, 100)
+    # فقط یکی از پاسخ‌ها به صورت تصادفی (بدون تکرار)
+    response = random.choice(responses)
 
-    for response in sampled_responses:
-        r_type = response.get("type")
-        if r_type == "text":
-            await update.message.reply_text(response.get("data", ""))
-        elif r_type == "photo":
-            await update.message.reply_photo(response["file_id"], caption=response.get("caption"))
-        elif r_type == "video":
-            await update.message.reply_video(response["file_id"], caption=response.get("caption"))
-        elif r_type == "document":
-            await update.message.reply_document(response["file_id"], caption=response.get("caption"))
-        elif r_type == "audio":
-            await update.message.reply_audio(response["file_id"], caption=response.get("caption"))
-        elif r_type == "animation":
-            await update.message.reply_animation(response["file_id"], caption=response.get("caption"))
+    r_type = response.get("type")
+
+    if r_type == "text":
+        await update.message.reply_text(response.get("data", ""))
+    elif r_type == "photo":
+        await update.message.reply_photo(response["file_id"], caption=response.get("caption"))
+    elif r_type == "video":
+        await update.message.reply_video(response["file_id"], caption=response.get("caption"))
+    elif r_type == "document":
+        await update.message.reply_document(response["file_id"], caption=response.get("caption"))
+    elif r_type == "audio":
+        await update.message.reply_audio(response["file_id"], caption=response.get("caption"))
+    elif r_type == "animation":
+        await update.message.reply_animation(response["file_id"], caption=response.get("caption"))
 
     context.user_data["custom_handled"] = True
-
-
 async def delete_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     if user.id != ADMIN_ID:
