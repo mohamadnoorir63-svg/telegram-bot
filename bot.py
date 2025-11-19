@@ -296,25 +296,43 @@ async def handle_group_reply_mode(update: Update, context: ContextTypes.DEFAULT_
                 return True  # یعنی بقیه تابع reply اجرا نشود
     return False
 # ======================= 🧾 ثبت کاربر =======================
-import json, os
+import json
+import os
 
 USERS_FILE = "users.json"
 
-async def register_user(user):
-    """ذخیره آیدی و نام کاربر در فایل users.json"""
+async def register_user(update):
+    """
+    ذخیره آیدی و نام کاربر در فایل users.json
+    فقط کاربران خصوصی ثبت می‌شوند (چت گروه یا کانال ذخیره نمی‌شود)
+    """
+    chat = update.effective_chat
+    user = update.effective_user
+
+    # بررسی اینکه پیام از چت خصوصی است
+    if chat.type != "private":
+        return  # گروه یا کانال ثبت نمی‌شود
+
     data = []
+    # بارگذاری فایل قبلی
     if os.path.exists(USERS_FILE):
         try:
             with open(USERS_FILE, "r", encoding="utf-8") as f:
                 data = json.load(f)
-        except:
+        except (json.JSONDecodeError, FileNotFoundError):
             data = []
 
-    if user.id not in [u["id"] for u in data]:
-        data.append({"id": user.id, "name": user.first_name})
-        with open(USERS_FILE, "w", encoding="utf-8") as f:
-            json.dump(data, f, ensure_ascii=False, indent=2)
-
+    # بررسی اینکه کاربر قبلاً ثبت نشده باشد
+    if user.id not in [u.get("id") for u in data]:
+        data.append({
+            "id": user.id,
+            "name": user.first_name or "—"
+        })
+        try:
+            with open(USERS_FILE, "w", encoding="utf-8") as f:
+                json.dump(data, f, ensure_ascii=False, indent=2)
+        except Exception as e:
+            print(f"⚠️ خطا در ذخیره users.json: {e}")
 
 # ======================= 📢 اطلاع به ادمین هنگام استارت =======================
 async def notify_admin_on_startup(app):
