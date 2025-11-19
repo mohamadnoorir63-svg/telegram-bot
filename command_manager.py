@@ -116,9 +116,6 @@ async def save_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         await update.message.reply_text("⚠️ این پاسخ قبلا ذخیره شده و تکراری نمی‌شود.")
 
-
-
-# اجرای دستور با ارسال فقط 1 پاسخ تصادفی
 # اجرای دستور بدون تکرار تا مصرف تمام پاسخ‌ها
 async def handle_custom_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message or not update.message.text:
@@ -173,6 +170,7 @@ async def handle_custom_command(update: Update, context: ContextTypes.DEFAULT_TY
         await update.message.reply_animation(chosen["file_id"], caption=chosen.get("caption"))
 
     context.user_data["custom_handled"] = True
+    
 async def list_commands(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     if user.id != ADMIN_ID:
