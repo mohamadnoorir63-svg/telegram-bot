@@ -1,7 +1,7 @@
 from telegram import Update
 from telegram.ext import ContextTypes, MessageHandler, filters
 
-# تابع کمکی وضعیت گروه‌ها
+# وضعیت گروه‌ها
 GROUP_STATUS = {}  # chat_id: {"active": True, "welcome": True, "locked": False}
 
 def get_group_status(chat_id: int):
@@ -9,7 +9,7 @@ def get_group_status(chat_id: int):
         GROUP_STATUS[chat_id] = {"active": True, "welcome": True, "locked": False}
     return GROUP_STATUS[chat_id]
 
-# ────────────── خاموش/روشن سخنگو ──────────────
+# خاموش/روشن سخنگو
 async def mute_speaker(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
     status = get_group_status(chat_id)
@@ -26,9 +26,8 @@ async def unmute_speaker(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "✅ سخنگو روشن شد!\n(همه پیام‌ها پاسخ داده می‌شوند)"
     )
 
-# ────────────── ثبت هندلرها در اپلیکیشن ──────────────
+# ثبت هندلرها
 def register_speaker_commands(application):
-    """این تابع هندلرهای سخنگو فارسی را به اپلیکیشن اضافه می‌کند"""
     application.add_handler(
         MessageHandler(filters.Regex(r"^سخنگو_خاموش$"), mute_speaker),
         group=4
