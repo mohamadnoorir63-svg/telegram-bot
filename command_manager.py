@@ -59,8 +59,9 @@ def save_commands_local(data: Dict[str, Any]):
 
 
 # ================= API اصلی =================
+
 async def save_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """ذخیره‌ی دستور با /save روی پیام ریپلای شده."""
+    """ذخیره‌ی دستور با /save روی پیام ریپلای شده (بدون تکرار)."""
     user = update.effective_user
     chat = update.effective_chat
 
@@ -83,8 +84,8 @@ async def save_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "owner_id": user.id
     })
 
+    # تشخیص نوع پیام و ساخت entry
     entry = {}
-    # ======= پشتیبانی از تمام انواع رسانه =======
     if reply.text or reply.caption:
         entry = {"type": "text", "data": (reply.text or reply.caption).strip()}
     elif reply.photo:
@@ -100,17 +101,33 @@ async def save_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         return await update.message.reply_text("⚠️ این نوع پیام پشتیبانی نمی‌شود!")
 
-    doc["responses"].append(entry)
-    if len(doc["responses"]) > 100:
-        doc["responses"].pop(0)
-    commands[name] = doc
+    # ======= جلوگیری از تکرار =======
+    already_exists = False
+    for r in doc["responses"]:
+        if r["type"] == entry["type"]:
+            if entry["type"] == "text" and r["data"] == entry["data"]:
+                already_exists = True
+                break
+            elif entry.get("file_id") and r.get("file_id") == entry.get("file_id"):
+                already_exists = True
+                break
 
+    if already_exists:
+        return await update.message.reply_text("⚠️ این پیام قبلاً ذخیره شده است!")
+
+    doc["responses"].append(entry)
+
+    # محدودیت 100 پاسخ، حداقل 50 بدون تکرار نگه داشته شود
+    if len(doc["responses"]) > 100:
+        doc["responses"] = doc["responses"][-100:]
+
+    commands[name] = doc
     save_commands_local(commands)
+
     await update.message.reply_text(
         f"✅ پاسخ برای دستور <b>{name}</b> ذخیره شد. ({len(doc['responses'])}/100)",
         parse_mode="HTML"
     )
-
 
 async def handle_custom_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """اجرای دستور ذخیره‌شده"""
