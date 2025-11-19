@@ -650,8 +650,10 @@ def _should_include_in_backup(path: str) -> bool:
     if lowered.endswith(".zip") or os.path.basename(lowered).startswith("backup_"):
         return False
     
-    # ۳. حتما فایل‌های دستورات ریپلی شامل شوند
-    if os.path.basename(path) in ["custom_commands.json", "custom_commands_backup"]:
+    if os.path.basename(path) in [
+        "custom_commands.json",
+        "custom_commands_backup.json"
+]:
         return True
     
     # ۴. فایل‌های مهم دیگر بر اساس پسوند
@@ -761,9 +763,9 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # پوشه رسانه فال‌ها
         "fortunes_media",
 
-        # دستورهای ذخیره‌شده
-        "custom_commands.json",
-        "custom_commands_backup.json",
+        
+        "/app/data/custom_commands.json",
+        "/app/data/custom_commands_backup.json"
         ]
 
         moved_any = False
