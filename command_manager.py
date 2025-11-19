@@ -4,7 +4,8 @@ import random
 from datetime import datetime
 from telegram import Update
 from telegram.ext import ContextTypes
-from pymongo import MongoClient, errors
+from pymongo import MongoClient
+import ssl
 
 # ====================== تنظیمات ======================
 ADMIN_ID = 8588347189
@@ -12,23 +13,19 @@ MONGO_URI = "mongodb+srv://username:password@cluster0.gya1hoa.mongodb.net/mydata
 DB_NAME = "mydatabase"
 COLLECTION_NAME = "custom_commands"
 
-# ====================== اتصال MongoDB ======================
-try:
-    client = MongoClient(MONGO_URI, serverSelectionTimeoutMS=5000, tls=True)
-    db = client[DB_NAME]
-    commands_collection = db[COLLECTION_NAME]
-    # تست اتصال
-    client.server_info()
-    print("[MongoDB] Connection established ✅")
-except errors.ServerSelectionTimeoutError as e:
-    print(f"[MongoDB] Connection failed ❌: {e}")
-    commands_collection = None
+# ====================== اتصال MongoDB امن ======================
+client = MongoClient(
+    MONGO_URI,
+    tls=True,
+    tlsAllowInvalidCertificates=False,
+    serverSelectionTimeoutMS=10000,  # 10 ثانیه timeout
+    ssl_cert_reqs=ssl.CERT_REQUIRED
+)
+db = client[DB_NAME]
+commands_collection = db[COLLECTION_NAME]
 
 # ====================== ذخیره دستور ======================
 async def save_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if commands_collection is None:
-        return await update.message.reply_text("❌ اتصال به دیتابیس برقرار نیست!")
-
     user = update.effective_user
     chat = update.effective_chat
 
@@ -80,9 +77,6 @@ async def save_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ====================== اجرای دستور ======================
 async def handle_custom_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if commands_collection is None:
-        return
-
     text = update.message.text.strip().lower()
     doc = commands_collection.find_one({"name": text})
     if not doc or not doc.get("responses"):
@@ -107,9 +101,6 @@ async def handle_custom_command(update: Update, context: ContextTypes.DEFAULT_TY
 
 # ====================== حذف دستور ======================
 async def delete_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if commands_collection is None:
-        return await update.message.reply_text("❌ اتصال به دیتابیس برقرار نیست!")
-
     user = update.effective_user
     if user.id != ADMIN_ID:
         return await update.message.reply_text("⛔ فقط مدیر اصلی اجازه این کار را دارد.")
@@ -127,9 +118,6 @@ async def delete_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ====================== لیست دستورات ======================
 async def list_commands(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if commands_collection is None:
-        return await update.message.reply_text("❌ اتصال به دیتابیس برقرار نیست!")
-
     user = update.effective_user
     if user.id != ADMIN_ID:
         return await update.message.reply_text("⛔ فقط مدیر اصلی مجاز است.")
@@ -149,7 +137,5 @@ async def list_commands(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ====================== پاکسازی دستورات گروه ======================
 def cleanup_group_commands(chat_id: int):
-    if commands_collection is None:
-        return
     removed = commands_collection.delete_many({"group_id": chat_id})
     print(f"[command_manager] cleaned {removed.deleted_count} commands from group {chat_id}")
