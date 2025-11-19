@@ -60,8 +60,8 @@ def save_commands_local(data: Dict[str, Any]):
 
 # ================= API اصلی =================
 
+# ذخیره دستور با جلوگیری از تکرار و حداکثر 200 پاسخ
 async def save_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """ذخیره‌ی دستور با /save روی پیام ریپلای شده (بدون تکرار)."""
     user = update.effective_user
     chat = update.effective_chat
 
@@ -84,7 +84,6 @@ async def save_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "owner_id": user.id
     })
 
-    # تشخیص نوع پیام و ساخت entry
     entry = {}
     if reply.text or reply.caption:
         entry = {"type": "text", "data": (reply.text or reply.caption).strip()}
@@ -101,36 +100,26 @@ async def save_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         return await update.message.reply_text("⚠️ این نوع پیام پشتیبانی نمی‌شود!")
 
-    # ======= جلوگیری از تکرار =======
-    already_exists = False
-    for r in doc["responses"]:
-        if r["type"] == entry["type"]:
-            if entry["type"] == "text" and r["data"] == entry["data"]:
-                already_exists = True
-                break
-            elif entry.get("file_id") and r.get("file_id") == entry.get("file_id"):
-                already_exists = True
-                break
+    # جلوگیری از ذخیره‌ی تکراری
+    if entry not in doc["responses"]:
+        doc["responses"].append(entry)
+        # حداکثر 200 پاسخ نگه داشته شود
+        while len(doc["responses"]) > 200:
+            doc["responses"].pop(0)
 
-    if already_exists:
-        return await update.message.reply_text("⚠️ این پیام قبلاً ذخیره شده است!")
+        commands[name] = doc
+        save_commands_local(commands)
+        await update.message.reply_text(
+            f"✅ پاسخ برای دستور <b>{name}</b> ذخیره شد. ({len(doc['responses'])}/200)",
+            parse_mode="HTML"
+        )
+    else:
+        await update.message.reply_text("⚠️ این پاسخ قبلا ذخیره شده و تکراری نمی‌شود.")
 
-    doc["responses"].append(entry)
 
-    # محدودیت 100 پاسخ، حداقل 50 بدون تکرار نگه داشته شود
-    if len(doc["responses"]) > 100:
-        doc["responses"] = doc["responses"][-100:]
-
-    commands[name] = doc
-    save_commands_local(commands)
-
-    await update.message.reply_text(
-        f"✅ پاسخ برای دستور <b>{name}</b> ذخیره شد. ({len(doc['responses'])}/100)",
-        parse_mode="HTML"
-    )
-
+# اجرای دستور با انتخاب حداقل 100 پاسخ بدون تکرار
+# اجرای دستور با ارسال حداقل 100 پاسخ بدون تکرار
 async def handle_custom_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """اجرای دستور ذخیره‌شده"""
     if not update.message or not update.message.text:
         return
 
@@ -145,21 +134,28 @@ async def handle_custom_command(update: Update, context: ContextTypes.DEFAULT_TY
     if not responses:
         return await update.message.reply_text("⚠️ هنوز پاسخی برای این دستور ثبت نشده.")
 
-    response = random.choice(responses)
-    r_type = response.get("type")
+    total_responses = len(responses)
+    # اگر کمتر از 100 پاسخ هست، همه را انتخاب کن
+    if total_responses <= 100:
+        sampled_responses = responses.copy()
+    else:
+        # اگر بیشتر از 100 هست، 100 پاسخ تصادفی بدون تکرار انتخاب کن
+        sampled_responses = random.sample(responses, 100)
 
-    if r_type == "text":
-        await update.message.reply_text(response.get("data", ""))
-    elif r_type == "photo":
-        await update.message.reply_photo(response["file_id"], caption=response.get("caption"))
-    elif r_type == "video":
-        await update.message.reply_video(response["file_id"], caption=response.get("caption"))
-    elif r_type == "document":
-        await update.message.reply_document(response["file_id"], caption=response.get("caption"))
-    elif r_type == "audio":
-        await update.message.reply_audio(response["file_id"], caption=response.get("caption"))
-    elif r_type == "animation":
-        await update.message.reply_animation(response["file_id"], caption=response.get("caption"))
+    for response in sampled_responses:
+        r_type = response.get("type")
+        if r_type == "text":
+            await update.message.reply_text(response.get("data", ""))
+        elif r_type == "photo":
+            await update.message.reply_photo(response["file_id"], caption=response.get("caption"))
+        elif r_type == "video":
+            await update.message.reply_video(response["file_id"], caption=response.get("caption"))
+        elif r_type == "document":
+            await update.message.reply_document(response["file_id"], caption=response.get("caption"))
+        elif r_type == "audio":
+            await update.message.reply_audio(response["file_id"], caption=response.get("caption"))
+        elif r_type == "animation":
+            await update.message.reply_animation(response["file_id"], caption=response.get("caption"))
 
     context.user_data["custom_handled"] = True
 
