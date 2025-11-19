@@ -2,18 +2,19 @@
 
 import random
 from datetime import datetime
+import certifi
 from telegram import Update
 from telegram.ext import ContextTypes
 from pymongo import MongoClient
 
 # ====================== تنظیمات ======================
 ADMIN_ID = 8588347189
-MONGO_URI = "mongodb+srv://username:password@cluster0.gya1hoa.mongodb.net/mydatabase"  # <--- اینجا رشته MongoDB خودت رو بزار
+MONGO_URI = "mongodb+srv://username:password@cluster0.gya1hoa.mongodb.net/mydatabase"  # رشته MongoDB خودت
 DB_NAME = "mydatabase"
 COLLECTION_NAME = "custom_commands"
 
-# ====================== اتصال MongoDB ======================
-client = MongoClient(MONGO_URI)
+# ====================== اتصال امن MongoDB ======================
+client = MongoClient(MONGO_URI, tls=True, tlsCAFile=certifi.where())
 db = client[DB_NAME]
 commands_collection = db[COLLECTION_NAME]
 
@@ -70,6 +71,9 @@ async def save_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ====================== اجرای دستور ======================
 async def handle_custom_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not update.message or not update.message.text:
+        return
+
     text = update.message.text.strip().lower()
     doc = commands_collection.find_one({"name": text})
     if not doc or not doc.get("responses"):
