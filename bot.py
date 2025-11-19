@@ -894,7 +894,7 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # اگر سخنگو خاموش است → فقط پاسخ هوش مصنوعی غیرفعال شود
     # دستورات (جوک، فال، یادبگیر، مدیریت،…) همچنان کار می‌کنند
     if not status["active"]:
-        if lower_text not in ["جوک", "فال"]:
+        if lower_text not in ["جوک", "فال" ,"ربات" ,یادبگیر"]:
             return
 
     # ادامه‌ی منطق پاسخ‌دهی هوش مصنوعی...
