@@ -9,16 +9,13 @@ from telegram.ext import ContextTypes
 ADMIN_ID = int(os.getenv("ADMIN_ID", "8588347189"))
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-# مسیر پوشه data کنار bot.py
 DATA_DIR = os.path.join(BASE_DIR, "data")
 os.makedirs(DATA_DIR, exist_ok=True)
 
-# پوشه بک‌آپ
 BACKUP_DIR = os.path.join(BASE_DIR, "backups")
 os.makedirs(BACKUP_DIR, exist_ok=True)
 
-# ====================== مسیرهای جدید طبق درخواست شما ======================
-
+# ====================== مسیرها ======================
 MEMORY_FILE = os.path.join(BASE_DIR, "memory.json")
 GROUP_DATA_FILE = os.path.join(BASE_DIR, "group_data.json")
 JOKES_FILE = os.path.join(BASE_DIR, "jokes.json")
@@ -36,7 +33,6 @@ os.makedirs(os.path.join(BASE_DIR, "group_control"), exist_ok=True)
 
 FORTUNES_MEDIA_DIR = os.path.join(BASE_DIR, "fortunes_media")
 
-# 🎨 آیکون‌ها
 ICONS = {
     "memory": "🧠",
     "group_data": "💬",
@@ -51,7 +47,6 @@ ICONS = {
     "media": "🎞️",
 }
 
-# 📦 فایل‌هایی که می‌شود بک‌آپ گرفت
 BACKUP_TARGETS = {
     "memory": MEMORY_FILE,
     "group_data": GROUP_DATA_FILE,
@@ -66,7 +61,6 @@ BACKUP_TARGETS = {
     "media": FORTUNES_MEDIA_DIR,
 }
 
-# نام نمایشی
 BACKUP_NAMES = {
     "memory": "حافظه",
     "group_data": "اطلاعات گروه",
@@ -91,10 +85,9 @@ async def selective_backup_menu(update: Update, context: ContextTypes.DEFAULT_TY
 
     keyboard = [
         [InlineKeyboardButton(
-            f"{ICONS[key]} {BACKUP_NAMES[key]}",
-            callback_data=f"selbk_{key}"
-        )]
-        for key in BACKUP_TARGETS.keys()
+            f"{ICONS[k]} {BACKUP_NAMES[k]}",
+            callback_data=f"selbk_{k}"
+        )] for k in BACKUP_TARGETS.keys()
     ]
 
     keyboard.append([InlineKeyboardButton("✅ انجام بک‌آپ", callback_data="selbk_do")])
@@ -128,23 +121,30 @@ async def selective_backup_buttons(update: Update, context: ContextTypes.DEFAULT
             zip_name = f"backup_selected_{len(selected)}files.zip"
 
             with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zipf:
+
                 for key in selected:
                     path = BACKUP_TARGETS[key]
 
-                    # اگر پوشه بود → کل پوشه داخل ZIP
+                    # اگر پوشه بود → کل مسیر نسبی پوشه را ذخیره کن
                     if os.path.isdir(path):
                         for root, dirs, files in os.walk(path):
                             for file in files:
                                 full_path = os.path.join(root, file)
+
+                                # مسیر نسبی درست → تا هنگام restore دقیقاً ایجاد شود
                                 rel_path = os.path.relpath(full_path, BASE_DIR)
+
                                 zipf.write(full_path, rel_path)
+
                         continue
 
                     # اگر فایل بود
                     if os.path.isfile(path):
-                        zipf.write(path, os.path.basename(path))
-                    else:
-                        print(f"⚠️ فایل یافت نشد: {path}")
+
+                        # مسیر نسبی درست
+                        rel_path = os.path.relpath(path, BASE_DIR)
+
+                        zipf.write(path, rel_path)
 
             zip_buffer.seek(0)
 
@@ -156,9 +156,9 @@ async def selective_backup_buttons(update: Update, context: ContextTypes.DEFAULT
             return await query.edit_message_text("📦 فایل بک‌آپ ارسال شد.")
 
         except Exception as e:
-            return await query.edit_message_text(f"⚠️ خطا در ساخت بک‌آپ: {e}")
+            return await query.edit_message_text(f"⚠️ خطا در ساخت ZIP:\n{e}")
 
-    # ☑️ انتخاب فایل
+    # ☑️ انتخاب/عدم انتخاب
     if data.startswith("selbk_"):
         key = data.replace("selbk_", "")
 
@@ -170,14 +170,13 @@ async def selective_backup_buttons(update: Update, context: ContextTypes.DEFAULT
         context.user_data["selected_files"] = selected
 
         text = "📦 فایل‌های انتخاب‌شده:\n"
-        text += "\n".join([f"✅ {BACKUP_NAMES[k]}" for k in selected]) if selected else "هیچی انتخاب نشده 😅"
+        text += "\n".join([f"✅ {BACKUP_NAMES[k]}" for k in selected]) if selected else "هیچ فایلی انتخاب نشده 😅"
 
         keyboard = [
             [InlineKeyboardButton(
                 ("☑️ " if k in selected else "⬜️ ") + f"{ICONS[k]} {BACKUP_NAMES[k]}",
                 callback_data=f"selbk_{k}"
-            )]
-            for k in BACKUP_TARGETS.keys()
+            )] for k in BACKUP_TARGETS.keys()
         ]
         keyboard.append([InlineKeyboardButton("✅ انجام بک‌آپ", callback_data="selbk_do")])
         keyboard.append([InlineKeyboardButton("❌ لغو", callback_data="selbk_cancel")])
