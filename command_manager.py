@@ -9,7 +9,9 @@ import ssl
 
 # ====================== تنظیمات ======================
 ADMIN_ID = 8588347189
-MONGO_URI = "mongodb+srv://username:password@cluster0.gya1hoa.mongodb.net/mydatabase?retryWrites=true&w=majority"
+
+# رشته اتصال واقعی MongoDB با URL encoded پسورد
+MONGO_URI = "mongodb+srv://mohamadnoorir63_db_user:mohamadHHH1234%40@cluster0.gya1hoa.mongodb.net/mydatabase?retryWrites=true&w=majority"
 DB_NAME = "mydatabase"
 COLLECTION_NAME = "custom_commands"
 
