@@ -451,6 +451,34 @@ async def mode_change(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ مود نامعتبر است!")
 
 # ======================= ⚙️ کنترل وضعیت =======================
+# حافظه وضعیت گروه‌ها
+GROUP_STATUS = {}  # chat_id: {"active": True, "welcome": True, "locked": False}
+
+# تابع کمکی برای گرفتن یا ساخت وضعیت گروه
+def get_group_status(chat_id: int):
+    if chat_id not in GROUP_STATUS:
+        GROUP_STATUS[chat_id] = {"active": True, "welcome": True, "locked": False}
+    return GROUP_STATUS[chat_id]
+
+# ────────────── خاموش/روشن سخنگو برای هر گروه ──────────────
+async def mute_speaker(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """خاموش کردن سخنگو فقط برای این گروه"""
+    chat_id = update.effective_chat.id
+    status = get_group_status(chat_id)
+    status["active"] = False
+    await update.message.reply_text(
+        "😴 سخنگو خاموش شد!\n(جوک و فال همچنان فعال هستند)"
+    )
+
+async def unmute_speaker(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """روشن کردن سخنگو فقط برای این گروه"""
+    chat_id = update.effective_chat.id
+    status = get_group_status(chat_id)
+    status["active"] = True
+    await update.message.reply_text(
+        "✅ سخنگو روشن شد!\n(همه پیام‌ها پاسخ داده می‌شوند)"
+    )
+
 async def toggle_welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """فعال/غیرفعال کردن خوشامد فقط برای این گروه"""
     chat_id = update.effective_chat.id
@@ -473,6 +501,7 @@ async def unlock_learning(update: Update, context: ContextTypes.DEFAULT_TYPE):
     status = get_group_status(chat_id)
     status["locked"] = False
     await update.message.reply_text("🔓 یادگیری باز شد!")
+    
 # ======================= 📊 آمار ربات واقعی =======================
 async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """نمایش آمار کلی — فقط برای مدیر اصلی یا سودوها"""
@@ -1931,13 +1960,12 @@ application.add_handler(
     CallbackQueryHandler(handle_fun_buttons, pattern=r"^fun_"),
     group=-3
 )
-# ────────────── سخنگو فارسی ──────────────
-from farsi_commands.speaker import register_speaker_commands
-register_speaker_commands(application)
+
 # ==========================================================
 # 📊 آمار، بک‌آپ و کنترل
 # ==========================================================
-
+application.add_handler(CommandHandler("mute", mute_speaker))
+application.add_handler(CommandHandler("unmute", unmute_speaker))
 application.add_handler(CommandHandler("stats", stats))
 application.add_handler(CommandHandler("fullstats", fullstats))
 application.add_handler(CommandHandler("backup", backup))
