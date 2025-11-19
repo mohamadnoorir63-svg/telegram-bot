@@ -1516,6 +1516,10 @@ async def reload_memory(update: Update, context: ContextTypes.DEFAULT_TYPE):
         print(f"[Sticker Error] {e}")
 
 # ======================= 📨 ارسال همگانی =======================
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import CallbackQueryHandler
+
+# -------------------- دستور broadcast --------------------
 async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_ID:
         return await update.message.reply_text("⛔ فقط مدیر اصلی می‌تونه پیام همگانی بفرسته!")
@@ -1524,107 +1528,106 @@ async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not msg_text:
         return await update.message.reply_text("❗ بعد از /broadcast پیام مورد نظر رو بنویس.")
 
-    import json, os
+    # منوی انتخاب نوع ارسال
+    keyboard = [
+        [InlineKeyboardButton("📨 فقط پیوی‌ها", callback_data=f"broadcast_pv:{msg_text}")],
+        [InlineKeyboardButton("🏠 فقط گروه‌ها", callback_data=f"broadcast_groups:{msg_text}")],
+        [InlineKeyboardButton("🌐 همه", callback_data=f"broadcast_all:{msg_text}")],
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await update.message.reply_text(
+        "لطفاً نوع ارسال همگانی را انتخاب کنید:", 
+        reply_markup=reply_markup
+    )
 
-    # ✅ خواندن کاربران از users.json
-    users = []
-    user_names = []
-    if os.path.exists("users.json" "Date/users.json" ):
+# -------------------- هندلر دکمه‌ها --------------------
+async def broadcast_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    data = query.data
+
+    if not data.startswith("broadcast_"):
+        return
+
+    mode, msg_text = data.split(":", 1)
+
+    # بارگذاری کاربران
+    users, user_names = [], []
+    users_file = "users.json" if os.path.exists("users.json") else "Date/users.json"
+    if users_file:
         try:
-            with open("users.json", "r", encoding="utf-8") as f:
+            with open(users_file, "r", encoding="utf-8") as f:
                 data = json.load(f)
                 users = [u["id"] for u in data]
                 user_names = [u.get("name", str(u["id"])) for u in data]
         except:
             pass
 
-    # ✅ خواندن گروه‌ها از group_data.json (سازگار با هر دو ساختار)
-    groups_data = load_data("group_data.json").get("groups", {})
+    # بارگذاری گروه‌ها
     group_ids, group_names = [], []
+    groups_data = load_data("group_data.json").get("groups", {})
     if isinstance(groups_data, dict):
         for gid, info in groups_data.items():
-            group_ids.append(gid)
+            group_ids.append(int(gid))
             group_names.append(info.get("title", f"Group_{gid}"))
     elif isinstance(groups_data, list):
         for g in groups_data:
             if "id" in g:
-                group_ids.append(g["id"])
+                group_ids.append(int(g["id"]))
                 group_names.append(g.get("title", f"Group_{g['id']}"))
 
-    total_targets = len(users) + len(group_ids)
-    if total_targets == 0:
-        return await update.message.reply_text("⚠️ هیچ کاربر یا گروهی برای ارسال پیدا نشد!")
+    # تعیین لیست هدف
+    targets = []
+    if mode == "broadcast_pv":
+        targets = [(uid, "user") for uid in users]
+    elif mode == "broadcast_groups":
+        targets = [(gid, "group") for gid in group_ids]
+    elif mode == "broadcast_all":
+        targets = [(uid, "user") for uid in users] + [(gid, "group") for gid in group_ids]
 
-    # 🕓 پیام اولیه
-    progress_msg = await update.message.reply_text(
-        f"📨 در حال ارسال همگانی...\n"
-        f"👤 کاربران: {len(users)} | 👥 گروه‌ها: {len(group_ids)}\n"
-        f"📊 پیشرفت: 0%"
-    )
+    if not targets:
+        return await query.edit_message_text("⚠️ هیچ گیرنده‌ای پیدا نشد!")
 
+    # پیام پیشرفت
     sent, failed = 0, 0
-    last_percent = 0
+    total = len(targets)
+    progress_msg = await query.edit_message_text(f"📨 در حال ارسال... 0%")
 
-    async def update_progress():
-        percent = int(((sent + failed) / total_targets) * 100)
-        nonlocal last_percent
-        if percent - last_percent >= 10 or percent == 100:
-            last_percent = percent
+    for idx, (cid, ctype) in enumerate(targets, start=1):
+        try:
+            await context.bot.send_message(chat_id=cid, text=msg_text)
+            sent += 1
+        except:
+            failed += 1
+
+        # بروزرسانی پیشرفت هر ۱۰٪
+        percent = int(idx / total * 100)
+        if percent % 10 == 0 or percent == 100:
             try:
                 await progress_msg.edit_text(
-                    f"📨 در حال ارسال همگانی...\n"
+                    f"📨 در حال ارسال...\n"
                     f"👤 کاربران: {len(users)} | 👥 گروه‌ها: {len(group_ids)}\n"
                     f"📊 پیشرفت: {percent}%"
                 )
             except:
                 pass
+        await asyncio.sleep(0.3)  # جلوگیری از Flood تلگرام
 
-    # 🔸 ارسال به کاربران
-    for uid in users:
-        try:
-            await context.bot.send_message(chat_id=uid, text=msg_text)
-            sent += 1
-        except:
-            failed += 1
-        await update_progress()
-        await asyncio.sleep(0.3)
-
-    # 🔸 ارسال به گروه‌ها
-    for gid in group_ids:
-        try:
-            await context.bot.send_message(chat_id=int(gid), text=msg_text)
-            sent += 1
-        except:
-            failed += 1
-        await update_progress()
-        await asyncio.sleep(0.3)
-
-    # ✅ نتیجه نهایی با لیست نمونه
+    # نمایش نتیجه نهایی با نمونه
     example_users = "، ".join(user_names[:3]) if user_names else "—"
     example_groups = "، ".join(group_names[:3]) if group_names else "—"
 
-    result = (
-        "✅ <b>ارسال همگانی با موفقیت انجام شد!</b>\n\n"
+    await progress_msg.edit_text(
+        "✅ ارسال همگانی انجام شد!\n\n"
         f"👤 کاربران: <b>{len(users)}</b>\n"
         f"👥 گروه‌ها: <b>{len(group_ids)}</b>\n"
-        f"📦 مجموع گیرندگان: <b>{total_targets}</b>\n"
+        f"📦 مجموع گیرندگان: <b>{total}</b>\n"
         f"📤 موفق: <b>{sent}</b>\n"
         f"⚠️ ناموفق: <b>{failed}</b>\n\n"
         f"👤 نمونه کاربران: <i>{example_users}</i>\n"
-        f"🏠 نمونه گروه‌ها: <i>{example_groups}</i>"
+        f"🏠 نمونه گروه‌ها: <i>{example_groups}</i>",
+        parse_mode="HTML"
     )
-
-    await progress_msg.edit_text(result, parse_mode="HTML")
-    # 🧹 وقتی ربات از گروه حذف می‌شود، دستورهای مربوط به آن گروه پاک می‌شوند
-async def handle_left_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    try:
-        my_chat_member = update.my_chat_member
-        if my_chat_member.new_chat_member.status == "left":
-            chat_id = update.effective_chat.id
-            cleanup_group_commands(chat_id)
-            print(f"🧹 دستورات گروه {chat_id} حذف شدند (ربات خارج شد).")
-    except Exception as e:
-        print(f"⚠️ خطا در پاکسازی خودکار گروه: {e}")
 # ======================= 🚪 خروج از گروه =======================
 async def leave(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id == ADMIN_ID:
@@ -1979,7 +1982,9 @@ application.add_handler(CallbackQueryHandler(selective_backup_buttons, pattern="
 application.add_handler(CommandHandler("restore", restore))
 application.add_handler(CommandHandler("reset", reset_memory))
 application.add_handler(CommandHandler("reload", reload_memory))
+# -------------------- ثبت هندلرها --------------------
 application.add_handler(CommandHandler("broadcast", broadcast))
+application.add_handler(CallbackQueryHandler(broadcast_buttons, pattern=r"^broadcast_"))
 application.add_handler(CommandHandler("cloudsync", cloudsync))
 application.add_handler(CommandHandler("leave", leave))
 application.add_handler(CommandHandler("reply", toggle_reply_mode))
