@@ -5,7 +5,6 @@ from datetime import datetime
 from telegram import Update
 from telegram.ext import ContextTypes
 from pymongo import MongoClient
-import ssl
 
 # ====================== تنظیمات ======================
 ADMIN_ID = 8588347189
@@ -18,11 +17,10 @@ COLLECTION_NAME = "custom_commands"
 # ====================== اتصال MongoDB امن ======================
 client = MongoClient(
     MONGO_URI,
-    tls=True,
-    tlsAllowInvalidCertificates=False,
-    serverSelectionTimeoutMS=10000,  # 10 ثانیه timeout
-    ssl_cert_reqs=ssl.CERT_REQUIRED
+    tls=True,                        # فعال کردن TLS/SSL
+    serverSelectionTimeoutMS=10000   # 10 ثانیه timeout
 )
+
 db = client[DB_NAME]
 commands_collection = db[COLLECTION_NAME]
 
