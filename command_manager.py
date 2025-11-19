@@ -14,11 +14,11 @@ MONGO_URI = "mongodb+srv://mohamadnoorir63_db_user:mohamadHHH1234%40@cluster0.gy
 DB_NAME = "mydatabase"
 COLLECTION_NAME = "custom_commands"
 
-# ====================== اتصال MongoDB امن ======================
-# نسخه اصلاح‌شده برای PyMongo جدید و Heroku
+# ====================== اتصال MongoDB امن با CA ======================
 client = MongoClient(
     MONGO_URI,
-    tls=True,                        # فعال کردن TLS/SSL
+    tls=True,
+    tlsCAFile="/app/certs/ca.pem",  # مسیر فایل CA رسمی MongoDB Atlas
     serverSelectionTimeoutMS=20000   # 20 ثانیه timeout
 )
 
@@ -40,7 +40,6 @@ async def save_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not reply:
         return await update.message.reply_text("📎 باید روی یک پیام ریپلای کنید.")
 
-    # تشخیص نوع پیام
     entry = {}
     if reply.text or reply.caption:
         entry = {"type": "text", "data": reply.text or reply.caption}
@@ -57,7 +56,6 @@ async def save_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         return await update.message.reply_text("⚠️ این نوع پیام پشتیبانی نمی‌شود!")
 
-    # بررسی وجود دستور قبلی
     doc = commands_collection.find_one({"name": name})
     if not doc:
         doc = {
