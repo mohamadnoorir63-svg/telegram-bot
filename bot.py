@@ -757,6 +757,7 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "fortunes.json",
         "aliases.json",
         "data/members.json",
+        "users.json",
 
         # مسیر اصلی
         "group_control/aliases.json",
@@ -1528,7 +1529,7 @@ async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # ✅ خواندن کاربران از users.json
     users = []
     user_names = []
-    if os.path.exists("users.json"):
+    if os.path.exists("users.json" "Date/users.json" ):
         try:
             with open("users.json", "r", encoding="utf-8") as f:
                 data = json.load(f)
