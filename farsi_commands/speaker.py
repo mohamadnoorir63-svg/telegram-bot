@@ -1,7 +1,7 @@
 from telegram import Update
 from telegram.ext import ContextTypes, MessageHandler, filters
 
-# حافظه وضعیت گروه‌ها
+# تابع کمکی وضعیت گروه‌ها
 GROUP_STATUS = {}  # chat_id: {"active": True, "welcome": True, "locked": False}
 
 def get_group_status(chat_id: int):
@@ -9,7 +9,7 @@ def get_group_status(chat_id: int):
         GROUP_STATUS[chat_id] = {"active": True, "welcome": True, "locked": False}
     return GROUP_STATUS[chat_id]
 
-# ────────────── سخنگو فارسی ──────────────
+# ────────────── خاموش/روشن سخنگو ──────────────
 async def mute_speaker(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
     status = get_group_status(chat_id)
@@ -26,28 +26,9 @@ async def unmute_speaker(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "✅ سخنگو روشن شد!\n(همه پیام‌ها پاسخ داده می‌شوند)"
     )
 
-async def toggle_welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    chat_id = update.effective_chat.id
-    status = get_group_status(chat_id)
-    status["welcome"] = not status["welcome"]
-    await update.message.reply_text(
-        "👋 خوشامد فعال شد!" if status["welcome"] else "🚫 خوشامد غیرفعال شد!"
-    )
-
-async def lock_learning(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    chat_id = update.effective_chat.id
-    status = get_group_status(chat_id)
-    status["locked"] = True
-    await update.message.reply_text("🔒 یادگیری قفل شد!")
-
-async def unlock_learning(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    chat_id = update.effective_chat.id
-    status = get_group_status(chat_id)
-    status["locked"] = False
-    await update.message.reply_text("🔓 یادگیری باز شد!")
-
-# ────────────── ثبت هندلرها ──────────────
+# ────────────── ثبت هندلرها در اپلیکیشن ──────────────
 def register_speaker_commands(application):
+    """این تابع هندلرهای سخنگو فارسی را به اپلیکیشن اضافه می‌کند"""
     application.add_handler(
         MessageHandler(filters.Regex(r"^سخنگو_خاموش$"), mute_speaker),
         group=4
@@ -56,5 +37,3 @@ def register_speaker_commands(application):
         MessageHandler(filters.Regex(r"^سخنگو_روشن$"), unmute_speaker),
         group=4
     )
-    # می‌تونی هندلر خوشامد و قفل/باز کردن هم اضافه کنی
-    # application.add_handler(MessageHandler(filters.Regex(r"^خوشامد$"), toggle_welcome), group=4)
