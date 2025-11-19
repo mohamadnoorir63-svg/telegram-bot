@@ -35,7 +35,6 @@ hijri-converter
 
 # ==== Progress & Misc ====
 tqdm==4.66.5
-Flask==3.0.3
 async-timeout==4.0.3
 tenacity==8.3.0
 telethon==1.34.0
@@ -44,3 +43,5 @@ matplotlib==3.8.1
 
 Pillow>=10.0.0
 cloudinary==1.32.0
+Flask
+requests
