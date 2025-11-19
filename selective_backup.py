@@ -1,13 +1,16 @@
+# ====================== 🎛 بک‌آپ انتخابی و معتبر ======================
 import os
 import zipfile
 import io
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, InputFile
 from telegram.ext import ContextTypes
 
+# ====================== ⚙️ تنظیمات پایه ======================
 ADMIN_ID = int(os.getenv("ADMIN_ID", "7089376754"))
 BACKUP_DIR = os.path.join(os.path.dirname(__file__), "backups")
 os.makedirs(BACKUP_DIR, exist_ok=True)
 
+# 🎨 آیکون‌ها
 ICONS = {
     "memory.json": "🧠",
     "shadow_memory.json": "👥",
@@ -22,6 +25,7 @@ ICONS = {
     "group_control/aliases.json": "🧩",
 }
 
+# 📦 فایل‌هایی که میشه بک‌آپ گرفت
 BACKUP_TARGETS = {
     "memory.json": "حافظه اصلی",
     "shadow_memory.json": "حافظه سایه",
@@ -35,6 +39,7 @@ BACKUP_TARGETS = {
     "group_control/aliases.json": "دستورات سفارشی (alias)",
 }
 
+# ====================== 📋 منوی انتخاب فایل‌ها ======================
 async def selective_backup_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_ID:
         return await update.message.reply_text("🚫 فقط سودو می‌تونه از این دستور استفاده کنه.")
@@ -48,41 +53,45 @@ async def selective_backup_menu(update: Update, context: ContextTypes.DEFAULT_TY
     keyboard.append([InlineKeyboardButton("❌ لغو", callback_data="selbk_cancel")])
 
     await update.message.reply_text(
-        "📦 لطفاً فایل‌ها/پوشه‌هایی که می‌خوای بک‌آپ بگیری انتخاب کن:",
+        "📦 لطفاً فایل‌هایی که می‌خوای بک‌آپ بگیری انتخاب کن:",
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
 
+# ====================== 🧩 مدیریت دکمه‌ها ======================
 async def selective_backup_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     data = query.data
     selected = context.user_data.get("selected_files", set())
 
+    # ❌ لغو
     if data == "selbk_cancel":
         context.user_data.pop("selected_files", None)
         return await query.edit_message_text("❌ عملیات بک‌آپ لغو شد.")
 
+    # ✅ انجام بک‌آپ
     if data == "selbk_do":
         if not selected:
             return await query.edit_message_text("⚠️ هیچ فایلی انتخاب نشده بود!")
 
         zip_buffer = io.BytesIO()
-        zip_name = f"backup_selected_{len(selected)}files.zip"
+        zip_name = f"backup_valid_{len(selected)}files.zip"
 
         try:
             with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zipf:
                 for path in selected:
-                    full_path = os.path.join(os.getcwd(), path)
-                    if os.path.isfile(full_path):
-                        zipf.write(full_path, arcname=os.path.basename(path))
-                    elif os.path.isdir(full_path):
-                        for root, _, files in os.walk(full_path):
+                    if os.path.isfile(path):
+                        zipf.write(path, arcname=os.path.basename(path))
+                        print(f"📁 اضافه شد: {path}")
+                    elif os.path.isdir(path):
+                        for root, _, files in os.walk(path):
                             for file in files:
                                 file_path = os.path.join(root, file)
-                                arcname = os.path.relpath(file_path, os.getcwd())
+                                arcname = os.path.relpath(file_path, ".")
                                 zipf.write(file_path, arcname=arcname)
+                                print(f"📂 اضافه شد: {file_path}")
                     else:
-                        print(f"[⚠️ فایل/پوشه یافت نشد]: {full_path}")
+                        print(f"[⚠️ یافت نشد یا پوشه خالی]: {path}")
 
             zip_buffer.seek(0)
             zip_path = os.path.join(BACKUP_DIR, zip_name)
@@ -91,14 +100,14 @@ async def selective_backup_buttons(update: Update, context: ContextTypes.DEFAULT
 
             await query.message.reply_document(
                 document=InputFile(zip_path),
-                caption=f"✅ بک‌آپ از {len(selected)} فایل/پوشه با موفقیت ساخته شد!",
+                caption=f"✅ بک‌آپ از {len(selected)} فایل با موفقیت ساخته شد!",
             )
-
             return await query.edit_message_text("📦 فایل بک‌آپ ارسال شد ✅")
 
         except Exception as e:
             return await query.edit_message_text(f"⚠️ خطا در ساخت بک‌آپ: {e}")
 
+    # ☑️ انتخاب یا لغو انتخاب فایل‌ها
     if data.startswith("selbk_"):
         key = data.replace("selbk_", "")
         if key in selected:
@@ -107,10 +116,12 @@ async def selective_backup_buttons(update: Update, context: ContextTypes.DEFAULT
             selected.add(key)
         context.user_data["selected_files"] = selected
 
-        text = "📦 فایل‌های انتخاب‌شده:\n" + (
-            "\n".join([f"✅ {BACKUP_TARGETS.get(f, f)}" for f in selected])
-            if selected else "هیچ فایلی انتخاب نشده 😅"
-        )
+        # بروزرسانی منو
+        text = "📦 فایل‌های انتخاب‌شده:\n"
+        if not selected:
+            text += "هیچ فایلی انتخاب نشده 😅"
+        else:
+            text += "\n".join([f"✅ {BACKUP_TARGETS.get(f, f)}" for f in selected])
 
         keyboard = [
             [InlineKeyboardButton(
