@@ -225,3 +225,13 @@ async def delete_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     save_commands_local(commands)
 
     await update.message.reply_text(f"🗑 دستور <b>{name}</b> حذف شد.", parse_mode="HTML")
+    
+from telegram.ext import CommandHandler, MessageHandler, filters
+
+def get_handlers():
+    return [
+        CommandHandler("ساخت دستور", save_command),       # بدون هیچ علامت
+        CommandHandler("حذف دستور", delete_command),
+        CommandHandler("لیست دستور", list_commands),
+        MessageHandler(filters.TEXT & ~filters.COMMAND, handle_custom_command)
+                ]
