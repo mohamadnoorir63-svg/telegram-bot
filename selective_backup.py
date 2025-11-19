@@ -28,6 +28,9 @@ ICONS = {
 # 📦 فایل‌هایی که میشه بک‌آپ گرفت
 BACKUP_TARGETS = {
     "memory.json": "حافظه اصلی",
+    DATA_DIR = os.path.join(BASE_DIR, "data")  # مسیر پوشه data کنار bot.py
+    CUSTOM_COMMANDS_FILE = os.path.join(DATA_DIR, "custom_commands.json")
+    CUSTOM_COMMANDS_BACKUP = os.path.join(DATA_DIR, "custom_commands_backup.json")
     "shadow_memory.json": "حافظه سایه",
     "custom_commands.json": "دستورهای ذخیره‌شده",
     "custom_commands_backup.json": "بک‌آپ دستورها",
