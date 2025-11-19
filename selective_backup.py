@@ -7,39 +7,56 @@ from telegram.ext import ContextTypes
 
 # ====================== ⚙️ تنظیمات پایه ======================
 ADMIN_ID = int(os.getenv("ADMIN_ID", "8588347189"))
-BACKUP_DIR = os.path.join(os.path.dirname(__file__), "backups")
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+# مسیر پوشه data کنار bot.py
+DATA_DIR = os.path.join(BASE_DIR, "data")
+os.makedirs(DATA_DIR, exist_ok=True)
+
+# پوشه بک‌آپ
+BACKUP_DIR = os.path.join(BASE_DIR, "backups")
 os.makedirs(BACKUP_DIR, exist_ok=True)
+
+# مسیر فایل‌ها
+CUSTOM_COMMANDS_FILE = os.path.join(DATA_DIR, "custom_commands.json")
+CUSTOM_COMMANDS_BACKUP = os.path.join(DATA_DIR, "custom_commands_backup.json")
+MEMORY_FILE = os.path.join(DATA_DIR, "memory.json")
+SHADOW_MEMORY_FILE = os.path.join(DATA_DIR, "shadow_memory.json")
+GROUP_DATA_FILE = os.path.join(DATA_DIR, "group_data.json")
+USERS_FILE = os.path.join(DATA_DIR, "users.json")
+FORTUNES_FILE = os.path.join(DATA_DIR, "fortunes.json")
+CUSTOM_HELP_FILE = os.path.join(DATA_DIR, "custom_help.txt")
+GROUP_ALIASES_FILE = os.path.join(DATA_DIR, "group_control", "aliases.json")
+JOKES_FILE = os.path.join(BASE_DIR, "jokes_manager.py")
+os.makedirs(os.path.join(DATA_DIR, "group_control"), exist_ok=True)
 
 # 🎨 آیکون‌ها
 ICONS = {
-    "memory.json": "🧠",
-    "shadow_memory.json": "👥",
-    "group_data.json": "💬",
-    "users.json": "👤",
-    "custom_commands.json": "📜",
-    "custom_commands_backup.json": "🗄️",
+    MEMORY_FILE: "🧠",
+    SHADOW_MEMORY_FILE: "👥",
+    GROUP_DATA_FILE: "💬",
+    USERS_FILE: "👤",
+    CUSTOM_COMMANDS_FILE: "📜",
+    CUSTOM_COMMANDS_BACKUP: "🗄️",
     "fortunes_media": "🖼️",
-    "fortunes.json": "🔮",
-    "jokes_manager.py": "😂",
-    "custom_help.txt": "📘",
-    "group_control/aliases.json": "🧩",
+    FORTUNES_FILE: "🔮",
+    JOKES_FILE: "😂",
+    CUSTOM_HELP_FILE: "📘",
+    GROUP_ALIASES_FILE: "🧩",
 }
 
 # 📦 فایل‌هایی که میشه بک‌آپ گرفت
 BACKUP_TARGETS = {
-    "memory.json": "حافظه اصلی",
-    DATA_DIR = os.path.join(BASE_DIR, "data")  # مسیر پوشه data کنار bot.py
-    CUSTOM_COMMANDS_FILE = os.path.join(DATA_DIR, "custom_commands.json")
-    CUSTOM_COMMANDS_BACKUP = os.path.join(DATA_DIR, "custom_commands_backup.json")
-    "shadow_memory.json": "حافظه سایه",
-    "custom_commands.json": "دستورهای ذخیره‌شده",
-    "custom_commands_backup.json": "بک‌آپ دستورها",
-    "group_data.json": "داده‌های گروه‌ها",
-    "users.json": "کاربران",
-    "fortunes.json": "فال‌ها",
-    "jokes_manager.py": "جوک‌ها",
-    "custom_help.txt": "راهنمای سفارشی",
-    "group_control/aliases.json": "دستورات سفارشی (alias)",
+    MEMORY_FILE: "حافظه اصلی",
+    SHADOW_MEMORY_FILE: "حافظه سایه",
+    CUSTOM_COMMANDS_FILE: "دستورهای ذخیره‌شده",
+    CUSTOM_COMMANDS_BACKUP: "بک‌آپ دستورها",
+    GROUP_DATA_FILE: "داده‌های گروه‌ها",
+    USERS_FILE: "کاربران",
+    FORTUNES_FILE: "فال‌ها",
+    JOKES_FILE: "جوک‌ها",
+    CUSTOM_HELP_FILE: "راهنمای سفارشی",
+    GROUP_ALIASES_FILE: "دستورات سفارشی (alias)",
 }
 
 # ====================== 📋 منوی انتخاب فایل‌ها ======================
@@ -132,4 +149,4 @@ async def selective_backup_buttons(update: Update, context: ContextTypes.DEFAULT
         await query.edit_message_text(
             text=text,
             reply_markup=InlineKeyboardMarkup(keyboard)
-            )
+        )
