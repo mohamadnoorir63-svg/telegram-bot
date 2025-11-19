@@ -9,21 +9,22 @@ from pymongo import MongoClient
 # ====================== تنظیمات ======================
 ADMIN_ID = 8588347189
 
-# رشته اتصال MongoDB با retryWrites=false
+# ====================== Non-SRV MongoDB URI ======================
+# جایگزین 'username', 'password' و 'mydatabase' با اطلاعات واقعی
 MONGO_URI = (
-    "mongodb+srv://mohamadnoorir63_db_user:"
-    "mohamadHHH1234%40@cluster0.gya1hoa.mongodb.net/"
-    "mydatabase?retryWrites=false&w=majority"
+    "mongodb://mohamadnoorir63_db_user:mohamadHHH1234%40@"
+    "ac-s17rbwl-shard-00-00.gya1hoa.mongodb.net:27017,"
+    "ac-s17rbwl-shard-00-01.gya1hoa.mongodb.net:27017,"
+    "ac-s17rbwl-shard-00-02.gya1hoa.mongodb.net:27017/"
+    "mydatabase?replicaSet=atlas-xxxxxx-shard-0&tls=true&retryWrites=false&w=majority"
 )
 
 DB_NAME = "mydatabase"
 COLLECTION_NAME = "custom_commands"
 
 # ====================== اتصال امن MongoDB ======================
-# tls=True برای ارتباط امن، بدون نیاز به فایل CA
 client = MongoClient(
     MONGO_URI,
-    tls=True,
     serverSelectionTimeoutMS=20000  # 20 ثانیه timeout
 )
 
