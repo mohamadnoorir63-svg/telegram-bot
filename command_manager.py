@@ -204,3 +204,24 @@ def cleanup_group_commands(chat_id: int):
         print(f"[command_manager] cleaned {removed} commands from group {chat_id}")
     except Exception as e:
         print(f"[command_manager] cleanup error: {e}")
+        
+# ================= حذف یک دستور =================
+async def delete_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+
+    if user.id != ADMIN_ID:
+        return await update.message.reply_text("⛔ فقط مدیر اصلی مجاز است.")
+
+    if not context.args:
+        return await update.message.reply_text("❗ استفاده: /delcmd <نام دستور>")
+
+    name = " ".join(context.args).strip().lower()
+    commands = load_commands()
+
+    if name not in commands:
+        return await update.message.reply_text("⚠️ چنین دستوری وجود ندارد.")
+
+    del commands[name]
+    save_commands_local(commands)
+
+    await update.message.reply_text(f"🗑 دستور <b>{name}</b> حذف شد.", parse_mode="HTML")
