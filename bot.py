@@ -651,7 +651,7 @@ def _should_include_in_backup(path: str) -> bool:
         return False
     
     if os.path.basename(path) in [
-        "custom_commands.json",
+        "data/custom_commands.json",
         "custom_commands_backup.json"
 ]:
         return True
@@ -764,8 +764,8 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "fortunes_media",
 
         
-        "/app/data/custom_commands.json",
-        "/app/data/custom_commands_backup.json"
+        "custom_commands_backup.json",
+        "data/custom_commands.json"
         ]
 
         moved_any = False
