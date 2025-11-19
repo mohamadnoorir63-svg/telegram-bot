@@ -296,18 +296,24 @@ async def handle_group_reply_mode(update: Update, context: ContextTypes.DEFAULT_
                 return True  # یعنی بقیه تابع reply اجرا نشود
     return False
 # ======================= 🧾 ثبت کاربر =======================
+
 import json
 import os
 
 USERS_FILE = "users.json"
 
-async def register_user(user):
+async def register_user(message):
     """
-    ذخیره آیدی و نام کاربر در فایل users.json
+    ذخیره آیدی و نام کاربر در فایل users.json فقط در صورتی که پیام از پیوی باشد.
     """
+    if message.chat.type != "private":
+        # پیام از گروه یا کانال است، ثبت نمی‌کنیم
+        return
+
+    user = message.from_user
     data = []
 
-    # بارگذاری داده‌های موجود در صورت وجود فایل
+    # بارگذاری داده‌های موجود
     if os.path.exists(USERS_FILE):
         try:
             with open(USERS_FILE, "r", encoding="utf-8") as f:
@@ -315,12 +321,11 @@ async def register_user(user):
         except (json.JSONDecodeError, IOError):
             data = []
 
-    # بررسی وجود کاربر و افزودن در صورت نبود
+    # اضافه کردن کاربر اگر هنوز ثبت نشده
     if user.id not in [u["id"] for u in data]:
         data.append({"id": user.id, "name": user.first_name})
         with open(USERS_FILE, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
-
 # ======================= 📢 اطلاع به ادمین هنگام استارت =======================
 async def notify_admin_on_startup(app):
     """ارسال پیام فعال‌سازی به ادمین هنگام استارت"""
