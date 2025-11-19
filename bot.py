@@ -1520,25 +1520,40 @@ async def reload_memory(update: Update, context: ContextTypes.DEFAULT_TYPE):
         print(f"[Sticker Error] {e}")
 
 # ======================= 📨 ارسال همگانی =======================
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import CallbackQueryHandler
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update, Message
+from telegram.ext import ContextTypes
+import os, json, asyncio
+
+USERS_FILE = "users.json"
 
 # -------------------- دستور broadcast --------------------
 async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_ID:
         return await update.message.reply_text("⛔ فقط مدیر اصلی می‌تونه پیام همگانی بفرسته!")
 
-    msg_text = " ".join(context.args)
-    if not msg_text:
-        return await update.message.reply_text("❗ بعد از /broadcast پیام مورد نظر رو بنویس.")
+    # پیام ریپلی شده
+    reply_msg: Message = update.message.reply_to_message
+    if reply_msg:
+        msg_text = reply_msg.text or reply_msg.caption or ""
+        msg_media = reply_msg
+    else:
+        msg_text = " ".join(context.args)
+        msg_media = None
+
+    if not msg_text and not msg_media:
+        return await update.message.reply_text("❗ بعد از /broadcast پیام مورد نظر رو بنویس یا روی پیام ریپلی کن.")
 
     # منوی انتخاب نوع ارسال
     keyboard = [
-        [InlineKeyboardButton("📨 فقط پیوی‌ها", callback_data=f"broadcast_pv:{msg_text}")],
-        [InlineKeyboardButton("🏠 فقط گروه‌ها", callback_data=f"broadcast_groups:{msg_text}")],
-        [InlineKeyboardButton("🌐 همه", callback_data=f"broadcast_all:{msg_text}")],
+        [InlineKeyboardButton("📨 فقط پیوی‌ها", callback_data=f"broadcast_pv")],
+        [InlineKeyboardButton("🏠 فقط گروه‌ها", callback_data=f"broadcast_groups")],
+        [InlineKeyboardButton("🌐 همه", callback_data=f"broadcast_all")],
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
+
+    # ذخیره موقت در context.user_data برای دکمه‌ها
+    context.user_data["broadcast"] = {"text": msg_text, "media": msg_media}
+
     await update.message.reply_text(
         "لطفاً نوع ارسال همگانی را انتخاب کنید:", 
         reply_markup=reply_markup
@@ -1548,19 +1563,20 @@ async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def broadcast_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    data = query.data
+    mode = query.data  # فقط broadcast_pv / broadcast_groups / broadcast_all
 
-    if not data.startswith("broadcast_"):
-        return
+    if "broadcast" not in context.user_data:
+        return await query.edit_message_text("⚠️ داده‌ای برای ارسال پیدا نشد!")
 
-    mode, msg_text = data.split(":", 1)
+    msg_data = context.user_data.pop("broadcast")
+    msg_text = msg_data.get("text")
+    msg_media: Message = msg_data.get("media")
 
     # بارگذاری کاربران
     users, user_names = [], []
-    users_file = "users.json" if os.path.exists("users.json") else "Date/users.json"
-    if users_file:
+    if os.path.exists(USERS_FILE):
         try:
-            with open(users_file, "r", encoding="utf-8") as f:
+            with open(USERS_FILE, "r", encoding="utf-8") as f:
                 data = json.load(f)
                 users = [u["id"] for u in data]
                 user_names = [u.get("name", str(u["id"])) for u in data]
@@ -1599,7 +1615,17 @@ async def broadcast_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     for idx, (cid, ctype) in enumerate(targets, start=1):
         try:
-            await context.bot.send_message(chat_id=cid, text=msg_text)
+            if msg_media:
+                # ارسال پیام ریپلی (متن + مدیا)
+                if msg_media.text:
+                    await context.bot.send_message(chat_id=cid, text=msg_media.text)
+                elif msg_media.photo:
+                    await context.bot.send_photo(chat_id=cid, photo=msg_media.photo[-1].file_id, caption=msg_media.caption)
+                elif msg_media.video:
+                    await context.bot.send_video(chat_id=cid, video=msg_media.video.file_id, caption=msg_media.caption)
+                # می‌تونی انواع مدیا دیگر هم اضافه کنی (animation, document, audio ...)
+            else:
+                await context.bot.send_message(chat_id=cid, text=msg_text)
             sent += 1
         except:
             failed += 1
