@@ -6,7 +6,7 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, InputFi
 from telegram.ext import ContextTypes
 
 # ====================== ⚙️ تنظیمات پایه ======================
-ADMIN_ID = int(os.getenv("ADMIN_ID", "8588347189)
+ADMIN_ID = int(os.getenv("ADMIN_ID", "8588347189))
 BACKUP_DIR = os.path.join(os.path.dirname(__file__), "backups")
 os.makedirs(BACKUP_DIR, exist_ok=True)
 
