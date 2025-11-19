@@ -15,9 +15,9 @@ qrcode==7.4.2
 imageio==2.36.0
 
 # ==== Database ====
-pymongo==4.10.1
-dnspython==2.6.1
 
+pymongo>=4.10.1
+dnspython>=2.6.0
 # ==== AI & NLP ====
 openai==0.28
 numpy==1.26.4
