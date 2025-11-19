@@ -81,21 +81,20 @@ async def selective_backup_buttons(update: Update, context: ContextTypes.DEFAULT
         zip_name = f"backup_selected_{len(selected)}files.zip"
 
         try:
+            # ایجاد ZIP در حافظه
             with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zipf:
                 for file in selected:
-                    if os.path.exists(file):
-                        zipf.write(file)
+                    if os.path.isfile(file):
+                        zipf.write(file, arcname=os.path.basename(file))
                         print(f"📁 افزودن فایل انتخابی: {file}")
                     else:
-                        print(f"[⚠️ فایل یافت نشد]: {file}")
+                        print(f"[⚠️ فایل یافت نشد یا پوشه است]: {file}")
 
             zip_buffer.seek(0)
-            zip_path = os.path.join(BACKUP_DIR, zip_name)
-            with open(zip_path, "wb") as f:
-                f.write(zip_buffer.read())
 
+            # ارسال مستقیم به تلگرام بدون ذخیره روی دیسک
             await query.message.reply_document(
-                document=InputFile(zip_path),
+                document=InputFile(zip_buffer, filename=zip_name),
                 caption=f"✅ بک‌آپ از {len(selected)} فایل با موفقیت ساخته شد!",
             )
 
@@ -133,4 +132,4 @@ async def selective_backup_buttons(update: Update, context: ContextTypes.DEFAULT
         await query.edit_message_text(
             text=text,
             reply_markup=InlineKeyboardMarkup(keyboard)
-        )
+            )
