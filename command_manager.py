@@ -14,12 +14,12 @@ MONGO_URI = "mongodb+srv://mohamadnoorir63_db_user:mohamadHHH1234%40@cluster0.gy
 DB_NAME = "mydatabase"
 COLLECTION_NAME = "custom_commands"
 
-# ====================== اتصال MongoDB امن با CA ======================
+# ====================== اتصال MongoDB امن ======================
+# بدون tlsCAFile، فقط tls=True
 client = MongoClient(
     MONGO_URI,
     tls=True,
-    tlsCAFile="/app/certs/ca.pem",  # مسیر فایل CA رسمی MongoDB Atlas
-    serverSelectionTimeoutMS=20000   # 20 ثانیه timeout
+    serverSelectionTimeoutMS=20000  # 20 ثانیه timeout
 )
 
 db = client[DB_NAME]
