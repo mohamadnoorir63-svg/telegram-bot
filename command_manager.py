@@ -9,13 +9,18 @@ from pymongo import MongoClient
 # ====================== تنظیمات ======================
 ADMIN_ID = 8588347189
 
-# رشته اتصال واقعی MongoDB با URL encoded پسورد
-MONGO_URI = "mongodb+srv://mohamadnoorir63_db_user:mohamadHHH1234%40@cluster0.gya1hoa.mongodb.net/mydatabase?retryWrites=true&w=majority"
+# رشته اتصال MongoDB با retryWrites=false
+MONGO_URI = (
+    "mongodb+srv://mohamadnoorir63_db_user:"
+    "mohamadHHH1234%40@cluster0.gya1hoa.mongodb.net/"
+    "mydatabase?retryWrites=false&w=majority"
+)
+
 DB_NAME = "mydatabase"
 COLLECTION_NAME = "custom_commands"
 
-# ====================== اتصال MongoDB امن ======================
-# بدون tlsCAFile، فقط tls=True
+# ====================== اتصال امن MongoDB ======================
+# tls=True برای ارتباط امن، بدون نیاز به فایل CA
 client = MongoClient(
     MONGO_URI,
     tls=True,
