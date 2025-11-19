@@ -15,10 +15,11 @@ DB_NAME = "mydatabase"
 COLLECTION_NAME = "custom_commands"
 
 # ====================== اتصال MongoDB امن ======================
+# نسخه اصلاح‌شده برای PyMongo جدید و Heroku
 client = MongoClient(
     MONGO_URI,
     tls=True,                        # فعال کردن TLS/SSL
-    serverSelectionTimeoutMS=10000   # 10 ثانیه timeout
+    serverSelectionTimeoutMS=20000   # 20 ثانیه timeout
 )
 
 db = client[DB_NAME]
