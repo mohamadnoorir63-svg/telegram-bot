@@ -49,13 +49,13 @@ from emotion_memory import init_emotion_memory, remember_emotion, get_last_emoti
 from auto_brain.auto_brain import start_auto_brain_loop
 from selective_backup import selective_backup_menu, selective_backup_buttons
 from auto_brain import auto_backup
-from command_manager import (
-    save_command,
-    delete_command,
-    handle_custom_command,
-    list_commands,
-    cleanup_group_commands
-)
+#from command_manager import #(
+   # save_command,
+   # delete_command,
+   # handle_custom_command,
+   # list_commands,
+   # cleanup_group_commands
+#)
 from group_control.daily_stats import (
     record_message_activity,
     record_new_members,
@@ -65,7 +65,7 @@ from group_control.daily_stats import (
     send_nightly_stats
 )
 
-
+from command_manager import get_handlers, cleanup_group_commands
 from panels.panel_menu import (
     Tastatur_menu,
     Tastatur_buttons,
@@ -1951,9 +1951,11 @@ application.add_handler(CommandHandler("listsudo", list_sudos))
 # ==========================================================
 # 💾 دستورات شخصی (ذخیره، حذف، اجرای دستورها)
 # ==========================================================
-application.add_handler(CommandHandler("save", save_command))
-application.add_handler(CommandHandler("del", delete_command))
-application.add_handler(CommandHandler("listcmds", list_commands))
+for handler in get_handlers():
+application.add_handler(handler)
+#application.add_handler(CommandHandler("save", save_command))
+#application.add_handler(CommandHandler("del", delete_command))
+#application.add_handler(CommandHandler("listcmds", list_commands))
 # ==========================================================
 #پیام‌های متنی غیر از کامند → هندلر دستورات ذخیره‌شده
 application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_custom_command), group=-4)
