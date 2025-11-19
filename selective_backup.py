@@ -6,39 +6,38 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, InputFi
 from telegram.ext import ContextTypes
 
 # ====================== ⚙️ تنظیمات پایه ======================
-ADMIN_ID = int(os.getenv("ADMIN_ID", "7089376754"))
+ADMIN_ID = int(os.getenv("ADMIN_ID", "8588347189"))
 BACKUP_DIR = os.path.join(os.path.dirname(__file__), "backups")
 os.makedirs(BACKUP_DIR, exist_ok=True)
 
 # 🎨 آیکون‌ها
 ICONS = {
-    "memory.json": "🧠",
-    "shadow_memory.json": "👥",
-    "group_data.json": "💬",
-    "users.json": "👤",
-    "custom_commands.json": "📜",
-    "custom_commands_backup.json": "🗄️",
-    "fortunes_media": "🖼️",  # پوشه رسانه فال‌ها
-    "fortunes.json": "🔮",
-    "jokes_manager.py": "😂",
-    "custom_help.txt": "📘",
-    "group_control/aliases.json": "🧩",  # ✅ اضافه شد
+    "telegram-bot/memory.json": "🧠",
+    "telegram-bot/shadow_memory.json": "👥",
+    "telegram-bot/group_data.json": "💬",
+    "telegram-bot/users.json": "👤",
+    "telegram-bot/custom_commands.json": "📜",
+    "telegram-bot/custom_commands_backup.json": "🗄️",
+    "telegram-bot/fortunes_media": "🖼️",
+    "telegram-bot/fortunes.json": "🔮",
+    "telegram-bot/jokes_manager.py": "😂",
+    "telegram-bot/custom_help.txt": "📘",
+    "telegram-bot/group_control/aliases.json": "🧩",
 }
 
-# 📦 فایل‌هایی که میشه بک‌آپ گرفت
+# 📦 فایل‌هایی که میشه بک‌آپ گرفت (مسیر کامل)
 BACKUP_TARGETS = {
-    "memory.json": "حافظه اصلی",
-    "shadow_memory.json": "حافظه سایه",
-    "custom_commands.json": "دستورهای ذخیره‌شده",
-    "custom_commands_backup.json": "بک‌آپ دستورها",
-    "group_data.json": "داده‌های گروه‌ها",
-    "users.json": "کاربران",
-    "fortunes.json": "فال‌ها",
-    "jokes_manager.py": "جوک‌ها",
-    "custom_help.txt": "راهنمای سفارشی",
-    "group_control/aliases.json": "دستورات سفارشی (alias)",  # ✅ اضافه شد
+    "telegram-bot/memory.json": "حافظه اصلی",
+    "telegram-bot/shadow_memory.json": "حافظه سایه",
+    "telegram-bot/custom_commands.json": "دستورهای ذخیره‌شده",
+    "telegram-bot/custom_commands_backup.json": "بک‌آپ دستورها",
+    "telegram-bot/group_data.json": "داده‌های گروه‌ها",
+    "telegram-bot/users.json": "کاربران",
+    "telegram-bot/fortunes.json": "فال‌ها",
+    "telegram-bot/jokes_manager.py": "جوک‌ها",
+    "telegram-bot/custom_help.txt": "راهنمای سفارشی",
+    "telegram-bot/group_control/aliases.json": "دستورات سفارشی (alias)",
 }
-
 
 # ====================== 📋 شروع فرآیند انتخاب بک‌آپ ======================
 async def selective_backup_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -81,20 +80,22 @@ async def selective_backup_buttons(update: Update, context: ContextTypes.DEFAULT
         zip_name = f"backup_selected_{len(selected)}files.zip"
 
         try:
-            # ایجاد ZIP در حافظه
             with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zipf:
                 for file in selected:
-                    if os.path.isfile(file):
-                        zipf.write(file, arcname=os.path.basename(file))
-                        print(f"📁 افزودن فایل انتخابی: {file}")
+                    full_path = os.path.join(os.path.dirname(__file__), file)
+                    if os.path.exists(full_path) and os.path.isfile(full_path):
+                        zipf.write(full_path, arcname=os.path.basename(file))
+                        print(f"📁 افزودن فایل انتخابی: {full_path}")
                     else:
-                        print(f"[⚠️ فایل یافت نشد یا پوشه است]: {file}")
+                        print(f"[⚠️ فایل یافت نشد یا پوشه است]: {full_path}")
 
             zip_buffer.seek(0)
+            zip_path = os.path.join(BACKUP_DIR, zip_name)
+            with open(zip_path, "wb") as f:
+                f.write(zip_buffer.read())
 
-            # ارسال مستقیم به تلگرام بدون ذخیره روی دیسک
             await query.message.reply_document(
-                document=InputFile(zip_buffer, filename=zip_name),
+                document=InputFile(zip_path),
                 caption=f"✅ بک‌آپ از {len(selected)} فایل با موفقیت ساخته شد!",
             )
 
@@ -132,4 +133,4 @@ async def selective_backup_buttons(update: Update, context: ContextTypes.DEFAULT
         await query.edit_message_text(
             text=text,
             reply_markup=InlineKeyboardMarkup(keyboard)
-            )
+        )
