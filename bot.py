@@ -296,24 +296,18 @@ async def handle_group_reply_mode(update: Update, context: ContextTypes.DEFAULT_
                 return True  # یعنی بقیه تابع reply اجرا نشود
     return False
 # ======================= 🧾 ثبت کاربر =======================
-
 import json
 import os
 
 USERS_FILE = "users.json"
 
-async def register_user(message):
+async def register_user(user):
     """
-    ذخیره آیدی و نام کاربر در فایل users.json فقط در صورتی که پیام از پیوی باشد.
+    ذخیره آیدی و نام کاربر در فایل users.json
     """
-    if message.chat.type != "private":
-        # پیام از گروه یا کانال است، ثبت نمی‌کنیم
-        return
-
-    user = message.from_user
     data = []
 
-    # بارگذاری داده‌های موجود
+    # بارگذاری داده‌های موجود در صورت وجود فایل
     if os.path.exists(USERS_FILE):
         try:
             with open(USERS_FILE, "r", encoding="utf-8") as f:
@@ -321,7 +315,7 @@ async def register_user(message):
         except (json.JSONDecodeError, IOError):
             data = []
 
-    # اضافه کردن کاربر اگر هنوز ثبت نشده
+    # بررسی وجود کاربر و افزودن در صورت نبود
     if user.id not in [u["id"] for u in data]:
         data.append({"id": user.id, "name": user.first_name})
         with open(USERS_FILE, "w", encoding="utf-8") as f:
