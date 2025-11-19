@@ -451,18 +451,28 @@ async def mode_change(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ مود نامعتبر است!")
 
 # ======================= ⚙️ کنترل وضعیت =======================
-# حافظه وضعیت گروه‌ها
-GROUP_STATUS = {}  # chat_id: {"active": True, "welcome": True, "locked": False}
+async def toggle_welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """فعال/غیرفعال کردن خوشامد فقط برای این گروه"""
+    chat_id = update.effective_chat.id
+    status = get_group_status(chat_id)
+    status["welcome"] = not status["welcome"]
+    await update.message.reply_text(
+        "👋 خوشامد فعال شد!" if status["welcome"] else "🚫 خوشامد غیرفعال شد!"
+    )
 
-# تابع کمکی برای گرفتن یا ساخت وضعیت گروه
-def get_group_status(chat_id: int):
-    if chat_id not in GROUP_STATUS:
-        GROUP_STATUS[chat_id] = {"active": True, "welcome": True, "locked": False}
-    return GROUP_STATUS[chat_id]
+async def lock_learning(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """قفل یادگیری فقط برای این گروه"""
+    chat_id = update.effective_chat.id
+    status = get_group_status(chat_id)
+    status["locked"] = True
+    await update.message.reply_text("🔒 یادگیری قفل شد!")
 
-# ────────────── خاموش/روشن سخنگو برای هر گروه ──────────────
-
-
+async def unlock_learning(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """باز کردن یادگیری فقط برای این گروه"""
+    chat_id = update.effective_chat.id
+    status = get_group_status(chat_id)
+    status["locked"] = False
+    await update.message.reply_text("🔓 یادگیری باز شد!")
 # ======================= 📊 آمار ربات واقعی =======================
 async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """نمایش آمار کلی — فقط برای مدیر اصلی یا سودوها"""
