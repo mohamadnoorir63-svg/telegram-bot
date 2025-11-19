@@ -457,7 +457,7 @@ GROUP_STATUS = {}  # chat_id: {"active": True, "welcome": True, "locked": False}
 # تابع کمکی برای گرفتن یا ساخت وضعیت گروه
 def get_group_status(chat_id: int):
     if chat_id not in GROUP_STATUS:
-        GROUP_STATUS[chat_id] = {"active": True, "welcome": True, "locked": False}
+        GROUP_STATUS[chat_id] = {"active":False , "welcome": True, "locked":True}
     return GROUP_STATUS[chat_id]
 
 # ────────────── خاموش/روشن سخنگو برای هر گروه ──────────────
