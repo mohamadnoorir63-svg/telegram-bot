@@ -1951,8 +1951,10 @@ application.add_handler(CommandHandler("listsudo", list_sudos))
 # ==========================================================
 # 💾 دستورات شخصی (ذخیره، حذف، اجرای دستورها)
 # ==========================================================
-for handler in get_handlers():
-application.add_handler(handler)
+handlers = get_handlers()  # از command_manager.py
+
+for handler in handlers:
+    application.add_handler(handler)
 #application.add_handler(CommandHandler("save", save_command))
 #application.add_handler(CommandHandler("del", delete_command))
 #application.add_handler(CommandHandler("listcmds", list_commands))
