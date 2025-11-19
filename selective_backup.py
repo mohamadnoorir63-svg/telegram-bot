@@ -32,32 +32,46 @@ os.makedirs(os.path.join(DATA_DIR, "group_control"), exist_ok=True)
 
 # 🎨 آیکون‌ها
 ICONS = {
-    MEMORY_FILE: "🧠",
-    SHADOW_MEMORY_FILE: "👥",
-    GROUP_DATA_FILE: "💬",
-    USERS_FILE: "👤",
-    CUSTOM_COMMANDS_FILE: "📜",
-    CUSTOM_COMMANDS_BACKUP: "🗄️",
-    "fortunes_media": "🖼️",
-    FORTUNES_FILE: "🔮",
-    JOKES_FILE: "😂",
-    CUSTOM_HELP_FILE: "📘",
-    GROUP_ALIASES_FILE: "🧩",
+    "memory": "🧠",
+    "shadow_memory": "👥",
+    "group_data": "💬",
+    "users": "👤",
+    "commands": "📜",
+    "commands_backup": "🗄️",
+    "fortunes": "🔮",
+    "jokes": "😂",
+    "help": "📘",
+    "aliases": "🧩",
 }
 
-# 📦 فایل‌هایی که میشه بک‌آپ گرفت
+# 📦 فایل‌هایی که میشه بک‌آپ گرفت (کلیدهای امن بدون / برای callback_data)
 BACKUP_TARGETS = {
-    MEMORY_FILE: "حافظه اصلی",
-    SHADOW_MEMORY_FILE: "حافظه سایه",
-    CUSTOM_COMMANDS_FILE: "دستورهای ذخیره‌شده",
-    CUSTOM_COMMANDS_BACKUP: "بک‌آپ دستورها",
-    GROUP_DATA_FILE: "داده‌های گروه‌ها",
-    USERS_FILE: "کاربران",
-    FORTUNES_FILE: "فال‌ها",
-    JOKES_FILE: "جوک‌ها",
-    CUSTOM_HELP_FILE: "راهنمای سفارشی",
-    GROUP_ALIASES_FILE: "دستورات سفارشی (alias)",
+    "memory": MEMORY_FILE,
+    "shadow_memory": SHADOW_MEMORY_FILE,
+    "commands": CUSTOM_COMMANDS_FILE,
+    "commands_backup": CUSTOM_COMMANDS_BACKUP,
+    "group_data": GROUP_DATA_FILE,
+    "users": USERS_FILE,
+    "fortunes": FORTUNES_FILE,
+    "jokes": JOKES_FILE,
+    "help": CUSTOM_HELP_FILE,
+    "aliases": GROUP_ALIASES_FILE,
 }
+
+# نام نمایشی هر فایل
+BACKUP_NAMES = {
+    "memory": "حافظه اصلی",
+    "shadow_memory": "حافظه سایه",
+    "commands": "دستورهای ذخیره‌شده",
+    "commands_backup": "بک‌آپ دستورها",
+    "group_data": "داده‌های گروه‌ها",
+    "users": "کاربران",
+    "fortunes": "فال‌ها",
+    "jokes": "جوک‌ها",
+    "help": "راهنمای سفارشی",
+    "aliases": "alias ها",
+}
+
 
 # ====================== 📋 منوی انتخاب فایل‌ها ======================
 async def selective_backup_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -65,10 +79,15 @@ async def selective_backup_menu(update: Update, context: ContextTypes.DEFAULT_TY
         return await update.message.reply_text("🚫 فقط سودو می‌تونه از این دستور استفاده کنه.")
 
     context.user_data["selected_files"] = set()
+
     keyboard = [
-        [InlineKeyboardButton(f"{ICONS.get(key, '📁')} {name}", callback_data=f"selbk_{key}")]
-        for key, name in BACKUP_TARGETS.items()
+        [InlineKeyboardButton(
+            f"{ICONS[key]} {BACKUP_NAMES[key]}",
+            callback_data=f"selbk_{key}"
+        )]
+        for key in BACKUP_TARGETS.keys()
     ]
+
     keyboard.append([InlineKeyboardButton("✅ انجام بک‌آپ", callback_data="selbk_do")])
     keyboard.append([InlineKeyboardButton("❌ لغو", callback_data="selbk_cancel")])
 
@@ -76,6 +95,7 @@ async def selective_backup_menu(update: Update, context: ContextTypes.DEFAULT_TY
         "📦 لطفاً فایل‌هایی که می‌خوای بک‌آپ بگیری انتخاب کن:",
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
+
 
 # ====================== 🧩 مدیریت دکمه‌ها ======================
 async def selective_backup_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -94,59 +114,64 @@ async def selective_backup_buttons(update: Update, context: ContextTypes.DEFAULT
         if not selected:
             return await query.edit_message_text("⚠️ هیچ فایلی انتخاب نشده بود!")
 
-        zip_buffer = io.BytesIO()
-        zip_name = f"backup_selected_{len(selected)}files.zip"
-
         try:
-            # ایجاد ZIP در حافظه
+            zip_buffer = io.BytesIO()
+            zip_name = f"backup_selected_{len(selected)}files.zip"
+
+            # ساخت ZIP
             with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zipf:
-                for file in selected:
-                    if os.path.isfile(file):
-                        zipf.write(file, arcname=os.path.basename(file))
-                        print(f"📁 افزودن فایل انتخابی: {file}")
+                for key in selected:
+                    path = BACKUP_TARGETS[key]
+                    if os.path.isfile(path):
+                        zipf.write(path, os.path.basename(path))
+                        print(f"📁 افزودن فایل: {path}")
                     else:
-                        print(f"[⚠️ فایل یافت نشد یا پوشه است]: {file}")
+                        print(f"⚠️ فایل یافت نشد: {path}")
 
             zip_buffer.seek(0)
 
-            # ارسال مستقیم به تلگرام بدون ذخیره روی دیسک
+            # ارسال ZIP
             await query.message.reply_document(
-                document=InputFile(zip_buffer, filename=zip_name),
-                caption=f"✅ بک‌آپ از {len(selected)} فایل با موفقیت ساخته شد!",
+                InputFile(zip_buffer, filename=zip_name),
+                caption=f"✅ بک‌آپ از {len(selected)} فایل ساخته شد!"
             )
 
-            return await query.edit_message_text("📦 فایل بک‌آپ ارسال شد ✅")
+            return await query.edit_message_text("📦 فایل بک‌آپ ارسال شد.")
 
         except Exception as e:
             return await query.edit_message_text(f"⚠️ خطا در ساخت بک‌آپ: {e}")
 
-    # ☑️ انتخاب یا لغو انتخاب فایل‌ها
+    # ☑️ انتخاب یا لغو انتخاب هر فایل
     if data.startswith("selbk_"):
         key = data.replace("selbk_", "")
+
         if key in selected:
             selected.remove(key)
         else:
             selected.add(key)
+
         context.user_data["selected_files"] = selected
 
         # بروزرسانی منو
         text = "📦 فایل‌های انتخاب‌شده:\n"
-        if not selected:
-            text += "هیچ فایلی انتخاب نشده 😅"
+        if selected:
+            text += "\n".join([f"✅ {BACKUP_NAMES[k]}" for k in selected])
         else:
-            text += "\n".join([f"✅ {BACKUP_TARGETS.get(f, f)}" for f in selected])
+            text += "هیچ فایلی انتخاب نشده 😅"
 
         keyboard = [
             [InlineKeyboardButton(
-                ("☑️ " if k in selected else "⬜️ ") + f"{ICONS.get(k, '📁')} {BACKUP_TARGETS[k]}",
+                ("☑️ " if k in selected else "⬜️ ")
+                + f"{ICONS[k]} {BACKUP_NAMES[k]}",
                 callback_data=f"selbk_{k}"
             )]
-            for k in BACKUP_TARGETS
+            for k in BACKUP_TARGETS.keys()
         ]
+
         keyboard.append([InlineKeyboardButton("✅ انجام بک‌آپ", callback_data="selbk_do")])
         keyboard.append([InlineKeyboardButton("❌ لغو", callback_data="selbk_cancel")])
 
-        await query.edit_message_text(
+        return await query.edit_message_text(
             text=text,
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
