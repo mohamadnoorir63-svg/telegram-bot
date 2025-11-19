@@ -119,6 +119,7 @@ async def save_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 # اجرای دستور با ارسال فقط 1 پاسخ تصادفی
+# اجرای دستور بدون تکرار تا مصرف تمام پاسخ‌ها
 async def handle_custom_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message or not update.message.text:
         return
@@ -131,47 +132,47 @@ async def handle_custom_command(update: Update, context: ContextTypes.DEFAULT_TY
 
     cmd = commands[text]
     responses = cmd.get("responses", [])
+
     if not responses:
         return await update.message.reply_text("⚠️ هنوز پاسخی برای این دستور ثبت نشده.")
 
-    # فقط یکی از پاسخ‌ها به صورت تصادفی (بدون تکرار)
-    response = random.choice(responses)
+    # لیست استفاده‌شده‌ (ایندکس‌ها)
+    used = cmd.get("last_used", [])
 
-    r_type = response.get("type")
+    # اگر همه استفاده شده‌اند → ریست کن
+    if len(used) >= len(responses):
+        used = []
+
+    # پیدا کردن ایندکس‌های استفاده نشده
+    unused_indexes = [i for i in range(len(responses)) if i not in used]
+
+    # انتخاب یکی بدون تکرار
+    chosen_index = random.choice(unused_indexes)
+    chosen = responses[chosen_index]
+
+    # ثبت در لیست استفاده‌شده‌ها
+    used.append(chosen_index)
+    cmd["last_used"] = used
+    commands[text] = cmd
+    save_commands_local(commands)
+
+    # ارسال پاسخ انتخاب‌شده
+    r_type = chosen.get("type")
 
     if r_type == "text":
-        await update.message.reply_text(response.get("data", ""))
+        await update.message.reply_text(chosen.get("data", ""))
     elif r_type == "photo":
-        await update.message.reply_photo(response["file_id"], caption=response.get("caption"))
+        await update.message.reply_photo(chosen["file_id"], caption=chosen.get("caption"))
     elif r_type == "video":
-        await update.message.reply_video(response["file_id"], caption=response.get("caption"))
+        await update.message.reply_video(chosen["file_id"], caption=chosen.get("caption"))
     elif r_type == "document":
-        await update.message.reply_document(response["file_id"], caption=response.get("caption"))
+        await update.message.reply_document(chosen["file_id"], caption=chosen.get("caption"))
     elif r_type == "audio":
-        await update.message.reply_audio(response["file_id"], caption=response.get("caption"))
+        await update.message.reply_audio(chosen["file_id"], caption=chosen.get("caption"))
     elif r_type == "animation":
-        await update.message.reply_animation(response["file_id"], caption=response.get("caption"))
+        await update.message.reply_animation(chosen["file_id"], caption=chosen.get("caption"))
 
     context.user_data["custom_handled"] = True
-async def delete_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user = update.effective_user
-    if user.id != ADMIN_ID:
-        return await update.message.reply_text("⛔ فقط مدیر اصلی اجازه این کار را دارد.")
-
-    if not context.args:
-        return await update.message.reply_text("❗ استفاده: /del <نام دستور>")
-
-    name = " ".join(context.args).strip().lower()
-    commands = load_commands()
-
-    if name in commands:
-        del commands[name]
-        save_commands_local(commands)
-        await update.message.reply_text(f"🗑 دستور '{name}' حذف شد.")
-    else:
-        await update.message.reply_text("⚠️ چنین دستوری وجود ندارد.")
-
-
 async def list_commands(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     if user.id != ADMIN_ID:
