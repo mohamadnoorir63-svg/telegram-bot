@@ -1205,19 +1205,16 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user = update.effective_user
         chat = update.effective_chat
 
-    # گروه / سوپرگروه → فقط مدیران و سودو فال بگیرند، بقیه سکوت
+    # گروه / سوپرگروه → کاربران عادی سکوت می‌کنند
     if chat.type in ["group", "supergroup"]:
         try:
             member = await chat.get_member(user.id)
             if not (user.id == ADMIN_ID or member.status in ["administrator", "creator"]):
-                return  # سکوت کامل برای کاربران عادی
+                return  # سکوت کامل
         except:
-            return  # اگر خطایی بود هم سکوت
+            return  # اگر خطایی بود، سکوت
 
-    # پیوی → همه بدون محدودیت می‌توانند فال دریافت کنند
-    # هیچ شرطی لازم نیست
-
-    # ادامه کد ارسال فال
+    # پیوی → همه دریافت می‌کنند
     if os.path.exists("fortunes.json"):
         data = load_data("fortunes.json")
         if data:
@@ -1233,6 +1230,8 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     await update.message.reply_video(video=v, caption="🔮 فال ویدیویی!")
                 elif t == "sticker":
                     await update.message.reply_sticker(sticker=v)
+                else:
+                    await update.message.reply_text("⚠️ نوع فایل پشتیبانی نمی‌شود.")
             except Exception as e:
                 await update.message.reply_text(f"⚠️ خطا در ارسال فال: {e}")
         else:
