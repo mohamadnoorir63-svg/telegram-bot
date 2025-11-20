@@ -1194,7 +1194,30 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     
     # ✅ فال تصادفی
-    
+    if text == "فال":
+        if os.path.exists("fortunes.json"):
+            data = load_data("fortunes.json")
+            if data:
+                key, val = random.choice(list(data.items()))
+                t = val.get("type", "text")
+                v = val.get("value", "")
+                try:
+                    if t == "text":
+                        await update.message.reply_text("🔮 " + v)
+                    elif t == "photo":
+                        await update.message.reply_photo(photo=v, caption="🔮 فال تصویری!")
+                    elif t == "video":
+                        await update.message.reply_video(video=v, caption="🔮 فال ویدیویی!")
+                    elif t == "sticker":
+                        await update.message.reply_sticker(sticker=v)
+                except Exception as e:
+                    await update.message.reply_text(f"⚠️ خطا در ارسال فال: {e}")
+            else:
+                await update.message.reply_text("هنوز فالی ثبت نشده 😔")
+        else:
+            await update.message.reply_text("📂 فایل فال‌ها پیدا نشد 😕")
+        return
+        
     
     # ✅ ثبت جوک و فال
     if text.lower() == "ثبت جوک" and update.message.reply_to_message:
