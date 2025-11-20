@@ -1202,44 +1202,7 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     # ✅ فال تصادفی
     
-    if text == "فال":
-        user = update.effective_user
-        chat = update.effective_chat
-
-    # گروه / سوپرگروه → کاربران عادی سکوت می‌کنند
-    if chat.type in ["group", "supergroup"]:
-        try:
-            member = await chat.get_member(user.id)
-            if not (user.id == ADMIN_ID or member.status in ["administrator", "creator"]):
-                return  # سکوت کامل
-        except:
-            return  # اگر خطایی بود، سکوت
-
-    # پیوی → همه دریافت می‌کنند
-    if os.path.exists("fortunes.json"):
-        data = load_data("fortunes.json")
-        if data:
-            key, val = random.choice(list(data.items()))
-            t = val.get("type", "text")
-            v = val.get("value", "")
-            try:
-                if t == "text":
-                    await update.message.reply_text("🔮 " + v)
-                elif t == "photo":
-                    await update.message.reply_photo(photo=v, caption="🔮 فال تصویری!")
-                elif t == "video":
-                    await update.message.reply_video(video=v, caption="🔮 فال ویدیویی!")
-                elif t == "sticker":
-                    await update.message.reply_sticker(sticker=v)
-                else:
-                    await update.message.reply_text("⚠️ نوع فایل پشتیبانی نمی‌شود.")
-            except Exception as e:
-                await update.message.reply_text(f"⚠️ خطا در ارسال فال: {e}")
-        else:
-            await update.message.reply_text("هنوز فالی ثبت نشده 😔")
-    else:
-        await update.message.reply_text("📂 فایل فال‌ها پیدا نشد 😕")
-    return
+    
     
     # ✅ ثبت جوک و فال
     if text.lower() == "ثبت جوک" and update.message.reply_to_message:
