@@ -1199,7 +1199,6 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if text in ["فال", "/فال", "/fal"]:
         chat = update.effective_chat
-        user = update.effective_user
 
         key = None
         val = None
@@ -1214,12 +1213,15 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 if ai_fortune:
                     key, val = ai_fortune
                 else:
-                    return  # کاربران معمولی بدون AI → سکوت
-            # ادمین و سودو → از فایل می‌گیرند (پایین)
+                    return  # سکوت
+        # ---------- پیوی همیشه آزاد ----------
+        # اگر به اینجا رسیدیم یعنی پیوی یا مدیر گروه است
 
-        # ---------- پیوی یا ادمین گروه ----------
+        # اگر از AI نیامده، از فایل بگیر
         if key is None or val is None:
             data = load_fortunes()
+            print("FORTUNE DATA LOADED:", data)
+
             if not data:
                 return await update.message.reply_text("❌ هیچ فالی ذخیره نشده!")
 
@@ -1243,7 +1245,6 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text(f"⚠️ خطا در ارسال فال: {e}")
 
         return
-    
     # ✅ ثبت جوک و فال
     if text.lower() == "ثبت جوک" and update.message.reply_to_message:
         await save_joke(update)
