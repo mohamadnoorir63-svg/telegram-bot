@@ -1194,54 +1194,7 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     
     # ✅ فال تصادفی
-    if text == "فال":
-        chat = update.effective_chat
-        user = update.effective_user
-
-    # --------------- استفاده از فال اختصاصی هوش مصنوعی (سخنگو) ---------------
-    if hasattr(context, "use_ai_fortune") and context.use_ai_fortune:
-        key, val = context.use_ai_fortune
-        t = val.get("type", "text")
-        v = val.get("value", "")
-        await send_media(update, t, v, key)
-        return
-
-    # --------------- محدودیت دسترسی در گروه ----------------
-    if chat.type in ["group", "supergroup"]:
-        if not await is_admin_or_sudo(update):
-            # کاربران عادی در گروه سکوت می‌کنند
-            return
-
-    # --------------- ادامه ارسال فال تصادفی ----------------
-    await send_random_fortune(update, context)
-    # -------------------- انتخاب فال --------------------
-    if use_ai_fortune:
-        key, val = use_ai_fortune
-    else:
-        # پیوی یا مدیر/سودو → فال تصادفی از فایل
-        if os.path.exists("fortunes.json"):
-            data = load_data("fortunes.json")
-            if not data:
-                return await update.message.reply_text("هنوز فالی ثبت نشده 😔")
-            key, val = random.choice(list(data.items()))
-        else:
-            return await update.message.reply_text("📂 فایل فال‌ها پیدا نشد 😕")
-
-    # -------------------- ارسال فال --------------------
-    t = val.get("type", "text")
-    v = val.get("value", "")
-    try: 
-        if t == "text":
-            await update.message.reply_text("🔮 " + v)
-        elif t == "photo":
-            await update.message.reply_photo(photo=v, caption="🔮 فال تصویری!")
-        elif t == "video":
-            await update.message.reply_video(video=v, caption="🔮 فال ویدیویی!")
-        elif t == "sticker":
-            await update.message.reply_sticker(sticker=v)
-    except Exception as e:
-        await update.message.reply_text(f"⚠️ خطا در ارسال فال: {e}")
-    return
+    
     
     # ✅ ثبت جوک و فال
     if text.lower() == "ثبت جوک" and update.message.reply_to_message:
