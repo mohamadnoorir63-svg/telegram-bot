@@ -99,7 +99,7 @@ async def send_media(update: Update, media_type: str, val: str, k: str):
 # ========================= ثبت فال (فقط سودو) =========================
 async def save_fortune(update: Update):
     if not await is_sudo(update):
-        return  # کاربر عادی و مدیر گروه → چیزی ذخیره نشود
+        return await update.message.reply_text("❌ فقط سودو می‌تواند فال ثبت کند.")
 
     reply = update.message.reply_to_message
     if not reply:
@@ -169,7 +169,7 @@ async def save_fortune(update: Update):
 # ========================= حذف فال (فقط سودو) =========================
 async def delete_fortune(update: Update):
     if not await is_sudo(update):
-        return  # کاربر عادی و مدیر گروه → چیزی حذف نشود
+        return await update.message.reply_text("❌ فقط سودو می‌تواند فال حذف کند.")
 
     reply = update.message.reply_to_message
     if not reply:
@@ -218,7 +218,7 @@ async def delete_fortune(update: Update):
 # ========================= ارسال فال تصادفی و لیست فال‌ها (مدیران گروه یا سودو) =========================
 async def send_random_fortune(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await is_admin_or_sudo(update):
-        return  # کاربر عادی → چیزی دریافت نکند
+        return await update.message.reply_text("❌ فقط مدیران گروه و سودو می‌توانند فال دریافت کنند.")
 
     data = load_fortunes()
     if not data:
@@ -252,7 +252,7 @@ async def send_random_fortune(update: Update, context: ContextTypes.DEFAULT_TYPE
 
 async def list_fortunes(update: Update):
     if not await is_admin_or_sudo(update):
-        return  # کاربر عادی → چیزی نمایش داده نشود
+        return await update.message.reply_text("❌ فقط مدیران گروه و سودو می‌توانند فال‌ها را مشاهده کنند.")
 
     data = load_fortunes()
     if not data:
