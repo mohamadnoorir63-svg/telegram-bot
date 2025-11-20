@@ -1717,7 +1717,7 @@ async def show_main_panel(update: Update, context: ContextTypes.DEFAULT_TYPE, ed
             InlineKeyboardButton("🧩 قابلیت‌های ربات", callback_data="panel_features")
         ],
         [
-            InlineKeyboardButton("🤖 راهنما ربات", callback_data="panel_about"),
+            InlineKeyboardButton("🤖 راهنمای ربات", callback_data="panel_about"),
             InlineKeyboardButton("👨‍💻 درباره تیم ما", callback_data="panel_team")
         ],
         [
@@ -1810,7 +1810,7 @@ async def panel_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     elif query.data == "panel_azan":
         await query.message.reply_text(
-            "🕌 برای دیدن اوقات شرعی بنویس:\n<b>اذان هرات</b> یا <b>اذان تهران</b>",
+            "🕌 برای دیدن اوقات شرعی بنویس:\n<b>اذان هرات</b> یا <b>اذان تهران</b>یا برای دیدن روز های مذهبی<b>رمضان</b>",
             parse_mode="HTML"
         )
 
@@ -1822,7 +1822,7 @@ async def panel_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.message.reply_text("🔮 لطفاً کلمه فال رو بفرستید تا فال ارسال شود:\n<b> فال </b>", parse_mode="HTML")
 
     elif query.data == "panel_joke":
-        await query.message.reply_text("🎭 لطفاً کلمه جوک رو بفرستید تا فال ارسال شود:\n<b> جوک </b>", parse_mode="HTML")
+        await query.message.reply_text("🎭 لطفاً کلمه جوک رو بفرستید تا جوک ارسال شود:\n<b> جوک </b>", parse_mode="HTML")
         
     elif query.data == "panel_font":
         await query.message.reply_text("🎨 برای ساخت فونت بنویس:\n<b> فونت اسمت </b>", parse_mode="HTML")
