@@ -1160,12 +1160,7 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
         
   # ✅ جوک تصادفی
-    # لیست سودوها
-
-    async def is_admin(update):
-        chat = update.effective_chat
-        user_id = update.effective_user.id
-
+    
     # سودو همیشه مجاز است
     if user_id in SUDO_USERS:
         return True
