@@ -10,15 +10,16 @@ from telegram import Update, InputFile
 from telegram.ext import ContextTypes
 
 # ========================= مسیرها و آماده‌سازی =========================
+
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 FORTUNE_FILE = os.path.join(BASE_DIR, "fortunes.json")
 MEDIA_DIR = os.path.join(BASE_DIR, "fortunes_media")
 os.makedirs(MEDIA_DIR, exist_ok=True)
 
 MAX_FORTUNES = 100  # حداکثر تعداد فال‌ها
-ADMIN_ID = 8588347189  # سودو اصلی
 
 # ========================= ابزارهای کمکی =========================
+
 def _is_valid_url(val: str) -> bool:
     if not isinstance(val, str) or not val.strip():
         return False
@@ -54,28 +55,8 @@ def save_fortunes(data):
     with open(FORTUNE_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
-# ========================= بررسی دسترسی =========================
-async def is_sudo(update: Update) -> bool:
-    """فقط سودو اصلی"""
-    user = update.effective_user
-    return user.id == ADMIN_ID
-
-async def is_admin_or_sudo(update: Update) -> bool:
-    """مدیر گروه یا سودو"""
-    user = update.effective_user
-    if user.id == ADMIN_ID:
-        return True
-    chat = update.effective_chat
-    if chat and chat.type in ["group", "supergroup"]:
-        try:
-            member = await chat.get_member(user.id)
-            if member.status in ["administrator", "creator"]:
-                return True
-        except:
-            pass
-    return False
-
 # ========================= ارسال مدیا ایمن =========================
+
 async def send_media(update: Update, media_type: str, val: str, k: str):
     val = _abs_media_path(val)
     if _is_valid_url(val):
@@ -96,11 +77,9 @@ async def send_media(update: Update, media_type: str, val: str, k: str):
         elif media_type == "sticker":
             await update.message.reply_sticker(sticker=file)
 
-# ========================= ثبت فال (فقط سودو) =========================
-async def save_fortune(update: Update):
-    if not await is_sudo(update):
-        return await update.message.reply_text("❌ فقط سودو می‌تواند فال ثبت کند.")
+# ========================= ثبت فال =========================
 
+async def save_fortune(update: Update):
     reply = update.message.reply_to_message
     if not reply:
         return await update.message.reply_text("❗ لطفاً روی پیام فال ریپلای کن.")
@@ -115,7 +94,6 @@ async def save_fortune(update: Update):
                 return await update.message.reply_text("⚠️ متن خالی است.")
             entry["type"] = "text"
             entry["value"] = val
-
         elif reply.photo:
             file = await reply.photo[-1].get_file()
             filename = f"photo_{int(datetime.now().timestamp())}.jpg"
@@ -123,7 +101,6 @@ async def save_fortune(update: Update):
             await file.download_to_drive(path)
             entry["type"] = "photo"
             entry["value"] = os.path.relpath(path, BASE_DIR)
-
         elif reply.video:
             file = await reply.video.get_file()
             filename = f"video_{int(datetime.now().timestamp())}.mp4"
@@ -131,7 +108,6 @@ async def save_fortune(update: Update):
             await file.download_to_drive(path)
             entry["type"] = "video"
             entry["value"] = os.path.relpath(path, BASE_DIR)
-
         elif reply.sticker:
             file = await reply.sticker.get_file()
             filename = f"sticker_{int(datetime.now().timestamp())}.webp"
@@ -139,14 +115,15 @@ async def save_fortune(update: Update):
             await file.download_to_drive(path)
             entry["type"] = "sticker"
             entry["value"] = os.path.relpath(path, BASE_DIR)
-
         else:
             return await update.message.reply_text("⚠️ فقط متن، عکس، ویدیو یا استیکر پشتیبانی می‌شود.")
 
+        # جلوگیری از تکراری بودن شدید
         for v in data.values():
             if v.get("type") == entry["type"] and v.get("value") == entry["value"]:
                 return await update.message.reply_text("😅 این فال قبلاً ذخیره شده بود!")
 
+        # حذف قدیمی‌ترین فال اگر بیشتر از MAX_FORTUNES
         if len(data) >= MAX_FORTUNES:
             sorted_keys = sorted(data.keys(), key=lambda x: x)
             oldest_key = sorted_keys[0]
@@ -155,6 +132,7 @@ async def save_fortune(update: Update):
                 os.remove(old_val)
             data.pop(oldest_key)
 
+        # کلید یکتا
         new_key = str(uuid.uuid4())
         data[new_key] = entry
         save_fortunes(data)
@@ -163,11 +141,9 @@ async def save_fortune(update: Update):
     except Exception as e:
         await update.message.reply_text(f"⚠️ خطا در ذخیره فال: {e}")
 
-# ========================= حذف فال (فقط سودو) =========================
-async def delete_fortune(update: Update):
-    if not await is_sudo(update):
-        return await update.message.reply_text("❌ فقط سودو می‌تواند فال حذف کند.")
+# ========================= حذف فال =========================
 
+async def delete_fortune(update: Update):
     reply = update.message.reply_to_message
     if not reply:
         return await update.message.reply_text("❗ لطفاً روی پیام فال ریپلای کن تا حذف شود.")
@@ -212,79 +188,44 @@ async def delete_fortune(update: Update):
     else:
         await update.message.reply_text("⚠️ فال موردنظر در فایل پیدا نشد.")
 
-# ========================= ارسال فال تصادفی =========================
+# ========================= ارسال فال تصادفی بدون تکرار پشت سر هم =========================
+
 async def send_random_fortune(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user = update.effective_user
-    chat = update.effective_chat
-
-    # ---------------- حالت گروه ----------------
-    if chat.type in ["group", "supergroup"]:
-        # اگر ادمین یا سودو نبود:
-        if not await is_admin_or_sudo(update):
-
-            # اگر فال AI وجود داشت → بفرست
-            ai_fortune = getattr(context, "use_ai_fortune", None)
-            if ai_fortune:
-                key, val = ai_fortune
-
-                t = val.get("type", "text")
-                v = val.get("value", "")
-                if not v:
-                    return
-
-                await send_media(update, t, v, key)
-                return
-
-            # در غیر این‌صورت → سکوت کامل
-            return
-
-        # اگر ادمین بود → فایل مخصوص گروه
-        key_file = os.path.join(BASE_DIR, f"sent_fortunes_group_{chat.id}.json")
-
-    # ---------------- حالت پیوی ----------------
-    elif chat.type == "private":
-        key_file = os.path.join(BASE_DIR, f"sent_fortunes_private_{user.id}.json")
-
-    else:
-        return  # سکوت برای سایر حالت‌ها
-
-    # ---------------- بارگذاری فال‌ها ----------------
     data = load_fortunes()
     if not data:
         return await update.message.reply_text("📭 هنوز فالی ذخیره نشده 😔")
 
-    sent_keys = _load_json(key_file, [])
+    sent_state_file = os.path.join(BASE_DIR, "sent_fortunes.json")
+    sent_keys = _load_json(sent_state_file, [])
+
     all_keys = list(data.keys())
     remaining_keys = [k for k in all_keys if k not in sent_keys]
 
-    # اگر همه فال‌ها ارسال شده بودند → ریست
-    if not remaining_keys:
+    if not remaining_keys:  # همه فال‌ها ارسال شدند → ریست
         sent_keys = []
         remaining_keys = all_keys.copy()
 
+    # جلوگیری از تکرار پشت سر هم
     last_sent = sent_keys[-1] if sent_keys else None
     possible_keys = [k for k in remaining_keys if k != last_sent] or remaining_keys
     k = random.choice(possible_keys)
     sent_keys.append(k)
 
-    # ذخیره لیست ارسال‌شده‌ها
-    with open(key_file, "w", encoding="utf-8") as f:
+    # ذخیره وضعیت ارسال
+    with open(sent_state_file, "w", encoding="utf-8") as f:
         json.dump(sent_keys, f, ensure_ascii=False, indent=2)
 
-    # ---------------- ارسال فال ----------------
     v = data.get(k, {})
     t = v.get("type", "text").strip()
     raw = (v.get("value") or "").strip()
-
     if not raw:
         return await update.message.reply_text("⚠️ فال نامعتبر یا خالی بود.")
 
     await send_media(update, t, raw, k)
-# ========================= لیست فال‌ها =========================
-async def list_fortunes(update: Update):
-    if not await is_admin_or_sudo(update):
-        return await update.message.reply_text("❌ فقط مدیران گروه و سودو می‌توانند فال‌ها را مشاهده کنند.")
 
+# ========================= لیست فال‌ها =========================
+
+async def list_fortunes(update: Update):
     data = load_fortunes()
     if not data:
         return await update.message.reply_text("هنوز هیچ فالی ثبت نشده 😔")
@@ -308,7 +249,9 @@ async def list_fortunes(update: Update):
             continue
 
     if shown == 0:
-        await update.message.reply_text("⚠️ هیچ فالی برای نمایش پیدا نشد (ممکنه فایل‌ها حذف شده باشن).")
+        await update.message.reply_text(
+            "⚠️ هیچ فالی برای نمایش پیدا نشد (ممکنه فایل‌ها حذف شده باشن)."
+        )
     else:
         await update.message.reply_text(
             f"✅ {shown} فال آخر نمایش داده شد.\n\n"
