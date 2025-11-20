@@ -1194,57 +1194,51 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     
     # ✅ فال تصادفی
-    async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
-        text = (update.message.text or "").strip()
+    
+    if text == "فال":
+        user = update.effective_user
+       chat = update.effective_chat
 
-    if text in ["فال", "/فال", "/fal"]:
-        chat = update.effective_chat
-
-        key = None
-        val = None
-
-        # ---------- گروه ----------
-        if chat.type in ["group", "supergroup"]:
-            is_admin = await is_admin_or_sudo(update)
-
-            if not is_admin:
-                # فقط کاربر معمولی
-                ai_fortune = getattr(context, "use_ai_fortune", None)
-                if ai_fortune:
-                    key, val = ai_fortune
-                else:
-                    return  # سکوت
-        # ---------- پیوی همیشه آزاد ----------
-        # اگر به اینجا رسیدیم یعنی پیوی یا مدیر گروه است
-
-        # اگر از AI نیامده، از فایل بگیر
-        if key is None or val is None:
-            data = load_fortunes()
-            print("FORTUNE DATA LOADED:", data)
-
-            if not data:
-                return await update.message.reply_text("❌ هیچ فالی ذخیره نشده!")
-
-            key, val = random.choice(list(data.items()))
-
-        # ---------- ارسال ----------
-        t = val.get("type", "text")
-        v = val.get("value", "")
-
+    # گروه / سوپرگروه → کاربر عادی سکوت کند
+    if chat.type in ["group", "supergroup"]:
         try:
-            if t == "text":
-                await update.message.reply_text("🔮 " + v)
-            elif t == "photo":
-                await update.message.reply_photo(photo=v, caption="🔮 فال تصویری!")
-            elif t == "video":
-                await update.message.reply_video(video=v, caption="🔮 فال ویدیویی!")
-            elif t == "sticker":
-                await update.message.reply_sticker(sticker=v)
+            member = await chat.get_member(user.id)
+            if not (user.id == ADMIN_ID or member.status in ["administrator", "creator"]):
+                return  # سکوت کامل برای کاربران عادی
+        except:
+            return  # اگر خطایی بود هم سکوت
 
-        except Exception as e:
-            await update.message.reply_text(f"⚠️ خطا در ارسال فال: {e}")
+    # پیوی → فقط سودو
+    elif chat.type == "private":
+        if user.id != ADMIN_ID:
+            return await update.message.reply_text("❌ فقط سودو می‌تواند فال خصوصی دریافت کند.")
+    else:
+        return  # سایر چت‌ها → سکوت
 
-        return
+    # ادامه کد ارسال فال
+    if os.path.exists("fortunes.json"):
+        data = load_data("fortunes.json")
+        if data:
+            key, val = random.choice(list(data.items()))
+            t = val.get("type", "text")
+            v = val.get("value", "")
+            try:
+                if t == "text":
+                    await update.message.reply_text("🔮 " + v)
+                elif t == "photo":
+                    await update.message.reply_photo(photo=v, caption="🔮 فال تصویری!")
+                elif t == "video":
+                    await update.message.reply_video(video=v, caption="🔮 فال ویدیویی!")
+                elif t == "sticker":
+                    await update.message.reply_sticker(sticker=v)
+            except Exception as e:
+                await update.message.reply_text(f"⚠️ خطا در ارسال فال: {e}")
+        else:
+            await update.message.reply_text("هنوز فالی ثبت نشده 😔")
+    else:
+        await update.message.reply_text("📂 فایل فال‌ها پیدا نشد 😕")
+    return
+    
     # ✅ ثبت جوک و فال
     if text.lower() == "ثبت جوک" and update.message.reply_to_message:
         await save_joke(update)
