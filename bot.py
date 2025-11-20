@@ -1214,7 +1214,8 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except:
             return  # اگر خطایی بود، سکوت
 
-    # پیوی → همه دریافت می‌کنند، یا ادمین‌ها در گروه
+    # پیوی → همه دریافت می‌کنند
+    # ادامه کد ارسال فال
     if os.path.exists("fortunes.json"):
         data = load_data("fortunes.json")
         if data:
