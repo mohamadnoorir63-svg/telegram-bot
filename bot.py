@@ -1167,8 +1167,8 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # ✅ جوک تصادفی
     if text == "جوک":
-    user = update.effective_user
-    chat = update.effective_chat
+        user = update.effective_user
+        chat = update.effective_chat
 
     # گروه / سوپرگروه → کاربران عادی سکوت می‌کنند
     if chat.type in ["group", "supergroup"]:
