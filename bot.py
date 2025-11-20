@@ -1188,29 +1188,49 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     # ✅ فال تصادفی
     if text == "فال":
+    chat = update.effective_chat
+    user = update.effective_user
+
+    use_ai_fortune = getattr(context, "use_ai_fortune", None)
+
+    # -------------------- محدودیت دسترسی --------------------
+    if chat.type in ["group", "supergroup"]:
+        if not await is_admin_or_sudo(update):
+            # کاربران عادی در گروه فقط می‌توانند از سخنگو فال دریافت کنند
+            if not use_ai_fortune:
+                return await update.message.reply_text(
+                    "❌ فقط مدیران گروه و سودو می‌توانند فال دریافت کنند."
+                )
+
+    # -------------------- انتخاب فال --------------------
+    if use_ai_fortune:
+        key, val = use_ai_fortune
+    else:
+        # پیوی یا مدیر/سودو → فال تصادفی از فایل
         if os.path.exists("fortunes.json"):
             data = load_data("fortunes.json")
-            if data:
-                key, val = random.choice(list(data.items()))
-                t = val.get("type", "text")
-                v = val.get("value", "")
-                try: 
-                    if t == "text":
-                        await update.message.reply_text("🔮 " + v)
-                    elif t == "photo":
-                        await update.message.reply_photo(photo=v, caption="🔮 فال تصویری!")
-                    elif t == "video":
-                        await update.message.reply_video(video=v, caption="🔮 فال ویدیویی!")
-                    elif t == "sticker":
-                        await update.message.reply_sticker(sticker=v)
-                except Exception as e:
-                    await update.message.reply_text(f"⚠️ خطا در ارسال فال: {e}")
-            else:
-                await update.message.reply_text("هنوز فالی ثبت نشده 😔")
+            if not data:
+                return await update.message.reply_text("هنوز فالی ثبت نشده 😔")
+            key, val = random.choice(list(data.items()))
         else:
-            await update.message.reply_text("📂 فایل فال‌ها پیدا نشد 😕")
-        return
+            return await update.message.reply_text("📂 فایل فال‌ها پیدا نشد 😕")
 
+    # -------------------- ارسال فال --------------------
+    t = val.get("type", "text")
+    v = val.get("value", "")
+    try: 
+        if t == "text":
+            await update.message.reply_text("🔮 " + v)
+        elif t == "photo":
+            await update.message.reply_photo(photo=v, caption="🔮 فال تصویری!")
+        elif t == "video":
+            await update.message.reply_video(video=v, caption="🔮 فال ویدیویی!")
+        elif t == "sticker":
+            await update.message.reply_sticker(sticker=v)
+    except Exception as e:
+        await update.message.reply_text(f"⚠️ خطا در ارسال فال: {e}")
+    return
+    
     # ✅ ثبت جوک و فال
     if text.lower() == "ثبت جوک" and update.message.reply_to_message:
         await save_joke(update)
