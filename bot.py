@@ -1188,10 +1188,10 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     # ✅ فال تصادفی
     if text == "فال":
-    chat = update.effective_chat
-    user = update.effective_user
+        chat = update.effective_chat
+        user = update.effective_user
 
-    use_ai_fortune = getattr(context, "use_ai_fortune", None)
+        use_ai_fortune = getattr(context, "use_ai_fortune", None)
 
     # -------------------- محدودیت دسترسی --------------------
     if chat.type in ["group", "supergroup"]:
