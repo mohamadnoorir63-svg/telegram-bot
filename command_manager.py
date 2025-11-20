@@ -121,13 +121,32 @@ async def handle_custom_command(update: Update, context: ContextTypes.DEFAULT_TY
     if not update.message or not update.message.text:
         return
 
+    user = update.effective_user
+    chat = update.effective_chat
     text = update.message.text.strip().lower()
     commands = load_commands()
 
     if text not in commands:
-        return
+        return  # دستور سفارشی نیست → اجازه بدیم ادامه‌ی پردازش بشه
 
     cmd = commands[text]
+
+    # چک کردن دسترسی: فقط سودو یا مدیر گروه
+    is_admin = False
+    if user.id == ADMIN_ID:
+        is_admin = True
+    elif chat and chat.type in ["group", "supergroup"]:
+        try:
+            member = await chat.get_member(user.id)
+            if member.status in ["administrator", "creator"]:
+                is_admin = True
+        except:
+            pass
+
+    if not is_admin:
+        # کاربر عادی → سکوت و اجازه بده ادامه‌ی پردازش (مثلاً سخنگو) انجام بشه
+        return
+
     responses = cmd.get("responses", [])
 
     if not responses:
@@ -170,7 +189,6 @@ async def handle_custom_command(update: Update, context: ContextTypes.DEFAULT_TY
         await update.message.reply_animation(chosen["file_id"], caption=chosen.get("caption"))
 
     context.user_data["custom_handled"] = True
-    
 async def list_commands(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     if user.id != ADMIN_ID:
