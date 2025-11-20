@@ -258,3 +258,36 @@ async def send_random_fortune(update: Update, context: ContextTypes.DEFAULT_TYPE
         return await update.message.reply_text("⚠️ فال نامعتبر یا خالی بود.")
 
     await send_media(update, t, raw, k)
+    async def list_fortunes(update: Update):
+    if not await is_admin_or_sudo(update):
+        return await update.message.reply_text("❌ فقط مدیران گروه و سودو می‌توانند فال‌ها را مشاهده کنند.")
+    
+    data = load_fortunes()
+    if not data:
+        return await update.message.reply_text("هنوز هیچ فالی ثبت نشده 😔")
+
+    await update.message.reply_text(
+        f"📜 تعداد کل فال‌ها: {len(data)}\n\n"
+        "برای حذف هر فال، روی پیام فال ریپلای بزن و بنویس: «حذف فال» 🗑️"
+    )
+
+    shown = 0
+    for k in sorted(data.keys(), key=lambda x: x)[-10:]:
+        v = data[k]
+        t = v.get("type", "text")
+        val = _abs_media_path(v.get("value", ""))
+
+        try:
+            await send_media(update, t, val, k)
+            shown += 1
+        except Exception as e:
+            print(f"[Fortune List Error] id={k} err={e}")
+            continue
+
+    if shown == 0:
+        await update.message.reply_text("⚠️ هیچ فالی برای نمایش پیدا نشد (ممکنه فایل‌ها حذف شده باشن).")
+    else:
+        await update.message.reply_text(
+            f"✅ {shown} فال آخر نمایش داده شد.\n\n"
+            "برای حذف، روی فال دلخواه ریپلای بزن و بنویس: حذف فال 🗑️"
+        )
