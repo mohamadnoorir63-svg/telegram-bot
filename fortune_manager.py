@@ -212,26 +212,24 @@ async def delete_fortune(update: Update):
     else:
         await update.message.reply_text("⚠️ فال موردنظر در فایل پیدا نشد.")
 
-# ========================= ارسال فال تصادفی (مدیر یا سودو) =========================
+# ========================= ارسال فال تصادفی =========================
 async def send_random_fortune(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     chat = update.effective_chat
 
-    # private chat → فقط سودو اجازه دارد
+    # ---------------- دسترسی ----------------
     if chat.type == "private":
-        if user.id != ADMIN_ID:
-            return await update.message.reply_text("❌ فقط سودو می‌تواند فال خصوصی دریافت کند.")
-
-    # group or supergroup → فقط مدیر یا سودو
+        # همه کاربران اجازه دارند
+        pass
     elif chat.type in ["group", "supergroup"]:
         if not await is_admin_or_sudo(update):
-            return await update.message.reply_text("❌ فقط مدیران گروه و سودو می‌توانند فال دریافت کنند.")
-
-    # سایر انواع چت (کانال، غیره) → اجازه نمی‌دهیم
+            return await update.message.reply_text(
+                "❌ فقط مدیران گروه و سودو می‌توانند فال دریافت کنند."
+            )
     else:
         return await update.message.reply_text("❌ دسترسی ندارید.")
 
-    # ===================== ادامه ارسال فال =====================
+    # ---------------- ادامه ارسال فال ----------------
     data = load_fortunes()
     if not data:
         return await update.message.reply_text("📭 هنوز فالی ذخیره نشده 😔")
@@ -262,7 +260,7 @@ async def send_random_fortune(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     await send_media(update, t, raw, k)
 
-# ========================= لیست فال‌ها (مدیر یا سودو) =========================
+# ========================= لیست فال‌ها =========================
 async def list_fortunes(update: Update):
     if not await is_admin_or_sudo(update):
         return await update.message.reply_text("❌ فقط مدیران گروه و سودو می‌توانند فال‌ها را مشاهده کنند.")
