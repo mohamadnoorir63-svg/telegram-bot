@@ -1196,12 +1196,12 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # ✅ فال تصادفی
     from fortune_manager import load_fortunes  # ⬅ حتما این باشد!
 
-if text == "فال":
-    chat = update.effective_chat
-    user = update.effective_user
+    if text == "فال":
+        chat = update.effective_chat
+        user = update.effective_user
 
-    key = None
-    val = None
+        key = None
+        val = None
 
     # -------------------- محدودیت در گروه --------------------
     if chat.type in ["group", "supergroup"]:
