@@ -1198,17 +1198,22 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
         chat = update.effective_chat
         user = update.effective_user
 
-        use_ai_fortune = getattr(context, "use_ai_fortune", None)
+    # --------------- استفاده از فال اختصاصی هوش مصنوعی (سخنگو) ---------------
+    if hasattr(context, "use_ai_fortune") and context.use_ai_fortune:
+        key, val = context.use_ai_fortune
+        t = val.get("type", "text")
+        v = val.get("value", "")
+        await send_media(update, t, v, key)
+        return
 
-    # -------------------- محدودیت دسترسی --------------------
+    # --------------- محدودیت دسترسی در گروه ----------------
     if chat.type in ["group", "supergroup"]:
         if not await is_admin_or_sudo(update):
-            # کاربران عادی در گروه فقط می‌توانند از سخنگو فال دریافت کنند
-            if not use_ai_fortune:
-                return await update.message.reply_text(
-                    "❌ فقط مدیران گروه و سودو می‌توانند فال دریافت کنند."
-                )
+            # کاربران عادی در گروه سکوت می‌کنند
+            return
 
+    # --------------- ادامه ارسال فال تصادفی ----------------
+    await send_random_fortune(update, context)
     # -------------------- انتخاب فال --------------------
     if use_ai_fortune:
         key, val = use_ai_fortune
