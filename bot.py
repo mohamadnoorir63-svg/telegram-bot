@@ -1204,22 +1204,22 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # -------------------- محدودیت در گروه --------------------
     if chat.type in ["group", "supergroup"]:
         if not await is_admin_or_sudo(update):
-            # اگر کاربر عادی است، فقط اگر فال AI داشت بگو
+            # فقط اگر AI فال وجود داشت از همان بده
             ai_fortune = getattr(context, "use_ai_fortune", None)
             if ai_fortune:
                 key, val = ai_fortune
             else:
-                return  # نه AI → سکوت
-    # -------------------- ادامه در پیوی یا برای مدیران --------------------
-    if not key or not val:
-        # یعنی فال از AI نبود → از فایل بده
+                return  # کاربر معمولی → سکوت کامل
+
+    # -------------------- پیوی + ادمین گروه --------------------
+    if key is None or val is None:
         if os.path.exists("fortunes.json"):
             data = load_data("fortunes.json")
             if not data:
-                return  # فال خالی
+                return  # سکوت اگر خالی بود
             key, val = random.choice(list(data.items()))
         else:
-            return  # فایل نیست → سکوت
+            return  # سکوت اگر فایل نبود
 
     # -------------------- ارسال فال --------------------
     t = val.get("type", "text")
@@ -1238,6 +1238,8 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"⚠️ خطا در ارسال فال: {e}")
 
     return
+
+    
     
     # ✅ ثبت جوک و فال
     if text.lower() == "ثبت جوک" and update.message.reply_to_message:
