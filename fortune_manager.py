@@ -219,27 +219,27 @@ async def send_random_fortune(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     # ---------------- دسترسی ----------------
     if chat.type == "private":
-        # همه کاربران اجازه دارند
-        pass
+        key_file = os.path.join(BASE_DIR, f"sent_fortunes_private_{user.id}.json")
     elif chat.type in ["group", "supergroup"]:
         if not await is_admin_or_sudo(update):
             return await update.message.reply_text(
                 "❌ فقط مدیران گروه و سودو می‌توانند فال دریافت کنند."
             )
+        key_file = os.path.join(BASE_DIR, f"sent_fortunes_group_{chat.id}.json")
     else:
         return await update.message.reply_text("❌ دسترسی ندارید.")
 
-    # ---------------- ادامه ارسال فال ----------------
+    # ---------------- بارگذاری فال‌ها ----------------
     data = load_fortunes()
     if not data:
         return await update.message.reply_text("📭 هنوز فالی ذخیره نشده 😔")
 
-    sent_state_file = os.path.join(BASE_DIR, "sent_fortunes.json")
-    sent_keys = _load_json(sent_state_file, [])
+    sent_keys = _load_json(key_file, [])
 
     all_keys = list(data.keys())
     remaining_keys = [k for k in all_keys if k not in sent_keys]
 
+    # اگر همه فال‌ها فرستاده شده باشند، لیست ارسال را ریست کن
     if not remaining_keys:
         sent_keys = []
         remaining_keys = all_keys.copy()
@@ -249,9 +249,10 @@ async def send_random_fortune(update: Update, context: ContextTypes.DEFAULT_TYPE
     k = random.choice(possible_keys)
     sent_keys.append(k)
 
-    with open(sent_state_file, "w", encoding="utf-8") as f:
+    with open(key_file, "w", encoding="utf-8") as f:
         json.dump(sent_keys, f, ensure_ascii=False, indent=2)
 
+    # ---------------- ارسال فال ----------------
     v = data.get(k, {})
     t = v.get("type", "text").strip()
     raw = (v.get("value") or "").strip()
