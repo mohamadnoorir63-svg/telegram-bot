@@ -1158,59 +1158,99 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         await update.message.reply_text(result, parse_mode="Markdown")
         return
+        
+  # ✅ جوک تصادفی
+# گرفتن اطلاعات کاربر
+user_id = update.effective_user.id
+chat_type = update.effective_chat.type
 
-    # ✅ جوک تصادفی
-    if text == "جوک":
-        if os.path.exists("jokes.json"):
-            data = load_data("jokes.json")
-            if data:
-                key, val = random.choice(list(data.items()))
-                t = val.get("type", "text")
-                v = val.get("value", "")
+# آیا گروه است؟
+is_group = chat_type in ["group", "supergroup"]
 
-                try:
-                    if t == "text":
-                        await update.message.reply_text("😂 " + v)
-                    elif t == "photo":
-                        await update.message.reply_photo(photo=v, caption="😂 جوک تصویری!")
-                    elif t == "video":
-                        await update.message.reply_video(video=v, caption="😂 جوک ویدیویی!")
-                    elif t == "sticker":
-                        await update.message.reply_sticker(sticker=v)
-                    else:
-                        await update.message.reply_text("⚠️ نوع فایل پشتیبانی نمی‌شود.")
-                except Exception as e:
-                    await update.message.reply_text(f"⚠️ خطا در ارسال جوک: {e}")
-            else:
-                await update.message.reply_text("هنوز جوکی ثبت نشده 😅")
+# آیا سودو است؟
+is_sudo = user_id in SUDOS
+
+# آیا مدیر یا سازنده گروه است؟
+if is_group:
+    member = await update.effective_chat.get_member(user_id)
+    is_admin = member.status in ["administrator", "creator"]
+else:
+    is_admin = True  # در خصوصی همیشه مجاز هست
+
+
+####################################
+#   محدودیت برای جوک
+####################################
+if text == "جوک":
+
+    # اگر گروه است و کاربر ادمین/سودو نیست → جواب معمولی بده
+    if is_group and not (is_admin or is_sudo):
+        return  # اجازه نده وارد جوک شود، پیام می‌رود برای سخنگو
+        
+
+    # اجرای جوک
+    if os.path.exists("jokes.json"):
+        data = load_data("jokes.json")
+        if data:
+            key, val = random.choice(list(data.items()))
+            t = val.get("type", "text")
+            v = val.get("value", "")
+
+            try:
+                if t == "text":
+                    await update.message.reply_text("😂 " + v)
+                elif t == "photo":
+                    await update.message.reply_photo(photo=v, caption="😂 جوک تصویری!")
+                elif t == "video":
+                    await update.message.reply_video(video=v, caption="😂 جوک ویدیویی!")
+                elif t == "sticker":
+                    await update.message.reply_sticker(sticker=v)
+                else:
+                    await update.message.reply_text("⚠️ نوع فایل پشتیبانی نمی‌شود.")
+            except Exception as e:
+                await update.message.reply_text(f"⚠️ خطا در ارسال جوک: {e}")
         else:
-            await update.message.reply_text("📂 فایل جوک‌ها پیدا نشد 😕")
-        return
-    
-    # ✅ فال تصادفی
-    if text == "فال":
-        if os.path.exists("fortunes.json"):
-            data = load_data("fortunes.json")
-            if data:
-                key, val = random.choice(list(data.items()))
-                t = val.get("type", "text")
-                v = val.get("value", "")
-                try:
-                    if t == "text":
-                        await update.message.reply_text("🔮 " + v)
-                    elif t == "photo":
-                        await update.message.reply_photo(photo=v, caption="🔮 فال تصویری!")
-                    elif t == "video":
-                        await update.message.reply_video(video=v, caption="🔮 فال ویدیویی!")
-                    elif t == "sticker":
-                        await update.message.reply_sticker(sticker=v)
-                except Exception as e:
-                    await update.message.reply_text(f"⚠️ خطا در ارسال فال: {e}")
-            else:
-                await update.message.reply_text("هنوز فالی ثبت نشده 😔")
+            await update.message.reply_text("هنوز جوکی ثبت نشده 😅")
+    else:
+        await update.message.reply_text("📂 فایل جوک‌ها پیدا نشد 😕")
+
+    return
+
+
+
+####################################
+#   محدودیت برای فال
+####################################
+if text == "فال":
+
+    # اگر گروه است و کاربر ادمین/سودو نیست → جواب معمولی بده
+    if is_group and not (is_admin or is_sudo):
+        return  # پیام می‌رود برای سخنگو
+
+    # اجرای فال
+    if os.path.exists("fortunes.json"):
+        data = load_data("fortunes.json")
+        if data:
+            key, val = random.choice(list(data.items()))
+            t = val.get("type", "text")
+            v = val.get("value", "")
+            try:
+                if t == "text":
+                    await update.message.reply_text("🔮 " + v)
+                elif t == "photo":
+                    await update.message.reply_photo(photo=v, caption="🔮 فال تصویری!")
+                elif t == "video":
+                    await update.message.reply_video(video=v, caption="🔮 فال ویدیویی!")
+                elif t == "sticker":
+                    await update.message.reply_sticker(sticker=v)
+            except Exception as e:
+                await update.message.reply_text(f"⚠️ خطا در ارسال فال: {e}")
         else:
-            await update.message.reply_text("📂 فایل فال‌ها پیدا نشد 😕")
-        return
+            await update.message.reply_text("هنوز فالی ثبت نشده 😔")
+    else:
+        await update.message.reply_text("📂 فایل فال‌ها پیدا نشد 😕")
+
+    return
     
     
     
