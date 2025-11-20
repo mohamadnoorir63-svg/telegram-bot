@@ -1728,7 +1728,6 @@ async def show_main_panel(update: Update, context: ContextTypes.DEFAULT_TYPE, ed
         ],
         [
             InlineKeyboardButton("🧠 گفتگوی ChatGPT", callback_data="panel_chatgpt")
-            InlineKeyboardButton("راهنمایی دستورات", callback_data="halp")
         ],
         [
             InlineKeyboardButton("🌤 آب و هوا", callback_data="panel_weather"),
@@ -1824,10 +1823,6 @@ async def panel_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif query.data == "panel_joke":
         await query.message.reply_text("  جوک \n<b> </b>", parse_mode="HTML")
         
-    elif query.data == "help":
-        await query.message.reply_text(" تست  \n<b> </b>", parse_mode="HTML")
-    
-
     elif query.data == "panel_font":
         await query.message.reply_text("🎨 برای ساخت فونت بنویس:\n<b> فونت اسمت </b>", parse_mode="HTML")
 
@@ -1859,7 +1854,7 @@ async def handle_azan_city(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
 # ======================= 🚀 اجرای نهایی =======================
 if __name__ == "__main__":
-    print("🤖 خنگول فارسی 8.7 Cloud+ Supreme Pro Stable+ آماده به خدمت است ...")
+    print("🤖 ربات فارسی 8.7 Cloud+ Supreme Pro Stable+  آماده به خدمت استم محمد ...")
 
     # 🧩 ساخت اپلیکیشن اصلی تلگرام
     application = (
