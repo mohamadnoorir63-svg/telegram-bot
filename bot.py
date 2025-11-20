@@ -1193,13 +1193,12 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("📂 فایل جوک‌ها پیدا نشد 😕")
         return
     
-    # ✅ فال تصادفی
-    
+      # ✅ فال تصادفی
     if text == "فال":
         user = update.effective_user
-       chat = update.effective_chat
+        chat = update.effective_chat
 
-    # گروه / سوپرگروه → کاربر عادی سکوت کند
+    # گروه / سوپرگروه → فقط مدیران و سودو فال بگیرند، بقیه سکوت
     if chat.type in ["group", "supergroup"]:
         try:
             member = await chat.get_member(user.id)
@@ -1208,12 +1207,8 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except:
             return  # اگر خطایی بود هم سکوت
 
-    # پیوی → فقط سودو
-    elif chat.type == "private":
-        if user.id != ADMIN_ID:
-            return await update.message.reply_text("❌ فقط سودو می‌تواند فال خصوصی دریافت کند.")
-    else:
-        return  # سایر چت‌ها → سکوت
+    # پیوی → همه بدون محدودیت می‌توانند فال دریافت کنند
+    # هیچ شرطی لازم نیست
 
     # ادامه کد ارسال فال
     if os.path.exists("fortunes.json"):
