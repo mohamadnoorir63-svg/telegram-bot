@@ -188,7 +188,7 @@ async def handle_custom_command(update: Update, context: ContextTypes.DEFAULT_TY
     elif r_type == "animation":
         await update.message.reply_animation(chosen["file_id"], caption=chosen.get("caption"))
 
-    context.user_data["custom_handled"] = True
+    #context.user_data["custom_handled"] = True
 async def list_commands(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     if user.id != ADMIN_ID:
