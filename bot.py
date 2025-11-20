@@ -1194,28 +1194,30 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     
     # ✅ فال تصادفی
-    if text == "فال":
-        chat = update.effective_chat
-        user = update.effective_user
+    from fortune_manager import load_fortunes  # ⬅ حتما این باشد!
 
-        key = None
-        val = None
+if text == "فال":
+    chat = update.effective_chat
+    user = update.effective_user
+
+    key = None
+    val = None
 
     # -------------------- محدودیت در گروه --------------------
     if chat.type in ["group", "supergroup"]:
         if not await is_admin_or_sudo(update):
-            # فقط اگر AI فال وجود داشت از همان بده
+            # فقط اگر AI وجود داشت، همان را بده
             ai_fortune = getattr(context, "use_ai_fortune", None)
             if ai_fortune:
                 key, val = ai_fortune
             else:
-                return  # کاربر معمولی → سکوت کامل
+                return  # سکوت کامل برای کاربر معمولی گروه
 
-    # -------------------- پیوی + ادمین گروه --------------------
+    # -------------------- پیوی یا مدیران گروه --------------------
     if key is None or val is None:
-        data = load_fortunes()  # ✔ درست شد
+        data = load_fortunes()   # ⬅ این 100٪ باید جواب بدهد
         if not data:
-            return  # سکوت اگر خالی بود
+            return
         key, val = random.choice(list(data.items()))
 
     # -------------------- ارسال فال --------------------
@@ -1232,10 +1234,9 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
         elif t == "sticker":
             await update.message.reply_sticker(sticker=v)
     except Exception as e:
-        await update.message.reply_text(f"⚠️ خطا در ارسال فال: {e}")
+        await update.message.reply_text(f"⚠️ خطا: {e}")
 
     return
-
     
     
     # ✅ ثبت جوک و فال
