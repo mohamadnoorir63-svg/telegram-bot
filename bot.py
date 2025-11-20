@@ -1200,7 +1200,7 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("📂 فایل جوک‌ها پیدا نشد 😕")
     return
     
-      # ✅ فال تصادفی
+    # ✅ فال تصادفی
     if text == "فال":
         user = update.effective_user
         chat = update.effective_chat
@@ -1214,7 +1214,7 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except:
             return  # اگر خطایی بود، سکوت
 
-    # پیوی → همه دریافت می‌کنند
+    # پیوی → همه دریافت می‌کنند، یا ادمین‌ها در گروه
     if os.path.exists("fortunes.json"):
         data = load_data("fortunes.json")
         if data:
@@ -1239,6 +1239,7 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         await update.message.reply_text("📂 فایل فال‌ها پیدا نشد 😕")
     return
+    
     
     # ✅ ثبت جوک و فال
     if text.lower() == "ثبت جوک" and update.message.reply_to_message:
