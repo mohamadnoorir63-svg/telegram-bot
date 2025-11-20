@@ -1204,20 +1204,22 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
         key = None
         val = None
 
-        # ---------- محدودیت در گروه ----------
+        # ---------- گروه ----------
         if chat.type in ["group", "supergroup"]:
-            if not await is_admin_or_sudo(update):
+            is_admin = await is_admin_or_sudo(update)
+
+            if not is_admin:
+                # فقط کاربر معمولی
                 ai_fortune = getattr(context, "use_ai_fortune", None)
                 if ai_fortune:
                     key, val = ai_fortune
                 else:
-                    return
+                    return  # کاربران معمولی بدون AI → سکوت
+            # ادمین و سودو → از فایل می‌گیرند (پایین)
 
-        # ---------- پیوی ----------
+        # ---------- پیوی یا ادمین گروه ----------
         if key is None or val is None:
             data = load_fortunes()
-            print("FORTUNE DATA:", data)  # ← لاگ بسیار مهم
-
             if not data:
                 return await update.message.reply_text("❌ هیچ فالی ذخیره نشده!")
 
@@ -1238,11 +1240,9 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await update.message.reply_sticker(sticker=v)
 
         except Exception as e:
-            print("MEDIA ERROR:", e)
             await update.message.reply_text(f"⚠️ خطا در ارسال فال: {e}")
 
         return
-    
     
     # ✅ ثبت جوک و فال
     if text.lower() == "ثبت جوک" and update.message.reply_to_message:
