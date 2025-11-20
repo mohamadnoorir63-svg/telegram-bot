@@ -1701,40 +1701,43 @@ async def show_main_panel(update: Update, context: ContextTypes.DEFAULT_TYPE, ed
     user_first_name = update.effective_user.first_name
     now = datetime.now().strftime("%Y/%m/%d - %H:%M:%S")
 
-    about = f"🌙 <b>به منوی اصلی ربات خوش آمدی {user_first_name}!</b>\n📅 {now}\nاز دکمه‌های زیر یکی رو انتخاب کن 😎"
+    about = (
+        f"🌙 <b>به منوی اصلی ربات خوش آمدی {user_first_name}!</b>\n"
+        f"📅 {now}\n"
+        f"از دکمه‌های زیر یکی رو انتخاب کن 😎"
+    )
 
-    # ادامه کدت اینجاست...
     keyboard = [
-    [
-        InlineKeyboardButton("💻 ارتباط با سازنده", url="https://t.me/NOORI_NOOR"),
-        InlineKeyboardButton("💭 گروه پشتیبانی", url="https://t.me/+CuXueaUaWQo1Yzhi")
-    ],
-    [
-        InlineKeyboardButton("➕ افزودن به گروه", url="https://t.me/Khngool_bot?startgroup=true"),
-        InlineKeyboardButton("🧩 قابلیت‌های ربات", callback_data="panel_features")
-    ],
-    [
-        InlineKeyboardButton("🤖 راهنما ربات", callback_data="panel_about"),
-        InlineKeyboardButton("👨‍💻 درباره تیم ما", callback_data="panel_team")
-    ],
-    [
-        InlineKeyboardButton("🔮 فال امروز", callback_data="panel_fortune"),
-        InlineKeyboardButton("😂 جوک خنده‌دار", callback_data="panel_joke")
-    ],
-    [
-        InlineKeyboardButton("🎨 فونت‌ساز حرفه‌ای", callback_data="panel_font"),
-        InlineKeyboardButton("💳 آیدی من", callback_data="panel_stats")
-    ],
-    [
-        InlineKeyboardButton("🧠 گفتگوی ChatGPT", callback_data="panel_chatgpt")
-    ],
-    [
-        InlineKeyboardButton("🌤 آب و هوا", callback_data="panel_weather"),
-        InlineKeyboardButton("🕌 اوقات شرعی / اذان", callback_data="panel_azan")
+        [
+            InlineKeyboardButton("💻 ارتباط با سازنده", url="https://t.me/NOORI_NOOR"),
+            InlineKeyboardButton("💭 گروه پشتیبانی", url="https://t.me/+CuXueaUaWQo1Yzhi")
+        ],
+        [
+            InlineKeyboardButton("➕ افزودن به گروه", url="https://t.me/Khngool_bot?startgroup=true"),
+            InlineKeyboardButton("🧩 قابلیت‌های ربات", callback_data="panel_features")
+        ],
+        [
+            InlineKeyboardButton("🤖 راهنما ربات", callback_data="panel_about"),
+            InlineKeyboardButton("👨‍💻 درباره تیم ما", callback_data="panel_team")
+        ],
+        [
+            InlineKeyboardButton("🔮 فال امروز", callback_data="panel_fortune"),
+            InlineKeyboardButton("😂 جوک خنده‌دار", callback_data="panel_joke")
+        ],
+        [
+            InlineKeyboardButton("🎨 فونت‌ساز حرفه‌ای", callback_data="panel_font"),
+            InlineKeyboardButton("💳 آیدی من", callback_data="panel_stats")
+        ],
+        [
+            InlineKeyboardButton("🧠 گفتگوی ChatGPT", callback_data="panel_chatgpt")
+        ],
+        [
+            InlineKeyboardButton("🌤 آب و هوا", callback_data="panel_weather"),
+            InlineKeyboardButton("🕌 اوقات شرعی / اذان", callback_data="panel_azan")
+        ]
     ]
-]
 
-markup = InlineKeyboardMarkup(keyboard)
+    markup = InlineKeyboardMarkup(keyboard)
 
     if edit:
         await update.callback_query.edit_message_text(
@@ -1744,7 +1747,6 @@ markup = InlineKeyboardMarkup(keyboard)
         await update.message.reply_text(
             about, reply_markup=markup, parse_mode="HTML"
         )
-
 
 # ======================= 🎛 بازگشت از منوی فونت یا سایر قابلیت‌ها =======================
 async def feature_back(update: Update, context: ContextTypes.DEFAULT_TYPE):
