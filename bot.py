@@ -1230,7 +1230,7 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_video(video=v, caption="🔮 فال ویدیویی!")
         elif t == "sticker":
             await update.message.reply_sticker(sticker=v)
-        except Exception as e:
+            except Exception as e:
             await update.message.reply_text(f"⚠️ خطا در ارسال فال: {e}")
       return
     
