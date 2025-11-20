@@ -83,7 +83,7 @@ async def save_fortune(update: Update):
     reply = update.message.reply_to_message
     if not reply:
         return await update.message.reply_text("❗ لطفاً روی پیام فال ریپلای کن.")
-
+    
     data = load_fortunes()
     entry = {"type": "text", "value": ""}
 
@@ -94,6 +94,7 @@ async def save_fortune(update: Update):
                 return await update.message.reply_text("⚠️ متن خالی است.")
             entry["type"] = "text"
             entry["value"] = val
+
         elif reply.photo:
             file = await reply.photo[-1].get_file()
             filename = f"photo_{int(datetime.now().timestamp())}.jpg"
@@ -101,6 +102,7 @@ async def save_fortune(update: Update):
             await file.download_to_drive(path)
             entry["type"] = "photo"
             entry["value"] = os.path.relpath(path, BASE_DIR)
+
         elif reply.video:
             file = await reply.video.get_file()
             filename = f"video_{int(datetime.now().timestamp())}.mp4"
@@ -108,6 +110,7 @@ async def save_fortune(update: Update):
             await file.download_to_drive(path)
             entry["type"] = "video"
             entry["value"] = os.path.relpath(path, BASE_DIR)
+
         elif reply.sticker:
             file = await reply.sticker.get_file()
             filename = f"sticker_{int(datetime.now().timestamp())}.webp"
@@ -115,6 +118,7 @@ async def save_fortune(update: Update):
             await file.download_to_drive(path)
             entry["type"] = "sticker"
             entry["value"] = os.path.relpath(path, BASE_DIR)
+
         else:
             return await update.message.reply_text("⚠️ فقط متن، عکس، ویدیو یا استیکر پشتیبانی می‌شود.")
 
@@ -147,7 +151,7 @@ async def delete_fortune(update: Update):
     reply = update.message.reply_to_message
     if not reply:
         return await update.message.reply_text("❗ لطفاً روی پیام فال ریپلای کن تا حذف شود.")
-
+    
     data = load_fortunes()
     if not data:
         return await update.message.reply_text("📂 هیچ فالی برای حذف وجود ندارد.")
@@ -194,7 +198,7 @@ async def send_random_fortune(update: Update, context: ContextTypes.DEFAULT_TYPE
     data = load_fortunes()
     if not data:
         return await update.message.reply_text("📭 هنوز فالی ذخیره نشده 😔")
-
+    
     sent_state_file = os.path.join(BASE_DIR, "sent_fortunes.json")
     sent_keys = _load_json(sent_state_file, [])
 
@@ -229,7 +233,7 @@ async def list_fortunes(update: Update):
     data = load_fortunes()
     if not data:
         return await update.message.reply_text("هنوز هیچ فالی ثبت نشده 😔")
-
+    
     await update.message.reply_text(
         f"📜 تعداد کل فال‌ها: {len(data)}\n\n"
         "برای حذف هر فال، روی پیام فال ریپلای بزن و بنویس: «حذف فال» 🗑️"
@@ -240,7 +244,6 @@ async def list_fortunes(update: Update):
         v = data[k]
         t = v.get("type", "text")
         val = _abs_media_path(v.get("value", ""))
-
         try:
             await send_media(update, t, val, k)
             shown += 1
@@ -249,9 +252,7 @@ async def list_fortunes(update: Update):
             continue
 
     if shown == 0:
-        await update.message.reply_text(
-            "⚠️ هیچ فالی برای نمایش پیدا نشد (ممکنه فایل‌ها حذف شده باشن)."
-        )
+        await update.message.reply_text("⚠️ هیچ فالی برای نمایش پیدا نشد (ممکنه فایل‌ها حذف شده باشن).")
     else:
         await update.message.reply_text(
             f"✅ {shown} فال آخر نمایش داده شد.\n\n"
