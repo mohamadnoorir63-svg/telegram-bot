@@ -143,12 +143,10 @@ async def save_fortune(update: Update):
         else:
             return await update.message.reply_text("⚠️ فقط متن، عکس، ویدیو یا استیکر پشتیبانی می‌شود.")
 
-        # جلوگیری از تکراری بودن شدید
         for v in data.values():
             if v.get("type") == entry["type"] and v.get("value") == entry["value"]:
                 return await update.message.reply_text("😅 این فال قبلاً ذخیره شده بود!")
 
-        # حذف قدیمی‌ترین فال اگر بیشتر از MAX_FORTUNES
         if len(data) >= MAX_FORTUNES:
             sorted_keys = sorted(data.keys(), key=lambda x: x)
             oldest_key = sorted_keys[0]
@@ -157,7 +155,6 @@ async def save_fortune(update: Update):
                 os.remove(old_val)
             data.pop(oldest_key)
 
-        # کلید یکتا
         new_key = str(uuid.uuid4())
         data[new_key] = entry
         save_fortunes(data)
@@ -215,16 +212,14 @@ async def delete_fortune(update: Update):
     else:
         await update.message.reply_text("⚠️ فال موردنظر در فایل پیدا نشد.")
 
-# ========================= ارسال فال تصادفی و لیست فال‌ها (مدیران گروه یا سودو) =========================
+# ========================= ارسال فال تصادفی (مدیر یا سودو) =========================
 async def send_random_fortune(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     chat = update.effective_chat
 
-    # کاربر عادی در private → اجازه ندارد
     if chat.type == "private" and user.id != ADMIN_ID:
         return await update.message.reply_text("❌ فقط سودو می‌تواند فال خصوصی دریافت کند.")
 
-    # گروه → فقط مدیر یا سودو
     if chat.type in ["group", "supergroup"]:
         if not await is_admin_or_sudo(update):
             return await update.message.reply_text("❌ فقط مدیران گروه و سودو می‌توانند فال دریافت کنند.")
@@ -258,10 +253,12 @@ async def send_random_fortune(update: Update, context: ContextTypes.DEFAULT_TYPE
         return await update.message.reply_text("⚠️ فال نامعتبر یا خالی بود.")
 
     await send_media(update, t, raw, k)
-    async def list_fortunes(update: Update):
+
+# ========================= لیست فال‌ها (مدیر یا سودو) =========================
+async def list_fortunes(update: Update):
     if not await is_admin_or_sudo(update):
         return await update.message.reply_text("❌ فقط مدیران گروه و سودو می‌توانند فال‌ها را مشاهده کنند.")
-    
+
     data = load_fortunes()
     if not data:
         return await update.message.reply_text("هنوز هیچ فالی ثبت نشده 😔")
