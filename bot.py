@@ -1818,10 +1818,10 @@ async def panel_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await get_ramadan_status(update, context)
 
     elif query.data == "panel_fortune":
-        await query.message.reply_text(" 🔮لطفاً کلمه فال رو بفرستید تا فال ارسال شود\n<b>فال</b>", parse_mode="HTML")
+        await query.message.reply_text(" 🔮 لطفاً کلمه فال رو بفرستید تا فال ارسال شود:\n<b>فال</b>", parse_mode="HTML")
 
     elif query.data == "panel_joke":
-        await query.message.reply_text(" 🎭لطفاً کلمه جوک رو بفرستید تا فال ارسال شود\n<b>جوک</b>", parse_mode="HTML")
+        await query.message.reply_text(" 🎭 لطفاً کلمه جوک رو بفرستید تا فال ارسال شود:\n<b>جوک</b>", parse_mode="HTML")
         
     elif query.data == "panel_font":
         await query.message.reply_text("🎨 برای ساخت فونت بنویس:\n<b> فونت اسمت </b>", parse_mode="HTML")
