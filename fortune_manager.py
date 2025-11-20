@@ -217,17 +217,36 @@ async def send_random_fortune(update: Update, context: ContextTypes.DEFAULT_TYPE
     user = update.effective_user
     chat = update.effective_chat
 
-    # ---------------- دسترسی ----------------
-    if chat.type == "private":
-        key_file = os.path.join(BASE_DIR, f"sent_fortunes_private_{user.id}.json")
-    elif chat.type in ["group", "supergroup"]:
+    # ---------------- حالت گروه ----------------
+    if chat.type in ["group", "supergroup"]:
+        # اگر ادمین یا سودو نبود:
         if not await is_admin_or_sudo(update):
-            return await update.message.reply_text(
-                "❌ فقط مدیران گروه و سودو می‌توانند فال دریافت کنند."
-            )
+
+            # اگر فال AI وجود داشت → بفرست
+            ai_fortune = getattr(context, "use_ai_fortune", None)
+            if ai_fortune:
+                key, val = ai_fortune
+
+                t = val.get("type", "text")
+                v = val.get("value", "")
+                if not v:
+                    return
+
+                await send_media(update, t, v, key)
+                return
+
+            # در غیر این‌صورت → سکوت کامل
+            return
+
+        # اگر ادمین بود → فایل مخصوص گروه
         key_file = os.path.join(BASE_DIR, f"sent_fortunes_group_{chat.id}.json")
+
+    # ---------------- حالت پیوی ----------------
+    elif chat.type == "private":
+        key_file = os.path.join(BASE_DIR, f"sent_fortunes_private_{user.id}.json")
+
     else:
-        return await update.message.reply_text("❌ دسترسی ندارید.")
+        return  # سکوت برای سایر حالت‌ها
 
     # ---------------- بارگذاری فال‌ها ----------------
     data = load_fortunes()
@@ -235,11 +254,10 @@ async def send_random_fortune(update: Update, context: ContextTypes.DEFAULT_TYPE
         return await update.message.reply_text("📭 هنوز فالی ذخیره نشده 😔")
 
     sent_keys = _load_json(key_file, [])
-
     all_keys = list(data.keys())
     remaining_keys = [k for k in all_keys if k not in sent_keys]
 
-    # اگر همه فال‌ها فرستاده شده باشند، لیست ارسال را ریست کن
+    # اگر همه فال‌ها ارسال شده بودند → ریست
     if not remaining_keys:
         sent_keys = []
         remaining_keys = all_keys.copy()
@@ -249,6 +267,7 @@ async def send_random_fortune(update: Update, context: ContextTypes.DEFAULT_TYPE
     k = random.choice(possible_keys)
     sent_keys.append(k)
 
+    # ذخیره لیست ارسال‌شده‌ها
     with open(key_file, "w", encoding="utf-8") as f:
         json.dump(sent_keys, f, ensure_ascii=False, indent=2)
 
@@ -256,11 +275,11 @@ async def send_random_fortune(update: Update, context: ContextTypes.DEFAULT_TYPE
     v = data.get(k, {})
     t = v.get("type", "text").strip()
     raw = (v.get("value") or "").strip()
+
     if not raw:
         return await update.message.reply_text("⚠️ فال نامعتبر یا خالی بود.")
 
     await send_media(update, t, raw, k)
-
 # ========================= لیست فال‌ها =========================
 async def list_fortunes(update: Update):
     if not await is_admin_or_sudo(update):
