@@ -1198,8 +1198,8 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
         chat = update.effective_chat
         user = update.effective_user
 
-    key = None
-    val = None
+        key = None
+        val = None
 
     # -------------------- محدودیت در گروه --------------------
     if chat.type in ["group", "supergroup"]:
@@ -1213,13 +1213,10 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # -------------------- پیوی + ادمین گروه --------------------
     if key is None or val is None:
-        if os.path.exists("fortunes.json"):
-            data = load_data("fortunes.json")
-            if not data:
-                return  # سکوت اگر خالی بود
-            key, val = random.choice(list(data.items()))
-        else:
-            return  # سکوت اگر فایل نبود
+        data = load_fortunes()  # ✔ درست شد
+        if not data:
+            return  # سکوت اگر خالی بود
+        key, val = random.choice(list(data.items()))
 
     # -------------------- ارسال فال --------------------
     t = val.get("type", "text")
