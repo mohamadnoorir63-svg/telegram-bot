@@ -1160,11 +1160,11 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
         
   # ✅ جوک تصادفی
-
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
-    user_id = update.effective_user.id
-    chat_type = update.effective_chat.type
+
+    # اینجا مجاز به استفاده از await هستی
+    member = await update.effective_chat.get_member(user_id)
 
 # آیا گروه است؟
 is_group = chat_type in ["group", "supergroup"]
