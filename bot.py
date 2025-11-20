@@ -1194,49 +1194,54 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     
     # ✅ فال تصادفی
-    from fortune_manager import load_fortunes  # ⬅ حتما این باشد!
+    async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        text = (update.message.text or "").strip()
 
-    if text == "فال":
+    if text in ["فال", "/فال", "/fal"]:
         chat = update.effective_chat
         user = update.effective_user
 
         key = None
         val = None
 
-    # -------------------- محدودیت در گروه --------------------
-    if chat.type in ["group", "supergroup"]:
-        if not await is_admin_or_sudo(update):
-            # فقط اگر AI وجود داشت، همان را بده
-            ai_fortune = getattr(context, "use_ai_fortune", None)
-            if ai_fortune:
-                key, val = ai_fortune
-            else:
-                return  # سکوت کامل برای کاربر معمولی گروه
+        # ---------- محدودیت در گروه ----------
+        if chat.type in ["group", "supergroup"]:
+            if not await is_admin_or_sudo(update):
+                ai_fortune = getattr(context, "use_ai_fortune", None)
+                if ai_fortune:
+                    key, val = ai_fortune
+                else:
+                    return
 
-    # -------------------- پیوی یا مدیران گروه --------------------
-    if key is None or val is None:
-        data = load_fortunes()   # ⬅ این 100٪ باید جواب بدهد
-        if not data:
-            return
-        key, val = random.choice(list(data.items()))
+        # ---------- پیوی ----------
+        if key is None or val is None:
+            data = load_fortunes()
+            print("FORTUNE DATA:", data)  # ← لاگ بسیار مهم
 
-    # -------------------- ارسال فال --------------------
-    t = val.get("type", "text")
-    v = val.get("value", "")
+            if not data:
+                return await update.message.reply_text("❌ هیچ فالی ذخیره نشده!")
 
-    try:
-        if t == "text":
-            await update.message.reply_text("🔮 " + v)
-        elif t == "photo":
-            await update.message.reply_photo(photo=v, caption="🔮 فال تصویری!")
-        elif t == "video":
-            await update.message.reply_video(video=v, caption="🔮 فال ویدیویی!")
-        elif t == "sticker":
-            await update.message.reply_sticker(sticker=v)
-    except Exception as e:
-        await update.message.reply_text(f"⚠️ خطا: {e}")
+            key, val = random.choice(list(data.items()))
 
-    return
+        # ---------- ارسال ----------
+        t = val.get("type", "text")
+        v = val.get("value", "")
+
+        try:
+            if t == "text":
+                await update.message.reply_text("🔮 " + v)
+            elif t == "photo":
+                await update.message.reply_photo(photo=v, caption="🔮 فال تصویری!")
+            elif t == "video":
+                await update.message.reply_video(video=v, caption="🔮 فال ویدیویی!")
+            elif t == "sticker":
+                await update.message.reply_sticker(sticker=v)
+
+        except Exception as e:
+            print("MEDIA ERROR:", e)
+            await update.message.reply_text(f"⚠️ خطا در ارسال فال: {e}")
+
+        return
     
     
     # ✅ ثبت جوک و فال
