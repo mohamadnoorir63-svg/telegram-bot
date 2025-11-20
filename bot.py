@@ -1721,7 +1721,6 @@ async def show_main_panel(update: Update, context: ContextTypes.DEFAULT_TYPE, ed
             InlineKeyboardButton("🔮 فال امروز", callback_data="panel_fortune"),
             InlineKeyboardButton("😂 جوک خنده‌دار", callback_data="panel_joke")
             
-            InlineKeyboardButton("راهنمایی دستورات", callback_data="halp")
         ]
         [
             InlineKeyboardButton("🎨 فونت‌ساز حرفه‌ای", callback_data="panel_font"),
@@ -1729,6 +1728,7 @@ async def show_main_panel(update: Update, context: ContextTypes.DEFAULT_TYPE, ed
         ],
         [
             InlineKeyboardButton("🧠 گفتگوی ChatGPT", callback_data="panel_chatgpt")
+            InlineKeyboardButton("راهنمایی دستورات", callback_data="halp")
         ],
         [
             InlineKeyboardButton("🌤 آب و هوا", callback_data="panel_weather"),
