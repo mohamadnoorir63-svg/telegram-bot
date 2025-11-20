@@ -217,13 +217,21 @@ async def send_random_fortune(update: Update, context: ContextTypes.DEFAULT_TYPE
     user = update.effective_user
     chat = update.effective_chat
 
-    if chat.type == "private" and user.id != ADMIN_ID:
-        return await update.message.reply_text("❌ فقط سودو می‌تواند فال خصوصی دریافت کند.")
+    # private chat → فقط سودو اجازه دارد
+    if chat.type == "private":
+        if user.id != ADMIN_ID:
+            return await update.message.reply_text("❌ فقط سودو می‌تواند فال خصوصی دریافت کند.")
 
-    if chat.type in ["group", "supergroup"]:
+    # group or supergroup → فقط مدیر یا سودو
+    elif chat.type in ["group", "supergroup"]:
         if not await is_admin_or_sudo(update):
             return await update.message.reply_text("❌ فقط مدیران گروه و سودو می‌توانند فال دریافت کنند.")
 
+    # سایر انواع چت (کانال، غیره) → اجازه نمی‌دهیم
+    else:
+        return await update.message.reply_text("❌ دسترسی ندارید.")
+
+    # ===================== ادامه ارسال فال =====================
     data = load_fortunes()
     if not data:
         return await update.message.reply_text("📭 هنوز فالی ذخیره نشده 😔")
