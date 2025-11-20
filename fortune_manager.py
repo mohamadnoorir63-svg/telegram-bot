@@ -189,6 +189,26 @@ async def delete_fortune(update: Update):
 
 # ========================= ارسال فال تصادفی بدون تکرار پشت سر هم =========================
 async def send_random_fortune(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    chat = update.effective_chat
+
+    # بررسی دسترسی
+    is_admin = False
+    if user.id == ADMIN_ID:
+        is_admin = True
+    elif chat and chat.type in ["group", "supergroup"]:
+        try:
+            member = await chat.get_member(user.id)
+            if member.status in ["administrator", "creator"]:
+                is_admin = True
+        except:
+            pass
+
+    if not is_admin:
+        # کاربر عادی → سکوت و اجازه به ادامه پردازش (مثلاً سخنگو)
+        return
+
+    # ادامه همان کد اصلی
     data = load_fortunes()
     if not data:
         return await update.message.reply_text("📭 هنوز فالی ذخیره نشده 😔")
@@ -223,32 +243,25 @@ async def send_random_fortune(update: Update, context: ContextTypes.DEFAULT_TYPE
 
 # ========================= لیست فال‌ها =========================
 async def list_fortunes(update: Update):
+    user = update.effective_user
+    chat = update.effective_chat
+
+    is_admin = False
+    if user.id == ADMIN_ID:
+        is_admin = True
+    elif chat and chat.type in ["group", "supergroup"]:
+        try:
+            member = await chat.get_member(user.id)
+            if member.status in ["administrator", "creator"]:
+                is_admin = True
+        except:
+            pass
+
+    if not is_admin:
+        return  # کاربر عادی → چیزی نشان نده
+
+    # ادامه کد اصلی
     data = load_fortunes()
     if not data:
         return await update.message.reply_text("هنوز هیچ فالی ثبت نشده 😔")
-
-    await update.message.reply_text(
-        f"📜 تعداد کل فال‌ها: {len(data)}\n\n"
-        "برای حذف هر فال، روی پیام فال ریپلای بزن و بنویس: «حذف فال» 🗑️"
-    )
-
-    shown = 0
-    for k in sorted(data.keys(), key=lambda x: x)[-10:]:
-        v = data[k]
-        t = v.get("type", "text")
-        val = _abs_media_path(v.get("value", ""))
-
-        try:
-            await send_media(update, t, val, k)
-            shown += 1
-        except Exception as e:
-            print(f"[Fortune List Error] id={k} err={e}")
-            continue
-
-    if shown == 0:
-        await update.message.reply_text("⚠️ هیچ فالی برای نمایش پیدا نشد (ممکنه فایل‌ها حذف شده باشن).")
-    else:
-        await update.message.reply_text(
-            f"✅ {shown} فال آخر نمایش داده شد.\n\n"
-            "برای حذف، روی فال دلخواه ریپلای بزن و بنویس: حذف فال 🗑️"
-        )
+    ...
