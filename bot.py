@@ -1720,7 +1720,9 @@ async def show_main_panel(update: Update, context: ContextTypes.DEFAULT_TYPE, ed
         [
             InlineKeyboardButton("🔮 فال امروز", callback_data="panel_fortune"),
             InlineKeyboardButton("😂 جوک خنده‌دار", callback_data="panel_joke")
-        ],
+            
+            InlineKeyboardButton("راهنمایی دستورات", callback_data="halp")
+        ]
         [
             InlineKeyboardButton("🎨 فونت‌ساز حرفه‌ای", callback_data="panel_font"),
             InlineKeyboardButton("💳 آیدی من", callback_data="panel_stats")
@@ -1817,10 +1819,14 @@ async def panel_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await get_ramadan_status(update, context)
 
     elif query.data == "panel_fortune":
-        await query.message.reply_text("   \n<b>فال</b>", parse_mode="HTML")
+        await query.message.reply_text(" فال  \n<b> </b>", parse_mode="HTML")
 
     elif query.data == "panel_joke":
-        await query.message.reply_text("   \n<b>جوک</b>", parse_mode="HTML")
+        await query.message.reply_text("  جوک \n<b> </b>", parse_mode="HTML")
+        
+    elif query.data == "help":
+        await query.message.reply_text(" تست  \n<b> </b>", parse_mode="HTML")
+    
 
     elif query.data == "panel_font":
         await query.message.reply_text("🎨 برای ساخت فونت بنویس:\n<b> فونت اسمت </b>", parse_mode="HTML")
