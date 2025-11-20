@@ -847,8 +847,6 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # 🧠 گرفتن کل تاریخچه اخیر کاربر
     recent_context = context_memory.get_context(uid)
 
-    # 🧩 ترکیب سه پیام آخر برای درک بهتر ادامه گفتگو
-    full_context = " ".join(recent_context[-3:]) if recent_context else text
 
     # 🚫 جلوگیری از پاسخ در پیوی (فقط جوک و فال مجازند)
     if update.effective_chat.type == "private" and lower_text not in ["جوک", "فال"]:
