@@ -1198,27 +1198,30 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
         chat = update.effective_chat
         user = update.effective_user
 
+    key = None
+    val = None
+
     # -------------------- محدودیت در گروه --------------------
     if chat.type in ["group", "supergroup"]:
         if not await is_admin_or_sudo(update):
-            # فقط سکوت کن اگر فال AI موجود نیست
+            # اگر کاربر عادی است، فقط اگر فال AI داشت بگو
             ai_fortune = getattr(context, "use_ai_fortune", None)
             if ai_fortune:
                 key, val = ai_fortune
             else:
-                return  # فال از فایل گروهی و فال عادی → سکوت
-
-    # -------------------- ادامه ارسال فال --------------------
-    if 'key' not in locals() or 'val' not in locals():
-        # اگر AI فال نبود، از فایل استفاده کن
+                return  # نه AI → سکوت
+    # -------------------- ادامه در پیوی یا برای مدیران --------------------
+    if not key or not val:
+        # یعنی فال از AI نبود → از فایل بده
         if os.path.exists("fortunes.json"):
             data = load_data("fortunes.json")
             if not data:
-                return  # فال خالی → سکوت
+                return  # فال خالی
             key, val = random.choice(list(data.items()))
         else:
-            return  # فایل پیدا نشد → سکوت
+            return  # فایل نیست → سکوت
 
+    # -------------------- ارسال فال --------------------
     t = val.get("type", "text")
     v = val.get("value", "")
 
