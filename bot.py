@@ -2114,27 +2114,45 @@ application.add_handler(
 )
 
 # ==========================================================
+from datetime import time, timezone, timedelta
+import asyncio
+
+# ================= وارد کردن یوزربات جانبی =================
+
+from userbot_module.userbot import start_userbot  # مسیر ماژول یوزرباتت
+
+
 async def on_startup(app):
-    # await notify_admin_on_startup(app)  # اگر این تابع موجود نیست، می‌تونی کامنتش کنی
+    """✅ وظایف استارتاپ ربات"""
+    await notify_admin_on_startup(app)
     app.create_task(auto_backup(app.bot))
     app.create_task(start_auto_brain_loop(app.bot))
     print("🌙 [SYSTEM] Startup tasks scheduled ✅")
 
-# این خط باید خارج از تابع و هم‌سطح با تعریف تابع باشه
+
 application.post_init = on_startup
 
-# ==========================================================
-# 🚀 اجرای نهایی ربات
-# ==========================================================
 try:
-    print("🔄 در حال اجرای ربات...")
+    print("🔄 در حال اجرای ربات اصلی...")
 
-    # 🌙 آمار خودکار شبانه (هر شب ساعت 00:00 به وقت تهران)
-    from datetime import time, timezone, timedelta
+    # 🌙 زمان‌بندی آمار شبانه (ساعت ۰۰:۰۰ به وقت تهران)
     tz_tehran = timezone(timedelta(hours=3, minutes=30))
     job_queue = application.job_queue
     job_queue.run_daily(send_nightly_stats, time=time(0, 0, tzinfo=tz_tehran))
 
+    # 🧩 تست سلامت (اختیاری، فقط برای لاگ زنده)
+    async def test_main_bot():
+        while True:
+            print("🤖 [BOT] ربات فعاله و در حال اجراست...")
+            await asyncio.sleep(10)
+
+    loop = asyncio.get_event_loop()
+    loop.create_task(test_main_bot())
+
+    # =================== ✅ اضافه کردن یوزربات ===================
+    loop.create_task(start_userbot())  # یوزربات جانبی همزمان اجرا می‌شود
+
+    # ✅ اجرای polling ربات اصلی
     application.run_polling(
         allowed_updates=[
             "message",
@@ -2144,6 +2162,9 @@ try:
             "my_chat_member",
         ]
     )
+
+    # جلوگیری از بسته شدن برنامه
+    loop.run_forever()
 
 except Exception as e:
     print(f"⚠️ خطا در اجرای ربات:\n{e}")
