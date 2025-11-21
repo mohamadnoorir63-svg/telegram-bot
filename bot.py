@@ -2284,100 +2284,89 @@ async def _safe_task_wrapper(coro_func, *args, name: str = None, **kwargs):
             logger.info(f"[{task_name}] restarting after backoff {backoff}s.")
 
 # ---------- Start main bot (قابل ری‌استارت داخلی) ----------
-                # تلاش برای ری‌استارت supervisor_task
-                if supervisor_task and not supervisor_task.done():
-                    logger.info("Cancelling supervisor_task for restart.")
-                    supervisor_task.cancel()
-                    # اجازه بده تا cancel پردازش شود
-                    await asyncio.sleep(1)
-                # سپس supervisor را دوباره می‌سازیم (در caller)
-                return
-            # 2) بررسی که supervisor_task زنده باشد
-            if supervisor_task and supervisor_task.done():
-                logger.warning("Watchdog: supervisor_task done unexpectedly. Restarting.")
-                await send_admin_message("⚠️ Watchdog: main supervisor finished unexpectedly. Restarting.")
-                return
-        except asyncio.CancelledError:
-            logger.info("watchdog cancelled")
-            raise
-        except Exception:
-            logger.exception("watchdog encountered exception — continuing loop")
+         # ============================
+# ⚙️ Startup Tasks
+# ============================
+async def on_startup(app):
+    try:
+        # اگر تابع notify_admin_on_startup وجود ندارد حذف/کامنت کن
+        # await notify_admin_on_startup(app)
+        app.create_task(auto_backup(app.bot))
+        app.create_task(start_auto_brain_loop(app.bot))
+        print("🌙 [SYSTEM] Startup tasks scheduled ✅")
+    except Exception as e:
+        print(f"⚠️ Startup error: {e}")
 
-# ---------- Orchestrator: اجرا و بازیابی خودکار ----------
-# =========================
-#     FIXED VERSION
-#     (Application runs once, polling is restartable)
-# =========================
+application.post_init = on_startup
 
-_application_started = False
 
-async def start_application_once():
-    global _application_started
-    if _application_started:
-        return
+# ============================
+# 🚀 اجرای اصلی ربات + UserBot
+# ============================
+async def run_main():
+    print("🔄 بوت‌ شدن ربات...")
 
-    if not application:
-        raise RuntimeError("application تعریف نشده است.")
+    # زمان تهران
+    tz_tehran = timezone(timedelta(hours=3, minutes=30))
 
+    # آمار شبانه
+    try:
+        application.job_queue.run_daily(
+            send_nightly_stats,
+            time=time(0, 0, tzinfo=tz_tehran),
+        )
+    except Exception as e:
+        print(f"⚠️ JobQueue error: {e}")
+
+    # تست سلامت
+    async def heartbeat():
+        while True:
+            print("🤖 [BOT] ربات فعاله و در حال اجراست...")
+            await asyncio.sleep(10)
+
+    asyncio.create_task(heartbeat())
+    asyncio.create_task(start_userbot())   # اجرای یوزربات
+
+    # مرحله آماده‌سازی ربات (فقط یک بار!)
     await application.initialize()
     await application.start()
 
-    logger.info("✅ Application initialized + started (only once).")
-    _application_started = True
+    # ارسال گزارش AutoBrain
+    try:
+        await send_autobrain_report(application.bot)
+        print("📤 گزارش AutoBrain ارسال شد.")
+    except Exception as e:
+        print(f"⚠️ AutoBrain report error: {e}")
+
+    # شروع polling (غیر بلاک کننده)
+    await application.updater.start_polling()
+    print("✅ Main bot polling started.")
 
 
-async def start_polling_safely():
-    """پولینگ را با قابلیت ری‌استارت اجرا می‌کند."""
+# ============================
+# ♻️ Supervisor (ری‌استارت در Crash)
+# ============================
+async def supervisor():
     while True:
         try:
-            logger.info("▶️ شروع Polling...")
-            await application.updater.start_polling()
-            logger.warning("⚠️ polling به پایان رسید! در حال ری‌استارت...")
+            print("🟢 Supervisor: Starting main bot...")
+            await run_main()
         except Exception as e:
-            logger.exception(f"polling error: {e}")
-        await asyncio.sleep(3)   # backoff کوچک
+            print(f"🔥 Main runner crashed: {e}")
+            print("⏳ در حال تلاش برای ری‌استارت ...")
+            await asyncio.sleep(5)
 
 
-async def main_runner_fixed():
-    """Application فقط یک بار اجرا می‌شود — polling بارها."""
-    await start_application_once()  # فقط یک بار اجرا!
-
-    # اجرای polling با قابلیت ری‌استارت
-    polling_task = asyncio.create_task(start_polling_safely())
-
-    # اجرای userbot یا وظایف دیگر
+# ============================
+# ▶️ اجرای اصلی
+# ============================
+if __name__ == "__main__":
     try:
-        asyncio.create_task(_safe_task_wrapper(start_userbot, name="userbot"))
-    except:
-        logger.warning("Userbot start failed")
-
-    # اجرای همیشگی
-    await polling_task
-
-
-async def watchdog_fixed(main_task):
-    """اگر polling گیر کرد → Restart فقط polling (نه Application!)"""
-    while True:
-        await asyncio.sleep(10)
-        now = time.time()
-        if now - _last_log_time > 30:
-            logger.warning("❗ Freeze detected — restarting polling ONLY")
-            await send_admin_message("⚠️ Watchdog: Freeze detected → Restarting polling")
-            try:
-                if application:
-                    await application.updater.stop()
-            except:
-                pass
-            return  # باعث ری‌استارت main_runner_fixed می‌شود
-
-
-async def orchestrator_fixed():
-    """ری‌استارت نرم فقط روی polling انجام می‌شود."""
-    while True:
-        main_task = asyncio.create_task(main_runner_fixed())
-        w = asyncio.create_task(watchdog_fixed(main_task))
-
-        await w  # watchdog برگشت = ری‌استارت polling
-        main_task.cancel()
-        await asyncio.sleep(2)
-        logger.info("🔁 Restarting polling loop...")
+        nest_asyncio.apply()
+        loop = asyncio.get_event_loop()
+        loop.create_task(supervisor())
+        loop.run_forever()
+    except Exception as e:
+        print(f"⚠️ Fatal error: {e}")
+        print("♻️ ربات به‌صورت خودکار توسط هاست ری‌استارت خواهد شد.")
+          
