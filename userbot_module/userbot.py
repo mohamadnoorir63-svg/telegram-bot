@@ -9,7 +9,7 @@ import json
 
 # ---------- یوزربات ----------
 API_ID = int(os.environ.get("API_ID"))
-API_HASH = os.environ.get("API_HASH")
+API_HASH = os.environ.get("API_HASH"))
 SESSION_STRING = os.environ.get("SESSION_STRING")
 BOT_USER_ID = int(os.environ.get("BOT_USER_ID"))
 
@@ -62,7 +62,6 @@ async def tag_users(chat_id, user_ids=None, random_count=None):
 # ================= پاکسازی یوزربات =================
 async def cleanup_via_userbot(chat_id, count=None, last_msg_id=None, mids=None):
     try:
-        # حالت ۳: لیست message_id ها
         if mids:
             for mid in mids:
                 try:
@@ -72,7 +71,6 @@ async def cleanup_via_userbot(chat_id, count=None, last_msg_id=None, mids=None):
                 await asyncio.sleep(0.08)
             return
 
-        # حالت ۱: پاکسازی عددی
         if count:
             for mid in range(last_msg_id, max(1, last_msg_id - count), -1):
                 try:
@@ -82,7 +80,6 @@ async def cleanup_via_userbot(chat_id, count=None, last_msg_id=None, mids=None):
                 await asyncio.sleep(0.08)
             return
 
-        # حالت ۲: پاکسازی کامل
         for mid in range(last_msg_id, 1, -1):
             try:
                 await client.delete_messages(chat_id, mid)
@@ -98,121 +95,96 @@ async def punish_via_userbot(chat_id, user_id, action="ban", seconds=None):
     try:
         if action == "ban":
             await client.edit_permissions(chat_id, user_id, view_messages=False)
+
         elif action == "unban":
             await client.edit_permissions(chat_id, user_id, view_messages=True)
+
         elif action == "mute":
-            until = None
-            if seconds:
-                until = datetime.utcnow() + timedelta(seconds=seconds)
+            until = datetime.utcnow() + timedelta(seconds=seconds) if seconds else None
             await client.edit_permissions(chat_id, user_id, send_messages=False, until_date=until)
+
         elif action == "unmute":
             await client.edit_permissions(chat_id, user_id, send_messages=True)
+
     except:
         pass
 
-# ================= دریافت فرمان از ربات اصلی =================
+# ================= هندلر واحد برای تمام پیام‌ها =================
 @client.on(events.NewMessage)
-async def handle_commands(event):
+async def all_handlers(event):
+    text = event.raw_text.lower()
     sender = await event.get_sender()
-    if sender.id != BOT_USER_ID:
-        return
 
-    text = event.raw_text
-    parts = text.split("|")
-    if len(parts) < 2:
-        return
+    # -------------------------------------------------------
+    # فرمان‌های ربات اصلی (handle_commands قبلی)
+    # -------------------------------------------------------
+    if sender.id == BOT_USER_ID:
+        parts = event.raw_text.split("|")
+        if len(parts) >= 2:
+            action = parts[0].strip().lower()
+            chat_id = int(parts[1])
 
-    action = parts[0].strip().lower()
-    chat_id = int(parts[1])
+            if action == "tagall":
+                return await tag_users(chat_id)
 
-    # ---------- تگ ----------
-    if action == "tagall":
-        await tag_users(chat_id)
+            elif action.startswith("tagrandom"):
+                count = int(parts[2]) if len(parts) >= 3 and parts[2].isdigit() else 5
+                return await tag_users(chat_id, random_count=count)
 
-    elif action.startswith("tagrandom"):
-        count = 5
-        if len(parts) >= 3 and parts[2].isdigit():
-            count = int(parts[2])
-        await tag_users(chat_id, random_count=count)
+            elif action.startswith("taglist"):
+                ids = [int(x) for x in parts[2].split(",")] if len(parts) >= 3 else None
+                return await tag_users(chat_id, user_ids=ids)
 
-    elif action.startswith("taglist"):
-        if len(parts) >= 3:
-            ids = [int(x) for x in parts[2].split(",") if x.isdigit()]
-        else:
-            ids = None
-        await tag_users(chat_id, user_ids=ids)
+            elif action == "ban":
+                target = parts[2].strip()
+                user_id = int(target) if target.isdigit() else None
+                if target.startswith("@"):
+                    try:
+                        user_id = (await client.get_entity(target)).id
+                    except:
+                        pass
+                if user_id:
+                    return await punish_via_userbot(chat_id, user_id, action="ban")
 
-    # ---------- بن / آنبن ----------
-    elif action == "ban":
-        target = parts[2].strip()
-        user_id = None
+            elif action == "unban":
+                target = parts[2].strip()
+                user_id = int(target) if target.isdigit() else None
+                if target.startswith("@"):
+                    try:
+                        user_id = (await client.get_entity(target)).id
+                    except:
+                        pass
+                if user_id:
+                    return await punish_via_userbot(chat_id, user_id, action="unban")
 
-        if target.isdigit():
-            user_id = int(target)
-        elif target.startswith("@"):
-            try:
-                user_obj = await client.get_entity(target)
-                user_id = user_obj.id
-            except:
-                pass
+            elif action == "cleanup":
+                last_msg_id = int(parts[2])
 
-        if user_id:
-            await punish_via_userbot(chat_id, user_id, action="ban")
+                if len(parts) >= 4 and parts[3].isdigit():
+                    return await cleanup_via_userbot(chat_id, count=int(parts[3]), last_msg_id=last_msg_id)
 
-    elif action == "unban":
-        target = parts[2].strip()
-        user_id = None
+                if len(parts) >= 4 and "," in parts[3]:
+                    mids = [int(x) for x in parts[3].split(",") if x.isdigit()]
+                    return await cleanup_via_userbot(chat_id, mids=mids)
 
-        if target.isdigit():
-            user_id = int(target)
-        elif target.startswith("@"):
-            try:
-                user_obj = await client.get_entity(target)
-                user_id = user_obj.id
-            except:
-                pass
+                return await cleanup_via_userbot(chat_id, last_msg_id=last_msg_id)
 
-        if user_id:
-            await punish_via_userbot(chat_id, user_id, action="unban")
-
-    # ---------- پاکسازی ----------
-    elif action == "cleanup":
-        last_msg_id = int(parts[2])
-
-        # اگر آرگومان چهارم عدد است → پاکسازی عددی
-        if len(parts) >= 4 and parts[3].isdigit():
-            count = int(parts[3])
-            await cleanup_via_userbot(chat_id, count=count, last_msg_id=last_msg_id)
-            return
-
-        # اگر لیست بود → پاکسازی انتخابی
-        if len(parts) >= 4 and "," in parts[3]:
-            mids = [int(x) for x in parts[3].split(",") if x.isdigit()]
-            await cleanup_via_userbot(chat_id, mids=mids)
-            return
-
-        # در غیر این صورت → پاکسازی کامل
-        await cleanup_via_userbot(chat_id, last_msg_id=last_msg_id)
-
-# ---------- پینگ ----------
-@client.on(events.NewMessage)
-async def simple_ping(event):
-    text = event.raw_text.lower()
+    # -------------------------------------------------------
+    # پینگ (simple_ping)
+    # -------------------------------------------------------
     if text == "ping":
-        await event.reply("✅ Userbot Online")
+        return await event.reply("✅ Userbot Online")
 
-# ---------- لفت ----------
-# ---------- لفت ----------
-@client.on(events.NewMessage)
-async def simple_left(event):
-    text = event.raw_text.lower()
+    # -------------------------------------------------------
+    # لفت (simple_left)
+    # -------------------------------------------------------
     if text == "left":
         try:
-            chat_id = event.chat_id
-            await client.send_message(chat_id, "👋 در حال لفت…")
-            await client.delete_dialog(chat_id)
+            await event.reply("👋 در حال لفت…")
+            await client.delete_dialog(event.chat_id)
         except Exception as e:
             await event.reply(f"❌ خطا در لفت: {e}")
+
 # ================= استارت یوزربات =================
 async def start_userbot():
     await client.start()
