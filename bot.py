@@ -2114,36 +2114,3 @@ application.add_handler(
 )
 
 # ==========================================================
-async def on_startup(app):
-    await notify_admin_on_startup(app)
-    app.create_task(auto_backup(app.bot))
-    app.create_task(start_auto_brain_loop(app.bot))
-    print("🌙 [SYSTEM] Startup tasks scheduled ✅")
-
-application.post_init = on_startup
-
-# ==========================================================
-# 🚀 اجرای نهایی ربات
-# ==========================================================
-try:
-    print("🔄 در حال اجرای ربات...")
-
-    # 🌙 آمار خودکار شبانه (هر شب ساعت 00:00 به وقت تهران)
-    from datetime import time, timezone, timedelta
-    tz_tehran = timezone(timedelta(hours=3, minutes=30))
-    job_queue = application.job_queue
-    job_queue.run_daily(send_nightly_stats, time=time(0, 0, tzinfo=tz_tehran))
-
-    application.run_polling(
-        allowed_updates=[
-            "message",
-            "edited_message",
-            "callback_query",
-            "chat_member",
-            "my_chat_member",
-        ]
-    )
-
-except Exception as e:
-    print(f"⚠️ خطا در اجرای ربات:\n{e}")
-    print("♻️ ربات به‌صورت خودکار توسط هاست ری‌استارت خواهد شد ✅")
