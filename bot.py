@@ -2116,11 +2116,12 @@ application.add_handler(
 # ==========================================================
 from datetime import time, timezone, timedelta
 import asyncio
+import nest_asyncio
 
 # ================= وارد کردن یوزربات جانبی =================
-
 from userbot_module.userbot import start_userbot  # مسیر ماژول یوزرباتت
 
+nest_asyncio.apply()  # 🔹 مهم برای اجرای همزمان Telethon در Heroku
 
 async def on_startup(app):
     """✅ وظایف استارتاپ ربات"""
@@ -2128,7 +2129,6 @@ async def on_startup(app):
     app.create_task(auto_backup(app.bot))
     app.create_task(start_auto_brain_loop(app.bot))
     print("🌙 [SYSTEM] Startup tasks scheduled ✅")
-
 
 application.post_init = on_startup
 
@@ -2146,11 +2146,8 @@ try:
             print("🤖 [BOT] ربات فعاله و در حال اجراست...")
             await asyncio.sleep(10)
 
-    loop = asyncio.get_event_loop()
-    loop.create_task(test_main_bot())
-
-    # =================== ✅ اضافه کردن یوزربات ===================
-    loop.create_task(start_userbot())  # یوزربات جانبی همزمان اجرا می‌شود
+    asyncio.create_task(test_main_bot())       # اجرا در loop موجود
+    asyncio.create_task(start_userbot())       # اجرای یوزربات جانبی همزمان
 
     # ✅ اجرای polling ربات اصلی
     application.run_polling(
@@ -2162,9 +2159,6 @@ try:
             "my_chat_member",
         ]
     )
-
-    # جلوگیری از بسته شدن برنامه
-    loop.run_forever()
 
 except Exception as e:
     print(f"⚠️ خطا در اجرای ربات:\n{e}")
