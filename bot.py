@@ -2117,12 +2117,6 @@ application.add_handler(
 from datetime import time, timezone, timedelta
 import asyncio
 
-async def on_startup(app):
-    """✅ وظایف استارتاپ ربات"""
-    await notify_admin_on_startup(app)
-    app.create_task(auto_backup(app.bot))
-    app.create_task(start_auto_brain_loop(app.bot))
-    print("🌙 [SYSTEM] Startup tasks scheduled ✅")
 
 application.post_init = on_startup
 
