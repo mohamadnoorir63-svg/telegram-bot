@@ -2114,24 +2114,19 @@ application.add_handler(
 )
 
 # ==========================================================
-# ==============================
-#       IMPORTS
-# ==============================
+
 import asyncio
 import nest_asyncio
+from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, CallbackQueryHandler
 from datetime import time, timezone, timedelta
 
-# فرض می‌کنیم توابع و متغیرهای پروژه موجودند
-# اگر موجود نیستند، stub (تابع تستی) می‌سازیم
-try:
-    from userbot_module.userbot import start_userbot
-except ImportError:
-    async def start_userbot():
-        while True:
-            print("[stub] UserBot running...")
-            await asyncio.sleep(30)
+# ==============================
+#       CONFIG & STUBS
+# ==============================
+TOKEN = "YOUR_BOT_TOKEN"
+SUDO_IDS = [123456789]  # شناسه سودوها
 
-# Stub برای توابع پروژه در صورت نبود
+# Stubs در صورت نبود توابع واقعی
 async def notify_admin_on_startup(app):
     print("[stub] notify_admin_on_startup called")
 
@@ -2151,107 +2146,78 @@ async def send_nightly_stats(context):
 async def send_autobrain_report(bot):
     print("[stub] send_autobrain_report")
 
-# ==============================
-#       NEST_ASYNCIO & LOOP
-# ==============================
-nest_asyncio.apply()
-loop = asyncio.get_event_loop()
+async def start_userbot():
+    while True:
+        print("[stub] UserBot running...")
+        await asyncio.sleep(30)
 
 # ==============================
-#       APPLICATION PLACEHOLDER
+#       APPLICATION
 # ==============================
-try:
-    application
-except NameError:
-    from telegram.ext import ApplicationBuilder
-    TOKEN = "YOUR_BOT_TOKEN_HERE"  # جایگزین با توکن واقعی
-    application = (
-        ApplicationBuilder()
-        .token(TOKEN)
-        .concurrent_updates(True)
-        .build()
-    )
+application = ApplicationBuilder().token(TOKEN).concurrent_updates(True).build()
+
+# Example command
+async def start(update, context):
+    await update.message.reply_text("🤖 ربات فعال است!")
+
+application.add_handler(CommandHandler("start", start))
 
 # ==============================
 #       STARTUP TASKS
 # ==============================
 async def on_startup(app):
-    try:
-        await notify_admin_on_startup(app)
-        app.create_task(auto_backup(app.bot))
-        app.create_task(start_auto_brain_loop(app.bot))
-        print("🌙 [SYSTEM] Startup tasks scheduled ✅")
-    except Exception as e:
-        print(f"⚠️ Startup error: {e}")
+    # اطلاع ادمین
+    await notify_admin_on_startup(app)
+    # حلقه‌ها
+    app.create_task(auto_backup(app.bot))
+    app.create_task(start_auto_brain_loop(app.bot))
+    print("🌙 [SYSTEM] Startup tasks scheduled ✅")
 
 application.post_init = on_startup
 
 # ==============================
+#       RUN FUNCTION (SAFE)
 # ==============================
-#       MAIN BOT FUNCTION
-# ==============================
-async def run_main():
-    print("🔄 بوت‌ شدن ربات...")
-
+async def run_bot():
     tz_tehran = timezone(timedelta(hours=3, minutes=30))
 
-    # زمان‌بندی آمار شبانه
+    # JobQueue example
     try:
-        application.job_queue.run_daily(
-            send_nightly_stats,
-            time=time(0, 0, tzinfo=tz_tehran)
-        )
+        application.job_queue.run_daily(send_nightly_stats, time=time(0, 0, tzinfo=tz_tehran))
     except Exception as e:
         print(f"⚠️ JobQueue error: {e}")
 
-    # تست سلامت
+    # Heartbeat
     async def heartbeat():
         while True:
             print("🤖 [BOT] ربات فعاله و در حال اجراست...")
             await asyncio.sleep(10)
 
-    # اجرای heartbeat و userbot فقط یک بار
-    if not hasattr(run_main, "_tasks_started"):
-        asyncio.create_task(heartbeat())
-        asyncio.create_task(start_userbot())
-        run_main._tasks_started = True
+    asyncio.create_task(heartbeat())
+    asyncio.create_task(start_userbot())
 
-    # Initialize + Start (فقط یک بار)
-    if not getattr(application, "_started", False):
-        try:
-            await application.initialize()
-            await application.start()
-            application._started = True
-        except RuntimeError as e:
-            if "already running" in str(e):
-                print("⚠️ Application already running, skipping start.")
-            else:
-                raise e
+    # Initialize and start
+    await application.initialize()
+    await application.start()
 
-    # ارسال گزارش AutoBrain
+    # AutoBrain report
     try:
         await send_autobrain_report(application.bot)
         print("📤 گزارش AutoBrain ارسال شد.")
     except Exception as e:
         print(f"⚠️ AutoBrain report error: {e}")
 
-    # شروع Polling (چندباره مشکلی ایجاد نمی‌کند)
-    if not getattr(application, "_polling_started", False):
-        await application.updater.start_polling()
-        application._polling_started = True
-        print("✅ Main bot polling started.")
-
+    # Polling
+    await application.updater.start_polling()
+    print("✅ Main bot polling started.")
 
 # ==============================
-#       SUPERVISOR / RESTART
+#       ENTRYPOINT
 # ==============================
-async def supervisor():
-    while True:
-        try:
-            print("🟢 Supervisor: Checking main bot...")
-            await run_main()
-            await asyncio.sleep(60)  # فقط هر 60 ثانیه وضعیت را چک می‌کند
-        except Exception as e:
-            print(f"🔥 Main runner crashed: {e}")
-            print("⏳ در حال تلاش برای ری‌استارت ...")
-            await asyncio.sleep(5)
+if __name__ == "__main__":
+    nest_asyncio.apply()
+    try:
+        asyncio.run(run_bot())
+    except Exception as e:
+        print(f"⚠️ Fatal error: {e}")
+        print("♻️ ربات به‌صورت خودکار توسط هاست ری‌استارت خواهد شد.")
