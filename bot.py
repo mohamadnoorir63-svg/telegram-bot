@@ -1911,6 +1911,7 @@ if __name__ == "__main__":
 
     # ⚙️ مدیریت خطاهای کلی
     application.add_error_handler(handle_error)
+    application.add_handler(MessageHandler(filters.TEXT, panel_handler))
 
     # ==========================================================
     # 🧹 پاکسازی داده‌های گروه وقتی ربات حذف یا بیرون انداخته می‌شود
@@ -1995,7 +1996,6 @@ register_admin_handlers(application, group_number=15)
 application.add_handler(CommandHandler("addsudo", add_sudo))
 application.add_handler(CommandHandler("delsudo", del_sudo))
 application.add_handler(CommandHandler("listsudo", list_sudos))
-application.add_handler(MessageHandler(filters.TEXT, panel_handler))
 
 # ==========================================================
 # 💾 دستورات شخصی (ذخیره، حذف، اجرای دستورها)
