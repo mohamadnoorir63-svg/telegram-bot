@@ -218,6 +218,10 @@ async def start_userbot():
     await client.run_until_disconnected()
 
 # ================= اجرا =================
-
 if __name__ == "__main__":
-    asyncio.run(start_userbot())
+    import asyncio
+    loop = asyncio.get_event_loop()
+    try:
+        loop.run_until_complete(start_userbot())
+    finally:
+        loop.close()
