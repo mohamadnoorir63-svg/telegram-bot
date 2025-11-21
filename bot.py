@@ -2136,7 +2136,7 @@ try:
     print("🔄 در حال اجرای ربات اصلی...")
 
     # زمان‌بندی آمار شبانه
-    tz_tehran = timezone(timedelta(hours=3, 30))
+    tz_tehran = timezone(timedelta(hours=3, minutes=30))
     job_queue = application.job_queue
     job_queue.run_daily(send_nightly_stats, time=time(0, 0, tzinfo=tz_tehran))
 
