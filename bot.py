@@ -2284,84 +2284,6 @@ async def _safe_task_wrapper(coro_func, *args, name: str = None, **kwargs):
             logger.info(f"[{task_name}] restarting after backoff {backoff}s.")
 
 # ---------- Start main bot (قابل ری‌استارت داخلی) ----------
-_current_main_task = None
-async def _start_application_and_polling():
-    """
-    مراحل initialize/start و start_polling را انجام می‌دهد.
-    طراحی شده تا در صورت خطا قابلیت فراخوانی مجدد داشته باشد.
-    """
-    if not application:
-        raise RuntimeError("`application` is not set. Provide your Application instance before running.")
-    # initialize و start
-    await application.initialize()
-    await application.start()
-    # job queue scheduling (nightly stats)
-    tz_tehran = timezone(timedelta(hours=3, minutes=30))
-    try:
-        application.job_queue.run_daily(send_nightly_stats, time=dt_time(0, 0, tzinfo=tz_tehran))
-    except Exception:
-        logger.exception("job_queue.run_daily failed — maybe job_queue not ready.")
-    # start polling (این خط معمولاً مسدود است؛ از متد غیرمسدود استفاده می‌کنیم)
-    try:
-        await application.updater.start_polling()
-        logger.info("application polling started.")
-    except Exception:
-        logger.exception("failed to start polling")
-
-async def _main_runner():
-    """
-    Runner که application را اجرا و مانیتور می‌کند، در صورت کرش تلاش به بازیابی می‌کند.
-    """
-    global _current_main_task
-    backoff = 1
-    while True:
-        try:
-            logger.info("Starting application lifecycle...")
-            _current_main_task = asyncio.create_task(_start_application_and_polling(), name="application_start")
-            await _current_main_task
-            # اگر _start_application_and_polling به صورت نرمال برگشت — احتمالاً اپ خاتمه یافته است
-            logger.warning("application lifecycle finished normally; restarting in 1s.")
-            await asyncio.sleep(1)
-        except asyncio.CancelledError:
-            logger.info("_main_runner cancelled; attempting graceful shutdown.")
-            raise
-        except Exception as e:
-            logger.exception(f"Main runner caught exception: {e}")
-            await send_admin_message(f"🔥 Main runner crashed: {e}\nدر حال تلاش برای ری‌استارت...")
-            await asyncio.sleep(min(backoff, RESTART_BACKOFF_MAX))
-            backoff = min(backoff * 2, RESTART_BACKOFF_MAX)
-            logger.info(f"Restarting main runner after backoff {backoff}s.")
-
-# ---------- Heartbeat و Watchdog ----------
-async def _heartbeat_task():
-    """هر HEARTBEAT_INTERVAL یک پیام به ادمین می‌فرستد تا وضعیت سالم را اعلام کند."""
-    while True:
-        try:
-            await asyncio.sleep(HEARTBEAT_INTERVAL)
-            uptime = time.time() - _last_log_time
-            msg = f"💓 Heartbeat — uptime: {uptime:.0f}s — last_log {time.time() - _last_log_time:.0f}s ago."
-            logger.info(msg)
-            await send_admin_message(msg)
-        except asyncio.CancelledError:
-            logger.info("heartbeat cancelled")
-            raise
-        except Exception:
-            logger.exception("heartbeat error — continuing")
-
-async def _watchdog_task(supervisor_task):
-    """
-    واکنش به شرایط Freeze: اگر مدت طولانی لاگی ثبت نشود یا supervisor_task خاتمه یابد،
-    اقدام به restart منطقی می‌کند.
-    """
-    while True:
-        try:
-            await asyncio.sleep(WATCHDOG_INTERVAL)
-            # 1) بررسی سلامت لاگ (اگر در NO_LOG_TIMEOUT هیچ لاگی نداریم => ممکنه Freeze)
-            now = time.time()
-            since = now - _last_log_time
-            if since > NO_LOG_TIMEOUT:
-                logger.warning(f"Watchdog: no log for {since:.1f}s — attempting recovery.")
-                await send_admin_message(f"⚠️ Watchdog detected freeze (no log for {since:.1f}s). Restarting runtime.")
                 # تلاش برای ری‌استارت supervisor_task
                 if supervisor_task and not supervisor_task.done():
                     logger.info("Cancelling supervisor_task for restart.")
@@ -2382,79 +2304,80 @@ async def _watchdog_task(supervisor_task):
             logger.exception("watchdog encountered exception — continuing loop")
 
 # ---------- Orchestrator: اجرا و بازیابی خودکار ----------
-async def orchestrator():
-    """
-    اورکستری که main_runner را اجرا می‌کند، روی آن مانیتور دارد و در صورت لزوم مجدداً آن را ایجاد می‌کند.
-    این اورکستراتور تضمین می‌کند که ری‌استارت‌ها با backoff انجام شود و لاگ به ادمین ارسال می‌گردد.
-    """
-    backoff = 1
+# =========================
+#     FIXED VERSION
+#     (Application runs once, polling is restartable)
+# =========================
+
+_application_started = False
+
+async def start_application_once():
+    global _application_started
+    if _application_started:
+        return
+
+    if not application:
+        raise RuntimeError("application تعریف نشده است.")
+
+    await application.initialize()
+    await application.start()
+
+    logger.info("✅ Application initialized + started (only once).")
+    _application_started = True
+
+
+async def start_polling_safely():
+    """پولینگ را با قابلیت ری‌استارت اجرا می‌کند."""
     while True:
-        supervisor = asyncio.create_task(_main_runner(), name="supervisor")
-        watchdog = asyncio.create_task(_watchdog_task(supervisor), name="watchdog")
-        heartbeat = asyncio.create_task(_heartbeat_task(), name="heartbeat")
         try:
-            # منتظر پایان watchdog باشیم — وقتی watchdog بازگشت یعنی باید restart کنیم
-            await watchdog
-            # اگر watchdog برگشت، supervisor را لغو کن و سپس منتظر اتمام شو
-            if not supervisor.done():
-                supervisor.cancel()
-            try:
-                await asyncio.wait_for(supervisor, timeout=GRACEFUL_SHUTDOWN_TIMEOUT)
-            except asyncio.TimeoutError:
-                logger.warning("supervisor did not shutdown gracefully; cancelling forcefully.")
-                if not supervisor.done():
-                    supervisor.cancel()
-            # لغو heartbeat
-            heartbeat.cancel()
-            try:
-                await heartbeat
-            except Exception:
-                pass
-            # backoff قبل از چرخش بعدی
-            await asyncio.sleep(min(backoff, RESTART_BACKOFF_MAX))
-            backoff = min(backoff * 2, RESTART_BACKOFF_MAX)
-            logger.info(f"Orchestrator: restarting supervisor (backoff now {backoff}s).")
-            await send_admin_message("🔁 Orchestrator restarting main supervisor...")
-        except asyncio.CancelledError:
-            logger.info("orchestrator cancelled — shutting down supervisor/watchdog/heartbeat")
-            supervisor.cancel()
-            watchdog.cancel()
-            heartbeat.cancel()
-            raise
+            logger.info("▶️ شروع Polling...")
+            await application.updater.start_polling()
+            logger.warning("⚠️ polling به پایان رسید! در حال ری‌استارت...")
         except Exception as e:
-            logger.exception(f"orchestrator unexpected error: {e}")
-            await send_admin_message(f"❗ Orchestrator encountered error: {e}")
-            # small sleep then try again
-            await asyncio.sleep(5)
+            logger.exception(f"polling error: {e}")
+        await asyncio.sleep(3)   # backoff کوچک
 
-# ---------- Entrypoint برای اجرا در if __name__ == "__main__" ----------
-def run_enterprise_loop():
-    """
-    تابعی که باید در main اجرا شود. این تابع loop را شروع می‌کند و orchestrator را ایجاد می‌کند.
-    """
-    loop = asyncio.get_event_loop()
+
+async def main_runner_fixed():
+    """Application فقط یک بار اجرا می‌شود — polling بارها."""
+    await start_application_once()  # فقط یک بار اجرا!
+
+    # اجرای polling با قابلیت ری‌استارت
+    polling_task = asyncio.create_task(start_polling_safely())
+
+    # اجرای userbot یا وظایف دیگر
     try:
-        loop.create_task(orchestrator())
-        # اگر یوزربات یا تست سلامت می‌خواهی اجرا کنی هم اینجا اضافه کن
-        try:
-            # اجرای start_userbot در پس‌زمینه (درصورتیکه استاب/فانکشن واقعی موجود باشد)
-            loop.create_task(_safe_task_wrapper(start_userbot, name="start_userbot"))
-        except Exception:
-            logger.exception("could not schedule start_userbot")
-        loop.run_forever()
-    except KeyboardInterrupt:
-        logger.info("KeyboardInterrupt received — shutting down loop.")
-    finally:
-        # تلاش برای توقف تمیز
-        pending = asyncio.all_tasks(loop=loop)
-        for t in pending:
-            t.cancel()
-        loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
-        loop.close()
-        logger.info("Loop closed cleanly.")
+        asyncio.create_task(_safe_task_wrapper(start_userbot, name="userbot"))
+    except:
+        logger.warning("Userbot start failed")
 
-# ---------- اجرا اگر مستقیم اجرا شود ----------
-if __name__ == "__main__":
-    logger.info("Starting Enterprise Bot Runtime...")
-    note_log_activity()
-    run_enterprise_loop()
+    # اجرای همیشگی
+    await polling_task
+
+
+async def watchdog_fixed(main_task):
+    """اگر polling گیر کرد → Restart فقط polling (نه Application!)"""
+    while True:
+        await asyncio.sleep(10)
+        now = time.time()
+        if now - _last_log_time > 30:
+            logger.warning("❗ Freeze detected — restarting polling ONLY")
+            await send_admin_message("⚠️ Watchdog: Freeze detected → Restarting polling")
+            try:
+                if application:
+                    await application.updater.stop()
+            except:
+                pass
+            return  # باعث ری‌استارت main_runner_fixed می‌شود
+
+
+async def orchestrator_fixed():
+    """ری‌استارت نرم فقط روی polling انجام می‌شود."""
+    while True:
+        main_task = asyncio.create_task(main_runner_fixed())
+        w = asyncio.create_task(watchdog_fixed(main_task))
+
+        await w  # watchdog برگشت = ری‌استارت polling
+        main_task.cancel()
+        await asyncio.sleep(2)
+        logger.info("🔁 Restarting polling loop...")
