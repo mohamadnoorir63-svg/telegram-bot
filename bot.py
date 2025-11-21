@@ -319,6 +319,50 @@ async def register_user(user):
         data.append({"id": user.id, "name": user.first_name})
         with open(USERS_FILE, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
+            # ======================================================
+# ====================== PANEL SYSTEM ===================
+# ======================================================
+
+from panel_manager import get_main_keyboard, get_submenu
+from telegram.ext import MessageHandler, filters
+
+# ========== Start ==========
+async def start(update, context):
+    await update.message.reply_text(
+        "👋 سلام! منوی ثابت برای شما فعال شد:",
+        reply_markup=get_main_keyboard()
+    )
+
+# ========== Handle Buttons ==========
+async def panel_handler(update, context):
+    text = update.message.text
+
+    # چک کن آیا زیرمنو دارد
+    submenu = get_submenu(text)
+    if submenu:
+        return await update.message.reply_text(
+            f"📂 زیرمنوی {text}:",
+            reply_markup=submenu
+        )
+
+    # اگر زیرمنو نبود → عملکرد عادی
+    if text == "📜 لیست دستورها":
+        return await update.message.reply_text("درحال ارسال لیست دستورات...")
+
+    if text == "➕ ساخت دستور":
+        return await update.message.reply_text("نام دستور جدید را ارسال کن.")
+
+    if text == "❌ حذف دستور":
+        return await update.message.reply_text("نام دستور را ارسال کن.")
+
+    if text == "📦 بکاپ گیری":
+        return await update.message.reply_text("درحال بکاپ گرفتن...")
+
+    if text == "ℹ️ راهنما":
+        return await update.message.reply_text("این راهنمای ربات است.")
+
+# ثبت handler
+application.add_handler(MessageHandler(filters.TEXT, panel_handler))
 # ======================= 📢 اطلاع به ادمین هنگام استارت =======================
 async def notify_admin_on_startup(app):
     """ارسال پیام فعال‌سازی به ادمین هنگام استارت"""
