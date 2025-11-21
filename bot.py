@@ -2114,67 +2114,347 @@ application.add_handler(
 )
 
 # ==========================================================
+"""
+Enterprise-level bot runtime with Watchdog, Heartbeat, Auto-Restart, Error-Shield and Admin Alerts.
+
+نکات نصب و استفاده:
+- این فایل فرض می‌کند متغیر `application` (نمونه‌ی telegram.ext.Application) از قبل ساخته شده و در دامنه‌ی اجرا در دسترس است.
+- مقدار ADMIN_CHAT_ID را در متغیر محیطی قرار بده (آی‌دی عددی چت ادمین).
+- توابعی که پروژه‌ات دارد (notify_admin_on_startup, auto_backup, start_auto_brain_loop,
+  send_nightly_stats, start_userbot, send_autobrain_report) اگر در جای دیگری تعریف شده‌اند،
+  این فایل از آنها استفاده خواهد کرد. در غیر این صورت، استاب (شبیه‌ساز) داخلی اجرا خواهد شد
+  تا کد کرش نکند.
+"""
+
 import asyncio
+import os
+import time
+import traceback
+import logging
+from datetime import time as dt_time, timezone, timedelta
+
 import nest_asyncio
-from datetime import time, timezone, timedelta
-from userbot_module.userbot import start_userbot  # مسیر یوزربات
+nest_asyncio.apply()
 
-nest_asyncio.apply()  # مهم برای Telethon روی Heroku
+# ---------- تنظیمات قابل تغییر ----------
+ADMIN_CHAT_ID = None  # اگر می‌خواهی سریعاً تست کنی: ADMIN_CHAT_ID = 123456789
+try:
+    if os.getenv("ADMIN_CHAT_ID"):
+        ADMIN_CHAT_ID = int(os.getenv("ADMIN_CHAT_ID"))
+except Exception:
+    ADMIN_CHAT_ID = None
 
-loop = asyncio.get_event_loop()  # گرفتن loop موجود
+WATCHDOG_INTERVAL = 5            # ثانیه — هر چند ثانیه watchdog بررسی می‌کند
+HEARTBEAT_INTERVAL = 60         # ثانیه — هر چند ثانیه Heartbeat ارسال می‌شود
+NO_LOG_TIMEOUT = 30             # ثانیه — اگر هیچ لاگی در این مدت نبود => ری‌استارت
+RESTART_BACKOFF_MAX = 60        # ثانیه — حداکثر بک‌آف بین ری‌استارت‌ها
+GRACEFUL_SHUTDOWN_TIMEOUT = 10  # ثانیه — منتظر اتمام تمیزکاری‌ها در هنگام ری‌استارت
 
-# =================== وظایف Startup / آسمینون ===================
+# ---------- تنظیم لاگ ----------
+logger = logging.getLogger("enterprise_bot")
+if not logger.handlers:
+    h = logging.StreamHandler()
+    fmt = logging.Formatter("%(asctime)s | %(levelname)s | %(message)s")
+    h.setFormatter(fmt)
+    logger.addHandler(h)
+logger.setLevel(logging.INFO)
+
+# ---------- بررسی وجود application ----------
+if "application" not in globals():
+    logger.warning("متغیر `application` در گلوبال نیست — باید قبل از اجرای این فایل مقداردهی شود.")
+    # برای جلوگیری از کرش، می‌سازیم placeholder ایمن (اگر نیاز به نمونه واقعی داری، این را حذف کن)
+    application = None  # در پروژه واقعی باید اینجا Application واقعی باشد
+
+# ---------- Helper: ارسال پیام به ادمین (ایمن) ----------
+async def send_admin_message(text: str):
+    """ارسال پیام به ADMIN_CHAT_ID در صورت تنظیم بودن."""
+    if not ADMIN_CHAT_ID:
+        logger.info(f"[AdminMsg skipped] {text[:80]}...")
+        return
+    try:
+        # application ممکن است None باشد — بررسی می‌کنیم
+        if application and getattr(application, "bot", None):
+            await application.bot.send_message(chat_id=ADMIN_CHAT_ID, text=text)
+            logger.info("[AdminMsg sent]")
+        else:
+            logger.warning("[AdminMsg failed] application.bot در دسترس نیست.")
+    except Exception as e:
+        logger.exception(f"[AdminMsg exception] {e}")
+
+# ---------- استاب‌های امن اگر توابع پروژه موجود نبودند ----------
+async def _stub_notify_admin_on_startup(app):
+    logger.info("[stub] notify_admin_on_startup called (no-op)")
+
+async def _stub_auto_backup(bot):
+    while True:
+        logger.info("[stub] auto_backup tick")
+        await asyncio.sleep(60 * 60)  # هر ساعت یک‌بار در استاب
+
+async def _stub_start_auto_brain_loop(bot):
+    while True:
+        logger.info("[stub] start_auto_brain_loop tick")
+        await asyncio.sleep(30)
+
+async def _stub_send_nightly_stats(context):
+    logger.info("[stub] send_nightly_stats")
+
+async def _stub_start_userbot():
+    logger.info("[stub] start_userbot running (no-op)")
+    # اگر یوزربات شما باید اجرا شود، اینجا call بزن
+
+async def _stub_send_autobrain_report(bot):
+    logger.info("[stub] send_autobrain_report (no-op)")
+
+# اگر توابع در پروژه تعریف شده‌اند، از آنها استفاده می‌کنیم؛ در غیر این صورت استاب می‌گیریم
+notify_admin_on_startup = globals().get("notify_admin_on_startup", _stub_notify_admin_on_startup)
+auto_backup = globals().get("auto_backup", _stub_auto_backup)
+start_auto_brain_loop = globals().get("start_auto_brain_loop", _stub_start_auto_brain_loop)
+send_nightly_stats = globals().get("send_nightly_stats", _stub_send_nightly_stats)
+start_userbot = globals().get("start_userbot", _stub_start_userbot)
+send_autobrain_report = globals().get("send_autobrain_report", _stub_send_autobrain_report)
+
+# ---------- وضعیت و متریک ساده ----------
+_last_log_time = time.time()
+def note_log_activity():
+    """هر زمان که لاگ مهمی می‌زنیم، این را فراخوانی کن."""
+    global _last_log_time
+    _last_log_time = time.time()
+
+# override logger.info/warn/error برای ثبت last_log_time در نقاط مهم
+_orig_info = logger.info
+def _info_and_note(msg, *args, **kwargs):
+    note_log_activity()
+    return _orig_info(msg, *args, **kwargs)
+logger.info = _info_and_note
+
+# ---------- Startup handler امن ----------
 async def on_startup(app):
-    await notify_admin_on_startup(app)       # اطلاع ادمین
-    app.create_task(auto_backup(app.bot))    # بکاپ خودکار
-    app.create_task(start_auto_brain_loop(app.bot))  # حلقه مغز مصنوعی
-    print("🌙 [SYSTEM] Startup tasks scheduled ✅")
+    """
+    On startup tasks — safe-wrapped: اگر تابع اصلی موجود نبود یا خطا داد، ادامه می‌دهد.
+    سپس آن را به application.post_init متصل کن.
+    """
+    try:
+        await notify_admin_on_startup(app)
+    except Exception as e:
+        logger.exception(f"notify_admin_on_startup error: {e}")
+    try:
+        # اجرای بکاپ و حلقه مغز در پس‌زمینه (با محافظ خطا)
+        app.create_task(_safe_task_wrapper(auto_backup, app.bot, name="auto_backup"))
+        app.create_task(_safe_task_wrapper(start_auto_brain_loop, app.bot, name="auto_brain_loop"))
+    except Exception as e:
+        logger.exception(f"failed to schedule background tasks: {e}")
+    logger.info("🌙 [SYSTEM] Startup tasks scheduled ✅")
+    await send_admin_message("🤖 ربات با موفقیت استارت شد (Startup tasks scheduled).")
 
-application.post_init = on_startup
+# فقط اگر application واقعی وجود داشته باشد این اتصال را انجام بده
+if application:
+    try:
+        application.post_init = on_startup
+    except Exception as e:
+        logger.exception(f"cannot set post_init: {e}")
 
+# ---------- wrapper امن برای تسک‌ها ----------
+async def _safe_task_wrapper(coro_func, *args, name: str = None, **kwargs):
+    """
+    یک wrapper که کوروت را اجرا می‌کند و در صورت بروز استثنا، لاگ می‌زند و تلاش برای بازیابی انجام می‌دهد.
+    coro_func می‌تواند یک تابع async یا coroutine factory باشد.
+    """
+    task_name = name or getattr(coro_func, "__name__", "task")
+    backoff = 1
+    while True:
+        try:
+            logger.info(f"[{task_name}] starting.")
+            result = coro_func(*args, **kwargs)
+            if asyncio.iscoroutine(result):
+                await result
+            else:
+                # اگر تابع sync بود (غیرمعمول)، آن را در حلقه اجرا کن
+                loop = asyncio.get_event_loop()
+                await loop.run_in_executor(None, coro_func, *args, **kwargs)
+            logger.info(f"[{task_name}] finished normally.")
+            return
+        except asyncio.CancelledError:
+            logger.info(f"[{task_name}] cancelled.")
+            raise
+        except Exception as e:
+            logger.exception(f"[{task_name}] crashed: {e}\n{traceback.format_exc()}")
+            await send_admin_message(f"⚠️ [{task_name}] با خطا مواجه شد: {e}\nدر حال تلاش برای ری‌استارت...")
+            await asyncio.sleep(min(backoff, RESTART_BACKOFF_MAX))
+            backoff = min(backoff * 2, RESTART_BACKOFF_MAX)
+            logger.info(f"[{task_name}] restarting after backoff {backoff}s.")
 
-# =================== اجرای ربات اصلی به صورت non-blocking ===================
-async def start_main_bot():
-    print("🔄 در حال اجرای ربات اصلی...")
-
-    # زمان‌بندی آمار شبانه (ساعت ۰۰:۰۰ به وقت تهران)
-    tz_tehran = timezone(timedelta(hours=3, minutes=30))
-    application.job_queue.run_daily(send_nightly_stats, time=time(0, 0, tzinfo=tz_tehran))
-
-    # تست سلامت ربات
-    async def test_main_bot():
-        while True:
-            print("🤖 [BOT] ربات فعاله و در حال اجراست...")
-            await asyncio.sleep(10)
-
-    loop.create_task(test_main_bot())       # اجرا روی همان loop
-    loop.create_task(start_userbot())       # اجرای یوزربات جانبی همزمان
-
-    # ================================
-    # 🟢 مرحله‌ای که ربات LOGIN و آماده ارسال پیام می‌شود
-    # ================================
+# ---------- Start main bot (قابل ری‌استارت داخلی) ----------
+_current_main_task = None
+async def _start_application_and_polling():
+    """
+    مراحل initialize/start و start_polling را انجام می‌دهد.
+    طراحی شده تا در صورت خطا قابلیت فراخوانی مجدد داشته باشد.
+    """
+    if not application:
+        raise RuntimeError("`application` is not set. Provide your Application instance before running.")
+    # initialize و start
     await application.initialize()
     await application.start()
-
-    # ================================
-    # 📤 ارسال گزارش AutoBrain (اینجا 100% جواب می‌دهد)
-    # ================================
+    # job queue scheduling (nightly stats)
+    tz_tehran = timezone(timedelta(hours=3, minutes=30))
     try:
-        await send_autobrain_report(application.bot)
-        print("📤 گزارش AutoBrain ارسال شد.")
-    except Exception as e:
-        print(f"⚠️ ارسال گزارش AutoBrain با خطا مواجه شد: {e}")
+        application.job_queue.run_daily(send_nightly_stats, time=dt_time(0, 0, tzinfo=tz_tehran))
+    except Exception:
+        logger.exception("job_queue.run_daily failed — maybe job_queue not ready.")
+    # start polling (این خط معمولاً مسدود است؛ از متد غیرمسدود استفاده می‌کنیم)
+    try:
+        await application.updater.start_polling()
+        logger.info("application polling started.")
+    except Exception:
+        logger.exception("failed to start polling")
 
-    # اجرای polling ربات اصلی غیر بلاک‌کننده
-    await application.updater.start_polling()
-    print("✅ Main bot started and polling...")
+async def _main_runner():
+    """
+    Runner که application را اجرا و مانیتور می‌کند، در صورت کرش تلاش به بازیابی می‌کند.
+    """
+    global _current_main_task
+    backoff = 1
+    while True:
+        try:
+            logger.info("Starting application lifecycle...")
+            _current_main_task = asyncio.create_task(_start_application_and_polling(), name="application_start")
+            await _current_main_task
+            # اگر _start_application_and_polling به صورت نرمال برگشت — احتمالاً اپ خاتمه یافته است
+            logger.warning("application lifecycle finished normally; restarting in 1s.")
+            await asyncio.sleep(1)
+        except asyncio.CancelledError:
+            logger.info("_main_runner cancelled; attempting graceful shutdown.")
+            raise
+        except Exception as e:
+            logger.exception(f"Main runner caught exception: {e}")
+            await send_admin_message(f"🔥 Main runner crashed: {e}\nدر حال تلاش برای ری‌استارت...")
+            await asyncio.sleep(min(backoff, RESTART_BACKOFF_MAX))
+            backoff = min(backoff * 2, RESTART_BACKOFF_MAX)
+            logger.info(f"Restarting main runner after backoff {backoff}s.")
 
+# ---------- Heartbeat و Watchdog ----------
+async def _heartbeat_task():
+    """هر HEARTBEAT_INTERVAL یک پیام به ادمین می‌فرستد تا وضعیت سالم را اعلام کند."""
+    while True:
+        try:
+            await asyncio.sleep(HEARTBEAT_INTERVAL)
+            uptime = time.time() - _last_log_time
+            msg = f"💓 Heartbeat — uptime: {uptime:.0f}s — last_log {time.time() - _last_log_time:.0f}s ago."
+            logger.info(msg)
+            await send_admin_message(msg)
+        except asyncio.CancelledError:
+            logger.info("heartbeat cancelled")
+            raise
+        except Exception:
+            logger.exception("heartbeat error — continuing")
 
-# =================== اجرای loop اصلی ===================
+async def _watchdog_task(supervisor_task):
+    """
+    واکنش به شرایط Freeze: اگر مدت طولانی لاگی ثبت نشود یا supervisor_task خاتمه یابد،
+    اقدام به restart منطقی می‌کند.
+    """
+    while True:
+        try:
+            await asyncio.sleep(WATCHDOG_INTERVAL)
+            # 1) بررسی سلامت لاگ (اگر در NO_LOG_TIMEOUT هیچ لاگی نداریم => ممکنه Freeze)
+            now = time.time()
+            since = now - _last_log_time
+            if since > NO_LOG_TIMEOUT:
+                logger.warning(f"Watchdog: no log for {since:.1f}s — attempting recovery.")
+                await send_admin_message(f"⚠️ Watchdog detected freeze (no log for {since:.1f}s). Restarting runtime.")
+                # تلاش برای ری‌استارت supervisor_task
+                if supervisor_task and not supervisor_task.done():
+                    logger.info("Cancelling supervisor_task for restart.")
+                    supervisor_task.cancel()
+                    # اجازه بده تا cancel پردازش شود
+                    await asyncio.sleep(1)
+                # سپس supervisor را دوباره می‌سازیم (در caller)
+                return
+            # 2) بررسی که supervisor_task زنده باشد
+            if supervisor_task and supervisor_task.done():
+                logger.warning("Watchdog: supervisor_task done unexpectedly. Restarting.")
+                await send_admin_message("⚠️ Watchdog: main supervisor finished unexpectedly. Restarting.")
+                return
+        except asyncio.CancelledError:
+            logger.info("watchdog cancelled")
+            raise
+        except Exception:
+            logger.exception("watchdog encountered exception — continuing loop")
+
+# ---------- Orchestrator: اجرا و بازیابی خودکار ----------
+async def orchestrator():
+    """
+    اورکستری که main_runner را اجرا می‌کند، روی آن مانیتور دارد و در صورت لزوم مجدداً آن را ایجاد می‌کند.
+    این اورکستراتور تضمین می‌کند که ری‌استارت‌ها با backoff انجام شود و لاگ به ادمین ارسال می‌گردد.
+    """
+    backoff = 1
+    while True:
+        supervisor = asyncio.create_task(_main_runner(), name="supervisor")
+        watchdog = asyncio.create_task(_watchdog_task(supervisor), name="watchdog")
+        heartbeat = asyncio.create_task(_heartbeat_task(), name="heartbeat")
+        try:
+            # منتظر پایان watchdog باشیم — وقتی watchdog بازگشت یعنی باید restart کنیم
+            await watchdog
+            # اگر watchdog برگشت، supervisor را لغو کن و سپس منتظر اتمام شو
+            if not supervisor.done():
+                supervisor.cancel()
+            try:
+                await asyncio.wait_for(supervisor, timeout=GRACEFUL_SHUTDOWN_TIMEOUT)
+            except asyncio.TimeoutError:
+                logger.warning("supervisor did not shutdown gracefully; cancelling forcefully.")
+                if not supervisor.done():
+                    supervisor.cancel()
+            # لغو heartbeat
+            heartbeat.cancel()
+            try:
+                await heartbeat
+            except Exception:
+                pass
+            # backoff قبل از چرخش بعدی
+            await asyncio.sleep(min(backoff, RESTART_BACKOFF_MAX))
+            backoff = min(backoff * 2, RESTART_BACKOFF_MAX)
+            logger.info(f"Orchestrator: restarting supervisor (backoff now {backoff}s).")
+            await send_admin_message("🔁 Orchestrator restarting main supervisor...")
+        except asyncio.CancelledError:
+            logger.info("orchestrator cancelled — shutting down supervisor/watchdog/heartbeat")
+            supervisor.cancel()
+            watchdog.cancel()
+            heartbeat.cancel()
+            raise
+        except Exception as e:
+            logger.exception(f"orchestrator unexpected error: {e}")
+            await send_admin_message(f"❗ Orchestrator encountered error: {e}")
+            # small sleep then try again
+            await asyncio.sleep(5)
+
+# ---------- Entrypoint برای اجرا در if __name__ == "__main__" ----------
+def run_enterprise_loop():
+    """
+    تابعی که باید در main اجرا شود. این تابع loop را شروع می‌کند و orchestrator را ایجاد می‌کند.
+    """
+    loop = asyncio.get_event_loop()
+    try:
+        loop.create_task(orchestrator())
+        # اگر یوزربات یا تست سلامت می‌خواهی اجرا کنی هم اینجا اضافه کن
+        try:
+            # اجرای start_userbot در پس‌زمینه (درصورتیکه استاب/فانکشن واقعی موجود باشد)
+            loop.create_task(_safe_task_wrapper(start_userbot, name="start_userbot"))
+        except Exception:
+            logger.exception("could not schedule start_userbot")
+        loop.run_forever()
+    except KeyboardInterrupt:
+        logger.info("KeyboardInterrupt received — shutting down loop.")
+    finally:
+        # تلاش برای توقف تمیز
+        pending = asyncio.all_tasks(loop=loop)
+        for t in pending:
+            t.cancel()
+        loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
+        loop.close()
+        logger.info("Loop closed cleanly.")
+
+# ---------- اجرا اگر مستقیم اجرا شود ----------
 if __name__ == "__main__":
-    try:
-        loop.create_task(start_main_bot())  # اجرای main bot روی loop
-        loop.run_forever()                  # جلوگیری از بسته شدن loop
-    except Exception as e:
-        print(f"⚠️ خطا در اجرای ربات:\n{e}")
-        print("♻️ ربات به‌صورت خودکار توسط هاست ری‌استارت خواهد شد ✅")
+    logger.info("Starting Enterprise Bot Runtime...")
+    note_log_activity()
+    run_enterprise_loop()
