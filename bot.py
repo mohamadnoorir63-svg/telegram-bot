@@ -2114,7 +2114,7 @@ application.add_handler(
 )
 
 # ==========================================================
-async def on_startup(app):
+  async def on_startup(app):
         await notify_admin_on_startup(app)
         app.create_task(auto_backup(app.bot))
         app.create_task(start_auto_brain_loop(app.bot))
