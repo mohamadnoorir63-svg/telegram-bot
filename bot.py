@@ -2114,3 +2114,48 @@ application.add_handler(
 )
 
 # ==========================================================
+from datetime import time, timezone, timedelta
+import asyncio
+
+async def on_startup(app):
+    """✅ وظایف استارتاپ ربات"""
+    await notify_admin_on_startup(app)
+    app.create_task(auto_backup(app.bot))
+    app.create_task(start_auto_brain_loop(app.bot))
+    print("🌙 [SYSTEM] Startup tasks scheduled ✅")
+
+application.post_init = on_startup
+
+try:
+    print("🔄 در حال اجرای ربات اصلی...")
+
+    # 🌙 زمان‌بندی آمار شبانه (ساعت ۰۰:۰۰ به وقت تهران)
+    tz_tehran = timezone(timedelta(hours=3, minutes=30))
+    job_queue = application.job_queue
+    job_queue.run_daily(send_nightly_stats, time=time(0, 0, tzinfo=tz_tehran))
+
+    # 🧩 تست سلامت (اختیاری، فقط برای لاگ زنده)
+    async def test_main_bot():
+        while True:
+            print("🤖 [BOT] خنگول فعاله و در حال اجراست...")
+            await asyncio.sleep(10)
+
+    asyncio.get_event_loop().create_task(test_main_bot())
+
+    # ✅ اجرای polling ربات اصلی
+    application.run_polling(
+        allowed_updates=[
+            "message",
+            "edited_message",
+            "callback_query",
+            "chat_member",
+            "my_chat_member",
+        ]
+    )
+
+    # جلوگیری از بسته شدن برنامه
+    asyncio.get_event_loop().run_forever()
+
+except Exception as e:
+    print(f"⚠️ خطا در اجرای ربات:\n{e}")
+    print("♻️ ربات به‌صورت خودکار توسط هاست ری‌استارت خواهد شد 
