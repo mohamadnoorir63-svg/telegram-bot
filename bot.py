@@ -319,48 +319,6 @@ async def register_user(user):
         data.append({"id": user.id, "name": user.first_name})
         with open(USERS_FILE, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
-            # ======================================================
-# ====================== PANEL SYSTEM ===================
-# ======================================================
-
-from panel_manager import get_main_keyboard, get_submenu
-from telegram.ext import MessageHandler, filters
-
-# ========== Start ==========
-async def start(update, context):
-    await update.message.reply_text(
-        "👋 سلام! منوی ثابت برای شما فعال شد:",
-        reply_markup=get_main_keyboard()
-    )
-
-# ========== Handle Buttons ==========
-async def panel_handler(update, context):
-    text = update.message.text
-
-    # چک کن آیا زیرمنو دارد
-    submenu = get_submenu(text)
-    if submenu:
-        return await update.message.reply_text(
-            f"📂 زیرمنوی {text}:",
-            reply_markup=submenu
-        )
-
-    # اگر زیرمنو نبود → عملکرد عادی
-    if text == "📜 لیست دستورها":
-        return await update.message.reply_text("درحال ارسال لیست دستورات...")
-
-    if text == "➕ ساخت دستور":
-        return await update.message.reply_text("نام دستور جدید را ارسال کن.")
-
-    if text == "❌ حذف دستور":
-        return await update.message.reply_text("نام دستور را ارسال کن.")
-
-    if text == "📦 بکاپ گیری":
-        return await update.message.reply_text("درحال بکاپ گرفتن...")
-
-    if text == "ℹ️ راهنما":
-        return await update.message.reply_text("این راهنمای ربات است.")
-
 # ======================= 🧠 شروع ساده بدون افکت =======================
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """شروع ساده بدون انیمیشن یا افکت"""
@@ -1895,8 +1853,6 @@ if __name__ == "__main__":
 
     # ⚙️ مدیریت خطاهای کلی
     application.add_error_handler(handle_error)
-    application.add_handler(MessageHandler(filters.TEXT, panel_handler))
-
     # ==========================================================
     # 🧹 پاکسازی داده‌های گروه وقتی ربات حذف یا بیرون انداخته می‌شود
     # ==========================================================
