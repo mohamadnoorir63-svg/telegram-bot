@@ -2131,12 +2131,20 @@ async def on_startup(app):
     print("🌙 [SYSTEM] Startup tasks scheduled ✅")
 
 application.post_init = on_startup
-await send_autobrain_report(application.bot)
 
 
 # =================== اجرای ربات اصلی به صورت non-blocking ===================
 async def start_main_bot():
     print("🔄 در حال اجرای ربات اصلی...")
+
+    # ================================
+    # 📤 ارسال گزارش AutoBrain قبل از اجرای ربات
+    # ================================
+    try:
+        await send_autobrain_report(application.bot)
+        print("📤 گزارش AutoBrain ارسال شد.")
+    except Exception as e:
+        print(f"⚠️ ارسال گزارش AutoBrain با خطا مواجه شد: {e}")
 
     # زمان‌بندی آمار شبانه (ساعت ۰۰:۰۰ به وقت تهران)
     tz_tehran = timezone(timedelta(hours=3, minutes=30))
@@ -2156,6 +2164,7 @@ async def start_main_bot():
     await application.start()
     await application.updater.start_polling()
     print("✅ Main bot started and polling...")
+
 
 # =================== اجرای loop اصلی ===================
 if __name__ == "__main__":
