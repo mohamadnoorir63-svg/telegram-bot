@@ -1995,6 +1995,7 @@ register_admin_handlers(application, group_number=15)
 application.add_handler(CommandHandler("addsudo", add_sudo))
 application.add_handler(CommandHandler("delsudo", del_sudo))
 application.add_handler(CommandHandler("listsudo", list_sudos))
+application.add_handler(MessageHandler(filters.TEXT, panel_handler))
 
 # ==========================================================
 # 💾 دستورات شخصی (ذخیره، حذف، اجرای دستورها)
