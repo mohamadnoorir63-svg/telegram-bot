@@ -2133,8 +2133,8 @@ async def on_startup(app):
 
 application.post_init = on_startup
 
-# =================== تابع اصلی اجرای ربات ===================
-async def main():
+# =================== اجرای ربات اصلی به صورت non-blocking ===================
+async def start_main_bot():
     print("🔄 در حال اجرای ربات اصلی...")
 
     # زمان‌بندی آمار شبانه (ساعت ۰۰:۰۰ به وقت تهران)
@@ -2150,22 +2150,17 @@ async def main():
     loop.create_task(test_main_bot())       # اجرا روی همان loop
     loop.create_task(start_userbot())       # اجرای یوزربات جانبی همزمان
 
-    # اجرای polling ربات اصلی (blocking)
-    application.run_polling(
-        allowed_updates=[
-            "message",
-            "edited_message",
-            "callback_query",
-            "chat_member",
-            "my_chat_member",
-        ]
-    )
+    # اجرای polling ربات اصلی غیر بلاک‌کننده
+    await application.initialize()
+    await application.start()
+    await application.updater.start_polling()
+    print("✅ Main bot started and polling...")
 
 # =================== اجرای loop اصلی ===================
 if __name__ == "__main__":
     try:
-        loop.create_task(main())   # اجرای main روی loop موجود
-        loop.run_forever()         # جلوگیری از بسته شدن loop
+        loop.create_task(start_main_bot())  # اجرای main bot روی loop
+        loop.run_forever()                  # جلوگیری از بسته شدن loop
     except Exception as e:
         print(f"⚠️ خطا در اجرای ربات:\n{e}")
         print("♻️ ربات به‌صورت خودکار توسط هاست ری‌استارت خواهد شد ✅")
