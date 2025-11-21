@@ -2125,13 +2125,13 @@ loop = asyncio.get_event_loop()  # گرفتن loop موجود
 
 # =================== وظایف Startup / آسمینون ===================
 async def on_startup(app):
-    """✅ وظایف استارتاپ ربات"""
-    await notify_admin_on_startup(app)       # بخش ادمین حفظ شد
-    app.create_task(auto_backup(app.bot))
-    app.create_task(start_auto_brain_loop(app.bot))
+    await notify_admin_on_startup(app)       # اطلاع ادمین
+    app.create_task(auto_backup(app.bot))    # بکاپ خودکار
+    app.create_task(start_auto_brain_loop(app.bot))  # حلقه مغز مصنوعی
     print("🌙 [SYSTEM] Startup tasks scheduled ✅")
 
 application.post_init = on_startup
+
 
 # =================== اجرای ربات اصلی به صورت non-blocking ===================
 async def start_main_bot():
