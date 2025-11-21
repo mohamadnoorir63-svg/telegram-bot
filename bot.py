@@ -2121,6 +2121,8 @@ from userbot_module.userbot import start_userbot  # مسیر یوزربات
 
 nest_asyncio.apply()  # مهم برای Telethon روی Heroku
 
+loop = asyncio.get_event_loop()  # گرفتن loop موجود
+
 # =================== وظایف Startup / آسمینون ===================
 async def on_startup(app):
     """✅ وظایف استارتاپ ربات"""
@@ -2145,11 +2147,11 @@ async def main():
             print("🤖 [BOT] ربات فعاله و در حال اجراست...")
             await asyncio.sleep(10)
 
-    asyncio.create_task(test_main_bot())       # اجرا روی همان loop
-    asyncio.create_task(start_userbot())       # اجرای یوزربات جانبی همزمان
+    loop.create_task(test_main_bot())       # اجرا روی همان loop
+    loop.create_task(start_userbot())       # اجرای یوزربات جانبی همزمان
 
     # اجرای polling ربات اصلی (blocking)
-    await application.run_polling(
+    application.run_polling(
         allowed_updates=[
             "message",
             "edited_message",
@@ -2162,7 +2164,8 @@ async def main():
 # =================== اجرای loop اصلی ===================
 if __name__ == "__main__":
     try:
-        asyncio.run(main())
+        loop.create_task(main())   # اجرای main روی loop موجود
+        loop.run_forever()         # جلوگیری از بسته شدن loop
     except Exception as e:
         print(f"⚠️ خطا در اجرای ربات:\n{e}")
         print("♻️ ربات به‌صورت خودکار توسط هاست ری‌استارت خواهد شد ✅")
