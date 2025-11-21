@@ -2117,37 +2117,52 @@ application.add_handler(
 import asyncio
 import nest_asyncio
 from datetime import time, timezone, timedelta
-from userbot_module.userbot import start_userbot
+from userbot_module.userbot import start_userbot  # مسیر یوزربات
 
-nest_asyncio.apply()  # مهم برای Heroku
+nest_asyncio.apply()  # مهم برای Telethon روی Heroku
 
+# =================== وظایف Startup / آسمینون ===================
+async def on_startup(app):
+    """✅ وظایف استارتاپ ربات"""
+    await notify_admin_on_startup(app)       # بخش ادمین حفظ شد
+    app.create_task(auto_backup(app.bot))
+    app.create_task(start_auto_brain_loop(app.bot))
+    print("🌙 [SYSTEM] Startup tasks scheduled ✅")
+
+application.post_init = on_startup
+
+# =================== تابع اصلی اجرای ربات ===================
 async def main():
-    # اجرای وظایف استارتاپ
-    await notify_admin_on_startup(application)
-    application.create_task(auto_backup(application.bot))
-    application.create_task(start_auto_brain_loop(application.bot))
+    print("🔄 در حال اجرای ربات اصلی...")
 
-    # تست سلامت
-    async def test_main_bot():
-        while True:
-            print("🤖 [BOT] فعال است")
-            await asyncio.sleep(10)
-
-    asyncio.create_task(test_main_bot())
-    asyncio.create_task(start_userbot())  # یوزربات
-
-    # زمان‌بندی آمار شبانه
+    # زمان‌بندی آمار شبانه (ساعت ۰۰:۰۰ به وقت تهران)
     tz_tehran = timezone(timedelta(hours=3, minutes=30))
     application.job_queue.run_daily(send_nightly_stats, time=time(0, 0, tzinfo=tz_tehran))
 
-    # اجرای main bot (blocking)
+    # تست سلامت ربات
+    async def test_main_bot():
+        while True:
+            print("🤖 [BOT] ربات فعاله و در حال اجراست...")
+            await asyncio.sleep(10)
+
+    asyncio.create_task(test_main_bot())       # اجرا روی همان loop
+    asyncio.create_task(start_userbot())       # اجرای یوزربات جانبی همزمان
+
+    # اجرای polling ربات اصلی (blocking)
     await application.run_polling(
         allowed_updates=[
-            "message", "edited_message", "callback_query",
-            "chat_member", "my_chat_member"
+            "message",
+            "edited_message",
+            "callback_query",
+            "chat_member",
+            "my_chat_member",
         ]
     )
 
-# اجرای loop اصلی
+# =================== اجرای loop اصلی ===================
 if __name__ == "__main__":
-    asyncio.run(main())
+    try:
+        asyncio.run(main())
+    except Exception as e:
+        print(f"⚠️ خطا در اجرای ربات:\n{e}")
+        print("♻️ ربات به‌صورت خودکار توسط هاست ری‌استارت خواهد شد ✅")
