@@ -2137,15 +2137,6 @@ application.post_init = on_startup
 async def start_main_bot():
     print("🔄 در حال اجرای ربات اصلی...")
 
-    # ================================
-    # 📤 ارسال گزارش AutoBrain قبل از اجرای ربات
-    # ================================
-    try:
-        await send_autobrain_report(application.bot)
-        print("📤 گزارش AutoBrain ارسال شد.")
-    except Exception as e:
-        print(f"⚠️ ارسال گزارش AutoBrain با خطا مواجه شد: {e}")
-
     # زمان‌بندی آمار شبانه (ساعت ۰۰:۰۰ به وقت تهران)
     tz_tehran = timezone(timedelta(hours=3, minutes=30))
     application.job_queue.run_daily(send_nightly_stats, time=time(0, 0, tzinfo=tz_tehran))
@@ -2159,9 +2150,22 @@ async def start_main_bot():
     loop.create_task(test_main_bot())       # اجرا روی همان loop
     loop.create_task(start_userbot())       # اجرای یوزربات جانبی همزمان
 
-    # اجرای polling ربات اصلی غیر بلاک‌کننده
+    # ================================
+    # 🟢 مرحله‌ای که ربات LOGIN و آماده ارسال پیام می‌شود
+    # ================================
     await application.initialize()
     await application.start()
+
+    # ================================
+    # 📤 ارسال گزارش AutoBrain (اینجا 100% جواب می‌دهد)
+    # ================================
+    try:
+        await send_autobrain_report(application.bot)
+        print("📤 گزارش AutoBrain ارسال شد.")
+    except Exception as e:
+        print(f"⚠️ ارسال گزارش AutoBrain با خطا مواجه شد: {e}")
+
+    # اجرای polling ربات اصلی غیر بلاک‌کننده
     await application.updater.start_polling()
     print("✅ Main bot started and polling...")
 
