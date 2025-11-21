@@ -8,16 +8,13 @@ from datetime import datetime, timedelta
 import json
 
 # ---------- یوزربات ----------
+# ---------- یوزربات ----------
 API_ID = int(os.environ.get("API_ID"))
-API_HASH = os.environ.get("API_HASH"))
+API_HASH = os.environ.get("API_HASH")   # ← پرانتز اضافه حذف شد
 SESSION_STRING = os.environ.get("SESSION_STRING")
 BOT_USER_ID = int(os.environ.get("BOT_USER_ID"))
 
 client = TelegramClient(sessions.StringSession(SESSION_STRING), API_ID, API_HASH)
-
-# فایل هشدارها
-WARN_FILE = "warnings.json"
-SUDO_IDS = [8588347189]
 
 if not os.path.exists(WARN_FILE):
     with open(WARN_FILE, "w", encoding="utf-8") as f:
