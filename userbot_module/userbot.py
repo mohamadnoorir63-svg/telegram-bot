@@ -17,7 +17,6 @@ client = TelegramClient(sessions.StringSession(SESSION_STRING), API_ID, API_HASH
 WARN_FILE = "warnings.json"
 SUDO_IDS = [8588347189]
 
-# ساخت فایل هشدار در صورت نبودن
 if not os.path.exists(WARN_FILE):
     with open(WARN_FILE, "w", encoding="utf-8") as f:
         json.dump({}, f, ensure_ascii=False, indent=2)
@@ -78,7 +77,7 @@ async def cleanup_via_userbot(chat_id, count=None, last_msg_id=None, mids=None):
     except:
         pass
 
-# ================= ارسال دستورات تنبیهی روی یوزربات =================
+# ================= ارسال دستورات تنبیهی =================
 async def punish_via_userbot(chat_id, user_id, action="ban", seconds=None):
     try:
         if action == "ban":
@@ -97,15 +96,13 @@ async def punish_via_userbot(chat_id, user_id, action="ban", seconds=None):
     except:
         pass
 
-# ================= هندلر واحد برای تمام پیام‌ها =================
+# ================= هندلر واحد =================
 @client.on(events.NewMessage)
 async def all_handlers(event):
     text = event.raw_text.lower()
     sender = await event.get_sender()
 
-    # -------------------------------------------------------
-    # فرمان‌های ربات اصلی (handle_commands قبلی)
-    # -------------------------------------------------------
+    # ===== فرمان‌های ربات اصلی
     if sender.id == BOT_USER_ID:
         parts = event.raw_text.split("|")
         if len(parts) >= 2:
@@ -120,13 +117,15 @@ async def all_handlers(event):
                 return await tag_users(chat_id, random_count=count)
 
             elif action.startswith("taglist"):
-                ids = [int(x) for x in parts[2].split(",")] if len(parts) >= 3 else None
+                ids = [int(x) for x in parts[2].split(",") if len(parts) >= 3 else None]
                 return await tag_users(chat_id, user_ids=ids)
 
             elif action == "ban":
                 target = parts[2].strip()
-                user_id = int(target) if target.isdigit() else None
-                if target.startswith("@"):
+                user_id = None
+                if target.isdigit():
+                    user_id = int(target)
+                elif target.startswith("@"):
                     try:
                         user_id = (await client.get_entity(target)).id
                     except:
@@ -136,8 +135,10 @@ async def all_handlers(event):
 
             elif action == "unban":
                 target = parts[2].strip()
-                user_id = int(target) if target.isdigit() else None
-                if target.startswith("@"):
+                user_id = None
+                if target.isdigit():
+                    user_id = int(target)
+                elif target.startswith("@"):
                     try:
                         user_id = (await client.get_entity(target)).id
                     except:
@@ -157,15 +158,11 @@ async def all_handlers(event):
 
                 return await cleanup_via_userbot(chat_id, last_msg_id=last_msg_id)
 
-    # -------------------------------------------------------
-    # پینگ (simple_ping)
-    # -------------------------------------------------------
+    # ===== پینگ
     if text == "ping":
         return await event.reply("✅ Userbot Online")
 
-    # -------------------------------------------------------
-    # لفت (simple_left)
-    # -------------------------------------------------------
+    # ===== لفت
     if text == "left":
         try:
             await event.reply("👋 در حال لفت…")
@@ -173,10 +170,7 @@ async def all_handlers(event):
         except Exception as e:
             await event.reply(f"❌ خطا در لفت: {e}")
 
-# ================= استارت یوزربات =================
+# ================= Start بدون run_until_disconnected =================
 async def start_userbot():
     await client.start()
-    print("✅ Userbot ready and listening to bot commands...")
-    await client.run_until_disconnected()
-
-# ================= اجرا =================
+    print("✅ Userbot connected and handlers registered.")
