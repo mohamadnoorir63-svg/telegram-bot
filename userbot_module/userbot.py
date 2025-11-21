@@ -1,5 +1,3 @@
-# ================= هماهنگ سازی یوزربات با ربات اصلی =================
-
 import os
 import asyncio
 import random
@@ -8,28 +6,21 @@ from datetime import datetime, timedelta
 import json
 
 # ---------- یوزربات ----------
-# ---------- یوزربات ----------
 API_ID = int(os.environ.get("API_ID"))
-API_HASH = os.environ.get("API_HASH")   # ← پرانتز اضافه حذف شد
+API_HASH = os.environ.get("API_HASH")
 SESSION_STRING = os.environ.get("SESSION_STRING")
 BOT_USER_ID = int(os.environ.get("BOT_USER_ID"))
 
 client = TelegramClient(sessions.StringSession(SESSION_STRING), API_ID, API_HASH)
 
+# ---------- فایل هشدارها ----------
+WARN_FILE = "warnings.json"
+SUDO_IDS = [8588347189]
+
+# ساخت فایل هشدار در صورت نبودن
 if not os.path.exists(WARN_FILE):
     with open(WARN_FILE, "w", encoding="utf-8") as f:
         json.dump({}, f, ensure_ascii=False, indent=2)
-
-def _load_json(file):
-    try:
-        with open(file, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except:
-        return {}
-
-def _save_json(file, data):
-    with open(file, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
 
 # ================= تگ کاربران با یوزربات =================
 async def tag_users(chat_id, user_ids=None, random_count=None):
