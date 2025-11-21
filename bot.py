@@ -2131,6 +2131,7 @@ async def on_startup(app):
     print("🌙 [SYSTEM] Startup tasks scheduled ✅")
 
 application.post_init = on_startup
+await send_autobrain_report(application.bot)
 
 
 # =================== اجرای ربات اصلی به صورت non-blocking ===================
