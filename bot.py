@@ -2187,6 +2187,7 @@ async def on_startup(app):
 application.post_init = on_startup
 
 # ==============================
+# ==============================
 #       MAIN BOT FUNCTION
 # ==============================
 async def run_main():
@@ -2209,18 +2210,23 @@ async def run_main():
             print("🤖 [BOT] ربات فعاله و در حال اجراست...")
             await asyncio.sleep(10)
 
-    asyncio.create_task(heartbeat())
-    asyncio.create_task(start_userbot())
+    # اجرای heartbeat و userbot فقط یک بار
+    if not hasattr(run_main, "_tasks_started"):
+        asyncio.create_task(heartbeat())
+        asyncio.create_task(start_userbot())
+        run_main._tasks_started = True
 
     # Initialize + Start (فقط یک بار)
-    try:
-        await application.initialize()
-        await application.start()
-    except RuntimeError as e:
-        if "already running" in str(e):
-            print("⚠️ Application already running, skipping start.")
-        else:
-            raise e
+    if not getattr(application, "_started", False):
+        try:
+            await application.initialize()
+            await application.start()
+            application._started = True
+        except RuntimeError as e:
+            if "already running" in str(e):
+                print("⚠️ Application already running, skipping start.")
+            else:
+                raise e
 
     # ارسال گزارش AutoBrain
     try:
@@ -2229,9 +2235,12 @@ async def run_main():
     except Exception as e:
         print(f"⚠️ AutoBrain report error: {e}")
 
-    # شروع Polling
-    await application.updater.start_polling()
-    print("✅ Main bot polling started.")
+    # شروع Polling (چندباره مشکلی ایجاد نمی‌کند)
+    if not getattr(application, "_polling_started", False):
+        await application.updater.start_polling()
+        application._polling_started = True
+        print("✅ Main bot polling started.")
+
 
 # ==============================
 #       SUPERVISOR / RESTART
@@ -2239,21 +2248,10 @@ async def run_main():
 async def supervisor():
     while True:
         try:
-            print("🟢 Supervisor: Starting main bot...")
+            print("🟢 Supervisor: Checking main bot...")
             await run_main()
+            await asyncio.sleep(60)  # فقط هر 60 ثانیه وضعیت را چک می‌کند
         except Exception as e:
             print(f"🔥 Main runner crashed: {e}")
             print("⏳ در حال تلاش برای ری‌استارت ...")
             await asyncio.sleep(5)
-
-# ==============================
-#       ENTRYPOINT
-# ==============================
-if __name__ == "__main__":
-    try:
-        nest_asyncio.apply()
-        loop.create_task(supervisor())
-        loop.run_forever()
-    except Exception as e:
-        print(f"⚠️ Fatal error: {e}")
-        print("♻️ ربات به‌صورت خودکار توسط هاست ری‌استارت خواهد شد.")
