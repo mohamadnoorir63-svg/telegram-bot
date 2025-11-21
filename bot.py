@@ -2114,7 +2114,6 @@ application.add_handler(
 )
 
 # ==========================================================
-
 from datetime import time, timezone, timedelta
 import asyncio
 
@@ -2130,7 +2129,12 @@ async def on_startup(app):
 
 application.post_init = on_startup
 
-try:
+async def test_main_bot():
+    while True:
+        print("🤖 [BOT] ربات فعاله و در حال اجراست...")
+        await asyncio.sleep(10)
+
+async def main():
     print("🔄 در حال اجرای ربات اصلی...")
 
     # 🌙 زمان‌بندی آمار شبانه (ساعت ۰۰:۰۰ به وقت تهران)
@@ -2138,20 +2142,14 @@ try:
     job_queue = application.job_queue
     job_queue.run_daily(send_nightly_stats, time=time(0, 0, tzinfo=tz_tehran))
 
-    # 🧩 تست سلامت (اختیاری، فقط برای لاگ زنده)
-    async def test_main_bot():
-        while True:
-            print("🤖 [BOT] ربات فعاله و در حال اجراست...")
-            await asyncio.sleep(10)
+    # اجرای همزمان یوزربات و تست سلامت
+    userbot_task = asyncio.create_task(start_userbot())
+    test_task = asyncio.create_task(test_main_bot())
 
-    loop = asyncio.get_event_loop()
-    loop.create_task(test_main_bot())
-
-    # =================== ✅ اضافه کردن یوزربات ===================
-    loop.create_task(start_userbot())  # یوزربات جانبی همزمان اجرا می‌شود
-
-    # ✅ اجرای polling ربات اصلی
-    application.run_polling(
+    # اجرای ربات اصلی
+    await application.initialize()
+    await application.start()
+    await application.updater.start_polling(
         allowed_updates=[
             "message",
             "edited_message",
@@ -2161,9 +2159,26 @@ try:
         ]
     )
 
-    # جلوگیری از بسته شدن برنامه
-    loop.run_forever()
+    # نگه داشتن ربات تا زمانی که بخواهیم
+    await application.updater.idle()
 
-except Exception as e:
-    print(f"⚠️ خطا در اجرای ربات:\n{e}")
-    print("♻️ ربات به‌صورت خودکار توسط هاست ری‌استارت خواهد شد ✅")
+    # وقتی ربات بسته شد، یوزربات و تست سلامت را قطع کن
+    userbot_task.cancel()
+    test_task.cancel()
+    try:
+        await userbot_task
+    except asyncio.CancelledError:
+        pass
+    try:
+        await test_task
+    except asyncio.CancelledError:
+        pass
+
+    await application.stop()
+
+if __name__ == "__main__":
+    try:
+        asyncio.run(main())
+    except Exception as e:
+        print(f"⚠️ خطا در اجرای ربات:\n{e}")
+        print("♻️ ربات به‌صورت خودکار توسط هاست ری‌استارت خواهد شد ✅")
