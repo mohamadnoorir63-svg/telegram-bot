@@ -2116,107 +2116,65 @@ application.add_handler(
 # ==========================================================
 import asyncio
 import nest_asyncio
-from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, CallbackQueryHandler
 from datetime import time, timezone, timedelta
+from userbot_module.userbot import start_userbot  # مسیر یوزربات
 
-# ==============================
-#       CONFIG & STUBS
-# ==============================
-TOKEN = "YOUR_BOT_TOKEN"
-SUDO_IDS = [123456789]  # شناسه سودوها
+nest_asyncio.apply()  # مهم برای Telethon روی Heroku
 
-# Stubs در صورت نبود توابع واقعی
-async def notify_admin_on_startup(app):
-    print("[stub] notify_admin_on_startup called")
+loop = asyncio.get_event_loop()  # گرفتن loop موجود
 
-async def auto_backup(bot):
-    while True:
-        print("[stub] auto_backup tick")
-        await asyncio.sleep(3600)
-
-async def start_auto_brain_loop(bot):
-    while True:
-        print("[stub] start_auto_brain_loop tick")
-        await asyncio.sleep(30)
-
-async def send_nightly_stats(context):
-    print("[stub] send_nightly_stats")
-
-async def send_autobrain_report(bot):
-    print("[stub] send_autobrain_report")
-
-async def start_userbot():
-    while True:
-        print("[stub] UserBot running...")
-        await asyncio.sleep(30)
-
-# ==============================
-#       APPLICATION
-# ==============================
-application = ApplicationBuilder().token(TOKEN).concurrent_updates(True).build()
-
-# Example command
-async def start(update, context):
-    await update.message.reply_text("🤖 ربات فعال است!")
-
-application.add_handler(CommandHandler("start", start))
-
-# ==============================
-#       STARTUP TASKS
-# ==============================
+# =================== وظایف Startup / آسمینون ===================
 async def on_startup(app):
-    # اطلاع ادمین
-    await notify_admin_on_startup(app)
-    # حلقه‌ها
-    app.create_task(auto_backup(app.bot))
-    app.create_task(start_auto_brain_loop(app.bot))
+    await notify_admin_on_startup(app)       # اطلاع ادمین
+    app.create_task(auto_backup(app.bot))    # بکاپ خودکار
+    app.create_task(start_auto_brain_loop(app.bot))  # حلقه مغز مصنوعی
     print("🌙 [SYSTEM] Startup tasks scheduled ✅")
 
 application.post_init = on_startup
 
-# ==============================
-#       RUN FUNCTION (SAFE)
-# ==============================
-async def run_bot():
+
+# =================== اجرای ربات اصلی به صورت non-blocking ===================
+async def start_main_bot():
+    print("🔄 در حال اجرای ربات اصلی...")
+
+    # زمان‌بندی آمار شبانه (ساعت ۰۰:۰۰ به وقت تهران)
     tz_tehran = timezone(timedelta(hours=3, minutes=30))
+    application.job_queue.run_daily(send_nightly_stats, time=time(0, 0, tzinfo=tz_tehran))
 
-    # JobQueue example
-    try:
-        application.job_queue.run_daily(send_nightly_stats, time=time(0, 0, tzinfo=tz_tehran))
-    except Exception as e:
-        print(f"⚠️ JobQueue error: {e}")
-
-    # Heartbeat
-    async def heartbeat():
+    # تست سلامت ربات
+    async def test_main_bot():
         while True:
             print("🤖 [BOT] ربات فعاله و در حال اجراست...")
             await asyncio.sleep(10)
 
-    asyncio.create_task(heartbeat())
-    asyncio.create_task(start_userbot())
+    loop.create_task(test_main_bot())       # اجرا روی همان loop
+    loop.create_task(start_userbot())       # اجرای یوزربات جانبی همزمان
 
-    # Initialize and start
+    # ================================
+    # 🟢 مرحله‌ای که ربات LOGIN و آماده ارسال پیام می‌شود
+    # ================================
     await application.initialize()
     await application.start()
 
-    # AutoBrain report
+    # ================================
+    # 📤 ارسال گزارش AutoBrain (اینجا 100% جواب می‌دهد)
+    # ================================
     try:
         await send_autobrain_report(application.bot)
         print("📤 گزارش AutoBrain ارسال شد.")
     except Exception as e:
-        print(f"⚠️ AutoBrain report error: {e}")
+        print(f"⚠️ ارسال گزارش AutoBrain با خطا مواجه شد: {e}")
 
-    # Polling
+    # اجرای polling ربات اصلی غیر بلاک‌کننده
     await application.updater.start_polling()
-    print("✅ Main bot polling started.")
+    print("✅ Main bot started and polling...")
 
-# ==============================
-#       ENTRYPOINT
-# ==============================
+
+# =================== اجرای loop اصلی ===================
 if __name__ == "__main__":
-    nest_asyncio.apply()
     try:
-        asyncio.run(run_bot())
+        loop.create_task(start_main_bot())  # اجرای main bot روی loop
+        loop.run_forever()                  # جلوگیری از بسته شدن loop
     except Exception as e:
-        print(f"⚠️ Fatal error: {e}")
-        print("♻️ ربات به‌صورت خودکار توسط هاست ری‌استارت خواهد شد.")
+        print(f"⚠️ خطا در اجرای ربات:\n{e}")
+        print("♻️ ربات به‌صورت خودکار توسط هاست ری‌استارت خواهد شد ✅")
