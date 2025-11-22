@@ -76,8 +76,8 @@ async def handler(event):
         users.append(user_id)
         save_json(USERS_FILE, users)
 
-    # سلام اولیه یک بار
-    if user_id not in greeted:
+    # سلام اولیه یک بار، فقط در پیوی
+    if user_id not in greeted and event.is_private:
         await event.reply("سلام بفرما!")
         greeted.append(user_id)
         save_json(GREETED_FILE, greeted)
