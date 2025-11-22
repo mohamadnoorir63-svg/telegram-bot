@@ -9,10 +9,6 @@ import json
 import os
 
 # ────── اطلاعات تلگرام
-API_ID = 32796779
-API_HASH = "4deabef1568103b3242db6f74a73e8a5"
-
-client = TelegramClient(StringSession(SESSION_STRING), API_ID, API_HASH)
 
 # ────── تنظیمات
 SUDO = 8588347189
