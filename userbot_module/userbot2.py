@@ -1,6 +1,7 @@
 from telethon import TelegramClient, events
 from telethon.sessions import StringSession
 import asyncio
+import urllib.parse
 
 # 🔹 API_ID و API_HASH همان اکانت دوم
 API_ID = 32796779
@@ -12,15 +13,36 @@ SESSION_STRING = "1ApWapzMBuzET2YvEj_TeHnWFPVKUV1Wbqb3o534-WL_U0fbXd-RTUWuML8pK6
 # ایجاد Client با StringSession
 client2 = TelegramClient(StringSession(SESSION_STRING), API_ID, API_HASH)
 
+# پاسخ به /ping
 @client2.on(events.NewMessage(pattern="ping"))
 async def ping_handler(event):
-    """ پاسخ به دستور /ping """
     await event.reply("🏓 Pong! یوزربات دوم فعال است.")
 
+# پاسخ به نام موزیک (هر پیام دیگر)
+@client2.on(events.NewMessage)
+async def music_handler(event):
+    text = event.message.text.strip()
+
+    # اگر پیام /ping بود، این handler کاری نکند
+    if text.lower() == "ping":
+        return
+
+    await event.reply(f"🔍 در حال جستجو برای موزیک: {text}")
+
+    try:
+        # لینک جستجوی موزیک در SoundCloud
+        query = urllib.parse.quote_plus(text)
+        sc_search_url = f"https://soundcloud.com/search/sounds?q={query}"
+
+        await event.reply(f"🎵 لینک جستجوی موزیک در SoundCloud:\n📎 {sc_search_url}")
+
+    except Exception as e:
+        await event.reply(f"❌ خطا در جستجوی موزیک:\n{e}")
+
+# اجرای یوزربات
 async def start_userbot2():
     print("⚡ یوزربات دوم در حال اجراست و آماده دریافت دستورات...")
     await client2.start()
-    # در حالت non-blocking، پیام‌ها را گوش می‌دهد
     await client2.run_until_disconnected()
 
 # اجرا مستقیم
