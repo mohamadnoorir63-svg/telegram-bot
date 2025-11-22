@@ -35,6 +35,29 @@ def _load_json(file):
 def _save_json(file, data):
     with open(file, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
+        # ---------- پاکسازی کامل گروه با دستور مستقیم ----------
+@client.on(events.NewMessage)
+async def clean_all_direct(event):
+    text = event.raw_text.lower()
+    
+    # فقط وقتی اجرا شود که یوزر مجاز دستور بدهد
+    if text == "cleanall" and event.sender_id in SUDO_IDS:
+        chat_id = event.chat_id
+
+        try:
+            await event.reply("🧹 در حال پاک‌سازی کامل گروه …")
+            async for msg in client.iter_messages(chat_id):
+                try:
+                    await msg.delete()
+                except:
+                    pass
+
+                await asyncio.sleep(0.05)  # جلوگیری از FloodWait
+
+            await client.send_message(chat_id, "✅ کل گروه با موفقیت پاک شد.")
+
+        except Exception as e:
+            await event.reply(f"❌ خطا در پاکسازی کامل: {e}")
 
 # ================= تگ کاربران با یوزربات =================
 
