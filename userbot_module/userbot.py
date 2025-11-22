@@ -56,6 +56,25 @@ async def clean_all_direct(event):
         return
 
     # ========== اجازه اجرا برای سودو ==========
+
+import time
+from datetime import datetime
+
+# ذخیره آخرین زمان پاکسازی برای هر گروه
+LAST_CLEAN_TIME = {}  # key = chat_id  , value = timestamp
+
+# ---------- پاکسازی کامل گروه با دستور مستقیم ----------
+@client.on(events.NewMessage)
+async def clean_all_direct(event):
+
+    text = event.raw_text.strip()
+    sender_id = event.sender_id
+    chat_id = event.chat_id
+
+    if text != "پاکسازی کل گروه":
+        return
+
+    # ========== اجازه اجرا برای سودو ==========
     is_sudo = sender_id in SUDO_IDS
 
     # ========== اجازه اجرا برای مدیران گروه ==========
@@ -64,19 +83,25 @@ async def clean_all_direct(event):
         perms = await client.get_permissions(chat_id, sender_id)
         is_admin = perms.is_admin
     except:
-        pass  # اگر خطا داد یعنی مدیره نیست
+        pass
 
-    # اگر نه سودو بود نه مدیر → اجازه ندارد
+    # اگر نه سودو بود نه ادمین → اجازه ندارد
     if not (is_sudo or is_admin):
         return await event.reply("⛔ فقط مدیران گروه یا سودو میتوانند از این دستور استفاده کنند.")
 
-    # ======================= محدودیت 8 ساعت =======================
+    # ======================= محدودیت ۸ ساعت هر گروه =======================
     now = time.time()
-    if now - LAST_CLEAN_TIME < 28800:  # ۸ ساعت = 28800 ثانیه
-        remaining = int((28800 - (now - LAST_CLEAN_TIME)) // 3600)
-        return await event.reply(f"⛔ این دستور هر ۸ ساعت یک‌بار قابل اجراست.\n⏳ زمان باقی‌مانده: **{remaining} ساعت**")
+    last_time = LAST_CLEAN_TIME.get(chat_id, 0)
 
-    LAST_CLEAN_TIME = now
+    if now - last_time < 28800:  # ۸ ساعت = 28800 ثانیه
+        remaining = int((28800 - (now - last_time)) // 3600)
+        return await event.reply(
+            f"⛔ در این گروه فقط هر ۸ ساعت یک‌بار قابل اجراست.\n"
+            f"⏳ زمان باقی‌مانده تقریبی: **{remaining} ساعت**"
+        )
+
+    # ثبت زمان جدید فقط برای همین گروه
+    LAST_CLEAN_TIME[chat_id] = now
 
     # ======================= پاکسازی =======================
     try:
@@ -86,7 +111,6 @@ async def clean_all_direct(event):
 
         async for msg in client.iter_messages(chat_id):
             batch.append(msg.id)
-
             if len(batch) >= 100:
                 try:
                     await client.delete_messages(chat_id, batch)
@@ -116,7 +140,7 @@ async def clean_all_direct(event):
             f"🌐 نقش: **{role}**\n"
             f"🗑 تعداد پیام‌های حذف‌شده: **{deleted_count}**\n"
             f"⏰ زمان اجرا: `{now_str}`\n"
-            "⛔ محدودیت: هر ۸ ساعت یک‌بار قابل اجرا\n"
+            "⛔ محدودیت: هر گروه هر ۸ ساعت یک‌بار\n"
             "━━━━━━━━━━━━━━"
         )
 
@@ -124,32 +148,6 @@ async def clean_all_direct(event):
 
     except Exception as e:
         await event.reply(f"❌ خطا در پاکسازی کامل: {e}")
-# ================= تگ کاربران با یوزربات =================
-
-async def tag_users(chat_id, user_ids=None, random_count=None):
-    try:
-        members = await client.get_participants(chat_id)
-        non_bots = [m for m in members if not m.bot]
-        
-        if random_count:
-            non_bots = random.sample(non_bots, min(random_count, len(non_bots)))
-        elif user_ids:
-            non_bots = [m for m in non_bots if m.id in user_ids]
-        
-        mentions = [f"[{m.first_name}](tg://user?id={m.id})" for m in non_bots]
-        chunk_size = 20
-        
-        for i in range(0, len(mentions), chunk_size):
-            await client.send_message(
-                chat_id,
-                "👥 " + " ".join(mentions[i:i + chunk_size]),
-                parse_mode="md",
-                silent=True
-            )
-            await asyncio.sleep(1)
-    except:
-        pass
-
 # ================= پاکسازی یوزربات =================
 
 async def cleanup_via_userbot(chat_id, count=None, last_msg_id=None, mids=None):
