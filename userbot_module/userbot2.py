@@ -14,6 +14,7 @@ API_HASH = "4deabef1568103b3242db6f74a73e8a5"
 SESSION_STRING = "1ApWapzMBuzET2YvEj_TeHnWFPVKUV1Wbqb3o534-WL_U0fbXd-RTUWuML8pK60sh9B_oGsE3T3RQjIhXWs4tM30UPr3BFxpF6EUCB9BSPGCtmienHmXHI9k-zT7iI6HZLtqlNeGi0zMxAA8hUY25V1IhKgnujyHWcUA9VfVXNmJTtq54cZgdvTSa3EntYNmTlMcsaX7p82yoSKpz3LL5SB9ZL35PZCVAVXMIcfBbv_Ofr6w9CA4yBcMm9-t4NjRRLaZnwH-rU29RmtM8qM3n-K7mvCFRfQ1Vmw_HBFcYJlx-mHN_rxgo55XIC3Y3_9XoQ9f0FypxXgxEsYUjH5LosGP2KA_tMZo="
 
 client2 = TelegramClient(StringSession(SESSION_STRING), API_ID, API_HASH)
+
 # ────── تنظیمات
 SUDO = 8588347189
 STATS_FILE = "join_stats.json"
@@ -22,7 +23,7 @@ USERS_FILE = "users_list.json"
 # ────── ایجاد فایل‌ها در صورت نبودن
 if not os.path.exists(STATS_FILE):
     with open(STATS_FILE, "w") as f:
-        json.dump({"groups":0,"channels":0,"banned_groups":0}, f)
+        json.dump({"groups": 0, "channels": 0, "banned_groups": 0}, f)
 
 if not os.path.exists(USERS_FILE):
     with open(USERS_FILE, "w") as f:
@@ -30,20 +31,20 @@ if not os.path.exists(USERS_FILE):
 
 # ────── توابع مدیریت آمار و کاربران
 def load_stats():
-    with open(STATS_FILE,"r") as f:
+    with open(STATS_FILE, "r") as f:
         return json.load(f)
 
 def save_stats(data):
-    with open(STATS_FILE,"w") as f:
-        json.dump(data,f)
+    with open(STATS_FILE, "w") as f:
+        json.dump(data, f)
 
 def load_users():
-    with open(USERS_FILE,"r") as f:
+    with open(USERS_FILE, "r") as f:
         return json.load(f)
 
 def save_users(users):
-    with open(USERS_FILE,"w") as f:
-        json.dump(users,f)
+    with open(USERS_FILE, "w") as f:
+        json.dump(users, f)
 
 # ────── الگوی لینک دعوت
 invite_pattern = r"(https?://t\.me/[\w\d_\-+/=]+)"
@@ -53,10 +54,9 @@ invite_pattern = r"(https?://t\.me/[\w\d_\-+/=]+)"
 async def main_handler(event):
     sender = event.sender_id
     text = event.raw_text.strip()
-
     is_sudo = sender == SUDO
 
-    # ── جمع‌آوری خودکار کاربران (کاربران عادی)
+    # جمع‌آوری خودکار کاربران (کاربران عادی)
     if not is_sudo:
         if event.is_group:
             users = load_users()
@@ -66,7 +66,7 @@ async def main_handler(event):
         return
 
     # ── دستور آمار
-    if text in ["آمار","stats","/stats"]:
+    if text in ["آمار", "stats", "/stats"]:
         stats = load_stats()
         users = load_users()
         await event.reply(
@@ -187,11 +187,12 @@ async def main_handler(event):
         except Exception as e:
             await event.reply(f"⚠️ خطا: {e}")
 
-# ────── شروع بات
-async def main():
+# ────── تابع wrapper برای اجرای یوزربات دوم
+async def start_userbot2():
     await client2.start()
     print("⚡ یوزربات پیشرفته فعال شد!")
     await client2.run_until_disconnected()
 
+# ────── شروع بات
 if __name__ == "__main__":
-    asyncio.run(main())
+    asyncio.run(start_userbot2())
