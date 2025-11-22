@@ -12,7 +12,7 @@ SESSION_STRING = "1ApWapzMBuzET2YvEj_TeHnWFPVKUV1Wbqb3o534-WL_U0fbXd-RTUWuML8pK6
 # ایجاد Client با StringSession
 client2 = TelegramClient(StringSession(SESSION_STRING), API_ID, API_HASH)
 
-@client2.on(events.NewMessage(pattern="/ping"))
+@client2.on(events.NewMessage(pattern="ping"))
 async def ping_handler(event):
     """ پاسخ به دستور /ping """
     await event.reply("🏓 Pong! یوزربات دوم فعال است.")
