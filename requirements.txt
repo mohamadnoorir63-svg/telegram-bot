@@ -44,4 +44,7 @@ cloudinary==1.32.0
 Flask==2.3.2
 gunicorn==21.2.0
 nest_asyncio==1.5.8
-pytgcalls
+
+# Voice/Video Calls
+pytgcalls==2.0.0
+tgcalls==2.0.0
