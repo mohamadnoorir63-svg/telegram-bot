@@ -2115,24 +2115,40 @@ application.add_handler(
 import asyncio
 import nest_asyncio
 from datetime import time, timezone, timedelta
-from userbot_module.userbot import start_userbot  # مسیر یوزربات
+
+# فرضی: مسیر یوزربات جانبی
+from userbot_module.userbot import start_userbot
 
 nest_asyncio.apply()  # مهم برای Telethon روی Heroku
 
 loop = asyncio.get_event_loop()  # گرفتن loop موجود
 
+# =================== توابع فرضی / تستی ===================
+async def notify_admin_on_startup(app):
+    print("📢 [Test] ادمین مطلع شد (نسخه تستی)")
+
+async def send_autobrain_report(bot):
+    print("📤 [AutoBrain] گزارش ارسال شد (نسخه تستی)")
+
+async def auto_backup(bot):
+    print("💾 [Backup] بکاپ خودکار انجام شد (نسخه تستی)")
+
+async def start_auto_brain_loop(bot):
+    print("🧠 [AutoBrain] حلقه مغز مصنوعی اجرا شد (نسخه تستی)")
+
+async def send_nightly_stats(context):
+    print("🌙 [Stats] آمار شبانه ارسال شد (نسخه تستی)")
+
+# =================== تنظیمات و اتصال ربات ===================
+application = ...  # جایگزین با ربات اصلی شما
+
 # =================== وظایف Startup ===================
 async def on_startup(app):
-    # اطلاع ادمین (اگر تعریف شده باشد)
     try:
-        if 'notify_admin_on_startup' in globals():
-            await notify_admin_on_startup(app)
-        else:
-            print("ℹ️ تابع notify_admin_on_startup تعریف نشده، عبور شد.")
+        await notify_admin_on_startup(app)
     except Exception as e:
         print(f"⚠️ خطا در اجرای notify_admin_on_startup: {e}")
 
-    # اجرای تسک‌های خودکار
     try:
         app.create_task(auto_backup(app.bot))
         app.create_task(start_auto_brain_loop(app.bot))
@@ -2140,10 +2156,9 @@ async def on_startup(app):
     except Exception as e:
         print(f"⚠️ خطا در اجرای تسک‌های خودکار startup: {e}")
 
-# اتصال تابع به ربات
 application.post_init = on_startup
 
-# =================== اجرای ربات اصلی به صورت non-blocking ===================
+# =================== اجرای ربات اصلی ===================
 async def start_main_bot():
     print("🔄 در حال اجرای ربات اصلی...")
 
@@ -2160,11 +2175,11 @@ async def start_main_bot():
             print("🤖 [BOT] ربات فعاله و در حال اجراست...")
             await asyncio.sleep(10)
 
-    loop.create_task(test_main_bot())       # اجرا روی همان loop
-    loop.create_task(start_userbot())       # اجرای یوزربات جانبی همزمان
+    loop.create_task(test_main_bot())
+    loop.create_task(start_userbot())
 
     # ================================
-    # 🟢 مرحله‌ای که ربات LOGIN و آماده ارسال پیام می‌شود
+    # ورود و آماده‌سازی ربات
     # ================================
     try:
         await application.initialize()
@@ -2172,19 +2187,13 @@ async def start_main_bot():
     except Exception as e:
         print(f"⚠️ خطا در شروع ربات اصلی: {e}")
 
-    # ================================
-    # 📤 ارسال گزارش AutoBrain (ایمن)
-    # ================================
+    # ارسال گزارش AutoBrain
     try:
-        if 'send_autobrain_report' in globals():
-            await send_autobrain_report(application.bot)
-            print("📤 گزارش AutoBrain ارسال شد.")
-        else:
-            print("ℹ️ تابع send_autobrain_report تعریف نشده، عبور شد.")
+        await send_autobrain_report(application.bot)
     except Exception as e:
         print(f"⚠️ ارسال گزارش AutoBrain با خطا مواجه شد: {e}")
 
-    # اجرای polling ربات اصلی غیر بلاک‌کننده
+    # اجرای polling ربات اصلی
     try:
         await application.updater.start_polling()
         print("✅ Main bot started and polling...")
@@ -2194,8 +2203,8 @@ async def start_main_bot():
 # =================== اجرای loop اصلی ===================
 if __name__ == "__main__":
     try:
-        loop.create_task(start_main_bot())  # اجرای main bot روی loop
-        loop.run_forever()                  # جلوگیری از بسته شدن loop
+        loop.create_task(start_main_bot())
+        loop.run_forever()
     except Exception as e:
         print(f"⚠️ خطا در اجرای ربات:\n{e}")
         print("♻️ ربات به‌صورت خودکار توسط هاست ری‌استارت خواهد شد ✅")
