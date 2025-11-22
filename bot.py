@@ -1366,7 +1366,7 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import ContextTypes, CallbackQueryHandler, MessageHandler, filters
 from datetime import datetime
 
-# ================== صف‌بندی ریپلی مدیا ==================
+# ======= تنظیمات =======
 SUDO_IDS = [123456789, 8588347189]  # آیدی مدیران/سودو
 queues = {}  # {chat_id: {"messages": [msg], "users": {user_id: [msg]}, "active": True}}
 
@@ -1448,11 +1448,19 @@ async def queue_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             summary += f"👤 {name}:\n"
             for m in messages:
                 summary += f"💬 {m.caption or 'بدون کپشن'}\n"
+                # ارسال خود مدیا به چت
+                if m.audio:
+                    await context.bot.send_audio(chat_id, audio=m.audio.file_id, caption=m.caption)
+                elif m.video:
+                    await context.bot.send_video(chat_id, video=m.video.file_id, caption=m.caption)
+                elif m.document:
+                    await context.bot.send_document(chat_id, document=m.document.file_id, caption=m.caption)
             summary += "\n"
         await query.edit_message_text(f"✅ صف بندی پایان یافت:\n\n{summary}")
         queues.pop(chat_id)
 
-# ================== افزودن هندلرها به اپلیکیشن ==================
+# ======= اضافه کردن هندلرها =======
+
 
 # ================== پایان بخش صف‌بندی ==================
 # ======================= 🧹 ریست و ریلود =======================
