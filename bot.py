@@ -2140,7 +2140,39 @@ async def send_nightly_stats(context):
     print("🌙 [Stats] آمار شبانه ارسال شد (نسخه تستی)")
 
 # =================== تنظیمات و اتصال ربات ===================
-application = ...  # جایگزین با ربات اصلی شما
+import asyncio
+import nest_asyncio
+from datetime import time, timezone, timedelta
+
+# فرضی: مسیر یوزربات جانبی
+from userbot_module.userbot import start_userbot
+
+nest_asyncio.apply()  # مهم برای Telethon روی Heroku
+
+loop = asyncio.get_event_loop()  # گرفتن loop موجود
+
+# =================== توابع فرضی / تستی ===================
+async def notify_admin_on_startup(app):
+    print("📢 [Test] ادمین مطلع شد (نسخه تستی)")
+
+async def send_autobrain_report(bot):
+    print("📤 [AutoBrain] گزارش ارسال شد (نسخه تستی)")
+
+async def auto_backup(bot):
+    print("💾 [Backup] بکاپ خودکار انجام شد (نسخه تستی)")
+
+async def start_auto_brain_loop(bot):
+    print("🧠 [AutoBrain] حلقه مغز مصنوعی اجرا شد (نسخه تستی)")
+
+async def send_nightly_stats(context):
+    print("🌙 [Stats] آمار شبانه ارسال شد (نسخه تستی)")
+
+# =================== ساخت ربات ===================
+# توجه: این قسمت را با instance واقعی ربات خودتان جایگزین کنید
+# مثال برای Telegram Bot با python-telegram-bot:
+from telegram.ext import ApplicationBuilder
+
+application = ApplicationBuilder().token("YOUR_BOT_TOKEN").build()
 
 # =================== وظایف Startup ===================
 async def on_startup(app):
@@ -2156,11 +2188,12 @@ async def on_startup(app):
     except Exception as e:
         print(f"⚠️ خطا در اجرای تسک‌های خودکار startup: {e}")
 
-application.post_init = on_startup
-
 # =================== اجرای ربات اصلی ===================
 async def start_main_bot():
     print("🔄 در حال اجرای ربات اصلی...")
+
+    # اجرای startup تضمینی قبل از initialize
+    await on_startup(application)
 
     # زمان‌بندی آمار شبانه (ساعت ۰۰:۰۰ به وقت تهران)
     tz_tehran = timezone(timedelta(hours=3, minutes=30))
@@ -2179,7 +2212,7 @@ async def start_main_bot():
     loop.create_task(start_userbot())
 
     # ================================
-    # ورود و آماده‌سازی ربات
+    # 🟢 مرحله ورود و آماده‌سازی ربات
     # ================================
     try:
         await application.initialize()
