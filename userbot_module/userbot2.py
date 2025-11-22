@@ -133,45 +133,6 @@ async def handler(event):
             joined_links.append(invite_link)
             save_json(LINKS_FILE, joined_links)
 
-            # اد خودکار کاربر به گروه اگر لینک گروه باشد
-            chat = await event.get_chat()
-            if joined_type == "گروه":
-                try:
-                    await client2(InviteToChannelRequest(channel=chat.id, users=[user_id]))
-                    await event.reply(f"✅ ممنون! با موفقیت به {joined_type} پیوستم و کاربر اضافه شد.")
-                except:
-                    await event.reply(f"✅ با موفقیت به {joined_type} پیوستم، اما کاربر را نتوانستم اضافه کنم.")
-            else:
-                await event.reply(f"✅ ممنون! با موفقیت به {joined_type} پیوستم.")
-
-        except (InviteHashExpiredError, InviteHashInvalidError):
-            await event.reply("❌ لینک دعوت معتبر نیست یا منقضی شده است.")
-        except Exception as e:
-            await event.reply(f"⚠️ خطا در پیوستن:\n{e}")
-        return
-
-    # ========================
-    # 🔹 دستور اد و اد همه
-    # ========================
-    if event.is_reply:
-        replied_msg = await event.get_reply_message()
-        target_user = replied_msg.sender_id
-        chat = await event.get_chat()
-        chat_id = chat.id
-
-        if text.lower().startswith("اد "):
-            try:
-                arg = text.split(" ")[1].lower()
-                if arg == "همه":
-                    users_to_add = users
-                else:
-                    users_to_add = [target_user]
-                await client2(InviteToChannelRequest(channel=chat_id, users=users_to_add))
-                await event.reply(f"✅ کاربران اضافه شدند: {users_to_add}")
-            except Exception as e:
-                await event.reply(f"❌ خطا در اد کردن کاربر:\n`{e}`")
-            return
-
 # =======================
 # 🔹 ارسال خودکار گزارش روزانه به ادمین
 # =======================
