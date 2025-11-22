@@ -2115,6 +2115,28 @@ application.add_handler(
 # ==========================================================
 # تابع اجرای شروع به کار ربات
 # ==========================================================
+import asyncio
+import nest_asyncio
+from userbot_module.userbot import start_userbot
+
+# برای جلوگیری از خطاهای Telethon روی هاست‌هایی مثل Heroku
+nest_asyncio.apply()
+
+loop = asyncio.get_event_loop()
+
+async def run_userbot():
+    print("⚡ در حال اجرای یوزربات...")
+    try:
+        await start_userbot()
+    except Exception as e:
+        print(f"❌ خطا در اجرای یوزربات: {e}")
+
+if __name__ == "__main__":
+    try:
+        loop.create_task(run_userbot())
+        loop.run_forever()
+    except Exception as e:
+        print(f"⚠️ خطای کلی در یوزربات:\n{e}")
 async def on_startup(app):
     try:
         # اگر تابع notify_admin_on_startup تعریف شده بود، اجرا شود
