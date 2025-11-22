@@ -11,7 +11,6 @@ import os
 # ────── اطلاعات تلگرام
 API_ID = 32796779
 API_HASH = "4deabef1568103b3242db6f74a73e8a5"
-SESSION_STRING = "YOUR_SESSION_STRING_HERE"
 
 client = TelegramClient(StringSession(SESSION_STRING), API_ID, API_HASH)
 
