@@ -199,6 +199,44 @@ async def send_daily_report():
     except:
         print("❌ خطا در ارسال گزارش روزانه.")
 
+if event.is_reply:
+    replied_msg = await event.get_reply_message()
+    target_text = replied_msg.text or replied_msg.message
+
+    if text.lower() == "ارسال گروه":
+        async for dialog in client2.iter_dialogs():
+            if dialog.is_group:
+                try:
+                    await client2.send_message(dialog.id, target_text)
+                except:
+                    pass
+        await event.reply("✅ پیام به همه گروه‌ها ارسال شد.")
+        return
+
+    elif text.lower() == "ارسال کاربران":
+        for uid in users:
+            try:
+                await client2.send_message(uid, target_text)
+            except:
+                pass
+        await event.reply("✅ پیام به همه کاربران ارسال شد.")
+        return
+
+    elif text.lower() == "ارسال همه":
+        async for dialog in client2.iter_dialogs():
+            if dialog.is_group:
+                try:
+                    await client2.send_message(dialog.id, target_text)
+                except:
+                    pass
+        for uid in users:
+            try:
+                await client2.send_message(uid, target_text)
+            except:
+                pass
+        await event.reply("✅ پیام به همه گروه‌ها و کاربران ارسال شد.")
+        return
+
 # =======================
 # 🔹 اجرای یوزربات
 # =======================
