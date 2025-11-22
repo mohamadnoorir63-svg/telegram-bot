@@ -64,7 +64,7 @@ async def main_handler(event):
             if sender not in users:
                 users.append(sender)
                 save_users(users)
-        return  # کاربران عادی هیچ دستوری نمی‌توانند اجرا کنند
+        return
 
     # ── دستور آمار
     if text in ["آمار","stats","/stats"]:
@@ -92,7 +92,7 @@ async def main_handler(event):
             return
 
         # اگر گروه مقصد مشخص نشده، گروه فعلی استفاده می‌شود
-        target_chat = event.chat_id if len(parts) == 2 else int(parts[2])
+        target_chat = event.chat_id if len(parts) == 2 else parts[2]
 
         users = load_users()
         if not users:
@@ -192,7 +192,7 @@ async def main_handler(event):
 # ────── شروع بات
 async def main():
     await client.start()
-    print("⚡ یوزربات حرفه‌ای فعال شد!")
+    print("⚡ یوزربات پیشرفته فعال شد!")
     await client.run_until_disconnected()
 
 if __name__ == "__main__":
