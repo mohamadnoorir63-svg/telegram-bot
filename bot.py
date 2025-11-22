@@ -1360,8 +1360,101 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_text = smart_response(full_context, uid) or enhance_sentence(full_context)
 
     await update.message.reply_text(reply_text)
+    # ======================= 🧹 ریست و ریلود =======================
 
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
+from telegram.ext import ContextTypes, CallbackQueryHandler, MessageHandler, filters
+from datetime import datetime
 
+# ================== صف‌بندی ریپلی مدیا ==================
+SUDO_IDS = [123456789, 8588347189]  # آیدی مدیران/سودو
+queues = {}  # {chat_id: {"messages": [msg], "users": {user_id: [msg]}, "active": True}}
+
+# ======= هندلر ریپلی روی مدیا =======
+async def reply_media_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    message = update.message
+    chat_id = message.chat.id
+    user_id = message.from_user.id
+
+    # فقط مدیر یا سودو می‌توانند پیام وارد صف کنند
+    if user_id not in SUDO_IDS:
+        return
+
+    # بررسی اینکه پیام ریپلی روی مدیا باشد
+    if not message.reply_to_message:
+        return
+    if not (message.reply_to_message.audio or message.reply_to_message.video or message.reply_to_message.document):
+        return
+
+    # ایجاد یا بازیابی صف
+    if chat_id not in queues or not queues[chat_id]["active"]:
+        queues[chat_id] = {"messages": [], "users": {}, "active": True}
+
+    queues[chat_id]["messages"].append(message.reply_to_message)
+
+    # دکمه‌ها برای اختصاص بخش و پایان صف
+    keyboard = [
+        [InlineKeyboardButton("👤 بخش خودم", callback_data="queue_my_part")],
+        [InlineKeyboardButton("⏹ پایان", callback_data="queue_end")]
+    ]
+    markup = InlineKeyboardMarkup(keyboard)
+
+    await message.reply_text(
+        f"📌 پیام وارد صف شد! کاربران می‌توانند بخش خود را اختصاص دهند.", 
+        reply_markup=markup
+    )
+
+# ======= هندلر دکمه‌ها =======
+async def queue_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    chat_id = query.message.chat.id
+    user_id = query.from_user.id
+
+    if chat_id not in queues or not queues[chat_id]["active"]:
+        await query.edit_message_text("❗ هیچ صف فعالی وجود ندارد.")
+        return
+
+    # اختصاص بخش به یوزر
+    if query.data == "queue_my_part":
+        user_section = queues[chat_id]["users"].get(user_id, [])
+        # اختصاص اولین پیام هنوز اختصاص نیافته
+        for msg in queues[chat_id]["messages"]:
+            allocated = False
+            for lst in queues[chat_id]["users"].values():
+                if msg in lst:
+                    allocated = True
+                    break
+            if not allocated:
+                user_section.append(msg)
+                queues[chat_id]["users"][user_id] = user_section
+                break
+        if user_section:
+            text = "\n".join([f"💬 {m.caption or 'بدون کپشن'}" for m in user_section])
+            await query.edit_message_text(f"📄 بخش شما:\n{text}")
+        else:
+            await query.edit_message_text("❗ هیچ پیام موجود برای اختصاص نیست.")
+
+    # پایان صف و جمع‌بندی
+    elif query.data == "queue_end":
+        queues[chat_id]["active"] = False
+        summary = ""
+        for uid, messages in queues[chat_id]["users"].items():
+            try:
+                member = await context.bot.get_chat(uid)
+                name = member.first_name
+            except:
+                name = str(uid)
+            summary += f"👤 {name}:\n"
+            for m in messages:
+                summary += f"💬 {m.caption or 'بدون کپشن'}\n"
+            summary += "\n"
+        await query.edit_message_text(f"✅ صف بندی پایان یافت:\n\n{summary}")
+        queues.pop(chat_id)
+
+# ================== افزودن هندلرها به اپلیکیشن ==================
+
+# ================== پایان بخش صف‌بندی ==================
 # ======================= 🧹 ریست و ریلود =======================
 import asyncio, os, json, random
 from datetime import datetime
@@ -2031,6 +2124,11 @@ application.add_handler(CallbackQueryHandler(next_font, pattern=r"^next_font_\d+
 application.add_handler(CallbackQueryHandler(prev_font, pattern=r"^prev_font_\d+$"), group=2)
 application.add_handler(CallbackQueryHandler(feature_back, pattern=r"^feature_back$"), group=2)
 application.add_handler(CallbackQueryHandler(send_selected_font, pattern=r"^send_font_\d+$"), group=2)
+# application = ApplicationBuilder().token("TOKEN").build()
+# هندلر ریپلی روی مدیا
+application.add_handler(MessageHandler(filters.ALL & filters.REPLY, reply_media_handler))
+# هندلر دکمه‌ها
+application.add_handler(CallbackQueryHandler(queue_callback, pattern="^queue_"))
 # ==========================================================
 # 🤖 پنل ChatGPT هوش مصنوعی
 # ==========================================================
