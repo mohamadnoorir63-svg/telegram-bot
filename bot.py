@@ -2113,12 +2113,22 @@ application.add_handler(
 
 # ==========================================================
 # ==========================================================
+# تابع اجرای شروع به کار ربات
+# ==========================================================
 async def on_startup(app):
-    await notify_admin_on_startup(app)
+    try:
+        # اگر تابع notify_admin_on_startup تعریف شده بود، اجرا شود
+        if 'notify_admin_on_startup' in globals():
+            await notify_admin_on_startup(app)
+    except Exception as e:
+        print(f"⚠️ خطا در اجرای notify_admin_on_startup: {e}")
+
+    # اجرای تسک‌های خودکار
     app.create_task(auto_backup(app.bot))
     app.create_task(start_auto_brain_loop(app.bot))
     print("🌙 [SYSTEM] Startup tasks scheduled ✅")
 
+# اتصال تابع به ربات
 application.post_init = on_startup
 
 # ==========================================================
@@ -2133,6 +2143,7 @@ try:
     job_queue = application.job_queue
     job_queue.run_daily(send_nightly_stats, time=time(0, 0, tzinfo=tz_tehran))
 
+    # اجرای polling ربات
     application.run_polling(
         allowed_updates=[
             "message",
