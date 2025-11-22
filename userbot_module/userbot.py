@@ -6,25 +6,22 @@ import random
 from telethon import TelegramClient, events, sessions
 from datetime import datetime, timedelta
 import json
-from pytgcalls import PyTgCalls
+from pytgcalls import PyTgClient
 from pytgcalls.types.input_stream import AudioPiped, AudioVideoPiped
 
-pytgcalls = PyTgCalls(client)
-
-# ذخیره وضعیت پخش در هر چت
-playing_in_chat = {}
-
 # ---------- یوزربات ----------
-
 API_ID = int(os.environ.get("API_ID"))
 API_HASH = os.environ.get("API_HASH")
 SESSION_STRING = os.environ.get("SESSION_STRING")
 BOT_USER_ID = int(os.environ.get("BOT_USER_ID"))
 
 client = TelegramClient(sessions.StringSession(SESSION_STRING), API_ID, API_HASH)
+pytgcalls = PyTgClient(client)
+
+# ذخیره وضعیت پخش در هر چت
+playing_in_chat = {}
 
 # فایل هشدارها
-
 WARN_FILE = "warnings.json"
 SUDO_IDS = [8588347189]
 
@@ -43,6 +40,7 @@ def _save_json(file, data):
     with open(file, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
+# ================= مدیریت پخش در گروه =================
 @client.on(events.NewMessage)
 async def play_in_call(event):
     if event.sender_id not in SUDO_IDS:
@@ -67,7 +65,6 @@ async def play_in_call(event):
             playing_in_chat[chat_id] = True
 
 # ================= تگ کاربران با یوزربات =================
-
 async def tag_users(chat_id, user_ids=None, random_count=None):
     try:
         members = await client.get_participants(chat_id)
@@ -93,10 +90,8 @@ async def tag_users(chat_id, user_ids=None, random_count=None):
         pass
 
 # ================= پاکسازی یوزربات =================
-
 async def cleanup_via_userbot(chat_id, count=None, last_msg_id=None, mids=None):
     try:
-        # حالت ۳: لیست message_id ها
         if mids:
             for mid in mids:
                 try:
@@ -106,7 +101,6 @@ async def cleanup_via_userbot(chat_id, count=None, last_msg_id=None, mids=None):
                 await asyncio.sleep(0.08)
             return
 
-        # حالت ۱: پاکسازی عددی
         if count:
             for mid in range(last_msg_id, max(1, last_msg_id - count), -1):
                 try:
@@ -116,7 +110,6 @@ async def cleanup_via_userbot(chat_id, count=None, last_msg_id=None, mids=None):
                 await asyncio.sleep(0.08)
             return
 
-        # حالت ۲: پاکسازی کامل
         for mid in range(last_msg_id, 1, -1):
             try:
                 await client.delete_messages(chat_id, mid)
@@ -126,8 +119,7 @@ async def cleanup_via_userbot(chat_id, count=None, last_msg_id=None, mids=None):
     except:
         pass
 
-# ================= ارسال دستورات تنبیهی روی یوزربات =================
-
+# ================= ارسال دستورات تنبیهی =================
 async def punish_via_userbot(chat_id, user_id, action="ban", seconds=None):
     try:
         if action == "ban":
@@ -145,7 +137,6 @@ async def punish_via_userbot(chat_id, user_id, action="ban", seconds=None):
         pass
 
 # ================= دریافت فرمان از ربات اصلی =================
-
 @client.on(events.NewMessage)
 async def handle_commands(event):
     sender = await event.get_sender()
@@ -206,21 +197,17 @@ async def handle_commands(event):
     # ---------- پاکسازی ----------
     elif action == "cleanup":
         last_msg_id = int(parts[2])
-        # اگر آرگومان چهارم عدد است → پاکسازی عددی
         if len(parts) >= 4 and parts[3].isdigit():
             count = int(parts[3])
             await cleanup_via_userbot(chat_id, count=count, last_msg_id=last_msg_id)
             return
-        # اگر لیست بود → پاکسازی انتخابی
         if len(parts) >= 4 and "," in parts[3]:
             mids = [int(x) for x in parts[3].split(",") if x.isdigit()]
             await cleanup_via_userbot(chat_id, mids=mids)
             return
-        # در غیر این صورت → پاکسازی کامل
         await cleanup_via_userbot(chat_id, last_msg_id=last_msg_id)
 
 # ---------- پینگ ----------
-
 @client.on(events.NewMessage)
 async def simple_ping(event):
     text = event.raw_text.lower()
@@ -228,7 +215,6 @@ async def simple_ping(event):
         await event.reply("✅ Userbot Online")
 
 # ---------- لفت ----------
-
 @client.on(events.NewMessage)
 async def simple_left(event):
     text = event.raw_text.lower()
@@ -241,13 +227,12 @@ async def simple_left(event):
             await event.reply(f"❌ خطا در لفت: {e}")
 
 # ================= استارت یوزربات =================
-
 async def start_userbot():
     await client.start()
     print("✅ Userbot ready and listening to bot commands...")
+    await pytgcalls.start()
     await client.run_until_disconnected()
 
 # ================= اجرا =================
 if __name__ == "__main__":
-    import asyncio
-    
+    asyncio.run(start_userbot())
