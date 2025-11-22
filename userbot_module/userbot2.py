@@ -206,7 +206,7 @@ async def handler(event):
                 try:
                     await client2.send_message(uid, target_text)
                 except:
-                    pass
+                        pass
             await event.reply("✅ پیام به همه کاربران ارسال شد.")
             return
 
@@ -226,32 +226,11 @@ async def handler(event):
             return
 
 # =======================
-# 🔹 ارسال خودکار گزارش روزانه به ادمین
-# =======================
-async def send_daily_report():
-    await client2.start()
-    daily = reset_daily_if_needed()
-    users_count = len(load_json(USERS_FILE))
-    stats_msg = (
-        f"📊 گزارش روزانه ربات\n\n"
-        f"👤 کاربران پیام‌دهنده: {users_count} نفر\n"
-        f"👥 گروه‌ها Joined امروز: {daily.get('groups',0)}\n"
-        f"📢 کانال‌ها Joined امروز: {daily.get('channels',0)}\n"
-        f"📦 مجموع امروز: {daily.get('groups',0) + daily.get('channels',0)}"
-    )
-    try:
-        await client2.send_message(ADMIN_ID, stats_msg)
-        print("✅ گزارش روزانه به ادمین ارسال شد.")
-    except:
-        print("❌ خطا در ارسال گزارش روزانه.")
-
-# =======================
 # 🔹 اجرای یوزربات
 # =======================
 async def start_userbot2():
     print("⚡ Userbot2 فعال و آماده است!")
     await client2.start()
-    # asyncio.create_task(send_daily_report())  # می‌توان زمان‌بندی کرد
     await client2.run_until_disconnected()
 
 if __name__ == "__main__":
