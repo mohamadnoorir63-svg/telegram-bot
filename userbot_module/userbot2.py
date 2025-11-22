@@ -15,14 +15,20 @@ SESSION_STRING = "1ApWapzMBuzET2YvEj_TeHnWFPVKUV1Wbqb3o534-WL_U0fbXd-RTUWuML8pK6
 client2 = TelegramClient(StringSession(SESSION_STRING), API_ID, API_HASH)
 
 # ────────────────────────────────
-# 📌 سیستم آمارگیر
+# 📌 فایل آمار + فایل کاربران
 # ────────────────────────────────
-STATS_FILE = "join_stats.json"
 
-# اگر فایل نبود، خودکار می‌سازیم
+STATS_FILE = "join_stats.json"
+USERS_FILE = "users.json"
+
+# اگر فایل‌ها نبودند، بسازیم
 if not os.path.exists(STATS_FILE):
     with open(STATS_FILE, "w") as f:
         f.write(json.dumps({"groups": 0, "channels": 0}))
+
+if not os.path.exists(USERS_FILE):
+    with open(USERS_FILE, "w") as f:
+        f.write(json.dumps([]))
 
 def load_stats():
     with open(STATS_FILE, "r") as f:
@@ -32,64 +38,90 @@ def save_stats(data):
     with open(STATS_FILE, "w") as f:
         json.dump(data, f)
 
+def load_users():
+    with open(USERS_FILE, "r") as f:
+        return json.load(f)
+
+def save_users(users):
+    with open(USERS_FILE, "w") as f:
+        json.dump(users, f)
+
 # ────────────────────────────────
 
 invite_pattern = r"(https?://t\.me/[\w\d_\-+/=]+)"
 
 @client2.on(events.NewMessage)
-async def join_group_handler(event):
+async def handler(event):
+
+    # 📌 ثبت کاربر جدید در آمار کاربران
+    user_id = event.sender_id
+    users = load_users()
+    if user_id not in users:
+        users.append(user_id)
+        save_users(users)
+
     text = event.raw_text
 
-    # 📊 اگر کسی بگوید "آمار"
+    # 📊 اگر گفت "آمار"
     if text.strip() in ["آمار", "/stats", "stats"]:
         stats = load_stats()
+        users_count = len(load_users())
+
         await event.reply(
             f"📊 **آمار ربات:**\n\n"
-            f"👥 گروه‌ها: `{stats['groups']}`\n"
-            f"📢 کانال‌ها: `{stats['channels']}`\n"
+            f"👤 کاربران پیام‌داده: `{users_count}` نفر\n"
+            f"👥 گروه‌ها Joined: `{stats['groups']}`\n"
+            f"📢 کانال‌ها Joined: `{stats['channels']}`\n"
             f"📦 مجموع: `{stats['groups'] + stats['channels']}`"
         )
         return
 
-    # جستجوی لینک
+    # 🔍 جستجوی لینک و join
     match = re.search(invite_pattern, text)
-    if not match:
-        return
+    if match:
+        invite_link = match.group(1)
+        await event.reply("🔍 در حال تلاش برای پیوستن...")
 
-    invite_link = match.group(1)
-    await event.reply("🔍 در حال تلاش برای پیوستن...")
+        try:
+            stats = load_stats()
 
-    try:
-        stats = load_stats()
-
-        # گروه‌های خصوصی (joinchat / +)
-        if "joinchat" in invite_link or "+" in invite_link:
-            invite_hash = invite_link.split("/")[-1]
-            await client2(ImportChatInviteRequest(invite_hash))
-
-            stats["groups"] += 1
-            save_stats(stats)
-
-        # گروه/کانال عمومی
-        else:
-            await client2(JoinChannelRequest(invite_link))
-
-            # تشخیص کانال یا گروه بر اساس لینک ساده
-            if "/c/" in invite_link or invite_link.count("/") > 3:
+            if "joinchat" in invite_link or "+" in invite_link:
+                invite_hash = invite_link.split("/")[-1]
+                await client2(ImportChatInviteRequest(invite_hash))
                 stats["groups"] += 1
             else:
+                await client2(JoinChannelRequest(invite_link))
                 stats["channels"] += 1
 
             save_stats(stats)
+            await event.reply("✅ با موفقیت پیوستم!")
 
-        await event.reply("✅ با موفقیت پیوستم!\n📊 آمار به‌روزرسانی شد.")
+        except Exception as e:
+            await event.reply(f"⚠️ خطا:\n{e}")
 
-    except InviteHashExpiredError:
-        await event.reply("❌ لینک دعوت منقضی شده است.")
-    except InviteHashInvalidError:
-        await event.reply("❌ لینک دعوت معتبر نیست.")
-    except Exception as e:
-        await event.reply(f"⚠️ خطا در پیوستن:\n{e}")
+# ────────────────────────────────
+# ⚡ جوین خودکار به لینک‌های کانال
+# ────────────────────────────────
+@client2.on(events.ChatAction)
+async def auto_join(event):
+    if event.user_joined or event.user_added:
+        if event.user_id == (await client2.get_me()).id:
+            chat = await event.get_chat()
+            if not chat.broadcast:  # یعنی کانال یا گروه عمومی
+                async for message in client2.iter_messages(chat.id, limit=200):
+                    if message.raw_text:
+                        match = re.search(invite_pattern, message.raw_text)
+                        if match:
+                            link = match.group(1)
+                            try:
+                                if "joinchat" in link or "+" in link:
+                                    invite_hash = link.split("/")[-1]
+                                    await client2(ImportChatInviteRequest(invite_hash))
+                                else:
+                                    await client2(JoinChannelRequest(link))
+
+                            except:
+                                pass
 
 async def start_userbot2():
     print("⚡ Userbot2 فعال شد!")
