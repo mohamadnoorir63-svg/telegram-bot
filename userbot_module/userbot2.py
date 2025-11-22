@@ -1,13 +1,13 @@
 from telethon import TelegramClient, events
 from telethon.sessions import StringSession
 from telethon.tl.functions.messages import ImportChatInviteRequest
-from telethon.tl.functions.channels import JoinChannelRequest, InviteToChannelRequest
+from telethon.tl.functions.channels import JoinChannelRequest
 from telethon.errors import InviteHashExpiredError, InviteHashInvalidError
 import asyncio
 import re
 import json
 import os
-from datetime import date
+from datetime import datetime, date
 
 # =======================
 # 🔹 تنظیمات یوزربات
@@ -15,6 +15,7 @@ from datetime import date
 API_ID = 32796779
 API_HASH = "4deabef1568103b3242db6f74a73e8a5"
 SESSION_STRING = "1ApWapzMBuzET2YvEj_TeHnWFPVKUV1Wbqb3o534-WL_U0fbXd-RTUWuML8pK60sh9B_oGsE3T3RQjIhXWs4tM30UPr3BFxpF6EUCB9BSPGCtmienHmXHI9k-zT7iI6HZLtqlNeGi0zMxAA8hUY25V1IhKgnujyHWcUA9VfVXNmJTtq54cZgdvTSa3EntYNmTlMcsaX7p82yoSKpz3LL5SB9ZL35PZCVAVXMIcfBbv_Ofr6w9CA4yBcMm9-t4NjRRLaZnwH-rU29RmtM8qM3n-K7mvCFRfQ1Vmw_HBFcYJlx-mHN_rxgo55XIC3Y3_9XoQ9f0FypxXgxEsYUjH5LosGP2KA_tMZo="
+
 ADMIN_ID = 8588347189  # آیدی برای ارسال گزارش روزانه
 
 client2 = TelegramClient(StringSession(SESSION_STRING), API_ID, API_HASH)
@@ -64,17 +65,15 @@ invite_pattern = r"(https?://t\.me/[\w\d_\-+/=]+)"
 # =======================
 @client2.on(events.NewMessage)
 async def handler(event):
-    text = event.raw_text.strip()
+    text = event.raw_text
     user_id = event.sender_id
     users = load_json(USERS_FILE)
-
-    # ذخیره کاربرانی که پیام دادن
     if user_id not in users:
         users.append(user_id)
         save_json(USERS_FILE, users)
 
     # نمایش آمار
-    if text.lower() in ["آمار","/stats","stats"]:
+    if text.strip().lower() in ["آمار","/stats","stats"]:
         stats = load_json(STATS_FILE)
         daily = reset_daily_if_needed()
         users_count = len(users)
@@ -89,34 +88,43 @@ async def handler(event):
         )
         return
 
-    # ========================
-    # 🔹 اد کردن کاربر به گروه
-    # ========================
+    # ارسال ریپلای به گروه یا کاربران
     if event.is_reply:
         replied_msg = await event.get_reply_message()
-        target_user = replied_msg.sender_id
-        if text.lower().startswith("اد "):
-            try:
-                group_id = int(text.split(" ")[1])
-                await client2(InviteToChannelRequest(channel=group_id, users=[target_user]))
-                await event.reply(f"✅ کاربر `{target_user}` به گروه `{group_id}` اضافه شد.")
-            except Exception as e:
-                await event.reply(f"❌ خطا در اد کردن کاربر:\n`{e}`")
+        target_text = replied_msg.text or replied_msg.message
+        if text.lower() == "ارسال گروه":
+            async for dialog in client2.iter_dialogs():
+                if dialog.is_group:
+                    try:
+                        await client2.send_message(dialog.id, target_text)
+                    except:
+                        pass
+            await event.reply("✅ پیام به همه گروه‌ها ارسال شد.")
             return
-        elif text.lower() == "اد همه":
-            added = 0
+        elif text.lower() == "ارسال کاربران":
             for uid in users:
                 try:
-                    await client2(InviteToChannelRequest(channel=TARGET_GROUP_ID, users=[uid]))
-                    added += 1
+                    await client2.send_message(uid, target_text)
                 except:
-                    continue
-            await event.reply(f"✅ `{added}` کاربر به گروه اضافه شدند.")
+                    pass
+            await event.reply("✅ پیام به همه کاربران ارسال شد.")
+            return
+        elif text.lower() == "ارسال همه":
+            async for dialog in client2.iter_dialogs():
+                if dialog.is_group:
+                    try:
+                        await client2.send_message(dialog.id, target_text)
+                    except:
+                        pass
+            for uid in users:
+                try:
+                    await client2.send_message(uid, target_text)
+                except:
+                    pass
+            await event.reply("✅ پیام به همه گروه‌ها و کاربران ارسال شد.")
             return
 
-    # ========================
-    # 🔹 Join گروه و کانال از لینک
-    # ========================
+    # جستجوی لینک و join
     match = re.search(invite_pattern, text)
     if match:
         invite_link = match.group(1)
@@ -171,11 +179,11 @@ async def send_daily_report():
     daily = reset_daily_if_needed()
     users_count = len(load_json(USERS_FILE))
     stats_msg = (
-        f"📊 گزارش روزانه ربات\n\n"
-        f"👤 کاربران پیام‌دهنده: {users_count} نفر\n"
-        f"👥 گروه‌ها Joined امروز: {daily['groups']}\n"
-        f"📢 کانال‌ها Joined امروز: {daily['channels']}\n"
-        f"📦 مجموع امروز: {daily['groups'] + daily['channels']}"
+        f"📊 **گزارش روزانه ربات**\n\n"
+        f"👤 کاربران پیام‌دهنده: `{users_count}` نفر\n"
+        f"👥 گروه‌ها Joined امروز: `{daily['groups']}`\n"
+        f"📢 کانال‌ها Joined امروز: `{daily['channels']}`\n"
+        f"📦 مجموع امروز: `{daily['groups'] + daily['channels']}`"
     )
     try:
         await client2.send_message(ADMIN_ID, stats_msg)
@@ -189,11 +197,9 @@ async def send_daily_report():
 async def start_userbot2():
     print("⚡ Userbot2 فعال و آماده است!")
     await client2.start()
-    # اگر خواستی گزارش خودکار روزانه فعال شود:
-    # asyncio.create_task(send_daily_report())
+    # می‌توان این تابع را برای ارسال گزارش خودکار روزانه زمان‌بندی کرد
+    # مثال: asyncio.create_task(send_daily_report())  
     await client2.run_until_disconnected()
 
 if __name__ == "__main__":
-    # گروه پیش‌فرض برای دستور "اد همه"
-    TARGET_GROUP_ID = -1001234567890
     asyncio.run(start_userbot2())
