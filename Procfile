@@ -1,2 +1,2 @@
-web: gunicorn webhook_bot:app
+#web: gunicorn webhook_bot:app
 worker: python bot.py
