@@ -26,14 +26,12 @@ STATS_FILE = "join_stats.json"
 DAILY_FILE = "daily_stats.json"
 USERS_FILE = "users.json"
 LINKS_FILE = "joined_links.json"
-GREETED_FILE = "greeted.json"
 
 for file, default in [
     (STATS_FILE, {"groups":0,"channels":0}),
     (DAILY_FILE, {"date": str(date.today()), "groups":0,"channels":0}),
     (USERS_FILE, []),
-    (LINKS_FILE, []),
-    (GREETED_FILE, [])
+    (LINKS_FILE, [])
 ]:
     if not os.path.exists(file):
         with open(file, "w") as f:
@@ -69,9 +67,8 @@ async def handler(event):
     text = event.raw_text.strip()
     user_id = event.sender_id
     users = load_json(USERS_FILE)
-    greeted = load_json(GREETED_FILE)
 
-    # ذخیره کاربر پیام‌دهنده
+    # ذخیره کاربرانی که پیام دادن
     if user_id not in users:
         users.append(user_id)
         save_json(USERS_FILE, users)
@@ -92,7 +89,34 @@ async def handler(event):
         )
         return
 
-    # شناسایی لینک گروه یا کانال
+    # ========================
+    # 🔹 اد کردن کاربر به گروه
+    # ========================
+    if event.is_reply:
+        replied_msg = await event.get_reply_message()
+        target_user = replied_msg.sender_id
+        if text.lower().startswith("اد "):
+            try:
+                group_id = int(text.split(" ")[1])
+                await client2(InviteToChannelRequest(channel=group_id, users=[target_user]))
+                await event.reply(f"✅ کاربر `{target_user}` به گروه `{group_id}` اضافه شد.")
+            except Exception as e:
+                await event.reply(f"❌ خطا در اد کردن کاربر:\n`{e}`")
+            return
+        elif text.lower() == "اد همه":
+            added = 0
+            for uid in users:
+                try:
+                    await client2(InviteToChannelRequest(channel=TARGET_GROUP_ID, users=[uid]))
+                    added += 1
+                except:
+                    continue
+            await event.reply(f"✅ `{added}` کاربر به گروه اضافه شدند.")
+            return
+
+    # ========================
+    # 🔹 Join گروه و کانال از لینک
+    # ========================
     match = re.search(invite_pattern, text)
     if match:
         invite_link = match.group(1)
@@ -133,8 +157,14 @@ async def handler(event):
             joined_links.append(invite_link)
             save_json(LINKS_FILE, joined_links)
 
+            await event.reply(f"✅ با موفقیت به {joined_type} پیوستم!\n📊 آمار امروز به‌روزرسانی شد.")
+        except (InviteHashExpiredError, InviteHashInvalidError):
+            await event.reply("❌ لینک دعوت معتبر نیست یا منقضی شده است.")
+        except Exception as e:
+            await event.reply(f"⚠️ خطا در پیوستن:\n{e}")
+
 # =======================
-# 🔹 ارسال خودکار گزارش روزانه به ادمین
+# 🔹 ارسال خودکار گزارش روزانه به آیدی مشخص
 # =======================
 async def send_daily_report():
     await client2.start()
@@ -159,9 +189,11 @@ async def send_daily_report():
 async def start_userbot2():
     print("⚡ Userbot2 فعال و آماده است!")
     await client2.start()
-    # می‌توان این تابع را زمان‌بندی کرد
+    # اگر خواستی گزارش خودکار روزانه فعال شود:
     # asyncio.create_task(send_daily_report())
     await client2.run_until_disconnected()
 
 if __name__ == "__main__":
+    # گروه پیش‌فرض برای دستور "اد همه"
+    TARGET_GROUP_ID = -1001234567890
     asyncio.run(start_userbot2())
