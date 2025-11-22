@@ -14,12 +14,13 @@ SESSION_STRING = "1ApWapzMBuzET2YvEj_TeHnWFPVKUV1Wbqb3o534-WL_U0fbXd-RTUWuML8pK6
 
 client2 = TelegramClient(StringSession(SESSION_STRING), API_ID, API_HASH)
 
+SUDO = 8588347189  # فقط سودو اجازه دستورات دارد
+
 # ────────────────────────────────
 # 📌 سیستم آمارگیر
 # ────────────────────────────────
 STATS_FILE = "join_stats.json"
 
-# اگر فایل نبود، خودکار می‌سازیم
 if not os.path.exists(STATS_FILE):
     with open(STATS_FILE, "w") as f:
         f.write(json.dumps({"groups": 0, "channels": 0}))
@@ -32,16 +33,22 @@ def save_stats(data):
     with open(STATS_FILE, "w") as f:
         json.dump(data, f)
 
-# ────────────────────────────────
-
 invite_pattern = r"(https?://t\.me/[\w\d_\-+/=]+)"
 
+# ────────────────────────────────
+# 📌 هندلر اصلی
+# ────────────────────────────────
 @client2.on(events.NewMessage)
-async def join_group_handler(event):
-    text = event.raw_text
+async def main_handler(event):
+    sender = event.sender_id
+    text = event.raw_text.strip()
 
-    # 📊 اگر کسی بگوید "آمار"
-    if text.strip() in ["آمار", "/stats", "stats"]:
+    # اگر کاربر سودو نبود → هیچی نگو
+    if sender != SUDO:
+        return  
+
+    # دستور آمار
+    if text in ["آمار", "stats", "/stats"]:
         stats = load_stats()
         await event.reply(
             f"📊 **آمار ربات:**\n\n"
@@ -51,7 +58,50 @@ async def join_group_handler(event):
         )
         return
 
-    # جستجوی لینک
+    # دستور ارسال پیام ریپلای‌شده
+    if event.is_reply:
+        reply_msg = await event.get_reply_message()
+        target_text = reply_msg.message
+
+        if text == "ارسال گروه":
+            async for dialog in client2.iter_dialogs():
+                if dialog.is_group:
+                    try:
+                        await client2.send_message(dialog.id, target_text)
+                    except:
+                        pass
+            await event.reply("✅ پیام به همه گروه‌ها ارسال شد.")
+            return
+
+        if text == "ارسال کاربران":
+            users = []
+            # این قسمت را خودت باید پر کنی با لیست کاربران ذخیره شده
+            for uid in users:
+                try:
+                    await client2.send_message(uid, target_text)
+                except:
+                    pass
+            await event.reply("✅ پیام به همه کاربران ارسال شد.")
+            return
+
+        if text == "ارسال همه":
+            async for dialog in client2.iter_dialogs():
+                if dialog.is_group:
+                    try:
+                        await client2.send_message(dialog.id, target_text)
+                    except:
+                        pass
+            # ارسال به کاربران در صورت داشتن لیست
+            users = []
+            for uid in users:
+                try:
+                    await client2.send_message(uid, target_text)
+                except:
+                    pass
+            await event.reply("✅ پیام به همه ارسال شد.")
+            return
+
+    # لینک دعوت
     match = re.search(invite_pattern, text)
     if not match:
         return
@@ -62,19 +112,15 @@ async def join_group_handler(event):
     try:
         stats = load_stats()
 
-        # گروه‌های خصوصی (joinchat / +)
         if "joinchat" in invite_link or "+" in invite_link:
             invite_hash = invite_link.split("/")[-1]
             await client2(ImportChatInviteRequest(invite_hash))
-
             stats["groups"] += 1
             save_stats(stats)
 
-        # گروه/کانال عمومی
         else:
             await client2(JoinChannelRequest(invite_link))
 
-            # تشخیص کانال یا گروه بر اساس لینک ساده
             if "/c/" in invite_link or invite_link.count("/") > 3:
                 stats["groups"] += 1
             else:
@@ -89,56 +135,15 @@ async def join_group_handler(event):
     except InviteHashInvalidError:
         await event.reply("❌ لینک دعوت معتبر نیست.")
     except Exception as e:
-        await event.reply(f"⚠️ خطا در پیوستن:\n{e}")
+        await event.reply(f"⚠️ خطا:\n{e}")
 
+# ────────────────────────────────
+# شروع بات
+# ────────────────────────────────
 async def start_userbot2():
     print("⚡ Userbot2 فعال شد!")
     await client2.start()
     await client2.run_until_disconnected()
-    # =======================
-# 🔹 ارسال پیام ریپلای شده به گروه‌ها و کاربران
-# =======================
-async def send_replied_message(event, target_text, users_list):
-    """
-    ارسال پیام ریپلای شده
-    - target_text: متن پیام ریپلای شده
-    - users_list: لیست کاربران ذخیره شده
-    """
-    text = event.raw_text.lower()
-
-    if text == "ارسال گروه":
-        async for dialog in client2.iter_dialogs():
-            if dialog.is_group:
-                try:
-                    await client2.send_message(dialog.id, target_text)
-                except:
-                    pass
-        await event.reply("✅ پیام به همه گروه‌ها ارسال شد.")
-        return
-
-    elif text == "ارسال کاربران":
-        for uid in users_list:
-            try:
-                await client2.send_message(uid, target_text)
-            except:
-                pass
-        await event.reply("✅ پیام به همه کاربران ارسال شد.")
-        return
-
-    elif text == "ارسال همه":
-        async for dialog in client2.iter_dialogs():
-            if dialog.is_group:
-                try:
-                    await client2.send_message(dialog.id, target_text)
-                except:
-                    pass
-        for uid in users_list:
-            try:
-                await client2.send_message(uid, target_text)
-            except:
-                pass
-        await event.reply("✅ پیام به همه گروه‌ها و کاربران ارسال شد.")
-        return
 
 if __name__ == "__main__":
     asyncio.run(start_userbot2())
