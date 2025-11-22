@@ -1,10 +1,12 @@
 from telethon import TelegramClient, events
 from telethon.sessions import StringSession
-from telethon.tl.functions.messages import ImportChatInviteRequest  # ← برای لینک joinchat
-from telethon.tl.functions.channels import JoinChannelRequest       # ← برای لینک t.me/c/... یا t.me/username
+from telethon.tl.functions.messages import ImportChatInviteRequest
+from telethon.tl.functions.channels import JoinChannelRequest
 from telethon.errors import InviteHashExpiredError, InviteHashInvalidError
 import asyncio
 import re
+import json
+import os
 
 API_ID = 32796779
 API_HASH = "4deabef1568103b3242db6f74a73e8a5"
@@ -12,13 +14,44 @@ SESSION_STRING = "1ApWapzMBuzET2YvEj_TeHnWFPVKUV1Wbqb3o534-WL_U0fbXd-RTUWuML8pK6
 
 client2 = TelegramClient(StringSession(SESSION_STRING), API_ID, API_HASH)
 
-# الگوهای لینک گروه و کانال
+# ────────────────────────────────
+# 📌 سیستم آمارگیر
+# ────────────────────────────────
+STATS_FILE = "join_stats.json"
+
+# اگر فایل نبود، خودکار می‌سازیم
+if not os.path.exists(STATS_FILE):
+    with open(STATS_FILE, "w") as f:
+        f.write(json.dumps({"groups": 0, "channels": 0}))
+
+def load_stats():
+    with open(STATS_FILE, "r") as f:
+        return json.load(f)
+
+def save_stats(data):
+    with open(STATS_FILE, "w") as f:
+        json.dump(data, f)
+
+# ────────────────────────────────
+
 invite_pattern = r"(https?://t\.me/[\w\d_\-+/=]+)"
 
 @client2.on(events.NewMessage)
 async def join_group_handler(event):
     text = event.raw_text
 
+    # 📊 اگر کسی بگوید "آمار"
+    if text.strip() in ["آمار", "/stats", "stats"]:
+        stats = load_stats()
+        await event.reply(
+            f"📊 **آمار ربات:**\n\n"
+            f"👥 گروه‌ها: `{stats['groups']}`\n"
+            f"📢 کانال‌ها: `{stats['channels']}`\n"
+            f"📦 مجموع: `{stats['groups'] + stats['channels']}`"
+        )
+        return
+
+    # جستجوی لینک
     match = re.search(invite_pattern, text)
     if not match:
         return
@@ -27,16 +60,29 @@ async def join_group_handler(event):
     await event.reply("🔍 در حال تلاش برای پیوستن...")
 
     try:
-        # اگر لینک joinchat هست از ImportChatInviteRequest استفاده می‌کنیم
+        stats = load_stats()
+
+        # گروه‌های خصوصی (joinchat / +)
         if "joinchat" in invite_link or "+" in invite_link:
-            # فقط قسمت invite hash را استخراج می‌کنیم
             invite_hash = invite_link.split("/")[-1]
             await client2(ImportChatInviteRequest(invite_hash))
+
+            stats["groups"] += 1
+            save_stats(stats)
+
+        # گروه/کانال عمومی
         else:
-            # لینک عمومی کانال یا گروه
             await client2(JoinChannelRequest(invite_link))
 
-        await event.reply("✅ با موفقیت به گروه/کانال پیوستم!")
+            # تشخیص کانال یا گروه بر اساس لینک ساده
+            if "/c/" in invite_link or invite_link.count("/") > 3:
+                stats["groups"] += 1
+            else:
+                stats["channels"] += 1
+
+            save_stats(stats)
+
+        await event.reply("✅ با موفقیت پیوستم!\n📊 آمار به‌روزرسانی شد.")
 
     except InviteHashExpiredError:
         await event.reply("❌ لینک دعوت منقضی شده است.")
@@ -46,7 +92,7 @@ async def join_group_handler(event):
         await event.reply(f"⚠️ خطا در پیوستن:\n{e}")
 
 async def start_userbot2():
-    print("⚡ Userbot2 آماده و فعال است!")
+    print("⚡ Userbot2 فعال شد!")
     await client2.start()
     await client2.run_until_disconnected()
 
