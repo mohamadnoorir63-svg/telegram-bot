@@ -2112,70 +2112,63 @@ application.add_handler(
 )
 
 # ==========================================================
-# ==========================================================
-# تابع اجرای شروع به کار ربات
-# ==========================================================
 import asyncio
 import nest_asyncio
+from datetime import time, timezone, timedelta
 from userbot_module.userbot import start_userbot
 
-# برای جلوگیری از خطاهای Telethon روی هاست‌هایی مثل Heroku
 nest_asyncio.apply()
 
-loop = asyncio.get_event_loop()
-
-async def run_userbot():
-    print("⚡ در حال اجرای یوزربات...")
-    try:
-        await start_userbot()
-    except Exception as e:
-        print(f"❌ خطا در اجرای یوزربات: {e}")
-
-if __name__ == "__main__":
-    try:
-        loop.create_task(run_userbot())
-        loop.run_forever()
-    except Exception as e:
-        print(f"⚠️ خطای کلی در یوزربات:\n{e}")
+# ======================
+#  Startup function
+# ======================
 async def on_startup(app):
-    try:
-        # اگر تابع notify_admin_on_startup تعریف شده بود، اجرا شود
-        if 'notify_admin_on_startup' in globals():
-            await notify_admin_on_startup(app)
-    except Exception as e:
-        print(f"⚠️ خطا در اجرای notify_admin_on_startup: {e}")
+    print("🚀 Startup running...")
 
-    # اجرای تسک‌های خودکار
+    # شروع یوزربات روی همان loop
+    app.create_task(start_userbot())
+
+    # شروع تسک‌های خودکار
     app.create_task(auto_backup(app.bot))
     app.create_task(start_auto_brain_loop(app.bot))
-    print("🌙 [SYSTEM] Startup tasks scheduled ✅")
 
-# اتصال تابع به ربات
+    print("🌙 Startup tasks scheduled.")
+
+
 application.post_init = on_startup
 
-# ==========================================================
-# 🚀 اجرای نهایی ربات
-# ==========================================================
-try:
-    print("🔄 در حال اجرای ربات...")
+# ======================
+#  Main Runner
+# ======================
+if __name__ == "__main__":
+    try:
+        print("🔄 Starting bot...")
 
-    # 🌙 آمار خودکار شبانه (هر شب ساعت 00:00 به وقت تهران)
-    from datetime import time, timezone, timedelta
-    tz_tehran = timezone(timedelta(hours=3, minutes=30))
-    job_queue = application.job_queue
-    job_queue.run_daily(send_nightly_stats, time=time(0, 0, tzinfo=tz_tehran))
+        # ===========================
+        # 🌙 آمار خودکار شبانه
+        # ===========================
+        tz_tehran = timezone(timedelta(hours=3, minutes=30))
+        application.job_queue.run_daily(
+            send_nightly_stats,
+            time=time(0, 0, tzinfo=tz_tehran),
+        )
+        print("📊 Nightly stats job scheduled.")
 
-    # اجرای polling ربات
-    application.run_polling(
-        allowed_updates=[
-            "message",
-            "edited_message",
-            "callback_query",
-            "chat_member",
-            "my_chat_member",
-        ]
-    )
+        # ===========================
+        # 🚀 اجرای ربات
+        # ===========================
+        application.run_polling(
+            allowed_updates=[
+                "message",
+                "edited_message",
+                "callback_query",
+                "chat_member",
+                "my_chat_member",
+            ],
+            stop_signals=None,     # برای جلوگیری از kill در Heroku
+            close_loop=False,      # اجازه نمی‌دهد loop از بین برود
+        )
 
-except Exception as e:
-    print(f"⚠️ خطا در اجرای ربات:\n{e}")
-    print("♻️ ربات به‌صورت خودکار توسط هاست ری‌استارت خواهد شد ✅")
+    except Exception as e:
+        print(f"⚠️ Bot crashed:\n{e}")
+        print("♻️ Heroku will restart automatically.")
