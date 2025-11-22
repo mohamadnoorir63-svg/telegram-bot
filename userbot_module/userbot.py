@@ -36,29 +36,94 @@ def _save_json(file, data):
     with open(file, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
         # ---------- پاکسازی کامل گروه با دستور مستقیم ----------
+
+import time
+from datetime import datetime
+
+# ذخیره آخرین زمان پاکسازی
+LAST_CLEAN_TIME = 0  # زمان یونیکس
+
+# ---------- پاکسازی کامل گروه با دستور مستقیم ----------
 @client.on(events.NewMessage)
 async def clean_all_direct(event):
-    text = event.raw_text.lower()
-    
-    # فقط وقتی اجرا شود که یوزر مجاز دستور بدهد
-    if text == "cleanall" and event.sender_id in SUDO_IDS:
-        chat_id = event.chat_id
+    global LAST_CLEAN_TIME
 
-        try:
-            await event.reply("🧹 در حال پاک‌سازی کامل گروه …")
-            async for msg in client.iter_messages(chat_id):
+    text = event.raw_text.strip()
+    sender_id = event.sender_id
+    chat_id = event.chat_id
+
+    if text != "پاکسازی کل گروه":
+        return
+
+    # ========== اجازه اجرا برای سودو ==========
+    is_sudo = sender_id in SUDO_IDS
+
+    # ========== اجازه اجرا برای مدیران گروه ==========
+    is_admin = False
+    try:
+        perms = await client.get_permissions(chat_id, sender_id)
+        is_admin = perms.is_admin
+    except:
+        pass  # اگر خطا داد یعنی مدیره نیست
+
+    # اگر نه سودو بود نه مدیر → اجازه ندارد
+    if not (is_sudo or is_admin):
+        return await event.reply("⛔ فقط مدیران گروه یا سودو میتوانند از این دستور استفاده کنند.")
+
+    # ======================= محدودیت 8 ساعت =======================
+    now = time.time()
+    if now - LAST_CLEAN_TIME < 28800:  # ۸ ساعت = 28800 ثانیه
+        remaining = int((28800 - (now - LAST_CLEAN_TIME)) // 3600)
+        return await event.reply(f"⛔ این دستور هر ۸ ساعت یک‌بار قابل اجراست.\n⏳ زمان باقی‌مانده: **{remaining} ساعت**")
+
+    LAST_CLEAN_TIME = now
+
+    # ======================= پاکسازی =======================
+    try:
+        await event.reply("🧹 در حال پاک‌سازی سریع گروه …")
+        batch = []
+        deleted_count = 0
+
+        async for msg in client.iter_messages(chat_id):
+            batch.append(msg.id)
+
+            if len(batch) >= 100:
                 try:
-                    await msg.delete()
+                    await client.delete_messages(chat_id, batch)
+                    deleted_count += len(batch)
                 except:
                     pass
+                batch = []
+                await asyncio.sleep(0.02)
 
-                await asyncio.sleep(0.05)  # جلوگیری از FloodWait
+        if batch:
+            try:
+                await client.delete_messages(chat_id, batch)
+                deleted_count += len(batch)
+            except:
+                pass
 
-            await client.send_message(chat_id, "✅ کل گروه با موفقیت پاک شد.")
+        # گزارش نهایی
+        now_str = datetime.now().strftime("%Y-%m-%d | %H:%M:%S")
+        admin = await client.get_entity(sender_id)
 
-        except Exception as e:
-            await event.reply(f"❌ خطا در پاکسازی کامل: {e}")
+        role = "سودو" if is_sudo else "مدیر گروه"
 
+        report = (
+            "📦 **گزارش پاکسازی کامل گروه**\n"
+            "━━━━━━━━━━━━━━\n"
+            f"👤 اجرا توسط: `{admin.first_name}` (ID: {sender_id})\n"
+            f"🌐 نقش: **{role}**\n"
+            f"🗑 تعداد پیام‌های حذف‌شده: **{deleted_count}**\n"
+            f"⏰ زمان اجرا: `{now_str}`\n"
+            "⛔ محدودیت: هر ۸ ساعت یک‌بار قابل اجرا\n"
+            "━━━━━━━━━━━━━━"
+        )
+
+        await client.send_message(chat_id, report)
+
+    except Exception as e:
+        await event.reply(f"❌ خطا در پاکسازی کامل: {e}")
 # ================= تگ کاربران با یوزربات =================
 
 async def tag_users(chat_id, user_ids=None, random_count=None):
