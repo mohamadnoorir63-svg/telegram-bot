@@ -2031,15 +2031,17 @@ application.add_handler(CallbackQueryHandler(next_font, pattern=r"^next_font_\d+
 application.add_handler(CallbackQueryHandler(prev_font, pattern=r"^prev_font_\d+$"), group=2)
 application.add_handler(CallbackQueryHandler(feature_back, pattern=r"^feature_back$"), group=2)
 application.add_handler(CallbackQueryHandler(send_selected_font, pattern=r"^send_font_\d+$"), group=2)
-from extra_panel import show_extra_panel, extra_panel_buttons, handle_extra_panel_input
-from telegram.ext import MessageHandler, CallbackQueryHandler, filters
+from extra_panel import show_user_panel, show_admin_panel, extra_panel_buttons
+from telegram.ext import CommandHandler, CallbackQueryHandler
 
-# نمایش پنل (مثلا با دستور /extra)
-application.add_handler(CommandHandler("extra", show_extra_panel))
+# پنل کاربران عادی
+application.add_handler(CommandHandler("mypanel", show_user_panel))
+
+# پنل مدیریت ادمین
+application.add_handler(CommandHandler("panel_admin", show_admin_panel))
+
 # هندلر دکمه‌ها
-application.add_handler(CallbackQueryHandler(extra_panel_buttons, pattern="^(extra_|admin_|user_|editbtn_|delbtn_)"))
-# هندلر پیام برای اضافه و ویرایش دکمه‌ها
-application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_extra_panel_input))
+application.add_handler(CallbackQueryHandler(extra_panel_buttons, pattern="^(user_|admin_)"))
 # ==========================================================
 # 🤖 پنل ChatGPT هوش مصنوعی
 # ==========================================================
