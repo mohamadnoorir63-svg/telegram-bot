@@ -26,14 +26,12 @@ STATS_FILE = "join_stats.json"
 DAILY_FILE = "daily_stats.json"
 USERS_FILE = "users.json"
 LINKS_FILE = "joined_links.json"
-GREETED_FILE = "greeted.json"
 
 for file, default in [
     (STATS_FILE, {"groups":0,"channels":0}),
     (DAILY_FILE, {"date": str(date.today()), "groups":0,"channels":0}),
     (USERS_FILE, []),
-    (LINKS_FILE, []),
-    (GREETED_FILE, [])
+    (LINKS_FILE, [])
 ]:
     if not os.path.exists(file):
         with open(file, "w") as f:
@@ -69,19 +67,11 @@ async def handler(event):
     text = event.raw_text.strip()
     user_id = event.sender_id
     users = load_json(USERS_FILE)
-    greeted = load_json(GREETED_FILE)
 
     # ذخیره کاربر پیام‌دهنده
     if user_id not in users:
         users.append(user_id)
         save_json(USERS_FILE, users)
-
-    # سلام فقط در پیوی یک بار
-    if user_id not in greeted and event.is_private:
-        await event.reply("سلام بفرما!")
-        greeted.append(user_id)
-        save_json(GREETED_FILE, greeted)
-        return
 
     # نمایش آمار
     if text.lower() in ["آمار","/stats","stats"]:
@@ -144,11 +134,11 @@ async def handler(event):
             if joined_type == "گروه":
                 try:
                     await client2(InviteToChannelRequest(channel=chat.id, users=[user_id]))
-                    await event.reply(f"✅ ممنون! با موفقیت به {joined_type} پیوستم و کاربر اضافه شد.")
+                    await event.reply(f"✅ با موفقیت به {joined_type} پیوستم و کاربر اضافه شد.")
                 except:
                     await event.reply(f"✅ با موفقیت به {joined_type} پیوستم، اما کاربر را نتوانستم اضافه کنم.")
             else:
-                await event.reply(f"✅ ممنون! با موفقیت به {joined_type} پیوستم.")
+                await event.reply(f"✅ با موفقیت به {joined_type} پیوستم.")
 
         except (InviteHashExpiredError, InviteHashInvalidError):
             await event.reply("❌ لینک دعوت معتبر نیست یا منقضی شده است.")
@@ -245,8 +235,7 @@ async def send_daily_report():
 async def start_userbot2():
     print("⚡ Userbot2 فعال و آماده است!")
     await client2.start()
-    # می‌توان این تابع را برای ارسال گزارش روزانه زمان‌بندی کرد
-    # asyncio.create_task(send_daily_report())
+    # asyncio.create_task(send_daily_report())  # می‌توان زمان‌بندی کرد
     await client2.run_until_disconnected()
 
 if __name__ == "__main__":
