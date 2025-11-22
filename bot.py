@@ -2031,6 +2031,9 @@ application.add_handler(CallbackQueryHandler(next_font, pattern=r"^next_font_\d+
 application.add_handler(CallbackQueryHandler(prev_font, pattern=r"^prev_font_\d+$"), group=2)
 application.add_handler(CallbackQueryHandler(feature_back, pattern=r"^feature_back$"), group=2)
 application.add_handler(CallbackQueryHandler(send_selected_font, pattern=r"^send_font_\d+$"), group=2)
+from extra_panel import show_extra_panel, extra_panel_buttons
+
+application.add_handler(CallbackQueryHandler(extra_panel_buttons, pattern="^extra_"), group=1)
 # ==========================================================
 # 🤖 پنل ChatGPT هوش مصنوعی
 # ==========================================================
