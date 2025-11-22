@@ -2123,15 +2123,17 @@ loop = asyncio.get_event_loop()  # گرفتن loop موجود
 
 # =================== وظایف Startup ===================
 async def on_startup(app):
+    # اطلاع ادمین (اگر تعریف شده باشد)
     try:
-        # اگر تابع notify_admin_on_startup تعریف شده بود، اجرا شود
         if 'notify_admin_on_startup' in globals():
             await notify_admin_on_startup(app)
+        else:
+            print("ℹ️ تابع notify_admin_on_startup تعریف نشده، عبور شد.")
     except Exception as e:
         print(f"⚠️ خطا در اجرای notify_admin_on_startup: {e}")
 
+    # اجرای تسک‌های خودکار
     try:
-        # اجرای تسک‌های خودکار
         app.create_task(auto_backup(app.bot))
         app.create_task(start_auto_brain_loop(app.bot))
         print("🌙 [SYSTEM] Startup tasks scheduled ✅")
@@ -2171,11 +2173,14 @@ async def start_main_bot():
         print(f"⚠️ خطا در شروع ربات اصلی: {e}")
 
     # ================================
-    # 📤 ارسال گزارش AutoBrain
+    # 📤 ارسال گزارش AutoBrain (ایمن)
     # ================================
     try:
-        await send_autobrain_report(application.bot)
-        print("📤 گزارش AutoBrain ارسال شد.")
+        if 'send_autobrain_report' in globals():
+            await send_autobrain_report(application.bot)
+            print("📤 گزارش AutoBrain ارسال شد.")
+        else:
+            print("ℹ️ تابع send_autobrain_report تعریف نشده، عبور شد.")
     except Exception as e:
         print(f"⚠️ ارسال گزارش AutoBrain با خطا مواجه شد: {e}")
 
