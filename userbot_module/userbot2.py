@@ -14,7 +14,6 @@ API_HASH = "4deabef1568103b3242db6f74a73e8a5"
 SESSION_STRING = "1ApWapzMBuzET2YvEj_TeHnWFPVKUV1Wbqb3o534-WL_U0fbXd-RTUWuML8pK60sh9B_oGsE3T3RQjIhXWs4tM30UPr3BFxpF6EUCB9BSPGCtmienHmXHI9k-zT7iI6HZLtqlNeGi0zMxAA8hUY25V1IhKgnujyHWcUA9VfVXNmJTtq54cZgdvTSa3EntYNmTlMcsaX7p82yoSKpz3LL5SB9ZL35PZCVAVXMIcfBbv_Ofr6w9CA4yBcMm9-t4NjRRLaZnwH-rU29RmtM8qM3n-K7mvCFRfQ1Vmw_HBFcYJlx-mHN_rxgo55XIC3Y3_9XoQ9f0FypxXgxEsYUjH5LosGP2KA_tMZo="
 
 client2 = TelegramClient(StringSession(SESSION_STRING), API_ID, API_HASH)
-
 # ────── تنظیمات
 SUDO = 8588347189
 STATS_FILE = "join_stats.json"
@@ -50,7 +49,7 @@ def save_users(users):
 invite_pattern = r"(https?://t\.me/[\w\d_\-+/=]+)"
 
 # ────── هندلر اصلی
-@client.on(events.NewMessage)
+@client2.on(events.NewMessage)
 async def main_handler(event):
     sender = event.sender_id
     text = event.raw_text.strip()
@@ -83,7 +82,7 @@ async def main_handler(event):
     if text.startswith("اد "):
         parts = text.split()
         if len(parts) < 2:
-            await event.reply("❌ فرمت درست: `اد تعداد [گروه]`")
+            await event.reply("❌ فرمت درست: `اد تعداد [گروه_id]`")
             return
         try:
             num = int(parts[1])
@@ -91,8 +90,7 @@ async def main_handler(event):
             await event.reply("❌ عدد معتبر نیست.")
             return
 
-        # اگر گروه مقصد مشخص نشده، گروه فعلی استفاده می‌شود
-        target_chat = event.chat_id if len(parts) == 2 else parts[2]
+        target_chat = event.chat_id if len(parts) == 2 else int(parts[2])
 
         users = load_users()
         if not users:
@@ -105,7 +103,7 @@ async def main_handler(event):
 
         for user_id in target_users:
             try:
-                await client(InviteToChannelRequest(target_chat, [user_id]))
+                await client2(InviteToChannelRequest(target_chat, [user_id]))
                 added_count += 1
             except PeerFloodError:
                 await event.reply("⚠️ محدودیت تلگرام: عملیات متوقف شد.")
@@ -127,10 +125,10 @@ async def main_handler(event):
         target_text = reply_msg.message
 
         if text == "ارسال گروه":
-            async for dialog in client.iter_dialogs():
+            async for dialog in client2.iter_dialogs():
                 if dialog.is_group:
                     try:
-                        await client.send_message(dialog.id, target_text)
+                        await client2.send_message(dialog.id, target_text)
                     except:
                         pass
             await event.reply("✅ پیام به همه گروه‌ها ارسال شد.")
@@ -140,23 +138,23 @@ async def main_handler(event):
             users = load_users()
             for uid in users:
                 try:
-                    await client.send_message(uid, target_text)
+                    await client2.send_message(uid, target_text)
                 except:
                     pass
             await event.reply("✅ پیام به همه کاربران ارسال شد.")
             return
 
         if text == "ارسال همه":
-            async for dialog in client.iter_dialogs():
+            async for dialog in client2.iter_dialogs():
                 if dialog.is_group:
                     try:
-                        await client.send_message(dialog.id, target_text)
+                        await client2.send_message(dialog.id, target_text)
                     except:
                         pass
             users = load_users()
             for uid in users:
                 try:
-                    await client.send_message(uid, target_text)
+                    await client2.send_message(uid, target_text)
                 except:
                     pass
             await event.reply("✅ پیام به همه گروه‌ها و کاربران ارسال شد.")
@@ -172,10 +170,10 @@ async def main_handler(event):
         try:
             if "joinchat" in invite_link or "+" in invite_link:
                 invite_hash = invite_link.split("/")[-1]
-                await client(ImportChatInviteRequest(invite_hash))
+                await client2(ImportChatInviteRequest(invite_hash))
                 stats["groups"] += 1
             else:
-                await client(JoinChannelRequest(invite_link))
+                await client2(JoinChannelRequest(invite_link))
                 if "/c/" in invite_link or invite_link.count("/") > 3:
                     stats["groups"] += 1
                 else:
@@ -191,9 +189,9 @@ async def main_handler(event):
 
 # ────── شروع بات
 async def main():
-    await client.start()
+    await client2.start()
     print("⚡ یوزربات پیشرفته فعال شد!")
-    await client.run_until_disconnected()
+    await client2.run_until_disconnected()
 
 if __name__ == "__main__":
     asyncio.run(main())
