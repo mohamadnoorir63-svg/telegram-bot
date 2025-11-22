@@ -27,15 +27,32 @@ DAILY_FILE = "daily_stats.json"
 USERS_FILE = "users.json"
 LINKS_FILE = "joined_links.json"
 
-for file, default in [
-    (STATS_FILE, {"groups":0,"channels":0}),
-    (DAILY_FILE, {"date": str(date.today()), "groups":0,"channels":0}),
-    (USERS_FILE, []),
-    (LINKS_FILE, [])
-]:
+DEFAULT_STATS = {"groups":0,"channels":0}
+DEFAULT_DAILY = {"date": str(date.today()), "groups":0,"channels":0}
+DEFAULT_USERS = []
+DEFAULT_LINKS = []
+
+def ensure_file(file, default):
     if not os.path.exists(file):
         with open(file, "w") as f:
             json.dump(default, f)
+    else:
+        try:
+            with open(file, "r") as f:
+                data = json.load(f)
+            if not isinstance(data, type(default)):
+                raise ValueError
+        except:
+            with open(file, "w") as f:
+                json.dump(default, f)
+
+for file, default in [
+    (STATS_FILE, DEFAULT_STATS),
+    (DAILY_FILE, DEFAULT_DAILY),
+    (USERS_FILE, DEFAULT_USERS),
+    (LINKS_FILE, DEFAULT_LINKS)
+]:
+    ensure_file(file, default)
 
 # =======================
 # 🔹 توابع کمکی
@@ -51,7 +68,9 @@ def save_json(file, data):
 def reset_daily_if_needed():
     daily = load_json(DAILY_FILE)
     today = str(date.today())
-    if daily["date"] != today:
+    if not isinstance(daily, dict):
+        daily = {"date": today, "groups":0,"channels":0}
+    if daily.get("date") != today:
         daily = {"date": today, "groups":0,"channels":0}
         save_json(DAILY_FILE, daily)
     return daily
@@ -76,16 +95,19 @@ async def handler(event):
     # نمایش آمار
     if text.lower() in ["آمار","/stats","stats"]:
         stats = load_json(STATS_FILE)
+        if not isinstance(stats, dict):
+            stats = DEFAULT_STATS.copy()
+            save_json(STATS_FILE, stats)
         daily = reset_daily_if_needed()
         users_count = len(users)
         joined_links = len(load_json(LINKS_FILE))
         await event.reply(
             f"📊 **آمار ربات:**\n\n"
             f"👤 کاربران پیام‌دهنده: `{users_count}` نفر\n"
-            f"👥 گروه‌ها Joined: `{stats['groups']}` (امروز: {daily['groups']})\n"
-            f"📢 کانال‌ها Joined: `{stats['channels']}` (امروز: {daily['channels']})\n"
+            f"👥 گروه‌ها Joined: `{stats.get('groups',0)}` (امروز: {daily.get('groups',0)})\n"
+            f"📢 کانال‌ها Joined: `{stats.get('channels',0)}` (امروز: {daily.get('channels',0)})\n"
             f"🔗 لینک‌های Join شده: `{joined_links}`\n"
-            f"📦 مجموع: `{stats['groups'] + stats['channels']}`"
+            f"📦 مجموع: `{stats.get('groups',0) + stats.get('channels',0)}`"
         )
         return
 
@@ -99,12 +121,14 @@ async def handler(event):
             return
 
         daily = reset_daily_if_needed()
-        if daily["groups"] + daily["channels"] >= MAX_JOIN_PER_DAY:
+        if daily.get("groups",0) + daily.get("channels",0) >= MAX_JOIN_PER_DAY:
             await event.reply(f"⚠️ محدودیت Join روزانه ({MAX_JOIN_PER_DAY}) رسید.")
             return
 
         await event.reply("🔍 در حال تلاش برای پیوستن...")
         stats = load_json(STATS_FILE)
+        if not isinstance(stats, dict):
+            stats = DEFAULT_STATS.copy()
 
         try:
             joined_type = ""
@@ -130,15 +154,7 @@ async def handler(event):
             joined_links.append(invite_link)
             save_json(LINKS_FILE, joined_links)
 
-            chat = await event.get_chat()
-            if joined_type == "گروه":
-                try:
-                    await client2(InviteToChannelRequest(channel=chat.id, users=[user_id]))
-                    await event.reply(f"✅ با موفقیت به {joined_type} پیوستم و کاربر اضافه شد.")
-                except:
-                    await event.reply(f"✅ با موفقیت به {joined_type} پیوستم، اما کاربر را نتوانستم اضافه کنم.")
-            else:
-                await event.reply(f"✅ با موفقیت به {joined_type} پیوستم.")
+            await event.reply(f"✅ با موفقیت به {joined_type} پیوستم.")
 
         except (InviteHashExpiredError, InviteHashInvalidError):
             await event.reply("❌ لینک دعوت معتبر نیست یا منقضی شده است.")
@@ -219,9 +235,9 @@ async def send_daily_report():
     stats_msg = (
         f"📊 گزارش روزانه ربات\n\n"
         f"👤 کاربران پیام‌دهنده: {users_count} نفر\n"
-        f"👥 گروه‌ها Joined امروز: {daily['groups']}\n"
-        f"📢 کانال‌ها Joined امروز: {daily['channels']}\n"
-        f"📦 مجموع امروز: {daily['groups'] + daily['channels']}"
+        f"👥 گروه‌ها Joined امروز: {daily.get('groups',0)}\n"
+        f"📢 کانال‌ها Joined امروز: {daily.get('channels',0)}\n"
+        f"📦 مجموع امروز: {daily.get('groups',0) + daily.get('channels',0)}"
     )
     try:
         await client2.send_message(ADMIN_ID, stats_msg)
