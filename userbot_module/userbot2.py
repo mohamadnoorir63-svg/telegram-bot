@@ -15,7 +15,7 @@ from datetime import date
 API_ID = 32796779
 API_HASH = "4deabef1568103b3242db6f74a73e8a5"
 SESSION_STRING = "1ApWapzMBuzET2YvEj_TeHnWFPVKUV1Wbqb3o534-WL_U0fbXd-RTUWuML8pK60sh9B_oGsE3T3RQjIhXWs4tM30UPr3BFxpF6EUCB9BSPGCtmienHmXHI9k-zT7iI6HZLtqlNeGi0zMxAA8hUY25V1IhKgnujyHWcUA9VfVXNmJTtq54cZgdvTSa3EntYNmTlMcsaX7p82yoSKpz3LL5SB9ZL35PZCVAVXMIcfBbv_Ofr6w9CA4yBcMm9-t4NjRRLaZnwH-rU29RmtM8qM3n-K7mvCFRfQ1Vmw_HBFcYJlx-mHN_rxgo55XIC3Y3_9XoQ9f0FypxXgxEsYUjH5LosGP2KA_tMZo="
-ADMIN_ID = 8588347189
+ADMIN_ID = 8588347189  # آیدی برای ارسال گزارش روزانه
 
 client2 = TelegramClient(StringSession(SESSION_STRING), API_ID, API_HASH)
 
@@ -76,13 +76,6 @@ async def handler(event):
         users.append(user_id)
         save_json(USERS_FILE, users)
 
-    # سلام فقط در پیوی یک بار
-    if user_id not in greeted and event.is_private:
-        await event.reply("سلام بفرما!")
-        greeted.append(user_id)
-        save_json(GREETED_FILE, greeted)
-        return
-
     # نمایش آمار
     if text.lower() in ["آمار","/stats","stats"]:
         stats = load_json(STATS_FILE)
@@ -140,6 +133,7 @@ async def handler(event):
             joined_links.append(invite_link)
             save_json(LINKS_FILE, joined_links)
 
+            # اد خودکار کاربر به گروه اگر لینک گروه باشد
             chat = await event.get_chat()
             if joined_type == "گروه":
                 try:
@@ -178,47 +172,6 @@ async def handler(event):
                 await event.reply(f"❌ خطا در اد کردن کاربر:\n`{e}`")
             return
 
-    # ========================
-    # 🔹 ارسال پیام ریپلای شده به گروه‌ها و کاربران
-    # ========================
-    if event.is_reply:
-        replied_msg = await event.get_reply_message()
-        target_text = replied_msg.text or replied_msg.message
-
-        if text.lower() == "ارسال گروه":
-            async for dialog in client2.iter_dialogs():
-                if dialog.is_group:
-                    try:
-                        await client2.send_message(dialog.id, target_text)
-                    except:
-                        pass
-            await event.reply("✅ پیام به همه گروه‌ها ارسال شد.")
-            return
-
-        elif text.lower() == "ارسال کاربران":
-            for uid in users:
-                try:
-                    await client2.send_message(uid, target_text)
-                except:
-                    pass
-            await event.reply("✅ پیام به همه کاربران ارسال شد.")
-            return
-
-        elif text.lower() == "ارسال همه":
-            async for dialog in client2.iter_dialogs():
-                if dialog.is_group:
-                    try:
-                        await client2.send_message(dialog.id, target_text)
-                    except:
-                        pass
-            for uid in users:
-                try:
-                    await client2.send_message(uid, target_text)
-                except:
-                    pass
-            await event.reply("✅ پیام به همه گروه‌ها و کاربران ارسال شد.")
-            return
-
 # =======================
 # 🔹 ارسال خودکار گزارش روزانه به ادمین
 # =======================
@@ -245,7 +198,7 @@ async def send_daily_report():
 async def start_userbot2():
     print("⚡ Userbot2 فعال و آماده است!")
     await client2.start()
-    # می‌توان این تابع را برای ارسال گزارش روزانه زمان‌بندی کرد
+    # می‌توان این تابع را زمان‌بندی کرد
     # asyncio.create_task(send_daily_report())
     await client2.run_until_disconnected()
 
