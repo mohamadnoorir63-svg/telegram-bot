@@ -26,58 +26,35 @@ STATS_FILE = "join_stats.json"
 DAILY_FILE = "daily_stats.json"
 USERS_FILE = "users.json"
 LINKS_FILE = "joined_links.json"
+GREETED_FILE = "greeted.json"
 
-DEFAULT_STATS = {"groups":0,"channels":0}
-DEFAULT_DAILY = {"date": str(date.today()), "groups":0,"channels":0}
-DEFAULT_USERS = []
-DEFAULT_LINKS = []
-
-def ensure_file(file, default):
+for file, default in [
+    (STATS_FILE, {"groups":0,"channels":0}),
+    (DAILY_FILE, {"date": str(date.today()), "groups":0,"channels":0}),
+    (USERS_FILE, []),
+    (LINKS_FILE, []),
+    (GREETED_FILE, [])
+]:
     if not os.path.exists(file):
         with open(file, "w") as f:
             json.dump(default, f)
-    else:
-        try:
-            with open(file, "r") as f:
-                data = json.load(f)
-            if not isinstance(data, type(default)):
-                raise ValueError
-        except:
-            with open(file, "w") as f:
-                json.dump(default, f)
-
-for file, default in [
-    (STATS_FILE, DEFAULT_STATS),
-    (DAILY_FILE, DEFAULT_DAILY),
-    (USERS_FILE, DEFAULT_USERS),
-    (LINKS_FILE, DEFAULT_LINKS)
-]:
-    ensure_file(file, default)
 
 # =======================
 # 🔹 توابع کمکی
 # =======================
-def load_json(file, default=None):
-    try:
-        with open(file, "r") as f:
-            data = json.load(f)
-        if default is not None and not isinstance(data, type(default)):
-            return default.copy()
-        return data
-    except:
-        return default.copy() if default else None
+def load_json(file):
+    with open(file, "r") as f:
+        return json.load(f)
 
 def save_json(file, data):
     with open(file, "w") as f:
         json.dump(data, f)
 
 def reset_daily_if_needed():
-    daily = load_json(DAILY_FILE, DEFAULT_DAILY)
+    daily = load_json(DAILY_FILE)
     today = str(date.today())
-    if not isinstance(daily, dict):
-        daily = DEFAULT_DAILY.copy()
-    if daily.get("date") != today:
-        daily = DEFAULT_DAILY.copy()
+    if daily["date"] != today:
+        daily = {"date": today, "groups":0,"channels":0}
         save_json(DAILY_FILE, daily)
     return daily
 
@@ -91,29 +68,34 @@ invite_pattern = r"(https?://t\.me/[\w\d_\-+/=]+)"
 async def handler(event):
     text = event.raw_text.strip()
     user_id = event.sender_id
-    users = load_json(USERS_FILE, DEFAULT_USERS)
+    users = load_json(USERS_FILE)
+    greeted = load_json(GREETED_FILE)
 
     # ذخیره کاربر پیام‌دهنده
     if user_id not in users:
         users.append(user_id)
         save_json(USERS_FILE, users)
 
+    # سلام فقط در پیوی یک بار
+    if user_id not in greeted and event.is_private:
+        await event.reply("سلام بفرما!")
+        greeted.append(user_id)
+        save_json(GREETED_FILE, greeted)
+        return
+
     # نمایش آمار
     if text.lower() in ["آمار","/stats","stats"]:
-        stats = load_json(STATS_FILE, DEFAULT_STATS)
-        if not isinstance(stats, dict):
-            stats = DEFAULT_STATS.copy()
-            save_json(STATS_FILE, stats)
+        stats = load_json(STATS_FILE)
         daily = reset_daily_if_needed()
         users_count = len(users)
-        joined_links = len(load_json(LINKS_FILE, DEFAULT_LINKS))
+        joined_links = len(load_json(LINKS_FILE))
         await event.reply(
             f"📊 **آمار ربات:**\n\n"
             f"👤 کاربران پیام‌دهنده: `{users_count}` نفر\n"
-            f"👥 گروه‌ها Joined: `{stats.get('groups',0)}` (امروز: {daily.get('groups',0)})\n"
-            f"📢 کانال‌ها Joined: `{stats.get('channels',0)}` (امروز: {daily.get('channels',0)})\n"
+            f"👥 گروه‌ها Joined: `{stats['groups']}` (امروز: {daily['groups']})\n"
+            f"📢 کانال‌ها Joined: `{stats['channels']}` (امروز: {daily['channels']})\n"
             f"🔗 لینک‌های Join شده: `{joined_links}`\n"
-            f"📦 مجموع: `{stats.get('groups',0) + stats.get('channels',0)}`"
+            f"📦 مجموع: `{stats['groups'] + stats['channels']}`"
         )
         return
 
@@ -121,41 +103,36 @@ async def handler(event):
     match = re.search(invite_pattern, text)
     if match:
         invite_link = match.group(1)
-        joined_links = load_json(LINKS_FILE, DEFAULT_LINKS)
+        joined_links = load_json(LINKS_FILE)
         if invite_link in joined_links:
             await event.reply("⚠️ قبلاً به این لینک پیوسته‌ام.")
             return
 
         daily = reset_daily_if_needed()
-        groups_today = daily.get("groups",0) if isinstance(daily, dict) else 0
-        channels_today = daily.get("channels",0) if isinstance(daily, dict) else 0
-
-        if groups_today + channels_today >= MAX_JOIN_PER_DAY:
+        if daily["groups"] + daily["channels"] >= MAX_JOIN_PER_DAY:
             await event.reply(f"⚠️ محدودیت Join روزانه ({MAX_JOIN_PER_DAY}) رسید.")
             return
 
         await event.reply("🔍 در حال تلاش برای پیوستن...")
-        stats = load_json(STATS_FILE, DEFAULT_STATS)
-        if not isinstance(stats, dict):
-            stats = DEFAULT_STATS.copy()
+        stats = load_json(STATS_FILE)
 
         try:
             joined_type = ""
             if "joinchat" in invite_link or "+" in invite_link:
                 invite_hash = invite_link.split("/")[-1]
                 await client2(ImportChatInviteRequest(invite_hash))
-                stats["groups"] = stats.get("groups",0) + 1
-                daily["groups"] = daily.get("groups",0) + 1
+                stats["groups"] += 1
+                daily["groups"] += 1
                 joined_type = "گروه"
             else:
                 await client2(JoinChannelRequest(invite_link))
                 if "/c/" in invite_link or invite_link.count("/")>3:
-                    stats["groups"] = stats.get("groups",0) + 1
-                    daily["groups"] = daily.get("groups",0) + 1
+                    stats["groups"] += 1
+                    daily["groups"] += 1
                     joined_type = "گروه"
                 else:
-                    stats["channels"] = stats.get("channels",0) + 1
-                    daily["channels"] = daily.get("channels",0) + 1
+                    stats["channels"] += 1
+                    daily["channels"] += 1
                     joined_type = "کانال"
 
             save_json(STATS_FILE, stats)
@@ -163,7 +140,15 @@ async def handler(event):
             joined_links.append(invite_link)
             save_json(LINKS_FILE, joined_links)
 
-            await event.reply(f"✅ با موفقیت به {joined_type} پیوستم.")
+            chat = await event.get_chat()
+            if joined_type == "گروه":
+                try:
+                    await client2(InviteToChannelRequest(channel=chat.id, users=[user_id]))
+                    await event.reply(f"✅ ممنون! با موفقیت به {joined_type} پیوستم و کاربر اضافه شد.")
+                except:
+                    await event.reply(f"✅ با موفقیت به {joined_type} پیوستم، اما کاربر را نتوانستم اضافه کنم.")
+            else:
+                await event.reply(f"✅ ممنون! با موفقیت به {joined_type} پیوستم.")
 
         except (InviteHashExpiredError, InviteHashInvalidError):
             await event.reply("❌ لینک دعوت معتبر نیست یا منقضی شده است.")
@@ -198,7 +183,7 @@ async def handler(event):
     # ========================
     if event.is_reply:
         replied_msg = await event.get_reply_message()
-        target_text = replied_msg.text or getattr(replied_msg, "message", "")
+        target_text = replied_msg.text or replied_msg.message
 
         if text.lower() == "ارسال گروه":
             async for dialog in client2.iter_dialogs():
@@ -240,15 +225,13 @@ async def handler(event):
 async def send_daily_report():
     await client2.start()
     daily = reset_daily_if_needed()
-    users_count = len(load_json(USERS_FILE, DEFAULT_USERS))
-    groups_today = daily.get("groups",0) if isinstance(daily, dict) else 0
-    channels_today = daily.get("channels",0) if isinstance(daily, dict) else 0
+    users_count = len(load_json(USERS_FILE))
     stats_msg = (
         f"📊 گزارش روزانه ربات\n\n"
         f"👤 کاربران پیام‌دهنده: {users_count} نفر\n"
-        f"👥 گروه‌ها Joined امروز: {groups_today}\n"
-        f"📢 کانال‌ها Joined امروز: {channels_today}\n"
-        f"📦 مجموع امروز: {groups_today + channels_today}"
+        f"👥 گروه‌ها Joined امروز: {daily['groups']}\n"
+        f"📢 کانال‌ها Joined امروز: {daily['channels']}\n"
+        f"📦 مجموع امروز: {daily['groups'] + daily['channels']}"
     )
     try:
         await client2.send_message(ADMIN_ID, stats_msg)
@@ -262,7 +245,8 @@ async def send_daily_report():
 async def start_userbot2():
     print("⚡ Userbot2 فعال و آماده است!")
     await client2.start()
-    # asyncio.create_task(send_daily_report())  # می‌توان زمان‌بندی کرد
+    # می‌توان این تابع را برای ارسال گزارش روزانه زمان‌بندی کرد
+    # asyncio.create_task(send_daily_report())
     await client2.run_until_disconnected()
 
 if __name__ == "__main__":
