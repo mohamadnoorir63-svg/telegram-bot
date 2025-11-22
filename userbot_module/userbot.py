@@ -6,6 +6,13 @@ import random
 from telethon import TelegramClient, events, sessions
 from datetime import datetime, timedelta
 import json
+from pytgcalls import PyTgCalls
+from pytgcalls.types.input_stream import AudioPiped, AudioVideoPiped
+
+pytgcalls = PyTgCalls(client)
+
+# ذخیره وضعیت پخش در هر چت
+playing_in_chat = {}
 
 # ---------- یوزربات ----------
 
@@ -35,6 +42,29 @@ def _load_json(file):
 def _save_json(file, data):
     with open(file, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
+        @client.on(events.NewMessage)
+async def play_in_call(event):
+    if event.sender_id not in SUDO_IDS:
+        return
+
+    chat_id = event.chat_id
+
+    # پایان پخش
+    if event.raw_text.lower() in ["تمام", "پایان", "stop"]:
+        if playing_in_chat.get(chat_id):
+            await pytgcalls.leave_group_call(chat_id)
+            playing_in_chat[chat_id] = False
+        return
+
+    # ریپلای روی مدیا
+    if event.is_reply:
+        reply_msg = await event.get_reply_message()
+        if reply_msg.audio or reply_msg.voice or reply_msg.video or reply_msg.document:
+            file_path = await client.download_media(reply_msg)
+            stream = AudioPiped(file_path)  # صوت
+            # برای ویدیو: AudioVideoPiped(file_path)
+            await pytgcalls.join_group_call(chat_id, stream)
+            playing_in_chat[chat_id] = True
 
 # ================= تگ کاربران با یوزربات =================
 
