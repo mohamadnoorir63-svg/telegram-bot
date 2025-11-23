@@ -18,6 +18,29 @@ client2 = TelegramClient(StringSession(SESSION_STRING), API_ID, API_HASH)
 
 # ────── تنظیمات
 SUDO = 8588347189
+# ────── شناسایی گروه/کانال‌هایی که از قبل عضو بوده‌ایم
+        if event.is_group or event.is_channel:
+            stats = load_stats()
+
+            # گروه
+            if event.is_group:
+                if "__joined_groups__" not in stats:
+                    stats["__joined_groups__"] = []
+
+                if event.chat_id not in stats["__joined_groups__"]:
+                    stats["__joined_groups__"].append(event.chat_id)
+                    stats["groups"] += 1
+                    save_stats(stats)
+
+            # کانال
+            if event.is_channel:
+                if "__joined_channels__" not in stats:
+                    stats["__joined_channels__"] = []
+
+                if event.chat_id not in stats["__joined_channels__"]:
+                    stats["__joined_channels__"].append(event.chat_id)
+                    stats["channels"] += 1
+                    save_stats(stats)
 STATS_FILE = "join_stats.json"
 USERS_FILE = "users_list.json"
 
