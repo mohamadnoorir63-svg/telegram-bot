@@ -7,6 +7,7 @@ import asyncio
 import re
 import json
 import os
+import time
 
 # ────── اطلاعات تلگرام
 API_ID = 32796779
@@ -20,6 +21,10 @@ SUDO = 8588347189
 STATS_FILE = "join_stats.json"
 USERS_FILE = "users_list.json"
 
+# زمان آخرین جوین (برای جلوگیری از محدودیت)
+LAST_JOIN_TIME = 0
+JOIN_DELAY = 60  # ← هر لینک ۶۰ ثانیه فاصله
+
 # ────── ایجاد فایل‌ها در صورت نبودن
 if not os.path.exists(STATS_FILE):
     with open(STATS_FILE, "w") as f:
@@ -29,7 +34,7 @@ if not os.path.exists(USERS_FILE):
     with open(USERS_FILE, "w") as f:
         json.dump([], f)
 
-# ────── توابع مدیریت آمار و کاربران
+# ────── توابع آمار
 def load_stats():
     with open(STATS_FILE, "r") as f:
         return json.load(f)
@@ -46,27 +51,79 @@ def save_users(users):
     with open(USERS_FILE, "w") as f:
         json.dump(users, f)
 
-# ────── الگوی لینک دعوت
+# ────── الگوی لینک
 invite_pattern = r"(https?://t\.me/[\w\d_\-+/=]+)"
 
-# ────── هندلر اصلی
+# ────── سیستم جوین با تاخیر
+async def join_with_delay(invite_link, event):
+    global LAST_JOIN_TIME
+
+    now = time.time()
+    wait_time = LAST_JOIN_TIME + JOIN_DELAY - now
+
+    if wait_time > 0:
+        await event.reply(f"⏳ باید {int(wait_time)} ثانیه صبر کنم... (جلوگیری از بلاک)")
+        await asyncio.sleep(wait_time)
+
+    LAST_JOIN_TIME = time.time()
+
+    stats = load_stats()
+
+    try:
+        clean = invite_link.replace("https://", "").replace("http://", "")
+        clean = clean.replace("t.me/", "")
+
+        # ── لینک + (لینک خصوصی)
+        if clean.startswith("+"):
+            invite_hash = clean.replace("+", "")
+            await client2(ImportChatInviteRequest(invite_hash))
+            stats["groups"] += 1
+
+        # ── لینک joinchat/
+        elif clean.startswith("joinchat/"):
+            invite_hash = clean.replace("joinchat/", "")
+            await client2(ImportChatInviteRequest(invite_hash))
+            stats["groups"] += 1
+
+        # ── کانال‌های عادی / t.me/test123
+        else:
+            await client2(JoinChannelRequest(clean))
+            stats["channels"] += 1
+
+        save_stats(stats)
+        await event.reply("✅ با موفقیت عضو شدم.")
+
+    except InviteHashExpiredError:
+        await event.reply("❌ لینک منقضی شده است.")
+    except InviteHashInvalidError:
+        await event.reply("❌ لینک معتبر نیست.")
+    except Exception as e:
+        await event.reply(f"⚠️ خطا: {e}")
+
+
+# ────── هندلر پیام‌ها
 @client2.on(events.NewMessage)
 async def main_handler(event):
     sender = event.sender_id
     text = event.raw_text.strip()
     is_sudo = sender == SUDO
 
-    # جمع‌آوری خودکار کاربران (کاربران عادی)
+    # ────── جمع‌آوری کاربران عادی
     if not is_sudo:
         if event.is_group:
             users = load_users()
             if sender not in users:
                 users.append(sender)
                 save_users(users)
+
+        # کاربران عادی هم اگر لینک بفرستند → خودکار جوین شو
+        match = re.search(invite_pattern, text)
+        if match:
+            await join_with_delay(match.group(1), event)
         return
 
-    # ── دستور آمار
-    if text in ["آمار", "stats", "/stats"]:
+    # ────── آمار
+    if text in ["آمار", "/stats", "stats"]:
         stats = load_stats()
         users = load_users()
         await event.reply(
@@ -78,12 +135,21 @@ async def main_handler(event):
         )
         return
 
-    # ── دستور اد با امکان انتخاب گروه مقصد
+    # ────── پاکسازی بن
+    if text == "پاکسازی بن":
+        stats = load_stats()
+        stats["banned_groups"] = 0
+        save_stats(stats)
+        await event.reply("✅ گروه‌های بن شده پاکسازی شدند.")
+        return
+
+    # ────── اد عضو
     if text.startswith("اد "):
         parts = text.split()
         if len(parts) < 2:
             await event.reply("❌ فرمت درست: `اد تعداد [گروه_id]`")
             return
+
         try:
             num = int(parts[1])
         except:
@@ -91,8 +157,8 @@ async def main_handler(event):
             return
 
         target_chat = event.chat_id if len(parts) == 2 else int(parts[2])
-
         users = load_users()
+
         if not users:
             await event.reply("❌ لیست کاربران خالی است.")
             return
@@ -109,17 +175,16 @@ async def main_handler(event):
                 await event.reply("⚠️ محدودیت تلگرام: عملیات متوقف شد.")
                 stats["banned_groups"] += 1
                 break
-            except Exception:
+            except:
                 stats["banned_groups"] += 1
                 pass
 
-        remaining_users = users[num:]
-        save_users(remaining_users)
+        save_users(users[num:])
         save_stats(stats)
         await event.reply(f"✅ تعداد {added_count} نفر اضافه شدند.")
         return
 
-    # ── ارسال پیام ریپلای
+    # ────── ارسال پیام ریپلای
     if event.is_reply:
         reply_msg = await event.get_reply_message()
         target_text = reply_msg.message
@@ -157,42 +222,20 @@ async def main_handler(event):
                     await client2.send_message(uid, target_text)
                 except:
                     pass
-            await event.reply("✅ پیام به همه گروه‌ها و کاربران ارسال شد.")
+            await event.reply("✅ پیام به همه ارسال شد.")
             return
 
-    # ── لینک دعوت
+    # ────── لینک دعوت (مدیریت خودکار)
     match = re.search(invite_pattern, text)
     if match:
-        invite_link = match.group(1)
-        await event.reply("🔍 در حال تلاش برای پیوستن...")
+        await join_with_delay(match.group(1), event)
 
-        stats = load_stats()
-        try:
-            if "joinchat" in invite_link or "+" in invite_link:
-                invite_hash = invite_link.split("/")[-1]
-                await client2(ImportChatInviteRequest(invite_hash))
-                stats["groups"] += 1
-            else:
-                await client2(JoinChannelRequest(invite_link))
-                if "/c/" in invite_link or invite_link.count("/") > 3:
-                    stats["groups"] += 1
-                else:
-                    stats["channels"] += 1
-            save_stats(stats)
-            await event.reply("✅ با موفقیت پیوستم و آمار بروز شد.")
-        except InviteHashExpiredError:
-            await event.reply("❌ لینک منقضی شده است.")
-        except InviteHashInvalidError:
-            await event.reply("❌ لینک معتبر نیست.")
-        except Exception as e:
-            await event.reply(f"⚠️ خطا: {e}")
 
-# ────── تابع wrapper برای اجرای یوزربات دوم
+# ────── اجرای کلاینت
 async def start_userbot2():
     await client2.start()
-    print("⚡ یوزربات پیشرفته فعال شد!")
+    print("⚡ یوزربات فعال شد.")
     await client2.run_until_disconnected()
 
-# ────── شروع بات
 if __name__ == "__main__":
     asyncio.run(start_userbot2())
