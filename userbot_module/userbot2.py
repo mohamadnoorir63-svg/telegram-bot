@@ -1,32 +1,44 @@
+# -*- coding: utf-8 -*-
+import asyncio
+import json
+import os
+import re
+import time
+import traceback
 from telethon import TelegramClient, events
 from telethon.sessions import StringSession
 from telethon.tl.functions.messages import ImportChatInviteRequest
 from telethon.tl.functions.channels import JoinChannelRequest, InviteToChannelRequest
-from telethon.errors import InviteHashExpiredError, InviteHashInvalidError, PeerFloodError
-import asyncio
-import re
-import json
-import os
-import time
-import traceback
+from telethon.errors import (
+    InviteHashExpiredError,
+    InviteHashInvalidError,
+    PeerFloodError,
+    UserPrivacyRestrictedError,
+    RPCError
+)
 
-# ────── اطلاعات تلگرام (مقادیر خودت رو نگه داشتم)
+# ────── تنظیمات تلگرام (مقادیر خودت)
 API_ID = 32796779
 API_HASH = "4deabef1568103b3242db6f74a73e8a5"
 SESSION_STRING = "1ApWapzMBuzET2YvEj_TeHnWFPVKUV1Wbqb3o534-WL_U0fbXd-RTUWuML8pK60sh9B_oGsE3T3RQjIhXWs4tM30UPr3BFxpF6EUCB9BSPGCtmienHmXHI9k-zT7iI6HZLtqlNeGi0zMxAA8hUY25V1IhKgnujyHWcUA9VfVXNmJTtq54cZgdvTSa3EntYNmTlMcsaX7p82yoSKpz3LL5SB9ZL35PZCVAVXMIcfBbv_Ofr6w9CA4yBcMm9-t4NjRRLaZnwH-rU29RmtM8qM3n-K7mvCFRfQ1Vmw_HBFcYJlx-mHN_rxgo55XIC3Y3_9XoQ9f0FypxXgxEsYUjH5LosGP2KA_tMZo="
 
 client2 = TelegramClient(StringSession(SESSION_STRING), API_ID, API_HASH)
 
-# ────── تنظیمات
-SUDO = 8588347189
+# ────── فایل‌ها و متغیرها
 STATS_FILE = "join_stats.json"
 USERS_FILE = "users_list.json"
+PM_TIMES_FILE = "pm_times.json"  # نگهداری زمان آخرین پیام خوش‌آمد
+JOIN_DELAY = 60        # هر جوین بین لینک‌ها (ثانیه)
+BROADCAST_DELAY = 1.5  # فاصله بین پیام به هر کاربر هنگام ارسال انبوه (ثانیه)
+PM_COOLDOWN = 60 * 60  # یک ساعت: فاصلهٔ ارسال پیام خوش‌آمد تکراری به یک کاربر
 
-# زمان آخرین جوین (برای جلوگیری از محدودیت)
+SUDO = 8588347189  # آی‌دی صاحب یا مدیر اصلی
+
 LAST_JOIN_TIME = 0
-JOIN_DELAY = 60  # ← هر لینک ۶۰ ثانیه فاصله
 
-# ────── ایجاد فایل‌ها در صورت نبودن (و مقداردهی لیست‌های داخلی)
+invite_pattern = r"(https?://t\.me/[\w\d_\-+/=]+)"
+
+# ────── اطمینان از وجود فایل‌ها
 def ensure_files():
     if not os.path.exists(STATS_FILE):
         initial = {
@@ -43,36 +55,45 @@ def ensure_files():
         with open(USERS_FILE, "w", encoding="utf-8") as f:
             json.dump([], f, ensure_ascii=False, indent=2)
 
+    if not os.path.exists(PM_TIMES_FILE):
+        with open(PM_TIMES_FILE, "w", encoding="utf-8") as f:
+            json.dump({}, f, ensure_ascii=False, indent=2)
+
 ensure_files()
 
-# ────── توابع آمار
-def load_stats():
-    with open(STATS_FILE, "r", encoding="utf-8") as f:
-        return json.load(f)
+# ────── خواندن/نوشتن JSON
+def load_json(path, default):
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return default
 
-def save_stats(data):
-    with open(STATS_FILE, "w", encoding="utf-8") as f:
+def save_json(path, data):
+    with open(path, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
+def load_stats():
+    return load_json(STATS_FILE, {})
+
+def save_stats(data):
+    save_json(STATS_FILE, data)
+
 def load_users():
-    with open(USERS_FILE, "r", encoding="utf-8") as f:
-        return json.load(f)
+    return load_json(USERS_FILE, [])
 
 def save_users(users):
-    with open(USERS_FILE, "w", encoding="utf-8") as f:
-        json.dump(users, f, ensure_ascii=False, indent=2)
+    save_json(USERS_FILE, users)
 
-# ────── الگوی لینک
-invite_pattern = r"(https?://t\.me/[\w\d_\-+/=]+)"
+def load_pm_times():
+    return load_json(PM_TIMES_FILE, {})
 
-# ────── تابعی که هنگام راه‌اندازی، دیالوگ‌های از قبل عضو شده را اسکن می‌کند
+def save_pm_times(d):
+    save_json(PM_TIMES_FILE, d)
+
+# ────── اسکن اولیهٔ دیالوگ‌ها (مثل قبل)
 async def init_joined_chats():
-    """
-    اسکن تمام دیالوگ‌ها و اضافه کردن گروه/کانال‌هایی که از قبل در آن‌ها عضو هستیم
-    به آمار (فقط اگر پیشتر وارد لیست نشده باشند).
-    """
     stats = load_stats()
-    # مطمئن شوید کلیدها وجود دارند
     stats.setdefault("__joined_groups__", [])
     stats.setdefault("__joined_channels__", [])
     stats.setdefault("groups", 0)
@@ -81,7 +102,6 @@ async def init_joined_chats():
 
     async for dialog in client2.iter_dialogs():
         try:
-            # dialog.is_group و dialog.is_channel پرکاربردترین پرچم‌ها هستند
             chat_id = dialog.id
             if dialog.is_group:
                 if chat_id not in stats["__joined_groups__"]:
@@ -89,13 +109,11 @@ async def init_joined_chats():
                     stats["groups"] = stats.get("groups", 0) + 1
                     changed = True
             elif dialog.is_channel:
-                # توجه: کانال‌های خصوصی/عمومی هم اینجا می‌افتند
                 if chat_id not in stats["__joined_channels__"]:
                     stats["__joined_channels__"].append(chat_id)
                     stats["channels"] = stats.get("channels", 0) + 1
                     changed = True
         except Exception:
-            # فقط لاگ کن، ادامه بده
             print("خطا هنگام اسکن دیالوگ:", traceback.format_exc())
 
     if changed:
@@ -104,13 +122,11 @@ async def init_joined_chats():
     else:
         print("ℹ️ هیچ چت جدیدی برای اضافه کردن به آمار وجود نداشت.")
 
-# ────── سیستم جوین با تاخیر
+# ────── تابع جوین با تاخیر و هندلینگ خطا
 async def join_with_delay(invite_link, event):
     global LAST_JOIN_TIME
-
     now = time.time()
     wait_time = LAST_JOIN_TIME + JOIN_DELAY - now
-
     if wait_time > 0:
         try:
             await event.reply(f"⏳ باید {int(wait_time)} ثانیه صبر کنم... (جلوگیری از بلاک)")
@@ -119,28 +135,19 @@ async def join_with_delay(invite_link, event):
         await asyncio.sleep(wait_time)
 
     LAST_JOIN_TIME = time.time()
-
     stats = load_stats()
 
     try:
         clean = invite_link.replace("https://", "").replace("http://", "")
         clean = clean.replace("t.me/", "")
 
-        # ── لینک + (لینک خصوصی)
-        if clean.startswith("+"):
-            invite_hash = clean.replace("+", "")
-            await client2(ImportChatInviteRequest(invite_hash))
-            # بعد از جوین، chat ممکنه به dialogها اضافه شده باشه؛ در init_joined_chats هم حساب میشه اما اینجا افزایش میدیم
-            stats["groups"] = stats.get("groups", 0) + 1
-
-        # ── لینک joinchat/
-        elif clean.startswith("joinchat/"):
-            invite_hash = clean.replace("joinchat/", "")
+        if clean.startswith("+") or clean.startswith("joinchat/"):
+            # لینک خصوصی
+            invite_hash = clean.replace("+", "").replace("joinchat/", "")
             await client2(ImportChatInviteRequest(invite_hash))
             stats["groups"] = stats.get("groups", 0) + 1
-
-        # ── کانال‌های عادی / t.me/test123
         else:
+            # کانال یا یوزرنیم
             await client2(JoinChannelRequest(clean))
             stats["channels"] = stats.get("channels", 0) + 1
 
@@ -161,37 +168,102 @@ async def join_with_delay(invite_link, event):
         except:
             pass
     except Exception as e:
-        # لاگ خطا برای دیباگ
         print("خطا در join_with_delay:", traceback.format_exc())
         try:
             await event.reply(f"⚠️ خطا: {e}")
         except:
             pass
 
-# ────── هندلر پیام‌ها
+# ────── ارسال پیام خوش‌آمد در PV (با cooldown و ذخیرهٔ کاربر فقط در PV)
+async def send_welcome_pm_if_needed(sender_id):
+    """
+    وقتی کاربر در گروه پیام داد، این تابع تلاش می‌کند در PV برای او خوش‌آمد بفرستد.
+    فقط اگر در  PM_TIMES بیشتر از PM_COOLDOWN گذشته باشد یا هنوز پیامی فرستاده نشده باشد.
+    """
+    pm_times = load_pm_times()
+    last = pm_times.get(str(sender_id), 0)
+    now = time.time()
+    if now - last < PM_COOLDOWN:
+        return False  # اخیراً پیام فرستاده شده؛ نپریزیم
+
+    welcome_text = (
+        "سلام! 👋\n"
+        "برای فعال شدن خدمات ربات و دریافت پیام‌ها، لطفاً همین‌جا یک پیام بفرستید.\n"
+        "این کار باعث می‌شود شما در لیست پیام‌رسانی قرار بگیرید."
+    )
+    try:
+        await client2.send_message(sender_id, welcome_text)
+        pm_times[str(sender_id)] = now
+        save_pm_times(pm_times)
+        return True
+    except (UserPrivacyRestrictedError, RPCError):
+        # کاربر امکان دریافت پیام از ادمین/ربات را بسته یا خطای RPC
+        return False
+    except Exception:
+        print("خطا در send_welcome_pm_if_needed:", traceback.format_exc())
+        return False
+
+# ────── تابع ارسال پیام انبوه به کاربران (با تاخیر، گزارش)
+async def broadcast_to_users(message_text):
+    users = load_users()
+    success = 0
+    failed = 0
+    for uid in users:
+        try:
+            await client2.send_message(int(uid), message_text)
+            success += 1
+        except PeerFloodError:
+            print("⚠️ PeerFloodError during broadcast -> توقف ارسال")
+            # وقتی flood میاد، بهتره متوقف کنیم
+            return success, failed + (len(users) - success)
+        except Exception:
+            failed += 1
+        await asyncio.sleep(BROADCAST_DELAY)
+    return success, failed
+
+# ────── تابع افزودن اعضا به کانال/گروه با رعایت خطاها
+async def invite_users_to_target(target_chat, user_ids):
+    stats = load_stats()
+    added_count = 0
+    for user_id in user_ids:
+        try:
+            await client2(InviteToChannelRequest(int(target_chat), [int(user_id)]))
+            added_count += 1
+            await asyncio.sleep(1.0)  # فاصله کوتاه بین دعوت‌ها
+        except PeerFloodError:
+            print("⚠️ محدودیت تلگرام: PeerFloodError هنگام دعوت")
+            stats["banned_groups"] = stats.get("banned_groups", 0) + 1
+            save_stats(stats)
+            break
+        except UserPrivacyRestrictedError:
+            # کاربر پرایوسی دارد؛ نمی‌توان دعوت کرد
+            stats["banned_groups"] = stats.get("banned_groups", 0) + 1
+            save_stats(stats)
+            continue
+        except Exception:
+            print("خطا در invite_users_to_target:", traceback.format_exc())
+            stats["banned_groups"] = stats.get("banned_groups", 0) + 1
+            save_stats(stats)
+            continue
+    return added_count
+
+# ────── هندلر پیام‌ها (اصلاح‌شده)
 @client2.on(events.NewMessage)
 async def main_handler(event):
-    """
-    هر پیام جدید (از هرکس) اینجا میاد.
-    - اگر پیام از SUDO باشه: دستورات مدیریتی را پردازش کن
-    - اگر پیام از کاربر عادی باشه: کاربر را ذخیره کن و در صورت وجود لینک، جوین شو
-    - همیشه: اگر چت (گروه/کانال) شناخته نشده باشه، به آمار اضافه کن
-    """
     try:
-        # sender_id ممکنه None باشه (مثلاً پیام کانال بدون sender). از getattr استفاده می‌کنیم
         sender = getattr(event, "sender_id", None)
         text = (event.raw_text or "").strip()
         is_sudo = (sender == SUDO)
 
-        # اول: اگر پیام در گروه/کانال باشد، مطمئن شویم آن چت به آمار اضافه شده
+        # همیشه چک کن آمار چت‌ها
         stats = load_stats()
         stats.setdefault("__joined_groups__", [])
         stats.setdefault("__joined_channels__", [])
+        stats.setdefault("groups", 0)
+        stats.setdefault("channels", 0)
         updated = False
 
-        # chat_id برای دیالوگ جاری
         chat_id = getattr(event, "chat_id", None)
-        # event.is_group و event.is_channel را چک کن (این‌ها در telethon موجودند)
         if getattr(event, "is_group", False) or getattr(event, "is_channel", False):
             if getattr(event, "is_group", False):
                 if chat_id is not None and chat_id not in stats["__joined_groups__"]:
@@ -203,150 +275,165 @@ async def main_handler(event):
                     stats["__joined_channels__"].append(chat_id)
                     stats["channels"] = stats.get("channels", 0) + 1
                     updated = True
-
         if updated:
             save_stats(stats)
-            # اگر مایل بودی می‌توانی این پیام را به SUDO اطلاع بدی؛ الان اعلان نمی‌فرستم تا اسپم نشه.
 
-        # ────── ادامه پردازش پیام
-        # ────── جمع‌آوری کاربران عادی
+        # ────── رفتار برای پیام‌های غیر-SUDO (کاربران عادی)
+        # 1) اگر پیام در گروه باشد → به کاربر پی‌وی خوش‌آمد بفرست و از ذخیره در لیست گروهی خودداری کن
         if not is_sudo:
-            # اگر فرستنده کاربر معمولی و داخل گروه است، ذخیره کن
-            if sender is not None and getattr(event, "is_group", False):
-                users = load_users()
-                if sender not in users:
-                    users.append(sender)
-                    save_users(users)
+            # اگر در گروه پیام دادیم، تلاش کن در پی‌وی برایش خوش‌آمد بفرستی
+            if getattr(event, "is_group", False) and sender is not None:
+                # ارسال پیام خوش‌آمد در PV (در صورت عدم cooldown)
+                await send_welcome_pm_if_needed(sender)
+                # دقت: ذخیره فقط وقتی انجام می‌شود که کاربر در پی‌وی با ما پیام بزند (بخش بعد)
+                # همچنین اگر پیام شامل لینک دعوت بود، سعی در جوین شدن کن
+                match = re.search(invite_pattern, text)
+                if match:
+                    await join_with_delay(match.group(1), event)
+                return  # کاربران عادی در این بخش کار دیگری انجام نمی‌دهند
 
-            # کاربران عادی هم اگر لینک بفرستند → خودکار جوین شو
+        # ────── رفتار برای پیام‌های SUDO (دستورات مدیریت)
+        if is_sudo:
+            # نمایش آمار
+            if text in ["آمار", "/stats", "stats"]:
+                stats = load_stats()
+                users = load_users()
+                await event.reply(
+                    f"📊 **آمار ربات:**\n\n"
+                    f"👥 کاربران ذخیره شده: `{len(users)}`\n"
+                    f"📢 کانال‌ها: `{stats.get('channels', 0)}`\n"
+                    f"👥 گروه‌ها: `{stats.get('groups', 0)}`\n"
+                    f"⛔ گروه‌های بن شده: `{stats.get('banned_groups', 0)}`"
+                )
+                return
+
+            # پاکسازی بن‌ها
+            if text == "پاکسازی بن":
+                stats = load_stats()
+                stats["banned_groups"] = 0
+                save_stats(stats)
+                await event.reply("✅ گروه‌های بن شده پاکسازی شدند.")
+                return
+
+            # دستور اد: "اد <تعداد> [target_chat_id]"
+            if text.startswith("اد "):
+                parts = text.split()
+                if len(parts) < 2:
+                    await event.reply("❌ فرمت درست: `اد تعداد [گروه_id]`")
+                    return
+                try:
+                    num = int(parts[1])
+                except:
+                    await event.reply("❌ عدد معتبر نیست.")
+                    return
+                target_chat = event.chat_id if len(parts) == 2 else int(parts[2])
+                users = load_users()
+                if not users:
+                    await event.reply("❌ لیست کاربران خالی است.")
+                    return
+                target_users = users[:num]
+                added_count = await invite_users_to_target(target_chat, target_users)
+                # حذف کاربرانی که تلاش برای دعوت شده‌اند (چه دعوت موفق باشد چه نه، آن‌ها از لیست حذف می‌شوند تا دوباره تلاش نکنیم)
+                remaining = users[num:]
+                save_users(remaining)
+                await event.reply(f"✅ تعداد {added_count} نفر اضافه شدند.")
+                return
+
+            # ارسال پیام به گروه‌ها / کاربران / همه — با ریپلای کردن پیام هدف
+            if event.is_reply:
+                reply_msg = await event.get_reply_message()
+                target_text = reply_msg.message or reply_msg.raw_text or ""
+                if text == "ارسال گروه":
+                    sent = 0
+                    async for dialog in client2.iter_dialogs():
+                        if dialog.is_group:
+                            try:
+                                await client2.send_message(dialog.id, target_text)
+                                sent += 1
+                                await asyncio.sleep(0.5)
+                            except Exception:
+                                pass
+                    await event.reply(f"✅ پیام به {sent} گروه ارسال شد.")
+                    return
+
+                if text == "ارسال کاربران":
+                    users = load_users()
+                    success, failed = 0, 0
+                    for uid in users:
+                        try:
+                            await client2.send_message(int(uid), target_text)
+                            success += 1
+                        except PeerFloodError:
+                            await event.reply("⚠️ محدودیت تلگرام: عملیات متوقف شد.")
+                            break
+                        except Exception:
+                            failed += 1
+                        await asyncio.sleep(BROADCAST_DELAY)
+                    await event.reply(f"✅ پیام به کاربران ارسال شد. موفق: {success} | ناموفق: {failed}")
+                    return
+
+                if text == "ارسال همه":
+                    # ارسال به گروه‌ها
+                    sent_groups = 0
+                    async for dialog in client2.iter_dialogs():
+                        if dialog.is_group:
+                            try:
+                                await client2.send_message(dialog.id, target_text)
+                                sent_groups += 1
+                                await asyncio.sleep(0.5)
+                            except Exception:
+                                pass
+                    # ارسال به کاربران
+                    users = load_users()
+                    success, failed = 0, 0
+                    for uid in users:
+                        try:
+                            await client2.send_message(int(uid), target_text)
+                            success += 1
+                        except Exception:
+                            failed += 1
+                        await asyncio.sleep(BROADCAST_DELAY)
+                    await event.reply(f"✅ ارسال کامل شد. گروه‌ها: {sent_groups} | کاربران موفق: {success} | ناموفق: {failed}")
+                    return
+
+            # اگر SUDO لینک فرستاد، جوین شو
             match = re.search(invite_pattern, text)
             if match:
                 await join_with_delay(match.group(1), event)
-            return
-
-        # ────── اگر SUDO هست، دستورات مدیریتی
-        if text in ["آمار", "/stats", "stats"]:
-            stats = load_stats()
-            users = load_users()
-            await event.reply(
-                f"📊 **آمار ربات:**\n\n"
-                f"👥 کاربران ذخیره شده: `{len(users)}`\n"
-                f"📢 کانال‌ها: `{stats.get('channels', 0)}`\n"
-                f"👥 گروه‌ها: `{stats.get('groups', 0)}`\n"
-                f"⛔ گروه‌های بن شده: `{stats.get('banned_groups', 0)}`"
-            )
-            return
-
-        # ────── پاکسازی بن
-        if text == "پاکسازی بن":
-            stats = load_stats()
-            stats["banned_groups"] = 0
-            save_stats(stats)
-            await event.reply("✅ گروه‌های بن شده پاکسازی شدند.")
-            return
-
-        # ────── اد عضو
-        if text.startswith("اد "):
-            parts = text.split()
-            if len(parts) < 2:
-                await event.reply("❌ فرمت درست: `اد تعداد [گروه_id]`")
-                return
-
-            try:
-                num = int(parts[1])
-            except:
-                await event.reply("❌ عدد معتبر نیست.")
-                return
-
-            target_chat = event.chat_id if len(parts) == 2 else int(parts[2])
-            users = load_users()
-
-            if not users:
-                await event.reply("❌ لیست کاربران خالی است.")
-                return
-
-            target_users = users[:num]
-            added_count = 0
-            stats = load_stats()
-
-            for user_id in target_users:
-                try:
-                    await client2(InviteToChannelRequest(target_chat, [user_id]))
-                    added_count += 1
-                except PeerFloodError:
-                    await event.reply("⚠️ محدودیت تلگرام: عملیات متوقف شد.")
-                    stats["banned_groups"] = stats.get("banned_groups", 0) + 1
-                    break
-                except Exception:
-                    # اگر خطا شد فقط آمار بن را افزایش بده
-                    stats["banned_groups"] = stats.get("banned_groups", 0) + 1
-                    pass
-
-            save_users(users[num:])
-            save_stats(stats)
-            await event.reply(f"✅ تعداد {added_count} نفر اضافه شدند.")
-            return
-
-        # ────── ارسال پیام ریپلای
-        if event.is_reply:
-            reply_msg = await event.get_reply_message()
-            target_text = reply_msg.message
-
-            if text == "ارسال گروه":
-                async for dialog in client2.iter_dialogs():
-                    if dialog.is_group:
-                        try:
-                            await client2.send_message(dialog.id, target_text)
-                        except:
-                            pass
-                await event.reply("✅ پیام به همه گروه‌ها ارسال شد.")
-                return
-
-            if text == "ارسال کاربران":
-                users = load_users()
-                for uid in users:
-                    try:
-                        await client2.send_message(uid, target_text)
-                    except:
-                        pass
-                await event.reply("✅ پیام به همه کاربران ارسال شد.")
-                return
-
-            if text == "ارسال همه":
-                async for dialog in client2.iter_dialogs():
-                    if dialog.is_group:
-                        try:
-                            await client2.send_message(dialog.id, target_text)
-                        except:
-                            pass
-                users = load_users()
-                for uid in users:
-                    try:
-                        await client2.send_message(uid, target_text)
-                    except:
-                        pass
-                await event.reply("✅ پیام به همه ارسال شد.")
-                return
-
-        # ────── لینک دعوت (مدیریت خودکار) برای SUDO هم
-        match = re.search(invite_pattern, text)
-        if match:
-            await join_with_delay(match.group(1), event)
 
     except Exception:
-        # لاگ کامل خطا برای دیباگ
         print("خطا در main_handler:", traceback.format_exc())
+
+# ────── وقتی کاربر در پی‌وی به یوزربات پیام داد: ذخیره کن (فقط در PV)
+@client2.on(events.NewMessage(incoming=True))
+async def pv_handler(event):
+    try:
+        # فقط پی‌وی
+        if not getattr(event, "is_private", False):
+            return
+        sender = getattr(event, "sender_id", None)
+        if sender is None:
+            return
+        users = load_users()
+        if sender not in users:
+            users.append(sender)
+            save_users(users)
+            # ذخیره به محض اولین پیام در پی‌وی — می‌تونیم تشکر هم کنیم
+            try:
+                await event.reply("✅ شما در لیست پیام‌رسانی ثبت شدید. ممنون از پیام شما!")
+            except:
+                pass
+    except Exception:
+        print("خطا در pv_handler:", traceback.format_exc())
 
 # ────── اجرای کلاینت
 async def start_userbot2():
     await client2.start()
     print("⚡ یوزربات فعال شد.")
-    # اسکن اولیهٔ دیالوگ‌ها تا گروه/کانال‌های از قبل عضو شده رو بشماره
     try:
         await init_joined_chats()
     except Exception:
         print("خطا هنگام init_joined_chats:", traceback.format_exc())
-
     await client2.run_until_disconnected()
 
 if __name__ == "__main__":
