@@ -1,30 +1,35 @@
 from telethon import TelegramClient, events
 from telethon.sessions import StringSession
 from telethon.tl.functions.messages import ImportChatInviteRequest
-from telethon.tl.functions.channels import JoinChannelRequest
-from telethon.errors import InviteHashExpiredError, InviteHashInvalidError
+from telethon.tl.functions.channels import JoinChannelRequest, InviteToChannelRequest
+from telethon.errors import InviteHashExpiredError, InviteHashInvalidError, PeerFloodError
 import asyncio
 import re
 import json
 import os
 
+# ────── اطلاعات تلگرام
 API_ID = 32796779
 API_HASH = "4deabef1568103b3242db6f74a73e8a5"
 SESSION_STRING = "1ApWapzMBuzET2YvEj_TeHnWFPVKUV1Wbqb3o534-WL_U0fbXd-RTUWuML8pK60sh9B_oGsE3T3RQjIhXWs4tM30UPr3BFxpF6EUCB9BSPGCtmienHmXHI9k-zT7iI6HZLtqlNeGi0zMxAA8hUY25V1IhKgnujyHWcUA9VfVXNmJTtq54cZgdvTSa3EntYNmTlMcsaX7p82yoSKpz3LL5SB9ZL35PZCVAVXMIcfBbv_Ofr6w9CA4yBcMm9-t4NjRRLaZnwH-rU29RmtM8qM3n-K7mvCFRfQ1Vmw_HBFcYJlx-mHN_rxgo55XIC3Y3_9XoQ9f0FypxXgxEsYUjH5LosGP2KA_tMZo="
 
 client2 = TelegramClient(StringSession(SESSION_STRING), API_ID, API_HASH)
 
-SUDO = 8588347189  # فقط سودو اجازه دستورات دارد
-
-# ────────────────────────────────
-# 📌 سیستم آمارگیر
-# ────────────────────────────────
+# ────── تنظیمات
+SUDO = 8588347189
 STATS_FILE = "join_stats.json"
+USERS_FILE = "users_list.json"
 
+# ────── ایجاد فایل‌ها در صورت نبودن
 if not os.path.exists(STATS_FILE):
     with open(STATS_FILE, "w") as f:
-        f.write(json.dumps({"groups": 0, "channels": 0}))
+        json.dump({"groups": 0, "channels": 0, "banned_groups": 0}, f)
 
+if not os.path.exists(USERS_FILE):
+    with open(USERS_FILE, "w") as f:
+        json.dump([], f)
+
+# ────── توابع مدیریت آمار و کاربران
 def load_stats():
     with open(STATS_FILE, "r") as f:
         return json.load(f)
@@ -33,32 +38,88 @@ def save_stats(data):
     with open(STATS_FILE, "w") as f:
         json.dump(data, f)
 
+def load_users():
+    with open(USERS_FILE, "r") as f:
+        return json.load(f)
+
+def save_users(users):
+    with open(USERS_FILE, "w") as f:
+        json.dump(users, f)
+
+# ────── الگوی لینک دعوت
 invite_pattern = r"(https?://t\.me/[\w\d_\-+/=]+)"
 
-# ────────────────────────────────
-# 📌 هندلر اصلی
-# ────────────────────────────────
+# ────── هندلر اصلی
 @client2.on(events.NewMessage)
 async def main_handler(event):
     sender = event.sender_id
     text = event.raw_text.strip()
+    is_sudo = sender == SUDO
 
-    # اگر کاربر سودو نبود → هیچی نگو
-    if sender != SUDO:
-        return  
+    # جمع‌آوری خودکار کاربران (کاربران عادی)
+    if not is_sudo:
+        if event.is_group:
+            users = load_users()
+            if sender not in users:
+                users.append(sender)
+                save_users(users)
+        return
 
-    # دستور آمار
+    # ── دستور آمار
     if text in ["آمار", "stats", "/stats"]:
         stats = load_stats()
+        users = load_users()
         await event.reply(
             f"📊 **آمار ربات:**\n\n"
-            f"👥 گروه‌ها: `{stats['groups']}`\n"
+            f"👥 کاربران ذخیره شده: `{len(users)}`\n"
             f"📢 کانال‌ها: `{stats['channels']}`\n"
-            f"📦 مجموع: `{stats['groups'] + stats['channels']}`"
+            f"👥 گروه‌ها: `{stats['groups']}`\n"
+            f"⛔ گروه‌های بن شده: `{stats['banned_groups']}`"
         )
         return
 
-    # دستور ارسال پیام ریپلای‌شده
+    # ── دستور اد با امکان انتخاب گروه مقصد
+    if text.startswith("اد "):
+        parts = text.split()
+        if len(parts) < 2:
+            await event.reply("❌ فرمت درست: `اد تعداد [گروه_id]`")
+            return
+        try:
+            num = int(parts[1])
+        except:
+            await event.reply("❌ عدد معتبر نیست.")
+            return
+
+        target_chat = event.chat_id if len(parts) == 2 else int(parts[2])
+
+        users = load_users()
+        if not users:
+            await event.reply("❌ لیست کاربران خالی است.")
+            return
+
+        target_users = users[:num]
+        added_count = 0
+        stats = load_stats()
+
+        for user_id in target_users:
+            try:
+                await client2(InviteToChannelRequest(target_chat, [user_id]))
+                added_count += 1
+            except PeerFloodError:
+                await event.reply("⚠️ محدودیت تلگرام: عملیات متوقف شد.")
+                stats["banned_groups"] += 1
+                break
+            except Exception:
+                stats["banned_groups"] += 1
+                pass
+
+        remaining_users = users[num:]
+        save_users(remaining_users)
+        save_stats(stats)
+        await event.reply(f"✅ تعداد {added_count} نفر اضافه شدند.")
+        return
+
+    # ── ارسال پیام ریپلای
     if event.is_reply:
         reply_msg = await event.get_reply_message()
         target_text = reply_msg.message
@@ -74,8 +135,7 @@ async def main_handler(event):
             return
 
         if text == "ارسال کاربران":
-            users = []
-            # این قسمت را خودت باید پر کنی با لیست کاربران ذخیره شده
+            users = load_users()
             for uid in users:
                 try:
                     await client2.send_message(uid, target_text)
@@ -91,59 +151,48 @@ async def main_handler(event):
                         await client2.send_message(dialog.id, target_text)
                     except:
                         pass
-            # ارسال به کاربران در صورت داشتن لیست
-            users = []
+            users = load_users()
             for uid in users:
                 try:
                     await client2.send_message(uid, target_text)
                 except:
                     pass
-            await event.reply("✅ پیام به همه ارسال شد.")
+            await event.reply("✅ پیام به همه گروه‌ها و کاربران ارسال شد.")
             return
 
-    # لینک دعوت
+    # ── لینک دعوت
     match = re.search(invite_pattern, text)
-    if not match:
-        return
+    if match:
+        invite_link = match.group(1)
+        await event.reply("🔍 در حال تلاش برای پیوستن...")
 
-    invite_link = match.group(1)
-    await event.reply("🔍 در حال تلاش برای پیوستن...")
-
-    try:
         stats = load_stats()
-
-        if "joinchat" in invite_link or "+" in invite_link:
-            invite_hash = invite_link.split("/")[-1]
-            await client2(ImportChatInviteRequest(invite_hash))
-            stats["groups"] += 1
-            save_stats(stats)
-
-        else:
-            await client2(JoinChannelRequest(invite_link))
-
-            if "/c/" in invite_link or invite_link.count("/") > 3:
+        try:
+            if "joinchat" in invite_link or "+" in invite_link:
+                invite_hash = invite_link.split("/")[-1]
+                await client2(ImportChatInviteRequest(invite_hash))
                 stats["groups"] += 1
             else:
-                stats["channels"] += 1
-
+                await client2(JoinChannelRequest(invite_link))
+                if "/c/" in invite_link or invite_link.count("/") > 3:
+                    stats["groups"] += 1
+                else:
+                    stats["channels"] += 1
             save_stats(stats)
+            await event.reply("✅ با موفقیت پیوستم و آمار بروز شد.")
+        except InviteHashExpiredError:
+            await event.reply("❌ لینک منقضی شده است.")
+        except InviteHashInvalidError:
+            await event.reply("❌ لینک معتبر نیست.")
+        except Exception as e:
+            await event.reply(f"⚠️ خطا: {e}")
 
-        await event.reply("✅ با موفقیت پیوستم!\n📊 آمار به‌روزرسانی شد.")
-
-    except InviteHashExpiredError:
-        await event.reply("❌ لینک دعوت منقضی شده است.")
-    except InviteHashInvalidError:
-        await event.reply("❌ لینک دعوت معتبر نیست.")
-    except Exception as e:
-        await event.reply(f"⚠️ خطا:\n{e}")
-
-# ────────────────────────────────
-# شروع بات
-# ────────────────────────────────
+# ────── تابع wrapper برای اجرای یوزربات دوم
 async def start_userbot2():
-    print("⚡ Userbot2 فعال شد!")
     await client2.start()
+    print("⚡ یوزربات پیشرفته فعال شد!")
     await client2.run_until_disconnected()
 
+# ────── شروع بات
 if __name__ == "__main__":
     asyncio.run(start_userbot2())
