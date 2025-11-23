@@ -18,6 +18,9 @@ client2 = TelegramClient(StringSession(SESSION_STRING), API_ID, API_HASH)
 
 # ────── تنظیمات
 SUDO = 8588347189
+(stats)
+STATS_FILE = "join_stats.json"
+USERS_FILE = "users_list.json"
 # ────── شناسایی گروه/کانال‌هایی که از قبل عضو بوده‌ایم
         if event.is_group or event.is_channel:
             stats = load_stats()
@@ -41,8 +44,6 @@ SUDO = 8588347189
                     stats["__joined_channels__"].append(event.chat_id)
                     stats["channels"] += 1
                     save_stats(stats)
-STATS_FILE = "join_stats.json"
-USERS_FILE = "users_list.json"
 
 # زمان آخرین جوین (برای جلوگیری از محدودیت)
 LAST_JOIN_TIME = 0
