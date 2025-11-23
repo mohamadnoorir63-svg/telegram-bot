@@ -461,7 +461,7 @@ async def is_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return True
 
     # صاحب ربات
-    bot_owner_id = 123456789  # آی‌دی عددی خودت
+    bot_owner_id = 8588347189  # آی‌دی عددی خودت
 
     if user_id == bot_owner_id:
         return True
