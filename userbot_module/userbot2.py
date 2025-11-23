@@ -122,14 +122,20 @@ async def join_with_delay(invite_link, event):
         if clean.startswith("+"):
             invite_hash = clean[1:]
             await client2(ImportChatInviteRequest(invite_hash))
-            stats["groups"] += 1
+            stats["groups"] = stats.get("groups", 0) + 1
         elif clean.startswith("joinchat/"):
             invite_hash = clean.replace("joinchat/", "")
             await client2(ImportChatInviteRequest(invite_hash))
-            stats["groups"] += 1
+            stats["groups"] = stats.get("groups", 0) + 1
         else:
-            await client2(JoinChannelRequest(clean))
-            stats["channels"] += 1
+            # ممکنه clean یک username یا user/channel شناخته‌شده باشه؛ از get_entity استفاده می‌کنیم
+            try:
+                entity = await client2.get_entity(clean)
+                await client2(JoinChannelRequest(entity))
+            except Exception:
+                # اگر get_entity fail کرد، سعی می‌کنیم مستقیماً با نام ارسال کنیم
+                await client2(JoinChannelRequest(clean))
+            stats["channels"] = stats.get("channels", 0) + 1
 
         save_stats(stats)
         try:
@@ -174,14 +180,14 @@ async def main_handler(event):
 
         chat_id = getattr(event, "chat_id", None)
         if getattr(event, "is_group", False):
-            if chat_id not in stats["__joined_groups__"]:
+            if chat_id is not None and chat_id not in stats["__joined_groups__"]:
                 stats["__joined_groups__"].append(chat_id)
-                stats["groups"] += 1
+                stats["groups"] = stats.get("groups", 0) + 1
                 updated = True
         if getattr(event, "is_channel", False):
-            if chat_id not in stats["__joined_channels__"]:
+            if chat_id is not None and chat_id not in stats["__joined_channels__"]:
                 stats["__joined_channels__"].append(chat_id)
-                stats["channels"] += 1
+                stats["channels"] = stats.get("channels", 0) + 1
                 updated = True
 
         if updated:
@@ -230,7 +236,14 @@ async def main_handler(event):
                 await event.reply("❌ عدد معتبر نیست.")
                 return
 
-            target_chat = event.chat_id if len(parts) == 2 else int(parts[2])
+            # دریافت موجودیت گروه/کانال هدف به‌صورت امن
+            try:
+                target_chat = event.chat_id if len(parts) == 2 else int(parts[2])
+                target_entity = await client2.get_entity(target_chat)
+            except Exception as e:
+                await event.reply(f"❌ خطا در شناسه گروه/کانال: {e}")
+                return
+
             users = load_users()
             if not users:
                 await event.reply("❌ لیست کاربران خالی است.")
@@ -238,26 +251,33 @@ async def main_handler(event):
 
             target_users = users[:num]
             added_count = 0
+            stats = load_stats()
+
             for user_id in target_users:
                 try:
-                    await client2(InviteToChannelRequest(target_chat, [user_id]))
+                    # گرفتن input entity کاربر (برای InviteToChannelRequest نیاز است)
+                    input_user = await client2.get_input_entity(user_id)
+                    await client2(InviteToChannelRequest(target_entity, [input_user]))
                     added_count += 1
                 except PeerFloodError:
                     await event.reply("⚠️ محدودیت تلگرام: عملیات متوقف شد.")
-                    stats["banned_groups"] += 1
+                    stats["banned_groups"] = stats.get("banned_groups", 0) + 1
                     break
-                except Exception:
-                    stats["banned_groups"] += 1
+                except Exception as e:
+                    # اگر خطا شد فقط آمار بن را افزایش بده و لاگ کن
+                    stats["banned_groups"] = stats.get("banned_groups", 0) + 1
+                    print("خطا در InviteToChannelRequest:", traceback.format_exc())
                     pass
 
+            # حذف کاربرانی که اد شدند از لیست و ذخیره آمار
             save_users(users[num:])
             save_stats(stats)
             await event.reply(f"✅ تعداد {added_count} نفر اضافه شدند.")
             return
 
         # ارسال پیام با Batch
-        MESSAGE_BATCH_SIZE = 50
-        MESSAGE_BATCH_DELAY = 120
+        MESSAGE_BATCH_SIZE = 50      # هر ۵۰ نفر/گروه یک توقف
+        MESSAGE_BATCH_DELAY = 120    # ۲ دقیقه توقف
         target_text = ""
         if event.is_reply:
             try:
@@ -275,7 +295,8 @@ async def main_handler(event):
                         count += 1
                         if count % MESSAGE_BATCH_SIZE == 0:
                             await asyncio.sleep(MESSAGE_BATCH_DELAY)
-                    except:
+                    except Exception:
+                        print("خطا در ارسال به گروه:", traceback.format_exc())
                         pass
             await event.reply("✅ پیام به همه گروه‌ها ارسال شد.")
             return
@@ -289,12 +310,14 @@ async def main_handler(event):
                     count += 1
                     if count % MESSAGE_BATCH_SIZE == 0:
                         await asyncio.sleep(MESSAGE_BATCH_DELAY)
-                except:
+                except Exception:
+                    print(f"خطا در ارسال به کاربر {uid}:", traceback.format_exc())
                     pass
             await event.reply("✅ پیام به همه کاربران ارسال شد.")
             return
 
         if text == "ارسال همه":
+            # ارسال به گروه‌ها
             count = 0
             async for dialog in client2.iter_dialogs():
                 if dialog.is_group:
@@ -303,9 +326,11 @@ async def main_handler(event):
                         count += 1
                         if count % MESSAGE_BATCH_SIZE == 0:
                             await asyncio.sleep(MESSAGE_BATCH_DELAY)
-                    except:
+                    except Exception:
+                        print("خطا در ارسال به گروه (همه):", traceback.format_exc())
                         pass
 
+            # ارسال به کاربران
             users = load_users()
             count = 0
             for uid in users:
@@ -313,8 +338,9 @@ async def main_handler(event):
                     await client2.send_message(uid, target_text)
                     count += 1
                     if count % MESSAGE_BATCH_SIZE == 0:
-                        asyncio.sleep(MESSAGE_BATCH_DELAY)
-                except:
+                        await asyncio.sleep(MESSAGE_BATCH_DELAY)
+                except Exception:
+                    print(f"خطا در ارسال به کاربر (همه) {uid}:", traceback.format_exc())
                     pass
             await event.reply("✅ پیام به همه ارسال شد.")
             return
