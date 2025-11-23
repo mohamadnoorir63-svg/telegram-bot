@@ -451,26 +451,53 @@ def get_group_status(chat_id: int):
     return GROUP_STATUS[chat_id]
 
 # ────────────── خاموش/روشن سخنگو برای هر گروه ──────────────
+# چک کردن اینکه کاربر ادمین است یا صاحب ربات
+async def is_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    chat_id = update.effective_chat.id
+
+    # اگر در PV بودند، اجازه بده
+    if update.effective_chat.type == "private":
+        return True
+
+    # صاحب ربات
+    bot_owner_id = 123456789  # آی‌دی عددی خودت
+
+    if user_id == bot_owner_id:
+        return True
+
+    # گرفتن لیست ادمین‌های گروه
+    admins = await context.bot.get_chat_administrators(chat_id)
+
+    # چک کردن اینکه کاربر داخل لیست ادمین‌هاست یا نه
+    for admin in admins:
+        if admin.user.id == user_id:
+            return True
+
+    return False
+
+
 async def mute_speaker(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """خاموش کردن سخنگو فقط برای این گروه"""
+    if not await is_admin(update, context):
+        return  # اگر ادمین نبود هیچ پیامی نده
     chat_id = update.effective_chat.id
     status = get_group_status(chat_id)
     status["active"] = False
-    await update.message.reply_text(
-        "😴 سخنگو خاموش شد!\n(جوک و فال همچنان فعال هستند)"
-    )
+    await update.message.reply_text("😴 سخنگو خاموش شد!\n(جوک و فال همچنان فعال هستند)")
+
 
 async def unmute_speaker(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """روشن کردن سخنگو فقط برای این گروه"""
+    if not await is_admin(update, context):
+        return
     chat_id = update.effective_chat.id
     status = get_group_status(chat_id)
     status["active"] = True
-    await update.message.reply_text(
-        "✅ سخنگو روشن شد!\n(همه پیام‌ها پاسخ داده می‌شوند)"
-    )
+    await update.message.reply_text("✅ سخنگو روشن شد!\n(همه پیام‌ها پاسخ داده می‌شوند)")
+
 
 async def toggle_welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """فعال/غیرفعال کردن خوشامد فقط برای این گروه"""
+    if not await is_admin(update, context):
+        return
     chat_id = update.effective_chat.id
     status = get_group_status(chat_id)
     status["welcome"] = not status["welcome"]
@@ -478,20 +505,23 @@ async def toggle_welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "👋 خوشامد فعال شد!" if status["welcome"] else "🚫 خوشامد غیرفعال شد!"
     )
 
+
 async def lock_learning(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """قفل یادگیری فقط برای این گروه"""
+    if not await is_admin(update, context):
+        return
     chat_id = update.effective_chat.id
     status = get_group_status(chat_id)
     status["locked"] = True
     await update.message.reply_text("🔒 یادگیری قفل شد!")
 
+
 async def unlock_learning(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """باز کردن یادگیری فقط برای این گروه"""
+    if not await is_admin(update, context):
+        return
     chat_id = update.effective_chat.id
     status = get_group_status(chat_id)
     status["locked"] = False
     await update.message.reply_text("🔓 یادگیری باز شد!")
-    
 # ======================= 📊 آمار ربات واقعی =======================
 async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """نمایش آمار کلی — فقط برای مدیر اصلی یا سودوها"""
