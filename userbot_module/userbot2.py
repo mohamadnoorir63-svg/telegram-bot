@@ -290,13 +290,13 @@ async def main_handler(event):
         
         # ────── تعداد پیام در هر Batch و تاخیر بین Batchها
         
-MESSAGE_BATCH_SIZE = 50      # هر ۵۰ نفر/گروه یک توقف
-MESSAGE_BATCH_DELAY = 120    # ۲ دقیقه توقف
+        MESSAGE_BATCH_SIZE = 50      # هر ۵۰ نفر/گروه یک توقف
+        MESSAGE_BATCH_DELAY = 120    # ۲ دقیقه توقف
 
-if event.is_reply:
-    try:
-        reply_msg = await event.get_reply_message()
-        target_text = reply_msg.message
+        if event.is_reply:
+            try:
+                reply_msg = await event.get_reply_message()
+                target_text = reply_msg.message
 
         # ────── ارسال به گروه‌ها با Batch
         if text == "ارسال گروه":
