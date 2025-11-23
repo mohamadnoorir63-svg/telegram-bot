@@ -287,47 +287,71 @@ async def main_handler(event):
             await event.reply(f"✅ تعداد {added_count} نفر اضافه شدند.")
             return
 
-        # ────── ارسال پیام ریپلای
-        if event.is_reply:
-            reply_msg = await event.get_reply_message()
-            target_text = reply_msg.message
+        
+        # ────── تعداد پیام در هر Batch و تاخیر بین Batchها
+MESSAGE_BATCH_SIZE = 50      # هر ۵۰ نفر/گروه یک توقف
+MESSAGE_BATCH_DELAY = 120    # ۲ دقیقه توقف
 
-            if text == "ارسال گروه":
-                async for dialog in client2.iter_dialogs():
-                    if dialog.is_group:
-                        try:
-                            await client2.send_message(dialog.id, target_text)
-                        except:
-                            pass
-                await event.reply("✅ پیام به همه گروه‌ها ارسال شد.")
-                return
+if event.is_reply:
+    reply_msg = await event.get_reply_message()
+    target_text = reply_msg.message
 
-            if text == "ارسال کاربران":
-                users = load_users()
-                for uid in users:
-                    try:
-                        await client2.send_message(uid, target_text)
-                    except:
-                        pass
-                await event.reply("✅ پیام به همه کاربران ارسال شد.")
-                return
+    # ────── ارسال به گروه‌ها با Batch
+    if text == "ارسال گروه":
+        count = 0
+        async for dialog in client2.iter_dialogs():
+            if dialog.is_group:
+                try:
+                    await client2.send_message(dialog.id, target_text)
+                    count += 1
+                    if count % MESSAGE_BATCH_SIZE == 0:
+                        await asyncio.sleep(MESSAGE_BATCH_DELAY)
+                except:
+                    pass
+        await event.reply("✅ پیام به همه گروه‌ها ارسال شد.")
+        return
 
-            if text == "ارسال همه":
-                async for dialog in client2.iter_dialogs():
-                    if dialog.is_group:
-                        try:
-                            await client2.send_message(dialog.id, target_text)
-                        except:
-                            pass
-                users = load_users()
-                for uid in users:
-                    try:
-                        await client2.send_message(uid, target_text)
-                    except:
-                        pass
-                await event.reply("✅ پیام به همه ارسال شد.")
-                return
+    # ────── ارسال به کاربران با Batch
+    if text == "ارسال کاربران":
+        users = load_users()
+        count = 0
+        for uid in users:
+            try:
+                await client2.send_message(uid, target_text)
+                count += 1
+                if count % MESSAGE_BATCH_SIZE == 0:
+                    await asyncio.sleep(MESSAGE_BATCH_DELAY)
+            except:
+                pass
+        await event.reply("✅ پیام به همه کاربران ارسال شد.")
+        return
 
+    # ────── ارسال به همه (گروه + کاربران) با Batch
+    if text == "ارسال همه":
+        # ارسال به گروه‌ها
+        count = 0
+        async for dialog in client2.iter_dialogs():
+            if dialog.is_group:
+                try:
+                    await client2.send_message(dialog.id, target_text)
+                    count += 1
+                    if count % MESSAGE_BATCH_SIZE == 0:
+                        await asyncio.sleep(MESSAGE_BATCH_DELAY)
+                except:
+                    pass
+        # ارسال به کاربران
+        users = load_users()
+        count = 0
+        for uid in users:
+            try:
+                await client2.send_message(uid, target_text)
+                count += 1
+                if count % MESSAGE_BATCH_SIZE == 0:
+                    await asyncio.sleep(MESSAGE_BATCH_DELAY)
+            except:
+                pass
+        await event.reply("✅ پیام به همه ارسال شد.")
+        return
         # ────── لینک دعوت (مدیریت خودکار) برای SUDO هم
         match = re.search(invite_pattern, text)
         if match:
