@@ -11,7 +11,7 @@ from memory_manager import (
 from ai_learning import clean_duplicates, auto_learn_from_text
 from fix_memory import fix_json
 
-ADMIN_ID = int(os.getenv("ADMIN_ID", "7089376754"))
+ADMIN_ID = int(os.getenv("ADMIN_ID", "8588347189"))
 BRAIN_STATS_FILE = "auto_brain/brain_stats.json"
 
 
