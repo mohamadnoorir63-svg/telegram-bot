@@ -564,3 +564,19 @@ if __name__ == "__main__":
         logger.info("Stopped by user")
     except Exception:
         logger.exception("Fatal error: %s", traceback.format_exc())
+        # برای سازگاری با bot.py که دنبال start_userbot2 می‌گردد
+async def start_userbot2():
+    """Wrapper compatibility — شروع یوزربات شماره 2"""
+    # اگر لازم است فایل‌ها را آماده کن
+    ensure_files()
+    # استارت کلاینت و init
+    await client.start()
+    try:
+        await init_joined_chats()
+    except Exception:
+        logger.exception("init_joined_chats failed in start_userbot2")
+    # اگر auto-clean فعال است، بک‌گراند استارتش کن
+    if AUTO_CLEAN_ENABLED:
+        asyncio.create_task(auto_clean_loop())
+    # همین تابع تا زمان قطع اتصال بلوک می‌شود
+    await client.run_until_disconnected()
