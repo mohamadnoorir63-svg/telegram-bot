@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Ultra All-in-One Userbot v3
+Ultra All-in-One Userbot v3 - Fixed Version
 - Auto-join links (public + private) in batches
 - Silent user collector (group + private)
 - Invite users to target chat
@@ -26,7 +26,6 @@ from telethon.errors import (
     PeerFloodError,
     UserPrivacyRestrictedError,
     FloodWaitError,
-    RPCError
 )
 
 # ============================
@@ -34,42 +33,22 @@ from telethon.errors import (
 # ============================
 API_ID = 32796779
 API_HASH = "4deabef1568103b3242db6f74a73e8a5"
-SESSION_STRING = "1ApWapzMBuzET2YvEj_TeHnWFPVKUV1Wbqb3o534-WL_U0fbXd-RTUWuML8pK60sh9B_oGsE3T3RQjIhXWs4tM30UPr3BFxpF6EUCB9BSPGCtmienHmXHI9k-zT7iI6HZLtqlNeGi0zMxAA8hUY25V1IhKgnujyHWcUA9VfVXNmJTtq54cZgdvTSa3EntYNmTlMcsaX7p82yoSKpz3LL5SB9ZL35PZCVAVXMIcfBbv_Ofr6w9CA4yBcMm9-t4NjRRLaZnwH-rU29RmtM8qM3n-K7mvCFRfQ1Vmw_HBFcYJlx-mHN_rxgo55XIC3Y3_9XoQ9f0FypxXgxEsYUjH5LosGP2KA_tMZo="
-
-client2 = TelegramClient(StringSession(SESSION_STRING), API_ID, API_HASH)
-
+SESSION_STRING = "YOUR_SESSION_STRING_HERE"  # جایگذاری StringSession
+SUDO_USERS = [8588347189]  # آیدی مدیران
 LINK_CHANNEL = "https://t.me/Link4you"  # لینک کانال لینکدونی
 
-async def auto_join_from_channel_loop():
-    if not AUTO_JOIN_ENABLED:
-        return
-    last_joined = set()
-    # تبدیل لینک یا یوزرنیم به entity.id
-    channel_entity = await client.get_entity(LINK_CHANNEL)
-    channel_id = channel_entity.id
-    while True:
-        try:
-            async for msg in client.iter_messages(channel_id, limit=5):
-                links = re.findall(invite_pattern, msg.message or "")
-                for link in links:
-                    if link not in last_joined:
-                        await join_with_delay(link)
-                        last_joined.add(link)
-                        await asyncio.sleep(AUTO_JOIN_CHANNEL_INTERVAL)
-        except Exception:
-            logger.exception("خطا در auto_join_from_channel_loop")
-            await asyncio.sleep(60)
-
-
+# ============================
+# SETTINGS
+# ============================
 USERS_FILE = "users_list.json"
 STATS_FILE = "join_stats.json"
 PM_TIMES_FILE = "pm_times.json"
 ERROR_LOG = "errors.log"
 
-JOIN_DELAY = 20          # فاصله بین join‌ها
-BATCH_JOIN_COUNT = 5     # بعد از چند لینک دسته بعدی
-BATCH_JOIN_DELAY = 120   # فاصله بین دسته‌ها (ثانیه)
-AUTO_JOIN_CHANNEL_INTERVAL = 60  # هر ۱ دقیقه لینک بعدی از کانال
+JOIN_DELAY = 20
+BATCH_JOIN_COUNT = 5
+BATCH_JOIN_DELAY = 120
+AUTO_JOIN_CHANNEL_INTERVAL = 60
 
 BROADCAST_DELAY = 1.5
 INVITE_DELAY = 1
@@ -103,7 +82,7 @@ logger = logging.getLogger(__name__)
 client = TelegramClient(StringSession(SESSION_STRING), API_ID, API_HASH)
 
 # ============================
-# Utils: File IO
+# File utils
 # ============================
 def ensure_files():
     for f, default in [(USERS_FILE, []), 
@@ -185,12 +164,10 @@ async def join_with_delay(invite_links, source_event=None):
             results.append((link,False,f"flood_wait_{getattr(e,'seconds',10)}"))
         except Exception as e:
             results.append((link,False,str(e)))
-        # دسته‌بندی هر 5 لینک
         if idx%BATCH_JOIN_COUNT==0:
             await asyncio.sleep(BATCH_JOIN_DELAY)
         else:
             await asyncio.sleep(JOIN_DELAY)
-    # گزارش به سودو
     if source_event and is_sudo(source_event.sender_id):
         summary=[]
         for l,ok,reason in results:
@@ -243,7 +220,7 @@ async def invite_users_to_target(target_chat_id,user_ids):
     return added
 
 # ============================
-# Broadcast functions
+# Broadcast
 # ============================
 async def broadcast_to_users(message_text,user_list=None):
     users=user_list or load_users()
@@ -309,15 +286,17 @@ async def auto_clean_loop():
         await asyncio.sleep(AUTO_CLEAN_INTERVAL)
 
 # ============================
-# Auto join from link channel
+# Auto join from channel (with username)
 # ============================
 async def auto_join_from_channel_loop():
     if not AUTO_JOIN_ENABLED:
         return
     last_joined = set()
+    channel_entity = await client.get_entity(LINK_CHANNEL)
+    channel_id = channel_entity.id
     while True:
         try:
-            async for msg in client.iter_messages(LINK_CHANNEL_ID, limit=5):
+            async for msg in client.iter_messages(channel_id, limit=5):
                 links = re.findall(invite_pattern, msg.message or "")
                 for link in links:
                     if link not in last_joined:
@@ -386,29 +365,6 @@ async def main_handler(event):
                 save_users(remaining)
                 await event.reply(f"✅ تعداد {added} نفر اضافه شدند.")
                 return
-            if event.is_reply:
-                reply_msg=await event.get_reply_message()
-                target_text=(reply_msg.message or reply_msg.raw_text or "").strip()
-                if text=="ارسال کاربران":
-                    users=load_users()
-                    succ,fail=await broadcast_to_users(target_text,users)
-                    await event.reply(f"✅ ارسال به کاربران: موفق {succ} | ناموفق {fail}")
-                    return
-                if text=="ارسال گروه":
-                    sent=await broadcast_to_groups(target_text)
-                    await event.reply(f"✅ پیام به {sent} گروه ارسال شد.")
-                    return
-                if text=="ارسال همه":
-                    sent_groups=await broadcast_to_groups(target_text)
-                    succ,fail=await broadcast_to_users(target_text,load_users())
-                    await event.reply(f"✅ ارسال کامل شد.\nگروه‌ها: {sent_groups} | کاربران موفق: {succ} | ناموفق: {fail}")
-                    return
-            # Manual join
-            match=re.search(invite_pattern,text)
-            if match:
-                ok,reason=await join_with_delay(match.group(1),event)
-                await event.reply(f"Join result: {ok} | {reason}")
-                return
     except Exception:
         logger.exception("خطا در main_handler: %s", traceback.format_exc())
 
@@ -425,6 +381,10 @@ async def main():
         asyncio.create_task(auto_join_from_channel_loop())
     await client.run_until_disconnected()
 
+# Wrapper function
+async def start_userbot2():
+    await main()
+
 if __name__=="__main__":
     try:
         asyncio.run(main())
@@ -432,5 +392,3 @@ if __name__=="__main__":
         logger.info("Stopped by user")
     except Exception:
         logger.exception("Fatal error: %s", traceback.format_exc())
-        async def start_userbot2():
-    await main()
