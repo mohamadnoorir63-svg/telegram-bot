@@ -432,3 +432,5 @@ if __name__=="__main__":
         logger.info("Stopped by user")
     except Exception:
         logger.exception("Fatal error: %s", traceback.format_exc())
+        async def start_userbot2():
+    await main()
