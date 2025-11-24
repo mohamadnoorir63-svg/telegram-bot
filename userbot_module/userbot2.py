@@ -542,22 +542,36 @@ async def clean_cmd(event):
 # ============================
 # ====== startup / main ======
 # ============================
+async def start_userbot2():
+    """Wrapper compatibility — شروع یوزربات شماره 2"""
+    ensure_files()
+    await client.start()
+    try:
+        await init_joined_chats()
+    except Exception:
+        logger.exception("init_joined_chats failed in start_userbot2")
+
+    if AUTO_CLEAN_ENABLED:
+        asyncio.create_task(auto_clean_loop())
+
+    await client.run_until_disconnected()
+
+
 async def main():
     ensure_files()
     await client.start()
     logger.info("Userbot started.")
-    # initial scan
+
     try:
         await init_joined_chats()
     except Exception:
         logger.exception("init_joined_chats failed")
 
-    # start auto-clean loop in background
     if AUTO_CLEAN_ENABLED:
         asyncio.create_task(auto_clean_loop())
 
-    # run until disconnected
     await client.run_until_disconnected()
+
 
 if __name__ == "__main__":
     try:
@@ -566,19 +580,3 @@ if __name__ == "__main__":
         logger.info("Stopped by user")
     except Exception:
         logger.exception("Fatal error: %s", traceback.format_exc())
-        # برای سازگاری با bot.py که دنبال start_userbot2 می‌گردد
-async def start_userbot2():
-    """Wrapper compatibility — شروع یوزربات شماره 2"""
-    # اگر لازم است فایل‌ها را آماده کن
-    ensure_files()
-    # استارت کلاینت و init
-    await client.start()
-    try:
-        await init_joined_chats()
-    except Exception:
-        logger.exception("init_joined_chats failed in start_userbot2")
-    # اگر auto-clean فعال است، بک‌گراند استارتش کن
-    if AUTO_CLEAN_ENABLED:
-        asyncio.create_task(auto_clean_loop())
-    # همین تابع تا زمان قطع اتصال بلوک می‌شود
-    await client.run_until_disconnected()
