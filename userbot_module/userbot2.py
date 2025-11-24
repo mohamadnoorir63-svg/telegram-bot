@@ -33,7 +33,7 @@ from telethon.errors import (
 # ============================
 API_ID = 32796779
 API_HASH = "4deabef1568103b3242db6f74a73e8a5"
-SESSION_STRING = "1ApWapzMBuzET2YvEj_TeHnWFPVKUV1Wbqb3o534-WL_U0fbXd-RTUWuML8pK60sh9B_oGsE3T3RQjIhXWs4tM30UPr3BFxpF6EUCB9BSPGCtmienHmXHI9k-zT7iI6HZLtqlNeGi0zMxAA8hUY25V1IhKgnujyH"  # جایگذاری StringSession
+
 SUDO_USERS = [8588347189]  # آیدی مدیران
 LINK_CHANNEL = "https://t.me/Link4you"  # لینک کانال لینکدونی
 
