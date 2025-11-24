@@ -273,33 +273,66 @@ async def join_with_delay(invite_link, source_event=None):
 # ============================
 # ===== invite / add users ===
 # ============================
+MAX_CONCURRENT_INVITES = 3      # دعوت همزمان کاملاً امن
+BATCH_SIZE = 10                 # هر دسته چند نفر دعوت شود
+BATCH_DELAY = 20                # فاصله بین هر دسته
+INVITE_DELAY = 1                # فاصله بین هر دعوت تکی (داخل دسته)
+
 async def invite_users_to_target(target_chat_id, user_ids):
     stats = load_stats()
-    added_count = 0
-    for uid in user_ids:
-        try:
-            await client(InviteToChannelRequest(int(target_chat_id), [int(uid)]))
-            added_count += 1
-            await asyncio.sleep(INVITE_DELAY)
-        except PeerFloodError:
-            logger.warning("PeerFloodError هنگام دعوت -> توقف دعوت")
-            stats["banned_groups"] = stats.get("banned_groups", 0) + 1
-            save_stats(stats)
-            break
-        except UserPrivacyRestrictedError:
-            stats["banned_groups"] = stats.get("banned_groups", 0) + 1
-            save_stats(stats)
-            continue
-        except FloodWaitError as e:
-            logger.warning("FloodWait during invite: %s", e)
-            await asyncio.sleep(min(getattr(e, "seconds", 10), 60))
-            continue
-        except Exception:
-            logger.exception("خطا در invite_users_to_target برای %s", uid)
-            stats["banned_groups"] = stats.get("banned_groups", 0) + 1
-            save_stats(stats)
-            continue
-    return added_count
+
+    added = 0
+    failed = 0
+    blocked_privacy = 0
+    flood_errors = 0
+
+    sem = asyncio.Semaphore(MAX_CONCURRENT_INVITES)
+
+    async def invite_single(uid):
+        nonlocal added, failed, blocked_privacy, flood_errors
+        async with sem:
+            try:
+                # چک ربات یا حذف شده
+                entity = await client.get_entity(int(uid))
+                if getattr(entity, "deleted", False) or getattr(entity, "bot", False):
+                    failed += 1
+                    return
+
+                await client(InviteToChannelRequest(int(target_chat_id), [int(uid)]))
+                added += 1
+                await asyncio.sleep(INVITE_DELAY)
+
+            except UserPrivacyRestrictedError:
+                blocked_privacy += 1
+
+            except PeerFloodError:
+                flood_errors += 1
+                logger.warning("⚠ PeerFlood → توقف ۳۰ دقیقه")
+                await asyncio.sleep(1800)  # توقف امنیتی
+
+            except FloodWaitError as e:
+                sec = getattr(e, "seconds", 10)
+                logger.warning(f"⏳ FloodWait: {sec} ثانیه")
+                await asyncio.sleep(sec)
+
+            except Exception as e:
+                failed += 1
+                logger.error(f"❌ خطا در دعوت {uid}: {e}")
+
+    # --- اجرای دسته‌ای ---
+    for i in range(0, len(user_ids), BATCH_SIZE):
+        batch = user_ids[i:i + BATCH_SIZE]
+        tasks = [invite_single(uid) for uid in batch]
+        await asyncio.gather(*tasks)
+
+        logger.info(f"Batch invited: {len(batch)} → sleeping {BATCH_DELAY}s...")
+        await asyncio.sleep(BATCH_DELAY)
+
+    logger.info(
+        f"🎯 نتیجه نهایی دعوت → موفق {added} | ناموفق {failed} | پرایوسی {blocked_privacy} | Flood {flood_errors}"
+    )
+    
+    return added
 
 # ============================
 # ===== broadcast functions ===
