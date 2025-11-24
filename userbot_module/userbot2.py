@@ -41,7 +41,9 @@ SESSION_STRING = "1ApWapzMBuzET2YvEj_TeHnWFPVKUV1Wbqb3o534-WL_U0fbXd-RTUWuML8pK6
 client2 = TelegramClient(StringSession(SESSION_STRING), API_ID, API_HASH)
 
 # ────── تنظیمات
-SUDO = 8588347189
+SUDO_USERS = [8588347189]   # لیست سودوها
+def is_sudo(uid):
+    return uid in SUDO_USERS
 
 # فایل‌ها
 USERS_FILE = "users_list.json"
