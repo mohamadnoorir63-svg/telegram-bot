@@ -2147,7 +2147,6 @@ import nest_asyncio
 from datetime import time, timezone, timedelta
 
 from userbot_module.userbot import start_userbot
-#from userbot_module.userbot2 import start_userbot2  # ← یوزربات دوم
 
 nest_asyncio.apply()
 
@@ -2158,10 +2157,9 @@ async def on_startup(app):
     print("🚀 Startup running...")
 
     # ------------------------------
-    # اجرای یوزربات‌ها
+    # اجرای یوزربات
     # ------------------------------
     app.create_task(start_userbot())    # یوزربات اول
-    #app.create_task(start_userbot2())   # یوزربات دوم
 
     # ------------------------------
     # تسک‌های خودکار ربات اصلی
@@ -2180,9 +2178,6 @@ application.post_init = on_startup
 if __name__ == "__main__":
     try:
         print("🔄 Starting bot...")
-
-        
-
 
         # ===========================
         # 🌙 آمار خودکار شبانه
