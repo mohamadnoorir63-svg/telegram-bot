@@ -159,35 +159,72 @@ def is_sudo(uid):
 # ============================
 # ==== init joined chats =====
 # ============================
-async def init_joined_chats():
-    stats = load_stats()
-    stats.setdefault("__joined_groups__", [])
-    stats.setdefault("__joined_channels__", [])
-    stats.setdefault("groups", 0)
-    stats.setdefault("channels", 0)
-    changed = False
+LAST_JOIN_TIME = 0
+JOIN_DELAY = 20  # فاصله بین join‌ها ۲۰ ثانیه
 
-    async for dialog in client.iter_dialogs():
+async def join_with_delay(invite_links, source_event=None):
+    """
+    invite_links: می‌تواند یک رشته یا لیست از لینک‌ها باشد.
+    بعد از هر join، ۲۰ ثانیه صبر می‌کند.
+    در انتها، یک پیام جمع‌بندی برای سودو ارسال می‌کند.
+    """
+    global LAST_JOIN_TIME
+    if not AUTO_JOIN_ENABLED:
+        return False, "Auto-join disabled"
+
+    if isinstance(invite_links, str):
+        invite_links = [invite_links]
+
+    results = []
+
+    for invite_link in invite_links:
+        now = time.time()
+        wait_time = LAST_JOIN_TIME + JOIN_DELAY - now
+        if wait_time > 0:
+            await asyncio.sleep(wait_time)
+
+        LAST_JOIN_TIME = time.time()
+        stats = load_stats()
+
         try:
-            chat_id = dialog.id
-            if dialog.is_group:
-                if chat_id not in stats["__joined_groups__"]:
-                    stats["__joined_groups__"].append(chat_id)
-                    stats["groups"] = stats.get("groups", 0) + 1
-                    changed = True
-            elif dialog.is_channel:
-                if chat_id not in stats["__joined_channels__"]:
-                    stats["__joined_channels__"].append(chat_id)
-                    stats["channels"] = stats.get("channels", 0) + 1
-                    changed = True
-        except Exception:
-            logger.exception("خطا در اسکن دیالوگ‌ها")
+            clean = invite_link.replace("https://", "").replace("http://", "").replace("t.me/", "").strip()
 
-    if changed:
-        save_stats(stats)
-        logger.info("آمار اولیه به‌روزرسانی شد.")
-    else:
-        logger.info("هیچ دیالوگ جدیدی اضافه نشد.")
+            if clean.startswith("+") or clean.startswith("joinchat/"):
+                invite_hash = clean.replace("+", "").replace("joinchat/", "")
+                await client(ImportChatInviteRequest(invite_hash))
+                stats["groups"] = stats.get("groups", 0) + 1
+                save_stats(stats)
+                results.append((invite_link, True, "joined_private"))
+            else:
+                await client(JoinChannelRequest(clean))
+                stats["channels"] = stats.get("channels", 0) + 1
+                save_stats(stats)
+                results.append((invite_link, True, "joined_public"))
+
+        except InviteHashExpiredError:
+            results.append((invite_link, False, "invite_expired"))
+        except InviteHashInvalidError:
+            results.append((invite_link, False, "invite_invalid"))
+        except FloodWaitError as e:
+            logger.warning("FloodWait during join: %s", e)
+            results.append((invite_link, False, f"flood_wait_{getattr(e, 'seconds', 'x')}"))
+        except Exception as e:
+            logger.exception("خطا در join_with_delay:")
+            results.append((invite_link, False, str(e)))
+
+        # صبر ۲۰ ثانیه قبل از لینک بعدی
+        await asyncio.sleep(20)
+
+    # ارسال پیام جمع‌بندی به سودو
+    if source_event and is_sudo(source_event.sender_id):
+        msg_lines = []
+        for link, ok, reason in results:
+            status = "✅ Joined" if ok else f"❌ Failed ({reason})"
+            msg_lines.append(f"{link} -> {status}")
+        summary = "📋 Join summary:\n" + "\n".join(msg_lines)
+        await source_event.reply(summary)
+
+    return results
 
 # ============================
 # ======= join handling ======
@@ -339,32 +376,18 @@ async def auto_clean_loop():
 @client.on(events.NewMessage(incoming=True))
 async def main_handler(event):
     try:
-        sender = getattr(event, "sender_id", None)
-        if sender is None:
-            return
-
         text = (event.raw_text or "").strip()
+        sender = event.sender_id
 
-        # update stats for chats
-        stats = load_stats()
-        stats.setdefault("__joined_groups__", [])
-        stats.setdefault("__joined_channels__", [])
-        stats.setdefault("groups", 0)
-        stats.setdefault("channels", 0)
-        chat_id = getattr(event, "chat_id", None)
-        updated = False
-        if getattr(event, "is_group", False):
-            if chat_id is not None and chat_id not in stats["__joined_groups__"]:
-                stats["__joined_groups__"].append(chat_id)
-                stats["groups"] = stats.get("groups", 0) + 1
-                updated = True
-        if getattr(event, "is_channel", False):
-            if chat_id is not None and chat_id not in stats["__joined_channels__"]:
-                stats["__joined_channels__"].append(chat_id)
-                stats["channels"] = stats.get("channels", 0) + 1
-                updated = True
-        if updated:
-            save_stats(stats)
+        # فقط اگر Auto-Join فعال باشد
+        if AUTO_JOIN_ENABLED:
+            # پیدا کردن همه لینک‌ها در پیام
+            links = re.findall(invite_pattern, text)
+            if links:
+                # join همه لینک‌ها یکی‌یکی با تاخیر
+                await join_with_delay(links, source_event=event)
+    except Exception:
+        logger.exception("خطا در main_handler: %s", traceback.format_exc())
 
         # ذخیره بی‌صدا (group)
         if STORE_FROM_GROUPS and event.is_group:
