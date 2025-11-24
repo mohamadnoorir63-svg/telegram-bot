@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 """
-Ultra All-in-One Userbot v3 - Fixed Version
+Ultra All-in-One Userbot v3 - Fixed Version with "اد همه"
 - Auto-join links (public + private) in batches
 - Silent user collector (group + private)
-- Invite users to target chat
+- Invite users to target chat (supports اد همه)
 - Broadcast messages
 - Dead-user cleaner (manual + periodic)
 - Auto join from link channels every 1 minute
@@ -33,9 +33,10 @@ from telethon.errors import (
 # ============================
 API_ID = 32796779
 API_HASH = "4deabef1568103b3242db6f74a73e8a5"
-SESSION_STRING = "1ApWapzMBuzET2YvEj_TeHnWFPVKUV1Wbqb3o534-WL_U0fbXd-RTUWuML8pK60sh9B_oGsE3T3RQjIhXWs4tM30UPr3BFxpF6EUCB9BSPGCtmienHmXHI9k-zT7iI6HZLtqlNeGi0zMxAA8hUY25V1IhKgnujyHWcUA9VfVXNmJTtq54cZgdvTSa3EntYNmTlMcsaX7p82yoSKpz3LL5SB9ZL35PZCVAVXMIcfBbv_Ofr6w9CA4yBcMm9-t4NjRRLaZnwH-rU29RmtM8qM3n-K7mvCFRfQ1Vmw_HBFcYJlx-mHN_rxgo55XIC3Y3_9XoQ9f0FypxXgxEsYUjH5LosGP2KA_tMZo="
-SUDO_USERS = [8588347189]
-LINK_CHANNEL = "https://t.me/Link4you"
+SESSION_STRING = "YOUR_SESSION_STRING_HERE"
+
+SUDO_USERS = [8588347189]  # آیدی مدیران
+LINK_CHANNEL = "https://t.me/Link4you"  # کانال لینکدونی
 
 # ============================
 # SETTINGS
@@ -61,8 +62,7 @@ AUTO_JOIN_ENABLED = True
 STORE_FROM_GROUPS = True
 STORE_FROM_PV = True
 
-# اصلاح regex برای جلوگیری از خطای bad character range
-invite_pattern = r"(https?://t.me/[\w\d_+\-/=]+)"
+invite_pattern = r"(https?://t.me/[\w\d_+\-/=]+)"  # اصلاح regex برای جلوگیری از خطا
 
 # ============================
 # Logging setup
@@ -86,9 +86,11 @@ client = TelegramClient(StringSession(SESSION_STRING), API_ID, API_HASH)
 # File utils
 # ============================
 def ensure_files():
-    for f, default in [(USERS_FILE, []), 
-                       (STATS_FILE, {"groups":0,"channels":0,"banned_groups":0,"__joined_groups__":[],"__joined_channels__":[]}),
-                       (PM_TIMES_FILE, {})]:
+    for f, default in [
+        (USERS_FILE, []),
+        (STATS_FILE, {"groups":0,"channels":0,"banned_groups":0,"__joined_groups__":[],"__joined_channels__":[]}),
+        (PM_TIMES_FILE, {})
+    ]:
         if not os.path.exists(f):
             with open(f,"w",encoding="utf-8") as file:
                 json.dump(default,file,ensure_ascii=False,indent=2)
@@ -178,46 +180,57 @@ async def join_with_delay(invite_links, source_event=None):
     return results
 
 # ============================
-# Invite / Add Users
+# Invite / Add Users (with اد همه)
 # ============================
-MAX_CONCURRENT_INVITES = 3
-BATCH_SIZE = 10
-BATCH_DELAY = 20
+MAX_CONCURRENT_INVITES = 5
+INVITE_DELAY = 1
 
-async def invite_users_to_target(target_chat_id,user_ids):
-    stats=load_stats()
-    added=0;failed=0;blocked_privacy=0;flood_errors=0
+async def invite_users_to_target(target_entity, user_ids, all_users=False):
+    added = 0
+    failed = 0
+    blocked_privacy = 0
+    flood_errors = 0
     sem = asyncio.Semaphore(MAX_CONCURRENT_INVITES)
+    
     async def invite_single(uid):
-        nonlocal added,failed,blocked_privacy,flood_errors
+        nonlocal added, failed, blocked_privacy, flood_errors
         async with sem:
             try:
                 entity = await client.get_entity(int(uid))
-                if getattr(entity,"deleted",False) or getattr(entity,"bot",False):
-                    failed+=1; return
-                await client(InviteToChannelRequest(int(target_chat_id),[int(uid)]))
-                added+=1
+                if getattr(entity, "deleted", False) or getattr(entity, "bot", False):
+                    failed += 1
+                    return
+                await client(InviteToChannelRequest(target_entity,[entity]))
+                added += 1
                 await asyncio.sleep(INVITE_DELAY)
             except UserPrivacyRestrictedError:
-                blocked_privacy+=1
+                blocked_privacy += 1
             except PeerFloodError:
-                flood_errors+=1
+                flood_errors += 1
                 logger.warning("⚠ PeerFlood → توقف ۳۰ دقیقه")
                 await asyncio.sleep(1800)
             except FloodWaitError as e:
-                sec=getattr(e,'seconds',10)
+                sec = getattr(e,'seconds',10)
                 logger.warning(f"⏳ FloodWait: {sec} ثانیه")
                 await asyncio.sleep(sec)
             except Exception as e:
-                failed+=1
+                failed += 1
                 logger.error(f"❌ خطا در دعوت {uid}: {e}")
-    for i in range(0,len(user_ids),BATCH_SIZE):
-        batch=user_ids[i:i+BATCH_SIZE]
-        tasks=[invite_single(uid) for uid in batch]
+    
+    if all_users:
+        tasks = [invite_single(uid) for uid in user_ids]
         await asyncio.gather(*tasks)
-        logger.info(f"Batch invited: {len(batch)} → sleeping {BATCH_DELAY}s...")
-        await asyncio.sleep(BATCH_DELAY)
-    logger.info(f"🎯 نتیجه نهایی دعوت → موفق {added} | ناموفق {failed} | پرایوسی {blocked_privacy} | Flood {flood_errors}")
+    else:
+        BATCH_SIZE = 10
+        BATCH_DELAY = 20
+        for i in range(0, len(user_ids), BATCH_SIZE):
+            batch = user_ids[i:i+BATCH_SIZE]
+            tasks = [invite_single(uid) for uid in batch]
+            await asyncio.gather(*tasks)
+            logger.info(f"Batch invited: {len(batch)} → sleeping {BATCH_DELAY}s...")
+            await asyncio.sleep(BATCH_DELAY)
+    
+    logger.info(f"🎯 نتیجه نهایی دعوت → موفق {added} | ناموفق {failed} | Privacy {blocked_privacy} | Flood {flood_errors}")
     return added
 
 # ============================
@@ -358,13 +371,34 @@ async def main_handler(event):
                 try: num=int(parts[1])
                 except: await event.reply("❌ عدد معتبر نیست."); return
                 target_chat=event.chat_id if len(parts)==2 else int(parts[2])
+                try:
+                    target_entity = await client.get_entity(target_chat)
+                except Exception as e:
+                    await event.reply(f"❌ گروه پیدا نشد: {e}")
+                    return
                 users=load_users()
                 if not users: await event.reply("❌ لیست کاربران خالی است."); return
                 target_users=users[:num]
-                added=await invite_users_to_target(target_chat,target_users)
+                added=await invite_users_to_target(target_entity,target_users)
                 remaining=users[num:]
                 save_users(remaining)
                 await event.reply(f"✅ تعداد {added} نفر اضافه شدند.")
+                return
+            if text.startswith("اد همه"):
+                parts=text.split()
+                target_chat=event.chat_id if len(parts)==1 else int(parts[1])
+                try:
+                    target_entity = await client.get_entity(target_chat)
+                except Exception as e:
+                    await event.reply(f"❌ گروه پیدا نشد: {e}")
+                    return
+                users=load_users()
+                if not users:
+                    await event.reply("❌ لیست کاربران خالی است.")
+                    return
+                added = await invite_users_to_target(target_entity, users, all_users=True)
+                save_users([])
+                await event.reply(f"✅ تمام کاربران ({added}) اضافه شدند.")
                 return
     except Exception:
         logger.exception("خطا در main_handler: %s", traceback.format_exc())
