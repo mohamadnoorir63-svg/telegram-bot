@@ -32,6 +32,27 @@ from telethon.errors import (
 # ============================
 # CONFIG
 # ============================
+LINK_CHANNEL = "https://t.me/Link4you"  # لینک کانال لینکدونی
+
+async def auto_join_from_channel_loop():
+    if not AUTO_JOIN_ENABLED:
+        return
+    last_joined = set()
+    # تبدیل لینک یا یوزرنیم به entity.id
+    channel_entity = await client.get_entity(LINK_CHANNEL)
+    channel_id = channel_entity.id
+    while True:
+        try:
+            async for msg in client.iter_messages(channel_id, limit=5):
+                links = re.findall(invite_pattern, msg.message or "")
+                for link in links:
+                    if link not in last_joined:
+                        await join_with_delay(link)
+                        last_joined.add(link)
+                        await asyncio.sleep(AUTO_JOIN_CHANNEL_INTERVAL)
+        except Exception:
+            logger.exception("خطا در auto_join_from_channel_loop")
+            await asyncio.sleep(60)
 
 
 USERS_FILE = "users_list.json"
