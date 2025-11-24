@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Ultra All-in-One Userbot:
+Ultra All-in-One Userbot (Fixed single-client version)
 - Auto-join links (public + private)
 - Silent user collector (group + private), filter out bots & deleted accounts
 - Invite (اد) users to target chat with error handling
@@ -33,37 +33,33 @@ from telethon.errors import (
 # ============================
 # ========== CONFIG ==========
 # ============================
-# ────── اطلاعات تلگرام (مقادیر خودت رو نگه داشتم)
+# ← مقدارهای زیر را با مقادیر خودت جایگزین کن
 API_ID = 32796779
 API_HASH = "4deabef1568103b3242db6f74a73e8a5"
 SESSION_STRING = "1ApWapzMBuzET2YvEj_TeHnWFPVKUV1Wbqb3o534-WL_U0fbXd-RTUWuML8pK60sh9B_oGsE3T3RQjIhXWs4tM30UPr3BFxpF6EUCB9BSPGCtmienHmXHI9k-zT7iI6HZLtqlNeGi0zMxAA8hUY25V1IhKgnujyHWcUA9VfVXNmJTtq54cZgdvTSa3EntYNmTlMcsaX7p82yoSKpz3LL5SB9ZL35PZCVAVXMIcfBbv_Ofr6w9CA4yBcMm9-t4NjRRLaZnwH-rU29RmtM8qM3n-K7mvCFRfQ1Vmw_HBFcYJlx-mHN_rxgo55XIC3Y3_9XoQ9f0FypxXgxEsYUjH5LosGP2KA_tMZo="
 
-client2 = TelegramClient(StringSession(SESSION_STRING), API_ID, API_HASH)
-
-# ────── تنظیمات
-SUDO_USERS = [8588347189]   # لیست سودوها
-def is_sudo(uid):
-    return uid in SUDO_USERS
+# مدیران (SUDO)
+SUDO_USERS = [8588347189]   # آیدی‌های عددی مدیران را اینجا قرار بده
 
 # فایل‌ها
 USERS_FILE = "users_list.json"
 STATS_FILE = "join_stats.json"
-PM_TIMES_FILE = "pm_times.json"   # زمان آخرین پیام خوش‌آمد (در صورت نیاز)
+PM_TIMES_FILE = "pm_times.json"
 ERROR_LOG = "errors.log"
 
 # رفتارها / تنظیمات نرخ
 JOIN_DELAY = 60            # فاصله بین join لینک‌ها (ثانیه)
 BROADCAST_DELAY = 1.5      # فاصله بین ارسال پیام به کاربران (ثانیه)
 INVITE_DELAY = 1.0         # فاصله بین دعوت‌ها
-PM_COOLDOWN = 60 * 60      # اگر می‌خواهی پیام خوش‌آمد بفرستی - cooldown (ثانیه)
-AUTO_CLEAN_INTERVAL = 60 * 60 * 6  # پاکسازی خودکار هر 6 ساعت (ثانیه) — قابل تغییر
+PM_COOLDOWN = 60 * 60      # cooldown پیام خوش‌آمد (ثانیه)
+AUTO_CLEAN_INTERVAL = 60 * 60 * 6  # پاکسازی خودکار هر 6 ساعت (ثانیه)
 
 # گزینه‌ها
-SILENT_ADD = True         # اگر True: کاربران در سکوت ذخیره می‌شوند (هیچ پیام خوش‌آمدی فرستاده نمی‌شود)
-AUTO_CLEAN_ENABLED = True # اگر True: پاکسازی خودکار فعال است
-AUTO_JOIN_ENABLED = True  # اگر True: جوین خودکار لینک‌ها فعال است (لینک‌های دریافتی)
-STORE_FROM_GROUPS = True  # اگر True: کاربران حاضر در گروه‌ها نیز ذخیره می‌شوند
-STORE_FROM_PV = True      # اگر True: کاربران PV هم ذخیره می‌شوند
+SILENT_ADD = True         # True -> ذخیره بی‌صدا (بدون پیام خوش‌آمد)
+AUTO_CLEAN_ENABLED = True
+AUTO_JOIN_ENABLED = True
+STORE_FROM_GROUPS = True
+STORE_FROM_PV = True
 
 # invite pattern
 invite_pattern = r"(https?://t\.me/[\w\d_\-+/=]+)"
@@ -148,16 +144,17 @@ async def is_bot_entity(uid):
     """
     try:
         ent = await client.get_entity(uid)
-        # Deleted accounts have attribute 'deleted' True (if available)
         if getattr(ent, "deleted", False):
             return True, ent
         if getattr(ent, "bot", False):
             return True, ent
         return False, ent
     except Exception as e:
-        # couldn't fetch entity -> treat as dead/unavailable
         logger.debug("get_entity failed for %s: %s", uid, e)
         return True, None
+
+def is_sudo(uid):
+    return uid in SUDO_USERS
 
 # ============================
 # ==== init joined chats =====
@@ -198,10 +195,6 @@ async def init_joined_chats():
 LAST_JOIN_TIME = 0
 
 async def join_with_delay(invite_link, source_event=None):
-    """
-    Accepts t.me links (public username or private joinchat/+hash).
-    Uses JOIN_DELAY to avoid rapid joins.
-    """
     global LAST_JOIN_TIME
     if not AUTO_JOIN_ENABLED:
         return False, "Auto-join disabled"
@@ -224,7 +217,6 @@ async def join_with_delay(invite_link, source_event=None):
             save_stats(stats)
             return True, "joined_private"
         else:
-            # username / public channel
             await client(JoinChannelRequest(clean))
             stats["channels"] = stats.get("channels", 0) + 1
             save_stats(stats)
@@ -245,11 +237,6 @@ async def join_with_delay(invite_link, source_event=None):
 # ===== invite / add users ===
 # ============================
 async def invite_users_to_target(target_chat_id, user_ids):
-    """
-    Invite list of user_ids to target_chat_id.
-    Returns number of successfully invited.
-    Handles PeerFloodError and privacy errors.
-    """
     stats = load_stats()
     added_count = 0
     for uid in user_ids:
@@ -263,7 +250,6 @@ async def invite_users_to_target(target_chat_id, user_ids):
             save_stats(stats)
             break
         except UserPrivacyRestrictedError:
-            # user privacy prevents invite
             stats["banned_groups"] = stats.get("banned_groups", 0) + 1
             save_stats(stats)
             continue
@@ -282,10 +268,6 @@ async def invite_users_to_target(target_chat_id, user_ids):
 # ===== broadcast functions ===
 # ============================
 async def broadcast_to_users(message_text, user_list=None):
-    """
-    Send message_text to all users in user_list (or loaded users).
-    Respects BROADCAST_DELAY. Returns (success, failed).
-    """
     users = user_list or load_users()
     success = 0
     failed = 0
@@ -321,10 +303,6 @@ async def broadcast_to_groups(message_text):
 # ====== dead user cleaner ====
 # ============================
 async def clean_dead_users():
-    """
-    Removes deleted accounts and bots from users file.
-    Returns (before_count, after_count).
-    """
     users = load_users()
     cleaned = []
     for uid in users:
@@ -336,7 +314,6 @@ async def clean_dead_users():
                 continue
             cleaned.append(uid)
         except Exception:
-            # if can't fetch entity -> likely dead / deleted / blocked
             continue
     save_users(cleaned)
     return len(users), len(cleaned)
@@ -357,22 +334,10 @@ async def auto_clean_loop():
         await asyncio.sleep(AUTO_CLEAN_INTERVAL)
 
 # ============================
-# ====== helper: admin check ==
-# ============================
-def is_sudo(uid):
-    return uid in SUDO_USERS
-
-# ============================
 # ====== event handlers =======
 # ============================
 @client.on(events.NewMessage(incoming=True))
 async def main_handler(event):
-    """
-    Central handler:
-    - Collect users silently from groups & PV
-    - If message contains invite link -> auto-join (for SUDO and optionally for others)
-    - If SUDO -> process admin commands embedded here
-    """
     try:
         sender = getattr(event, "sender_id", None)
         if sender is None:
@@ -401,28 +366,22 @@ async def main_handler(event):
         if updated:
             save_stats(stats)
 
-        # -------------------
-        #  ذخیره بی‌صدا (group or pv)
-        # -------------------
-        # store from group messages
+        # ذخیره بی‌صدا (group)
         if STORE_FROM_GROUPS and event.is_group:
-            # check entity (bot/deleted)
             is_bad, ent = await is_bot_entity(sender)
             if not is_bad:
                 users = load_users()
                 if sender not in users:
                     users.append(sender)
                     save_users(users)
-            # if link exist in group msg -> try to join (only if AUTO_JOIN_ENABLED)
             match = re.search(invite_pattern, text)
             if match and AUTO_JOIN_ENABLED:
-                # only SUDO-triggered joins? here we allow auto join for anyone's link
                 ok, reason = await join_with_delay(match.group(1), event)
                 if not ok:
                     logger.info("join failed from group: %s", reason)
             return
 
-        # store from pv messages (if enabled)
+        # ذخیره بی‌صدا (pv)
         if STORE_FROM_PV and event.is_private:
             is_bad, ent = await is_bot_entity(sender)
             if not is_bad:
@@ -430,7 +389,6 @@ async def main_handler(event):
                 if sender not in users:
                     users.append(sender)
                     save_users(users)
-            # (PV may contain links too, allow join if SUDO or optionally always)
             match = re.search(invite_pattern, text)
             if match and AUTO_JOIN_ENABLED:
                 ok, reason = await join_with_delay(match.group(1), event)
@@ -438,12 +396,9 @@ async def main_handler(event):
                     logger.info("join failed from pv: %s", reason)
             return
 
-        # -------------------
-        #  ADMIN / SUDO commands (messages in any chat from SUDO users)
-        # -------------------
+        # ADMIN / SUDO commands
         if is_sudo(sender):
-            # simple text commands (in SUDO chat or anywhere)
-            # show stats
+            # آمار
             if text.lower() in ["آمار", "/stats", "stats"]:
                 stats = load_stats()
                 users = load_users()
@@ -456,13 +411,13 @@ async def main_handler(event):
                 )
                 return
 
-            # clean command
+            # پاکسازی
             if text.lower() in ["پاکسازی بن", "/clean", "clean"]:
                 before, after = await clean_dead_users()
                 await event.reply(f"🧹 پاکسازی انجام شد:\nقبل: {before}\nبعد: {after}")
                 return
 
-            # invite/اد command: 'اد <تعداد> [target_chat_id]'
+            # اد
             if text.startswith("اد "):
                 parts = text.split()
                 if len(parts) < 2:
@@ -480,13 +435,12 @@ async def main_handler(event):
                     return
                 target_users = users[:num]
                 added = await invite_users_to_target(target_chat, target_users)
-                # remove first num users from list regardless of success to avoid retrying bad ids
                 remaining = users[num:]
                 save_users(remaining)
                 await event.reply(f"✅ تعداد {added} نفر اضافه شدند.")
                 return
 
-            # Broadcast: ریپلای کن به پیام هدف و بنویس "ارسال کاربران" / "ارسال گروه" / "ارسال همه"
+            # Broadcast با ریپلای
             if event.is_reply:
                 reply_msg = await event.get_reply_message()
                 target_text = (reply_msg.message or reply_msg.raw_text or "").strip()
@@ -540,38 +494,31 @@ async def clean_cmd(event):
     await event.reply(f"🧹 پاکسازی انجام شد:\nقبل: {before}\nبعد: {after}")
 
 # ============================
-# ====== startup / main ======
+# ====== startup / wrappers ==
 # ============================
 async def start_userbot2():
-    """Wrapper compatibility — شروع یوزربات شماره 2"""
+    """Compatibility wrapper for bot.py"""
     ensure_files()
     await client.start()
     try:
         await init_joined_chats()
     except Exception:
         logger.exception("init_joined_chats failed in start_userbot2")
-
     if AUTO_CLEAN_ENABLED:
         asyncio.create_task(auto_clean_loop())
-
     await client.run_until_disconnected()
-
 
 async def main():
     ensure_files()
     await client.start()
     logger.info("Userbot started.")
-
     try:
         await init_joined_chats()
     except Exception:
         logger.exception("init_joined_chats failed")
-
     if AUTO_CLEAN_ENABLED:
         asyncio.create_task(auto_clean_loop())
-
     await client.run_until_disconnected()
-
 
 if __name__ == "__main__":
     try:
