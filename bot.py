@@ -245,12 +245,17 @@ def is_group_reply_enabled(chat_id):
 
 async def toggle_reply_mode(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """تغییر وضعیت ریپلی مود — فقط مدیران گروه یا ادمین اصلی مجازند"""
+    msg = update.message or update.edited_message
     chat = update.effective_chat
     user = update.effective_user
 
+    if not msg or not chat or not user:
+        print("⚠️ پیام، چت یا کاربر موجود نیست، دستور رد شد.")
+        return
+
     # فقط در گروه قابل استفاده است
     if chat.type not in ["group", "supergroup"]:
-        return await update.message.reply_text("⚠️ این دستور فقط داخل گروه کار می‌کند!")
+        return await safe_reply(update, context, "⚠️ این دستور فقط داخل گروه کار می‌کند!")
 
     # بررسی ادمین اصلی یا مدیر گروه بودن
     is_main_admin = (user.id == ADMIN_ID)
@@ -260,11 +265,11 @@ async def toggle_reply_mode(update: Update, context: ContextTypes.DEFAULT_TYPE):
         member = await context.bot.get_chat_member(chat.id, user.id)
         if member.status in ["creator", "administrator"]:
             is_group_admin = True
-    except:
-        pass
+    except Exception as e:
+        print(f"⚠️ خطا در بررسی ادمین: {e}")
 
     if not (is_main_admin or is_group_admin):
-        return await update.message.reply_text("⛔ فقط مدیران گروه یا ادمین اصلی می‌توانند این تنظیم را تغییر دهند!")
+        return await safe_reply(update, context, "⛔ فقط مدیران گروه یا ادمین اصلی می‌توانند این تنظیم را تغییر دهند!")
 
     # تغییر وضعیت مخصوص همان گروه
     group_id = str(chat.id)
@@ -273,9 +278,9 @@ async def toggle_reply_mode(update: Update, context: ContextTypes.DEFAULT_TYPE):
     save_reply_status(reply_status)
 
     if reply_status[group_id]["enabled"]:
-        await update.message.reply_text("💬 ریپلی مود در این گروه فعال شد!\nفقط با ریپلای به پیام‌های من چت کنید 😄")
+        await safe_reply(update, context, "💬 ریپلی مود در این گروه فعال شد!\nفقط با ریپلای به پیام‌های من چت کنید 😄")
     else:
-        await update.message.reply_text("🗨️ ریپلی مود در این گروه غیرفعال شد!\nالان به همه پیام‌ها جواب می‌دهم 😎")
+        await safe_reply(update, context, "🗨️ ریپلی مود در این گروه غیرفعال شد!\nالان به همه پیام‌ها جواب می‌دهم 😎")
 
 
 # ======================= 🧠 بررسی حالت ریپلی مود گروهی =======================
