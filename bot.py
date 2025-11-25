@@ -184,22 +184,17 @@ status = {
     "locked": False
 }
 # ────────────────────────────── ترجمه با رپلی ──────────────────────────────
-from telegram import Update
-from telegram.ext import MessageHandler, filters, ContextTypes
-from deep_translator import GoogleTranslator
-
-# تابع ترجمه دینامیک
 async def translate_reply_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    msg = update.message
-    if not msg or not msg.reply_to_message:
-        return  # فقط روی پیام‌های رپلی جواب بده
+    if not update.message.reply_to_message:
+        return  # فقط روی ریپلی
 
-    text = msg.reply_to_message.text
+    text = update.message.reply_to_message.text
     if not text:
         return
 
-    cmd = msg.text.strip().lower()  # متن دستور خود کاربر
+    cmd = update.message.text.strip().lower()
 
+    target_lang = None
     if "ترجمه به فارسی" in cmd:
         target_lang = "fa"
     elif "ترجمه به انگلیسی" in cmd:
@@ -207,14 +202,14 @@ async def translate_reply_handler(update: Update, context: ContextTypes.DEFAULT_
     elif "ترجمه به آلمانی" in cmd:
         target_lang = "de"
     else:
-        return  # اگر دستور مرتبط نبود کاری نکن
+        return  # اگر دستور معتبر نیست، هیچ کاری نکند
 
     try:
+        from deep_translator import GoogleTranslator
         translated = GoogleTranslator(source='auto', target=target_lang).translate(text)
-        await msg.reply_text(f"🌐 ترجمه به {target_lang}:\n{translated}")
+        await update.message.reply_text(f"🌐 ترجمه ({target_lang}):\n{translated}")
     except Exception as e:
-        await msg.reply_text(f"⚠️ خطا در ترجمه: {e}")
-
+        await update.message.reply_text(f"⚠️ خطا در ترجمه: {e}")
 
 # ────────────────────────────── پایان بخش ترجمه رپلی ──────────────────────────────
 # ======================= 🧠 جلوگیری از پاسخ تکراری و پاسخ به خودش =======================
@@ -1915,8 +1910,6 @@ application.add_handler(
     CallbackQueryHandler(link_panel_buttons, pattern="^link_"),
     group=-10
 )
-# هندلر پیام برای دستورات ترجمه (رپلی)
-application.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), translate_reply_handler))
 
 # ==========================================================
 # 📦 کنترل گروه‌ها
@@ -1973,6 +1966,11 @@ application.add_handler(CommandHandler("listsudo", list_sudos))
 application.add_handler(CommandHandler("save", save_command))
 application.add_handler(CommandHandler("del", delete_command))
 application.add_handler(CommandHandler("listcmds", list_commands))
+
+application.add_handler(
+    MessageHandler(filters.TEXT & (~filters.COMMAND) & filters.Regex(r"^ترجمه به"), translate_reply_handler),
+    group=-9
+)
 # ==========================================================
 #پیام‌های متنی غیر از کامند → هندلر دستورات ذخیره‌شده
 application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_custom_command), group=-4)
