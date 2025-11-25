@@ -215,8 +215,7 @@ async def translate_reply_handler(update: Update, context: ContextTypes.DEFAULT_
     except Exception as e:
         await msg.reply_text(f"⚠️ خطا در ترجمه: {e}")
 
-# هندلر پیام برای دستورات ترجمه (رپلی)
-application.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), translate_reply_handler))
+
 # ────────────────────────────── پایان بخش ترجمه رپلی ──────────────────────────────
 # ======================= 🧠 جلوگیری از پاسخ تکراری و پاسخ به خودش =======================
 def is_valid_message(update):
@@ -1916,8 +1915,9 @@ application.add_handler(
     CallbackQueryHandler(link_panel_buttons, pattern="^link_"),
     group=-10
 )
-# ثبت هندلر برای تمام پیام‌های متنی (بدون نیاز به /)
-application.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), auto_translate))
+# هندلر پیام برای دستورات ترجمه (رپلی)
+application.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), translate_reply_handler))
+
 # ==========================================================
 # 📦 کنترل گروه‌ها
 # ==========================================================
