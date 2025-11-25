@@ -47,3 +47,4 @@ nest_asyncio==1.5.8
 
 # Translator
 deep-translator==1.11.4
+py-tgcalls[telethon]==1.0.1
