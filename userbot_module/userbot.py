@@ -281,12 +281,7 @@ from telethon import TelegramClient, events
 from pytgcalls import PyTgCalls
 from pytgcalls.types import AudioPiped
 
-# ===== تنظیمات یوزربات =====
-API_ID = int(os.environ.get("API_ID"))
-API_HASH = os.environ.get("API_HASH"))
-SESSION_STRING = os.environ.get("SESSION_STRING"))
 
-client = TelegramClient(StringSession(SESSION_STRING), API_ID, API_HASH)
 pytg = PyTgCalls(client)
 
 # ذخیره فایل آخر برای ریپلی پخش
