@@ -274,6 +274,57 @@ async def handle_commands(event):
             return
         # در غیر این صورت → پاکسازی کامل
         await cleanup_via_userbot(chat_id, last_msg_id=last_msg_id)
+        # ======================= پاکسازی اعضای ریمو شده =======================
+
+@client.on(events.NewMessage)
+async def clean_removed_users(event):
+
+    if event.raw_text.strip() != "پاکسازی ریمو ها":
+        return
+
+    chat_id = event.chat_id
+    sender_id = event.sender_id
+
+    # مجوز سودو یا ادمین
+    is_sudo = sender_id in SUDO_IDS
+    is_admin = False
+    try:
+        perms = await client.get_permissions(chat_id, sender_id)
+        is_admin = perms.is_admin
+    except:
+        pass
+
+    if not (is_sudo or is_admin):
+        return await event.reply("⛔ فقط مدیران یا سودو اجازه پاکسازی ریموها را دارند.")
+
+    await event.reply("🔍 در حال جستجو برای کاربران ریمو شده…")
+
+    removed_users = []
+    try:
+        async for user in client.iter_participants(chat_id):
+            if user.status is None:   # دقیق‌ترین تشخیص اعضای Removed
+                removed_users.append(user)
+    except Exception as e:
+        return await event.reply(f"❌ خطا در دریافت لیست: {e}")
+
+    if not removed_users:
+        return await event.reply("✅ هیچ کاربر ریمو شده‌ای پیدا نشد.")
+
+    count = 0
+    for user in removed_users:
+        try:
+            # حذف کامل کاربر از لیست اعضا
+            await client.edit_permissions(chat_id, user.id, view_messages=False)
+            await client.delete_user_history(chat_id, user.id)
+            count += 1
+            await asyncio.sleep(0.08)
+        except:
+            continue
+
+    await event.reply(
+        f"🧹 پاکسازی کامل انجام شد.\n"
+        f"👥 تعداد اعضای ریمو شده حذف‌شده: **{count}** نفر"
+                )
 
 # ---------- پینگ ----------
 
