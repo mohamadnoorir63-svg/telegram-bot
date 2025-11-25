@@ -302,7 +302,7 @@ async def clean_removed_users(event):
     removed_users = []
     try:
         async for user in client.iter_participants(chat_id):
-            if user.status is None:   # دقیق‌ترین تشخیص اعضای Removed
+            if getattr(user, "deleted", False):    # ← تشخیص واقعی کاربر حذف‌شده
                 removed_users.append(user)
     except Exception as e:
         return await event.reply(f"❌ خطا در دریافت لیست: {e}")
@@ -313,19 +313,16 @@ async def clean_removed_users(event):
     count = 0
     for user in removed_users:
         try:
-            # حذف کامل کاربر از لیست اعضا
             await client.edit_permissions(chat_id, user.id, view_messages=False)
-            await client.delete_user_history(chat_id, user.id)
-            count += 1
             await asyncio.sleep(0.08)
+            count += 1
         except:
             continue
 
     await event.reply(
         f"🧹 پاکسازی کامل انجام شد.\n"
         f"👥 تعداد اعضای ریمو شده حذف‌شده: **{count}** نفر"
-                )
-
+    )
 # ---------- پینگ ----------
 
 @client.on(events.NewMessage)
