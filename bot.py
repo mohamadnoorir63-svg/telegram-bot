@@ -1697,6 +1697,17 @@ async def broadcast_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except:
         pass
 
+
+
+async def handle_left_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    try:
+        my_chat_member = update.my_chat_member
+        if my_chat_member.new_chat_member.status == "left":
+            chat_id = update.effective_chat.id
+            cleanup_group_commands(chat_id)
+            print(f"🧹 دستورات گروه {chat_id} حذف شدند (ربات خارج شد).")
+    except Exception as e:
+        print(f"⚠️ خطا در پاکسازی خودکار گروه: {e}")
 # ======================= 🚪 خروج از گروه =======================
 async def leave(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id == ADMIN_ID:
