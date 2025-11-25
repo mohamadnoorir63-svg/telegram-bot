@@ -159,6 +159,22 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
         await asyncio.sleep(10)
         await reply.delete()
         return
+        # ---------- پاکسازی کامل لیست‌ها ----------
+    if text in ["پاکسازی بن", "پاکسازی سکوت"]:
+        if not await _has_access(context, chat.id, user.id):
+            return
+        file = BAN_FILE if text == "پاکسازی بن" else MUTE_FILE
+        chat_key = str(chat.id)
+        data = _load_json(file)
+        if chat_key in data:
+            del data[chat_key]
+            _save_json(file, data)
+            reply = await msg.reply_text(f"✅ {'لیست بن' if file==BAN_FILE else 'لیست سکوت'} پاکسازی شد.")
+        else:
+            reply = await msg.reply_text(f"ℹ️ هیچ چیزی برای پاکسازی وجود ندارد.")
+        await asyncio.sleep(10)
+        await reply.delete()
+        return
 
     # ---------- regex دستورات ----------
     PATTERNS = {
