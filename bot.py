@@ -183,27 +183,96 @@ status = {
     "welcome": True,
     "locked": False
 }
-# ======================= 🧠 جلوگیری از پاسخ تکراری و پاسخ به خودش =======================
-def is_valid_message(update):
+
+
+# ======================= 💬 ریپلی مود گروهی و محدود به مدیران =======================
+REPLY_FILE = "reply_status.json"
+
+def load_reply_status():
+    """خواندن وضعیت ریپلی مود برای تمام گروه‌ها"""
+    if os.path.exists(REPLY_FILE):
+        try:
+            with open(REPLY_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except:
+            pass
+    return {}  # ساختار داده: { "group_id": {"enabled": True/False} }
+
+def save_reply_status(data):
+    """ذخیره وضعیت ریپلی مود برای همه گروه‌ها"""
+    with open(REPLY_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
+reply_status = load_reply_status()
+
+# ======================= توابع کمکی ایمن =======================
+def get_message(update: Update):
+    """پیام واقعی رو از انواع آپدیت‌ها بگیره یا None برگردونه"""
+    if hasattr(update, "message") and update.message:
+        return update.message
+    if hasattr(update, "edited_message") and update.edited_message:
+        return update.edited_message
+    return None
+
+def get_chat(update: Update):
+    """چت واقعی رو برگردونه یا None"""
+    msg = get_message(update)
+    if msg and msg.chat:
+        return msg.chat
+    if hasattr(update, "effective_chat"):
+        return update.effective_chat
+    return None
+
+def get_user(update: Update):
+    """کاربر واقعی رو برگردونه یا None"""
+    msg = get_message(update)
+    if msg and msg.from_user:
+        return msg.from_user
+    if hasattr(update, "effective_user"):
+        return update.effective_user
+    return None
+
+async def safe_reply(update: Update, context: ContextTypes.DEFAULT_TYPE, text: str, reply_to: bool = True):
+    """
+    ارسال پیام ایمن بدون خطای NoneType
+    """
+    msg = get_message(update)
+    chat = get_chat(update)
+    if not msg or not chat:
+        print("⚠️ پیام یا چت موجود نیست، ارسال رد شد.")
+        return
+
+    reply_id = msg.message_id if reply_to else None
+    try:
+        await context.bot.send_message(
+            chat_id=chat.id,
+            text=text,
+            reply_to_message_id=reply_id,
+            parse_mode="HTML"
+        )
+    except Exception as e:
+        print(f"⚠️ خطا در ارسال پیام: {e}")
+
+# ======================= بررسی وضعیت ریپلی مود =======================
+def is_group_reply_enabled(chat_id):
+    """بررسی فعال بودن ریپلی مود در گروه خاص"""
+    return reply_status.get(str(chat_id), {}).get("enabled", False)
+
+# ======================= فیلتر پیام معتبر =======================
+LAST_MESSAGES = {}
+
+def is_valid_message(update: Update):
     """فیلتر برای جلوگیری از پاسخ تکراری یا پاسخ به پیام‌های ربات"""
-    msg = update.effective_message
+    msg = get_message(update)
     if not msg:
         return False
 
-    # جلوگیری از پاسخ به خودش (پیام ربات)
     if msg.from_user and msg.from_user.is_bot:
         return False
-        # 🚫 جلوگیری از پاسخ سخنگو به پیام‌های دستوری
 
-        
     text = msg.text or msg.caption or ""
     if not text.strip():
         return False
-
-    # حافظه کوتاه برای جلوگیری از تکرار
-    global LAST_MESSAGES
-    if "LAST_MESSAGES" not in globals():
-        LAST_MESSAGES = {}
 
     user_id = msg.from_user.id if msg.from_user else None
     last_msg = LAST_MESSAGES.get(user_id)
@@ -213,51 +282,21 @@ def is_valid_message(update):
 
     LAST_MESSAGES[user_id] = text
     return True
-# ======================= 💬 ریپلی مود گروهی و محدود به مدیران =======================
-REPLY_FILE = "reply_status.json"
 
-def load_reply_status():
-    """خواندن وضعیت ریپلی مود برای تمام گروه‌ها"""
-    import json, os
-    if os.path.exists(REPLY_FILE):
-        try:
-            with open(REPLY_FILE, "r", encoding="utf-8") as f:
-                return json.load(f)
-        except:
-            pass
-    return {}  # ساختار داده: { "group_id": {"enabled": True/False} }
-
-
-def save_reply_status(data):
-    """ذخیره وضعیت ریپلی مود برای همه گروه‌ها"""
-    import json
-    with open(REPLY_FILE, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
-
-
-reply_status = load_reply_status()
-
-
-def is_group_reply_enabled(chat_id):
-    """بررسی فعال بودن ریپلی مود در گروه خاص"""
-    return reply_status.get(str(chat_id), {}).get("enabled", False)
-
-
+# ======================= تغییر وضعیت ریپلی مود =======================
 async def toggle_reply_mode(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """تغییر وضعیت ریپلی مود — فقط مدیران گروه یا ادمین اصلی مجازند"""
-    msg = update.message or update.edited_message
-    chat = update.effective_chat
-    user = update.effective_user
+    msg = get_message(update)
+    chat = get_chat(update)
+    user = get_user(update)
 
     if not msg or not chat or not user:
         print("⚠️ پیام، چت یا کاربر موجود نیست، دستور رد شد.")
         return
 
-    # فقط در گروه قابل استفاده است
     if chat.type not in ["group", "supergroup"]:
         return await safe_reply(update, context, "⚠️ این دستور فقط داخل گروه کار می‌کند!")
 
-    # بررسی ادمین اصلی یا مدیر گروه بودن
     is_main_admin = (user.id == ADMIN_ID)
     is_group_admin = False
 
@@ -281,8 +320,6 @@ async def toggle_reply_mode(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await safe_reply(update, context, "💬 ریپلی مود در این گروه فعال شد!\nفقط با ریپلای به پیام‌های من چت کنید 😄")
     else:
         await safe_reply(update, context, "🗨️ ریپلی مود در این گروه غیرفعال شد!\nالان به همه پیام‌ها جواب می‌دهم 😎")
-
-
 # ======================= 🧠 بررسی حالت ریپلی مود گروهی =======================
 async def handle_group_reply_mode(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """اگر ریپلی مود فعال باشد، فقط در صورت ریپلای به ربات پاسخ بده"""
