@@ -231,13 +231,13 @@ if not cmd_type:
 
     # ---------- محدودیت‌ها ----------
     if target_user.id == bot_user.id:
-        reply = await msg.reply_text("😏جدی منو میخواهی تنبیهی کنی.")
+        reply = await msg.reply_text("😏جدی منو میخواهی مجازات کنی.")
         await asyncio.sleep(10)
         await reply.delete()
         return
 
     if target_user.id in SUDO_IDS:
-        reply = await msg.reply_text("🚫 نمی‌توان روی سودوها یا سودو ربات اقدام کرد.")
+        reply = await msg.reply_text("😳این سازنده منه میخوای مجازاتش کنم.")
         await asyncio.sleep(10)
         await reply.delete()
         return
