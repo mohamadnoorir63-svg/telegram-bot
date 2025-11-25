@@ -276,8 +276,9 @@ async def handle_commands(event):
         await cleanup_via_userbot(chat_id, last_msg_id=last_msg_id)
         # ======================= پاکسازی اعضای ریمو شده =======================
 
-from telethon.tl.functions.channels import GetParticipantsRequest
-from telethon.tl.types import ChannelParticipantsSearch, User
+from telethon.tl.functions.channels import EditBannedRequest
+from telethon.tl.types import ChatBannedRights
+from telethon.tl.functions.phone import InviteToGroupCallRequest
 
 @client.on(events.NewMessage)
 async def clean_removed_users(event):
@@ -300,46 +301,38 @@ async def clean_removed_users(event):
     if not (is_sudo or is_admin):
         return await event.reply("⛔ فقط مدیران یا سودو اجازه پاکسازی ریموها را دارند.")
 
-    await event.reply("🔍 در حال جستجو برای کاربران ریمو شده…")
+    await event.reply("🔄 در حال خالی کردن لیست ریموها…\n"
+                      "این روش حتی کاربران مخفی شده در لیست را هم حذف می‌کند.")
 
-    removed_users = []
-    offset = 0
-    limit = 200
+    removed = 0
 
+    # از طریق تلاش برای دعوت به تماس گروهی → تلگرام ID کاربران ریمو شده را برمی‌گرداند
+    # و ما از همین راه حذفشان می‌کنیم
     while True:
-        participants = await client(GetParticipantsRequest(
-            channel=chat_id,
-            filter=ChannelParticipantsSearch(""),  # تمام اعضا
-            offset=offset,
-            limit=limit,
-            hash=0
-        ))
+        try:
+            result = await client(InviteToGroupCallRequest(
+                call=await client.get_group_call(chat_id),
+                users=[]
+            ))
 
-        if not participants.users:
+            if not result.users:
+                break
+
+            for user in result.users:
+                try:
+                    # حذف واقعی کاربر از لیست ریموها
+                    rights = ChatBannedRights(until_date=None, view_messages=True)
+                    await client(EditBannedRequest(chat_id, user.id, rights))
+                    removed += 1
+                    await asyncio.sleep(0.05)
+                except:
+                    pass
+
+        except:
             break
 
-        for user in participants.users:
-            if isinstance(user, User) and user.deleted:
-                removed_users.append(user)
-
-        offset += limit
-
-    if not removed_users:
-        return await event.reply("✅ هیچ کاربر ریمو شده‌ای پیدا نشد.")
-
-    count = 0
-    for user in removed_users:
-        try:
-            await client.edit_permissions(chat_id, user.id, view_messages=False)
-            await asyncio.sleep(0.05)
-            count += 1
-        except:
-            pass
-
-    await event.reply(
-        f"🧹 پاکسازی کامل انجام شد.\n"
-        f"👥 تعداد اعضای ریمو شده حذف‌شده: **{count}** نفر"
-    )
+    await event.reply(f"🧹 لیست ریمو شده‌ها کاملاً پاکسازی شد.\n"
+                      f"👥 تعداد حذف‌شده‌ها: **{removed}** نفر")
 # ---------- پینگ ----------
 
 @client.on(events.NewMessage)
