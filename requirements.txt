@@ -46,4 +46,4 @@ gunicorn==21.2.0
 nest_asyncio==1.5.8
 
 # Translator
-deep-translator==1.12.1
+deep-translator==1.11.4
