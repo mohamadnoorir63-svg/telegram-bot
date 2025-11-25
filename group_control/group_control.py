@@ -475,6 +475,26 @@ async def handle_lock_commands(update: Update, context: ContextTypes.DEFAULT_TYP
 
     # هیچ پیامی نده اگه دستور اشتباه بود
     return
+    # ─────────────────────────────── نمایش وضعیت قفل‌ها ───────────────────────────────
+async def show_lock_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """نمایش وضعیت همه قفل‌ها در گروه"""
+    chat = update.effective_chat
+    user = update.effective_user
+
+    if not await _has_full_access(context, chat.id, user.id):
+        return await update.message.reply_text("❌ شما دسترسی لازم را ندارید.")
+
+    locks = _get_locks(chat.id)
+    if not locks:
+        await update.message.reply_text("ℹ️ هیچ قفلی برای این گروه تعریف نشده است.")
+        return
+
+    text = "🔒 وضعیت قفل‌های گروه:\n\n"
+    for key, fa in LOCK_TYPES.items():
+        status = "✅ فعال" if locks.get(key) else "❌ باز"
+        text += f"{fa}: {status}\n"
+
+    await update.message.reply_text(text)
 
         
 # ─────────────────────────────── هندلر مرکزی گروه ───────────────────────────────
@@ -493,10 +513,13 @@ async def handle_group_message(update: Update, context: ContextTypes.DEFAULT_TYP
 
     if text == "لیست ویژه":
         return await list_vips(update, context)
+        # ───────────── بررسی وضعیت قفل‌ها ─────────────
+if text == "وضعیت قفل‌ها":
+    return await show_lock_status(update, context)
 
     # ───────────── بررسی دستورات قفل / باز کردن محتوا ─────────────
     if text.startswith("قفل ") or text.startswith("باز کردن ") or text.startswith("بازکردن "):
         return await handle_lock_commands(update, context)
-
+    
     # ───────────── در نهایت بررسی پیام‌ها مطابق قفل‌ها ─────────────
     await check_message_locks(update, context)
