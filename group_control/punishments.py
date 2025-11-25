@@ -201,9 +201,9 @@ if not cmd_type:
                     break
             break  # فقط اولین alias match شود
 
-# اگر باز هم match نشد، خارج شو
-if not cmd_type:
-    return
+    # اگر باز هم match نشد، خارج شو
+    if not cmd_type:
+        return
 
     if not await _has_access(context, chat.id, user.id):
         return
