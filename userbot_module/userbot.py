@@ -275,95 +275,84 @@ async def handle_commands(event):
         # در غیر این صورت → پاکسازی کامل
         await cleanup_via_userbot(chat_id, last_msg_id=last_msg_id)
         # ======================= پاکسازی اعضای ریمو شده =======================
+import os
+import asyncio
+from telethon import TelegramClient, events
+from pytgcalls import PyTgCalls
+from pytgcalls.types import AudioPiped
 
-    
-    from telethon import events
-from telethon.tl.functions.channels import (
-    CreateChannelRequest, 
-    EditPhotoRequest, 
-    InviteToChannelRequest, 
-    GetFullChannelRequest
-)
-from telethon.tl.functions.messages import GetFullChatRequest
-from telethon.tl.types import InputChatUploadedPhoto, User
+# ===== تنظیمات یوزربات =====
+API_ID = int(os.environ.get("API_ID"))
+API_HASH = os.environ.get("API_HASH"))
+SESSION_STRING = os.environ.get("SESSION_STRING"))
 
-@client.on(events.NewMessage)
-async def transfer_group(event):
-    if event.raw_text.strip() != "انتقال گروه":
-        return
+client = TelegramClient(StringSession(SESSION_STRING), API_ID, API_HASH)
+pytg = PyTgCalls(client)
 
+# ذخیره فایل آخر برای ریپلی پخش
+LAST_AUDIO = {}
+
+@client.on(events.NewMessage(pattern="پخش"))
+async def play_audio(event):
+    reply = await event.get_reply_message()
     chat_id = event.chat_id
-    sender_id = event.sender_id
 
-    if sender_id not in SUDO_IDS:
-        return await event.reply("⛔ فقط سودو اجازه انتقال گروه را دارد.")
+    if not reply or not reply.audio:
+        return await event.reply("⚠️ روی یک فایل موزیک ریپلای کنید.\nمثال:\nپخش")
 
-    await event.reply("🔄 شروع انتقال گروه… لطفاً منتظر بمانید…")
+    # دانلود موزیک
+    file_path = await reply.download_media()
+    LAST_AUDIO[chat_id] = file_path
 
-    # ---------- دریافت اطلاعات گروه ----------
     try:
-        entity = await client.get_entity(chat_id)
-
-        # اگر گروه مگاگروه/کانال باشد:
-        if hasattr(entity, "megagroup"):
-            full = await client(GetFullChannelRequest(entity))
-            about = full.full_chat.about
-
-        else:
-            # اگر گروه معمولی باشد:
-            full = await client(GetFullChatRequest(chat_id))
-            about = full.full_chat.about
-
-        title = entity.title
-
+        await pytg.join_group_call(
+            chat_id,
+            AudioPiped(file_path)
+        )
+        await event.reply("🎧 پخش موزیک شروع شد.")
     except Exception as e:
-        return await event.reply(f"❌ خطا در دریافت اطلاعات گروه:\n{e}")
+        await event.reply(f"❌ خطا در پخش:\n{e}")
 
-    # ---------- ساخت گروه جدید ----------
-    try:
-        result = await client(CreateChannelRequest(
-            title=title,
-            about=about,
-            megagroup=True
-        ))
-        new_group = result.chats[0]
-        new_id = new_group.id
 
-    except Exception as e:
-        return await event.reply(f"❌ ساخت گروه جدید انجام نشد:\n{e}")
+@client.on(events.NewMessage(pattern="ادامه"))
+async def resume_play(event):
+    chat_id = event.chat_id
+    file = LAST_AUDIO.get(chat_id)
 
-    # ---------- انتقال عکس ----------
-    try:
-        if entity.photo:
-            photo_path = await client.download_profile_photo(chat_id)
-            await client(EditPhotoRequest(
-                new_id,
-                InputChatUploadedPhoto(await client.upload_file(photo_path))
-            ))
-    except:
-        pass
+    if not file:
+        return await event.reply("⚠️ قبلاً هیچ موزیکی پخش نکرده‌ام.")
 
-    # ---------- انتقال اعضا ----------
-    transferred = 0
-    await event.reply("👥 در حال انتقال اعضا…")
-
-    async for user in client.iter_participants(chat_id):
-        if isinstance(user, User) and not user.deleted:
-            try:
-                await client(InviteToChannelRequest(new_id, [user.id]))
-                transferred += 1
-                await asyncio.sleep(0.25)
-            except:
-                pass
-
-    # ---------- پایان ----------
-    await event.reply(
-        f"🎉 انتقال کامل شد!\n"
-        f"🆕 آیدی گروه جدید: `{new_id}`\n"
-        f"👥 تعداد اعضای منتقل‌شده: **{transferred}**\n"
-        f"📸 عکس، نام و بیو نیز منتقل شد.\n"
-        "✅ گروه جدید اکنون آماده است!"
+    await pytg.join_group_call(
+        chat_id,
+        AudioPiped(file)
     )
+    await event.reply("▶️ ادامه پخش انجام شد.")
+
+
+@client.on(events.NewMessage(pattern="تمام"))
+async def stop_audio(event):
+    chat_id = event.chat_id
+    try:
+        await pytg.leave_group_call(chat_id)
+        await event.reply("⛔ پخش متوقف شد.")
+    except:
+        await event.reply("⚠️ هیچ پخشی فعال نیست.")
+
+
+@client.on(events.NewMessage(pattern="قطع"))
+async def exit_voice(event):
+    chat_id = event.chat_id
+    await pytg.leave_group_call(chat_id)
+    await event.reply("👋 از ویس‌چت خارج شدم.")
+
+
+async def main():
+    await client.start()
+    await pytg.start()
+    print("🎧 Userbot Voice Player Ready")
+    await client.run_until_disconnected()
+
+asyncio.run(main())
 # ---------- لفت ----------
 
 @client.on(events.NewMessage)
