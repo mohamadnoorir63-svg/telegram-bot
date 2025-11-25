@@ -132,23 +132,35 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
     text = (msg.text or "").strip()
 
     # ---------- ساخت alias داخل گروه ----------
-    match_alias = re.match(r"افزودن دستور (.+?)\s+(.+)", text)
-    if match_alias:
-        if not await _has_access(context, chat.id, user.id):
-            return
-        alias_name = match_alias.group(1).strip()
-        original_cmd = match_alias.group(2).strip()
-        data = _load_json(ALIAS_FILE)
-        chat_key = str(chat.id)
-        if chat_key not in data:
-            data[chat_key] = {}
-        data[chat_key][alias_name] = original_cmd
-        _save_json(ALIAS_FILE, data)
-        reply = await msg.reply_text(f"✅ دستور alias ساخته شد:\n`{alias_name}`→`{original_cmd}`", parse_mode="Markdown")
-        await asyncio.sleep(10)
-        await reply.delete()
-        return
+    # ---------- اجرای alias ----------
+matched = None
+cmd_type = None
 
+# ابتدا دستور اصلی را چک کن
+for k, pat in PATTERNS.items():
+    m = pat.fullmatch(text)
+    if m:
+        cmd_type = k
+        matched = m
+        break
+
+# اگر دستور اصلی match نشد، alias را بررسی کن
+if not cmd_type:
+    aliases_all = _load_json(ALIAS_FILE)
+    chat_aliases = aliases_all.get(str(chat.id), {})
+    for alias_text, alias_cmd in chat_aliases.items():
+        if text.startswith(alias_text):
+            text = alias_cmd
+            for k, pat in PATTERNS.items():
+                m = pat.fullmatch(text)
+                if m:
+                    cmd_type = k
+                    matched = m
+                    break
+            break  # فقط اولین alias match شود
+
+if not cmd_type:
+    return
     # ---------- لیست‌ها فقط برای مدیران و سودوها ----------
     if text in ["لیست بن", "لیست سکوت"]:
         if not await _has_access(context, chat.id, user.id):
@@ -209,12 +221,54 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
         await reply.delete()
         return
 
-    bot_user = await context.bot.get_me()
-    if target_user.id == bot_user.id or target_user.id in SUDO_IDS:
-        reply = await msg.reply_text("🚫 نمی‌توان روی این کاربر اقدام کرد.")
+      bot_user = await context.bot.get_me()
+target_ref = f"@{target_user.username}" if getattr(target_user, "username", None) else str(target_user.id)
+
+# محدودیت‌ها
+if target_user.id == bot_user.id:
+    reply = await msg.reply_text("🚫 نمی‌توان روی ربات اقدام کرد.")
+    await asyncio.sleep(10)
+    await reply.delete()
+    return
+
+if target_user.id in SUDO_IDS:
+    reply = await msg.reply_text("🚫 نمی‌توان روی سودوها اقدام کرد.")
+    await asyncio.sleep(10)
+    await reply.delete()
+    return
+bot_user = await context.bot.get_me()
+target_ref = f"@{target_user.username}" if getattr(target_user, "username", None) else str(target_user.id)
+
+# محدودیت‌ها
+if target_user.id == bot_user.id:
+    reply = await msg.reply_text("🚫 نمی‌توان روی ربات اقدام کرد.")
+    await asyncio.sleep(10)
+    await reply.delete()
+    return
+
+if target_user.id in SUDO_IDS:
+    reply = await msg.reply_text("🚫 نمی‌توان روی سودوها یا سودو ربات اقدام کرد.")
+    await asyncio.sleep(10)
+    await reply.delete()
+    return
+
+try:
+    tm = await context.bot.get_chat_member(chat.id, target_user.id)
+    if tm.status == "creator":
+        reply = await msg.reply_text("🛡 امکان اجرای دستور روی سازنده گروه وجود ندارد.")
         await asyncio.sleep(10)
         await reply.delete()
         return
+    if tm.status == "administrator":
+        # اگر سودو ربات هست، اجازه بده یا نه
+        if target_user.id in SUDO_IDS:
+            return  # سودو ربات دسترسی دارد
+        reply = await msg.reply_text("🛡 امکان اجرای دستور روی مدیر گروه وجود ندارد.")
+        await asyncio.sleep(10)
+        await reply.delete()
+        return
+except Exception:
+    pass
 
     try:
         tm = await context.bot.get_chat_member(chat.id, target_user.id)
