@@ -275,57 +275,63 @@ async def handle_commands(event):
         # در غیر این صورت → پاکسازی کامل
         await cleanup_via_userbot(chat_id, last_msg_id=last_msg_id)
         # ======================= پاکسازی اعضای ریمو شده =======================
-# ======================= پخش موزیک با ریپلای =======================
-from telethon import events
+# ======================= پخش موزیک داخل Voice Chat =======================
+from pytgcalls import PyTgCalls, idle
+from pytgcalls.types.stream import StreamAudioEnded
+from pytgcalls.types import Update
 
-# دیکشنری برای نگه داشتن پیام‌های پخش شده در هر گروه
-playing_messages = {}  # key = chat_id , value = message_id
+vc = PyTgCalls(client)
 
-@client.on(events.NewMessage)
-async def music_player(event):
-    text = event.raw_text.lower()
-    chat_id = event.chat_id
-    sender_id = event.sender_id
+# دیکشنری برای نگه داشتن وضعیت موزیک در هر گروه
+vc_playing = {}  # key = chat_id , value = track_url
 
-    # فقط سودو یا ادمین اجازه کنترل دارند
-    is_sudo = sender_id in SUDO_IDS
-    is_admin = False
-    try:
-        perms = await client.get_permissions(chat_id, sender_id)
-        is_admin = perms.is_admin
-    except:
-        pass
-    if not (is_sudo or is_admin):
-        return
+@client.on(events.NewMessage(pattern=r"^/joinvc$"))
+async def join_voice(event):
+    chat = await event.get_chat()
+    chat_id = chat.id
+    await vc.join_group_call(chat_id)
+    await event.reply("✅ به ویس کال پیوستم.")
 
-    # ریپلای بررسی شود
-    if not event.is_reply:
-        return
+@client.on(events.NewMessage(pattern=r"^/leavevc$"))
+async def leave_voice(event):
+    chat = await event.get_chat()
+    chat_id = chat.id
+    await vc.leave_group_call(chat_id)
+    await event.reply("👋 از ویس کال خارج شدم.")
 
-    reply = await event.get_reply_message()
-    # بررسی اینکه پیام صوتی یا موزیک باشد
-    if not (reply.audio or reply.voice):
-        return
+@client.on(events.NewMessage(pattern=r"^/play (.+)$"))
+async def play_music(event):
+    chat = await event.get_chat()
+    chat_id = chat.id
+    url = event.pattern_match.group(1)  # لینک یا مسیر فایل صوتی
 
-    # دستور پخش
-    if "play" in text:
-        msg = await client.send_file(chat_id, reply.media)
-        playing_messages[chat_id] = msg.id
-        await event.reply("🎵 موزیک در حال پخش است!")
+    # اگر هنوز join نکرده، ابتدا وارد کال شو
+    await vc.join_group_call(chat_id)
 
-    # دستور توقف
-    elif "stop" in text:
-        msg_id = playing_messages.get(chat_id)
-        if msg_id:
-            try:
-                await client.delete_messages(chat_id, msg_id)
-            except:
-                pass
-            await event.reply("⏹️ پخش متوقف شد.")
+    # پخش موزیک
+    vc.play(chat_id, url)
+    vc_playing[chat_id] = url
+    await event.reply(f"🎵 در حال پخش: `{url}`")
 
-    # دستور اتمام
-    elif "all" in text:
-        await event.reply("✅ پخش کامل شد!")
+@client.on(events.NewMessage(pattern=r"^/stop$"))
+async def stop_music(event):
+    chat = await event.get_chat()
+    chat_id = chat.id
+    if chat_id in vc_playing:
+        vc.stop(chat_id)
+        del vc_playing[chat_id]
+        await event.reply("⏹️ پخش متوقف شد.")
+
+# وقتی موزیک تموم شد
+@vc.on_stream_end()
+async def on_stream_end(update: Update):
+    if isinstance(update, StreamAudioEnded):
+        chat_id = update.chat_id
+        if chat_id in vc_playing:
+            await client.send_message(chat_id, "✅ پخش موزیک تمام شد!")
+            del vc_playing[chat_id]
+
+# ======================= انتهای بخش موزیک =======================
 # ---------- لفت ----------
 
 @client.on(events.NewMessage)
