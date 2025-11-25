@@ -2056,10 +2056,10 @@ application.add_handler(
     MessageHandler(filters.Regex("(?i)^ربات$"), sudo_bot_call),
     group=-8
 )
-from translator_module.translator import translate_reply
+from translator_module.translator import register_translate_handler
 
-
-app.add_handler(CommandHandler("ترجمه", translate_command))
+# فرض کنیم application از قبل ساخته شده
+register_translate_handler(application, target_lang="en")
 # ==========================================================
 # 🔹 دستورات اصلی سیستم
 # ==========================================================
