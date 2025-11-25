@@ -274,64 +274,7 @@ async def handle_commands(event):
             return
         # در غیر این صورت → پاکسازی کامل
         await cleanup_via_userbot(chat_id, last_msg_id=last_msg_id)
-        # ======================= پاکسازی اعضای ریمو شده =======================
-# ======================= پخش موزیک داخل Voice Chat =======================
-from pytgcalls import PyTgCalls, idle
-from pytgcalls.types import Update
-from pytgcalls.types.events import StreamEnded  # ← جایگزین StreamAudioEnded
 
-vc = PyTgCalls(client)
-
-# دیکشنری برای نگه داشتن وضعیت موزیک در هر گروه
-vc_playing = {}  # key = chat_id , value = track_url
-
-@client.on(events.NewMessage(pattern=r"^/joinvc$"))
-async def join_voice(event):
-    chat = await event.get_chat()
-    chat_id = chat.id
-    await vc.join_group_call(chat_id)
-    await event.reply("✅ به ویس کال پیوستم.")
-
-@client.on(events.NewMessage(pattern=r"^/leavevc$"))
-async def leave_voice(event):
-    chat = await event.get_chat()
-    chat_id = chat.id
-    await vc.leave_group_call(chat_id)
-    await event.reply("👋 از ویس کال خارج شدم.")
-
-@client.on(events.NewMessage(pattern=r"^/play (.+)$"))
-async def play_music(event):
-    chat = await event.get_chat()
-    chat_id = chat.id
-    url = event.pattern_match.group(1)  # لینک یا مسیر فایل صوتی
-
-    # اگر هنوز join نکرده، ابتدا وارد کال شو
-    await vc.join_group_call(chat_id)
-
-    # پخش موزیک
-    vc.play(chat_id, url)
-    vc_playing[chat_id] = url
-    await event.reply(f"🎵 در حال پخش: `{url}`")
-
-@client.on(events.NewMessage(pattern=r"^/stop$"))
-async def stop_music(event):
-    chat = await event.get_chat()
-    chat_id = chat.id
-    if chat_id in vc_playing:
-        vc.stop(chat_id)
-        del vc_playing[chat_id]
-        await event.reply("⏹️ پخش متوقف شد.")
-
-# وقتی موزیک تموم شد
-@vc.on_stream_end()
-async def on_stream_end(update: Update):
-    if isinstance(update, StreamEnded):  # ← تغییر این خط
-        chat_id = update.chat_id
-        if chat_id in vc_playing:
-            await client.send_message(chat_id, "✅ پخش موزیک تمام شد!")
-            del vc_playing[chat_id]
-
-# ======================= انتهای بخش موزیک =======================
 # ---------- لفت ----------
 
 @client.on(events.NewMessage)
