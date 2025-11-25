@@ -54,7 +54,6 @@ async def _has_access(context, chat_id: int, user_id: int) -> bool:
         return False
 
 async def _resolve_target(msg, context, chat_id, explicit_arg: str = None):
-    # اگر reply زده شده باشد
     if msg.reply_to_message and getattr(msg.reply_to_message, "from_user", None):
         return msg.reply_to_message.from_user
 
@@ -131,7 +130,7 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
     text = (msg.text or "").strip()
 
-    # ---------- ساخت alias داخل گروه ----------
+    # ---------- ساخت alias ----------
     match_alias = re.match(r"افزودن دستور (.+?)\s+(.+)", text)
     if match_alias:
         if not await _has_access(context, chat.id, user.id):
@@ -144,7 +143,7 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
             data[chat_key] = {}
         data[chat_key][alias_name] = original_cmd
         _save_json(ALIAS_FILE, data)
-        reply = await msg.reply_text(f"✅ دستور alias ساخته شد:\n`{alias_name}`→`{original_cmd}`", parse_mode="Markdown")
+        reply = await msg.reply_text(f"✅ دستور alias ساخته شد:\n`{alias_name}` → `{original_cmd}`", parse_mode="Markdown")
         await asyncio.sleep(10)
         await reply.delete()
         return
@@ -162,46 +161,41 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
         return
 
     # ---------- regex دستورات ----------
-    # ---------- regex دستورات ----------
-PATTERNS = {
-    "ban": re.compile(r"^بن(?:\s+(@?[A-Za-z0-9_]{3,32}|\d{6,15}))?$"),
-    "unban": re.compile(r"^حذف\s+بن(?:\s+(@?[A-Za-z0-9_]{3,32}|\d{6,15}))?$"),
-    "mute": re.compile(r"^سکوت(?:\s+(@?[A-Za-z0-9_]{3,32}|\d{6,15}))?$"),
-    "unmute": re.compile(r"^حذف\s+سکوت(?:\s+(@?[A-Za-z0-9_]{3,32}|\d{6,15}))?$"),
-    "warn": re.compile(r"^اخطار(?:\s+(@?[A-Za-z0-9_]{3,32}|\d{6,15}))?$"),
-    "delwarn": re.compile(r"^حذف\s+اخطار(?:\s+(@?[A-Za-z0-9_]{3,32}|\d{6,15}))?$"),
-}
+    PATTERNS = {
+        "ban": re.compile(r"^بن(?:\s+(@?[A-Za-z0-9_]{3,32}|\d{6,15}))?$"),
+        "unban": re.compile(r"^حذف\s+بن(?:\s+(@?[A-Za-z0-9_]{3,32}|\d{6,15}))?$"),
+        "mute": re.compile(r"^سکوت(?:\s+(@?[A-Za-z0-9_]{3,32}|\d{6,15}))?$"),
+        "unmute": re.compile(r"^حذف\s+سکوت(?:\s+(@?[A-Za-z0-9_]{3,32}|\d{6,15}))?$"),
+        "warn": re.compile(r"^اخطار(?:\s+(@?[A-Za-z0-9_]{3,32}|\d{6,15}))?$"),
+        "delwarn": re.compile(r"^حذف\s+اخطار(?:\s+(@?[A-Za-z0-9_]{3,32}|\d{6,15}))?$"),
+    }
 
-# ---------- پیدا کردن دستور ----------
-matched = None
-cmd_type = None
+    matched = None
+    cmd_type = None
 
-# 1️⃣ ابتدا متن اصلی را چک کن
-for k, pat in PATTERNS.items():
-    m = pat.fullmatch(text)
-    if m:
-        cmd_type = k
-        matched = m
-        break
+    # 1️⃣ بررسی دستور اصلی
+    for k, pat in PATTERNS.items():
+        m = pat.fullmatch(text)
+        if m:
+            cmd_type = k
+            matched = m
+            break
 
-# 2️⃣ اگر متن اصلی match نشد، aliasها را بررسی کن
-if not cmd_type:
-    aliases_all = _load_json(ALIAS_FILE)
-    chat_aliases = aliases_all.get(str(chat.id), {})
-    for alias_text, alias_cmd in chat_aliases.items():
-        if text.startswith(alias_text):
-            # جایگزینی alias
-            text = alias_cmd + text[len(alias_text):]  # ادامه متن اصلی اضافه شود
-            # بعد از جایگزینی، دوباره PATTERNS را چک کن
-            for k, pat in PATTERNS.items():
-                m = pat.fullmatch(text)
-                if m:
-                    cmd_type = k
-                    matched = m
-                    break
-            break  # فقط اولین alias match شود
+    # 2️⃣ بررسی alias
+    if not cmd_type:
+        aliases_all = _load_json(ALIAS_FILE)
+        chat_aliases = aliases_all.get(str(chat.id), {})
+        for alias_text, alias_cmd in chat_aliases.items():
+            if text.startswith(alias_text):
+                text = alias_cmd + text[len(alias_text):]  # ادامه متن اصلی اضافه شود
+                for k, pat in PATTERNS.items():
+                    m = pat.fullmatch(text)
+                    if m:
+                        cmd_type = k
+                        matched = m
+                        break
+                break
 
-    # اگر باز هم match نشد، خارج شو
     if not cmd_type:
         return
 
@@ -231,36 +225,29 @@ if not cmd_type:
 
     # ---------- محدودیت‌ها ----------
     if target_user.id == bot_user.id:
-        reply = await msg.reply_text("😏جدی منو میخواهی مجازات کنی.")
+        reply = await msg.reply_text("😏جدی منو میخوای مجازات کنی؟")
         await asyncio.sleep(10)
         await reply.delete()
         return
 
     if target_user.id in SUDO_IDS:
-        reply = await msg.reply_text("😳این سازنده منه میخوای مجازاتش کنم.")
+        reply = await msg.reply_text("😳این سازنده منه، نمیشه مجازاتش کرد.")
         await asyncio.sleep(10)
         await reply.delete()
         return
 
     try:
         tm = await context.bot.get_chat_member(chat.id, target_user.id)
-
         if tm.status == "creator":
             reply = await msg.reply_text("🛡 امکان اجرای دستور روی سازنده گروه وجود ندارد.")
             await asyncio.sleep(10)
             await reply.delete()
             return
-
-        if tm.status == "administrator":
-            # اگر هدف سودو ربات باشد، اجازه بده
-            if target_user.id in SUDO_IDS:
-                pass
-            else:
-                reply = await msg.reply_text("🛡 امکان اجرای دستور روی مدیر گروه وجود ندارد.")
-                await asyncio.sleep(10)
-                await reply.delete()
-                return
-
+        if tm.status == "administrator" and target_user.id not in SUDO_IDS:
+            reply = await msg.reply_text("🛡 امکان اجرای دستور روی مدیر گروه وجود ندارد.")
+            await asyncio.sleep(10)
+            await reply.delete()
+            return
     except Exception:
         pass
 
@@ -279,33 +266,15 @@ if not cmd_type:
             reply = await msg.reply_text(f"✅ {target_user.first_name} از بن خارج شد.")
 
         elif cmd_type == "mute":
-            permissions = ChatPermissions(
-                can_send_messages=False,
-                can_send_polls=False,
-                can_add_web_page_previews=False
-            )
-            await context.bot.restrict_chat_member(
-                chat.id,
-                target_user.id,
-                permissions=permissions,
-                until_date=None  # سکوت دائمی
-            )
+            permissions = ChatPermissions(can_send_messages=False, can_send_polls=False, can_add_web_page_previews=False)
+            await context.bot.restrict_chat_member(chat.id, target_user.id, permissions=permissions, until_date=None)
             add_to_list(MUTE_FILE, chat.id, target_user)
             await punish_via_userbot(chat.id, target_ref, action="mute")
             reply = await msg.reply_text(f"🤐 {target_user.first_name} برای همیشه سکوت شد.")
 
         elif cmd_type == "unmute":
-            permissions = ChatPermissions(
-                can_send_messages=True,
-                can_send_polls=True,
-                can_add_web_page_previews=True
-            )
-            await context.bot.restrict_chat_member(
-                chat.id,
-                target_user.id,
-                permissions=permissions,
-                until_date=None
-            )
+            permissions = ChatPermissions(can_send_messages=True, can_send_polls=True, can_add_web_page_previews=True)
+            await context.bot.restrict_chat_member(chat.id, target_user.id, permissions=permissions, until_date=None)
             remove_from_list(MUTE_FILE, chat.id, target_user)
             await punish_via_userbot(chat.id, target_ref, action="unmute")
             reply = await msg.reply_text(f"🔊 {target_user.first_name} از سکوت خارج شد.")
@@ -321,7 +290,7 @@ if not cmd_type:
                 await punish_via_userbot(chat.id, target_ref, action="ban")
                 warns[key] = 0
                 _save_json(WARN_FILE, warns)
-                reply = await msg.reply_text(f"🚫 {target_user.first_name} به‌دلیل ۳ اخطار بن شد.")
+                reply = await msg.reply_text(f"🚫 {target_user.first_name} به دلیل ۳ اخطار بن شد.")
             else:
                 reply = await msg.reply_text(f"⚠️ {target_user.first_name} اخطار {warns[key]}/3 گرفت.")
 
