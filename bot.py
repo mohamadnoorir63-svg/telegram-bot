@@ -184,7 +184,22 @@ status = {
     "locked": False
 }
 
+# ────────────────────────────────────────────────────────────────
+from telegram.ext import CommandHandler
 
+# تابع ترجمه
+async def translate_command(update, context):
+    # متن بعد از دستور رو می‌گیریم
+    text_to_translate = " ".join(context.args)
+    if not text_to_translate:
+        await update.message.reply_text("⚠️ لطفا متنی برای ترجمه وارد کنید!")
+        return
+
+    # این تابع رو خودت بساز یا از ماژول translator استفاده کن
+    translated_text = translate_reply(text_to_translate, target_lang="en")
+    await update.message.reply_text(translated_text)
+
+# ────────────────────────────────────────────────────────────────
 # ======================= 💬 ریپلی مود گروهی و محدود به مدیران =======================
 import os
 import json
@@ -2056,10 +2071,9 @@ application.add_handler(
     MessageHandler(filters.Regex("(?i)^ربات$"), sudo_bot_call),
     group=-8
 )
-from translator_module.translator import register_translate_handler
+# ثبت هندلر در اپلیکیشن اصلی
+application.add_handler(CommandHandler("translate", translate_command))
 
-# فرض کنیم application از قبل ساخته شده
-register_translate_handler(application, target_lang="en")
 # ==========================================================
 # 🔹 دستورات اصلی سیستم
 # ==========================================================
