@@ -209,37 +209,26 @@ if not cmd_type:
     explicit_arg = matched.group(1) if matched else None
 
     # ---------- تعیین هدف ----------
-    target_user = None
-    if msg.reply_to_message and getattr(msg.reply_to_message, "from_user", None):
-        target_user = msg.reply_to_message.from_user
-    else:
-        target_user = await _resolve_target(msg, context, chat.id, explicit_arg)
+    # ---------- تعیین هدف ----------
+target_user = None
+if msg.reply_to_message and getattr(msg.reply_to_message, "from_user", None):
+    target_user = msg.reply_to_message.from_user
+else:
+    target_user = await _resolve_target(msg, context, chat.id, explicit_arg)
 
-    if not target_user:
-        reply = await msg.reply_text("⚠️ هدف مشخص نیست.\n• ریپلای روی پیام کاربر\n• یا آیدی عددی/یوزرنیم")
-        await asyncio.sleep(10)
-        await reply.delete()
-        return
-
-      bot_user = await context.bot.get_me()
-target_ref = f"@{target_user.username}" if getattr(target_user, "username", None) else str(target_user.id)
-
-# محدودیت‌ها
-if target_user.id == bot_user.id:
-    reply = await msg.reply_text("🚫 نمی‌توان روی ربات اقدام کرد.")
+if not target_user:
+    reply = await msg.reply_text(
+        "⚠️ هدف مشخص نیست.\n• ریپلای روی پیام کاربر\n• یا آیدی عددی/یوزرنیم"
+    )
     await asyncio.sleep(10)
     await reply.delete()
     return
 
-if target_user.id in SUDO_IDS:
-    reply = await msg.reply_text("🚫 نمی‌توان روی سودوها اقدام کرد.")
-    await asyncio.sleep(10)
-    await reply.delete()
-    return
+# ---------- مرجع کاربر و ربات ----------
 bot_user = await context.bot.get_me()
 target_ref = f"@{target_user.username}" if getattr(target_user, "username", None) else str(target_user.id)
 
-# محدودیت‌ها
+# ---------- محدودیت‌ها ----------
 if target_user.id == bot_user.id:
     reply = await msg.reply_text("🚫 نمی‌توان روی ربات اقدام کرد.")
     await asyncio.sleep(10)
@@ -254,31 +243,26 @@ if target_user.id in SUDO_IDS:
 
 try:
     tm = await context.bot.get_chat_member(chat.id, target_user.id)
+    
     if tm.status == "creator":
         reply = await msg.reply_text("🛡 امکان اجرای دستور روی سازنده گروه وجود ندارد.")
         await asyncio.sleep(10)
         await reply.delete()
         return
+    
     if tm.status == "administrator":
-        # اگر سودو ربات هست، اجازه بده یا نه
+        # اگر هدف سودو ربات باشد، اجازه بده
         if target_user.id in SUDO_IDS:
-            return  # سودو ربات دسترسی دارد
-        reply = await msg.reply_text("🛡 امکان اجرای دستور روی مدیر گروه وجود ندارد.")
-        await asyncio.sleep(10)
-        await reply.delete()
-        return
-except Exception:
-    pass
-
-    try:
-        tm = await context.bot.get_chat_member(chat.id, target_user.id)
-        if tm.status in ("creator", "administrator"):
-            reply = await msg.reply_text("🛡 امکان اجرای دستور روی ادمین وجود ندارد.")
+            pass  # سودو ربات دسترسی دارد، هیچ محدودیتی
+        else:
+            reply = await msg.reply_text("🛡 امکان اجرای دستور روی مدیر گروه وجود ندارد.")
             await asyncio.sleep(10)
             await reply.delete()
             return
-    except Exception:
-        pass
+
+except Exception:
+    # در صورت خطا، ادامه بده بدون متوقف شدن
+    pass
 
     target_ref = f"@{target_user.username}" if getattr(target_user, "username", None) else str(target_user.id)
 
