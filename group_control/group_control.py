@@ -235,41 +235,74 @@ def _is_locked(chat_id: int, key: str) -> bool:
     return LOCKS.get(str(chat_id), {}).get(key, False)
 
 # ─────────────────────────────── حذف پیام ممنوع ───────────────────────────────
-async def _del_msg(update: Update, lock_name: str = None):
-    """حذف پیام و ارسال هشدار شیک با نماد و ساعت"""
+# ─────────────────────────────── حذف پیام با نماد اختصاصی ───────────────────────────────
+LOCK_REASONS = {
+    "spam_repeats": "🚫 ارسال پیام تکراری ممنوع است.",
+    "all_links": "🌐 ارسال هرگونه لینک ممنوع است.",
+    "urls_videos": "🎥 ارسال لینک ویدیو ممنوع است.",
+    "short_links": "🔗 ارسال لینک کوتاه ممنوع است.",
+    "inline_bots": "🤖 استفاده از ربات اینلاین ممنوع است.",
+    "long_text": "📝 ارسال پیام طولانی ممنوع است.",
+    "capslock": "🔠 پیام با حروف بزرگ ممنوع است.",
+    "ads": "📢 ارسال تبلیغ ممنوع است.",
+    "photos": "📸 ارسال عکس ممنوع است.",
+    "videos": "🎬 ارسال ویدیو ممنوع است.",
+    "files": "📂 ارسال فایل ممنوع است.",
+    "voices": "🎙️ ارسال ویس ممنوع است.",
+    "stickers": "🖼️ ارسال استیکر ممنوع است.",
+    "gifs": "🎞️ ارسال گیف ممنوع است.",
+    "forward": "📤 فوروارد پیام ممنوع است.",
+    "tag": "🏷️ استفاده از @ یا منشن ممنوع است.",
+    "arabic": "🕌 استفاده از حروف عربی ممنوع است.",
+    "english": "🇬🇧 استفاده از حروف انگلیسی ممنوع است.",
+    "caption": "🏷️ کپشن‌گذاری ممنوع است.",
+    "reply": "↩️ پاسخ دادن ممنوع است.",
+    "emoji": "😎 ارسال فقط ایموجی مجاز نیست.",
+    "text": "✉️ ارسال پیام متنی ممنوع است.",
+    "voicechat": "🎤 ارسال ویس چت ممنوع است.",
+    "location": "📍 ارسال مکان ممنوع است.",
+    "contact": "📇 ارسال مخاطب ممنوع است.",
+    "bots": "🤖 ارسال ربات ممنوع است.",
+    "join": "🚪 ورود اعضا محدود است.",
+    "media": "🖼️ ارسال رسانه ممنوع است.",
+    "external_media": "🌐 ارسال رسانه خارجی ممنوع است.",
+    "invite_links": "✉️ ارسال لینک دعوت ممنوع است.",
+    "file_types": "📄 ارسال فایل‌های خاص ممنوع است.",
+    "forward_from_bots": "📤 فوروارد از ربات ممنوع است.",
+    "urls_videos": "🎬 ارسال لینک ویدیو ممنوع است.",
+}
+
+async def _del_msg(update: Update, reason: str):
+    """حذف پیام و ارسال هشدار با نماد اختصاصی"""
     try:
         msg = update.message
         user = update.effective_user
         await msg.delete()
 
-        if lock_name:
-            now = datetime.now().strftime("%H:%M:%S")
-            symbol = "𓄂ꪴꪰ❨𝄠⃘۪۪۪۪۪۪ٜ♕{name}♕𝄠⃘۪۪۪۪۪۪❩"
-            user_symbol = symbol.format(name=user.first_name)
-            text = (
-                f"⚠️ پیام شما به دلیل نقض قوانین حذف شد\n"
-                f"لطفاً از ارسال این نوع محتوا خودداری کنید.\n"
-                f"👤 {user_symbol}\n"
-                f"⏰ {now}"
-            )
-            warn = await msg.chat.send_message(text, parse_mode="HTML")
-            await asyncio.sleep(5)
-            await warn.delete()
+        now = datetime.now().strftime("%H:%M:%S")
+        text = (
+            f"⚠️ پیام شما حذف شد\n"
+            f"📌 دلیل: {reason}\n"
+            f"👤 کاربر: {user.first_name}\n"
+            f"⏰ ساعت: {now}\n"
+            f"❗ لطفاً از ارسال این نوع محتوا خودداری کنید."
+        )
+        warn_msg = await msg.chat.send_message(text, parse_mode="HTML")
+        await asyncio.sleep(5)
+        await warn_msg.delete()
     except Exception as e:
         print(f"[Delete Error] {e}")
 
-# ─────────────────────────────── بررسی پیام‌ها و اعمال قفل ───────────────────────────────
-# دیکشنری برای ذخیره آخرین پیام هر کاربر
+# ─────────────────────────────── بررسی پیام‌ها با نماد اختصاصی ───────────────────────────────
 LAST_MESSAGES = {}
 
-async def check_message_locks(update, context):
+async def check_message_locks(update: Update, context):
     """بررسی پیام و حذف در صورت نقض قفل‌ها"""
     if not update.message:
         return
 
     msg = update.message
     text = (msg.text or msg.caption or "").strip()
-    text_lower = text.lower()
     chat = msg.chat
     user = msg.from_user
 
@@ -277,7 +310,6 @@ async def check_message_locks(update, context):
     if not any(locks.values()):
         return
 
-    # مدیر + سودو + VIP معاف از حذف پیام
     if await _has_full_access(context, chat.id, user.id):
         return
 
@@ -288,89 +320,104 @@ async def check_message_locks(update, context):
     has_anim = bool(msg.animation)
     has_stick = bool(msg.sticker)
     has_fwd = bool(msg.forward_date)
+    has_location = bool(msg.location)
+    has_contact = bool(msg.contact)
 
-    # 🚫 پیام تکراری
-    if locks.get("spam_repeats") and text:
-        last_msg = LAST_MESSAGES.get(user.id)
-        if last_msg and last_msg == text:
-            return await _del_msg(update, "🚫 ارسال پیام تکراری ممنوع است.")
-        LAST_MESSAGES[user.id] = text
+    emoji_pattern = re.compile(r"[\U00010000-\U0010ffff]", flags=re.UNICODE)
 
-    # ادامه بررسی سایر قفل‌ها ...
-    # 🚫 همه لینک‌ ها
-    if locks.get("all_links") and any(x in text for x in ["http://", "https://", "t.me", "telegram.me"]):
-        return await _del_msg(update, "🚫 ارسال هرگونه لینک ممنوع است.")
+    for lock_key, reason in LOCK_REASONS.items():
+        if not locks.get(lock_key):
+            continue
 
-    # 🚫 لینک ویدیو
-    if locks.get("urls_videos") and any(x in text for x in ["youtube.com", "youtu.be", "tiktok.com"]):
-        return await _del_msg(update, "🚫 ارسال لینک ویدیو ممنوع است.")
+        if lock_key == "spam_repeats" and text:
+            last_msg = LAST_MESSAGES.get(user.id)
+            if last_msg and last_msg == text:
+                return await _del_msg(update, reason)
+            LAST_MESSAGES[user.id] = text
 
-    # 🚫 لینک کوتاه
-    if locks.get("short_links") and any(x in text for x in ["bit.ly", "tinyurl.com", "t2m.io"]):
-        return await _del_msg(update, "🚫 ارسال لینک کوتاه ممنوع است.")
+        elif lock_key == "all_links" and any(x in text for x in ["http://", "https://", "t.me", "telegram.me"]):
+            return await _del_msg(update, reason)
 
-    # 🚫 ربات تبچی (Inline Bots)
-    if locks.get("inline_bots") and getattr(msg, "via_bot", None):
-        return await _del_msg(update, "🚫 استفاده از ربات اینلاین ممنوع است.")
-        
-   # 🚫 پیام طولانی
-    if locks.get("long_text") and len(text) > 200:   # اینجا 200 یعنی حد مجاز
-        return await _del_msg(update, "🚫 ارسال پیام طولانی ممنوع است.")
+        elif lock_key == "urls_videos" and any(x in text for x in ["youtube.com", "youtu.be", "tiktok.com"]):
+            return await _del_msg(update, reason)
 
-    # 🚫 حروف بزرگ
-    if locks.get("capslock") and text.isupper():
-        return await _del_msg(update, "🚫 پیام با حروف بزرگ ممنوع است.")
+        elif lock_key == "short_links" and any(x in text for x in ["bit.ly", "tinyurl.com", "t2m.io"]):
+            return await _del_msg(update, reason)
 
-    # 🚫 لینک
-    if locks.get("links") and any(x in text for x in ["http://", "https://", "t.me", "telegram.me"]):
-        return await _del_msg(update, "🚫 ارسال لینک ممنوع است.")
+        elif lock_key == "inline_bots" and getattr(msg, "via_bot", None):
+            return await _del_msg(update, reason)
 
-    # 🚫 تبلیغ
-    if locks.get("ads") and any(x in text for x in ["joinchat", "promo", "invite", "bot?start=", "channel"]):
-        return await _del_msg(update, "🚫 تبلیغات ممنوع است.")
+        elif lock_key == "long_text" and len(text) > 200:
+            return await _del_msg(update, reason)
 
-    # 🚫 رسانه‌ها
-    if locks.get("photos") and has_photo:
-        return await _del_msg(update, "🚫 ارسال عکس ممنوع است.")
-    if locks.get("videos") and has_video:
-        return await _del_msg(update, "🚫 ارسال ویدیو ممنوع است.")
-    if locks.get("files") and has_doc:
-        return await _del_msg(update, "🚫 ارسال فایل ممنوع است.")
-    if locks.get("voices") and has_voice:
-        return await _del_msg(update, "🚫 ارسال ویس ممنوع است.")
-    if locks.get("stickers") and has_stick:
-        return await _del_msg(update, "🚫 ارسال استیکر ممنوع است.")
-    if locks.get("gifs") and has_anim:
-        return await _del_msg(update, "🚫 ارسال گیف ممنوع است.")
-    if locks.get("forward") and has_fwd:
-        return await _del_msg(update, "🚫 فوروارد پیام ممنوع است.")
+        elif lock_key == "capslock" and text.isupper():
+            return await _del_msg(update, reason)
 
-    # 🚫 تگ
-    if locks.get("tag") and "@" in text:
-        return await _del_msg(update, "🚫 استفاده از @ یا منشن ممنوع است.")
+        elif lock_key == "ads" and any(x in text for x in ["joinchat", "promo", "invite", "bot?start=", "channel"]):
+            return await _del_msg(update, reason)
 
-    # 🚫 حروف عربی / انگلیسی
-    if locks.get("arabic") and any("\u0600" <= c <= "\u06FF" for c in text):
-        return await _del_msg(update, "🚫 استفاده از حروف عربی ممنوع است.")
-    if locks.get("english") and any("a" <= c <= "z" or "A" <= c <= "Z" for c in text):
-        return await _del_msg(update, "🚫 استفاده از حروف انگلیسی ممنوع است.")
+        elif lock_key == "photos" and has_photo:
+            return await _del_msg(update, reason)
+        elif lock_key == "videos" and has_video:
+            return await _del_msg(update, reason)
+        elif lock_key == "files" and has_doc:
+            return await _del_msg(update, reason)
+        elif lock_key == "voices" and has_voice:
+            return await _del_msg(update, reason)
+        elif lock_key == "stickers" and has_stick:
+            return await _del_msg(update, reason)
+        elif lock_key == "gifs" and has_anim:
+            return await _del_msg(update, reason)
+        elif lock_key == "forward" and has_fwd:
+            return await _del_msg(update, reason)
+        elif lock_key == "voicechat" and getattr(msg, "voice_chat_started", False):
+            return await _del_msg(update, reason)
+        elif lock_key == "location" and has_location:
+            return await _del_msg(update, reason)
+        elif lock_key == "contact" and has_contact:
+            return await _del_msg(update, reason)
 
-    # 🚫 کپشن / ریپلای
-    if locks.get("caption") and msg.caption:
-        return await _del_msg(update, "🚫 کپشن‌گذاری ممنوع است.")
-    if locks.get("reply") and msg.reply_to_message:
-        return await _del_msg(update, "🚫 پاسخ دادن ممنوع است.")
+        elif lock_key == "tag" and "@" in text:
+            return await _del_msg(update, reason)
 
-    # 🚫 فقط ایموجی
-    if locks.get("emoji"):
-        emoji_pattern = re.compile(r"[\U00010000-\U0010ffff]", flags=re.UNICODE)
-        if text and all(emoji_pattern.match(c) for c in text if not c.isspace()):
-            return await _del_msg(update, "🚫 ارسال فقط ایموجی مجاز نیست.")
+        elif lock_key == "arabic" and any("\u0600" <= c <= "\u06FF" for c in text):
+            return await _del_msg(update, reason)
+        elif lock_key == "english" and any("a" <= c <= "z" or "A" <= c <= "Z" for c in text):
+            return await _del_msg(update, reason)
 
-    # 🚫 پیام متنی
-    if locks.get("text") and text and not (has_photo or has_video or has_doc):
-        return await _del_msg(update, "🚫 ارسال پیام متنی ممنوع است.")
+        elif lock_key == "caption" and msg.caption:
+            return await _del_msg(update, reason)
+        elif lock_key == "reply" and msg.reply_to_message:
+            return await _del_msg(update, reason)
 
+        elif lock_key == "emoji" and text and all(emoji_pattern.match(c) for c in text if not c.isspace()):
+            return await _del_msg(update, reason)
+
+        elif lock_key == "text" and text and not (has_photo or has_video or has_doc):
+            return await _del_msg(update, reason)
+
+        elif lock_key == "bots" and getattr(msg, "via_bot", None):
+            return await _del_msg(update, reason)
+
+        elif lock_key == "join" and False:  # محدودیت ورود می‌تونه اینجا اضافه بشه
+            return await _del_msg(update, reason)
+
+        elif lock_key == "media" and (has_photo or has_video or has_doc or has_anim or has_stick or has_voice):
+            return await _del_msg(update, reason)
+
+        elif lock_key == "external_media" and False:  # بررسی رسانه خارجی در متن یا لینک‌ها
+            return await _del_msg(update, reason)
+
+        elif lock_key == "invite_links" and any(x in text for x in ["t.me/joinchat", "telegram.me/joinchat"]):
+            return await _del_msg(update, reason)
+
+        elif lock_key == "file_types" and has_doc:
+            # می‌تونی نوع فایل خاص رو بررسی کنی
+            return await _del_msg(update, reason)
+
+        elif lock_key == "forward_from_bots" and getattr(msg, "forward_from", None) and getattr(msg.forward_from, "is_bot", False):
+            return await _del_msg(update, reason)
+    
 # ─────────────────────────────── فعال‌سازی / غیرفعال‌سازی قفل ───────────────────────────────
 
 async def handle_lock(update: Update, context: ContextTypes.DEFAULT_TYPE, key: str):
