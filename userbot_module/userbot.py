@@ -276,6 +276,9 @@ async def handle_commands(event):
         await cleanup_via_userbot(chat_id, last_msg_id=last_msg_id)
         # ======================= پاکسازی اعضای ریمو شده =======================
 
+from telethon.tl.functions.channels import GetParticipantsRequest
+from telethon.tl.types import ChannelParticipantsSearch, User
+
 @client.on(events.NewMessage)
 async def clean_removed_users(event):
 
@@ -285,7 +288,7 @@ async def clean_removed_users(event):
     chat_id = event.chat_id
     sender_id = event.sender_id
 
-    # مجوز سودو یا ادمین
+    # مجوز
     is_sudo = sender_id in SUDO_IDS
     is_admin = False
     try:
@@ -300,12 +303,26 @@ async def clean_removed_users(event):
     await event.reply("🔍 در حال جستجو برای کاربران ریمو شده…")
 
     removed_users = []
-    try:
-        async for user in client.iter_participants(chat_id):
-            if getattr(user, "deleted", False):    # ← تشخیص واقعی کاربر حذف‌شده
+    offset = 0
+    limit = 200
+
+    while True:
+        participants = await client(GetParticipantsRequest(
+            channel=chat_id,
+            filter=ChannelParticipantsSearch(""),  # تمام اعضا
+            offset=offset,
+            limit=limit,
+            hash=0
+        ))
+
+        if not participants.users:
+            break
+
+        for user in participants.users:
+            if isinstance(user, User) and user.deleted:
                 removed_users.append(user)
-    except Exception as e:
-        return await event.reply(f"❌ خطا در دریافت لیست: {e}")
+
+        offset += limit
 
     if not removed_users:
         return await event.reply("✅ هیچ کاربر ریمو شده‌ای پیدا نشد.")
@@ -314,10 +331,10 @@ async def clean_removed_users(event):
     for user in removed_users:
         try:
             await client.edit_permissions(chat_id, user.id, view_messages=False)
-            await asyncio.sleep(0.08)
+            await asyncio.sleep(0.05)
             count += 1
         except:
-            continue
+            pass
 
     await event.reply(
         f"🧹 پاکسازی کامل انجام شد.\n"
