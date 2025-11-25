@@ -887,16 +887,25 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data["custom_handled"] = False
         return
 
-    # 🧩 اطمینان از اینکه پیام معتبره
-    if not update.message or not update.message.text:
+    # ===================== ایمن کردن دسترسی به پیام، چت و کاربر =====================
+    msg = getattr(update, "message", None) or getattr(update, "edited_message", None)
+    chat = getattr(update, "effective_chat", None)
+    user = getattr(update, "effective_user", None)
+
+    if not msg or not chat or not user:
+        print("⚠️ پیام، چت یا کاربر موجود نیست، پاسخ رد شد.")
         return
 
-    uid = update.effective_user.id
-    chat_id = update.effective_chat.id
-    text = update.message.text.strip()
+    text = getattr(msg, "text", "") or getattr(msg, "caption", "")
+    if not text.strip():
+        return
+
+    uid = user.id
+    chat_id = chat.id
+    text = text.strip()
     lower_text = text.lower()
 
-    # 🧠 گرفتن وضعیت گروه (قبل از هر استفاده)
+    # 🧠 گرفتن وضعیت گروه
     status = get_group_status(chat_id)
 
     # 🧠 ثبت پیام در حافظه کوتاه‌مدت
@@ -904,16 +913,18 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # 🧠 گرفتن کل تاریخچه اخیر کاربر
     recent_context = context_memory.get_context(uid)
-    
-   # 🧩 ترکیب سه پیام آخر برای درک بهتر ادامه گفتگو
     full_context = " ".join(recent_context[-3:]) if recent_context else text
 
-
     # 🚫 جلوگیری از پاسخ در پیوی (فقط جوک و فال مجازند)
-    if update.effective_chat.type == "private" and lower_text not in ["جوک", "فال"]:
+    if chat.type == "private" and lower_text not in ["جوک", "فال"]:
         return
 
-    if re.search(r"(هوای|آب[\s‌]*و[\s‌]*هوا)", text):
+    # 🚫 جلوگیری از پاسخ به دستورات یا کلمات محافظت شده
+    protected_words = [
+        "راهنما", "ثبت راهنما", "خوشامد", "ثبت خوشامد",
+        "save", "del", "panel", "backup", "cloudsync", "leave"
+    ]
+    if any(lower_text.startswith(word) for word in protected_words):
         return
 
     # حافظه کوتاه برای جلوگیری از تکرار
@@ -923,34 +934,15 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     last_msg = LAST_MESSAGES.get(uid)
     if last_msg == text:
-        return False  # پیام تکراری → پاسخ نده
-
-    # تابع کمکی برای بررسی پیام معتبر
-    def is_valid_message(update):
-        """فیلتر برای جلوگیری از پاسخ تکراری یا پاسخ به پیام‌های ربات"""
-        msg = update.effective_message
-        if not msg:
-            return False
-
-        # ✅ جلوگیری از پاسخ به دستورات خاص (مثل راهنما، خوشامد، ربات و غیره)
-        protected_words = [
-            "راهنما", "ثبت راهنما", "خوشامد", "ثبت خوشامد",
-            "save", "del", "panel", "backup", "cloudsync", "leave"
-        ]
-        if any(lower_text.startswith(word) for word in protected_words):
-            return False
-
-        return True
-
-    if not is_valid_message(update):
-        return
+        return  # پیام تکراری → پاسخ نده
+    LAST_MESSAGES[uid] = text
 
     # 🧠 بررسی حالت ریپلی مود گروهی
     if await handle_group_reply_mode(update, context):
         return
 
     # ثبت کاربر و گروه
-    await register_user(update.effective_user)
+    await register_user(user)
     register_group_activity(chat_id, uid)
 
     # یادگیری خودکار و شرایط فعال/غیر فعال
@@ -958,12 +950,13 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
         auto_learn_from_text(text)
 
     # اگر سخنگو خاموش است → فقط پاسخ هوش مصنوعی غیرفعال شود
-    # دستورات (جوک، فال، یادبگیر، مدیریت،…) همچنان کار می‌کنند
     if not status["active"]:
-        if lower_text not in ["جوک", "فال" ,"ربات" ,"یادبگیر"]:
+        if lower_text not in ["جوک", "فال", "ربات", "یادبگیر"]:
             return
 
-    # ادامه‌ی منطق پاسخ‌دهی هوش مصنوعی...
+    # ======================= پاسخ هوش مصنوعی =======================
+    reply_text = smart_response(text, uid)
+    await safe_reply(update, context, reply_text)
         
     # ✅ درصد هوش منطقی
     if text.lower() == "درصد هوش":
