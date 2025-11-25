@@ -462,6 +462,7 @@ def evaluate_intelligence():
     return {"iq": iq_score, "level": level, "summary": summary}
 
 # ========================= حذف جمله از حافظه =========================
+# ========================= حذف جمله از حافظه =========================
 
 def delete_phrase(phrase, partial=False):
     """حذف یک جمله یا چند جمله‌ی مشابه از حافظه"""
@@ -487,31 +488,61 @@ def delete_phrase(phrase, partial=False):
 
     save_data("memory.json", data)
     return f"<b>{len(found)} جمله حذف شد:</b>\n" + "\n".join(f"- {k}" for k in found)
-    # ========================= حذف پاسخ مشخص از همه جملات =========================
-    def delete_response(response_text):
-        """
-        حذف یک پاسخ خاص از تمام جملات حافظه
-        response_text: متنی که باید حذف شود
-        """
-        response_text = response_text.strip()
-        data = load_data("memory.json")
 
-        if "data" not in data:
-            return "<b>حافظه خالی است.</b>"
 
-        removed_count = 0
-        for phrase, responses in data["data"].items():
-            # فیلتر کردن پاسخ‌ها با پشتیبانی از dict و str
-            new_responses = [
-                r for r in responses 
-                if (r.get("text") if isinstance(r, dict) else r) != response_text
-            ]
-            if len(new_responses) != len(responses):
-                data["data"][phrase] = new_responses
-                removed_count += len(responses) - len(new_responses)
+# ========================= حذف پاسخ مشخص از همه جملات =========================
 
-        if removed_count == 0:
-            return f"<b>پاسخ '{response_text}' در حافظه پیدا نشد.</b>"
+def delete_response(response_text):
+    """
+    حذف یک پاسخ خاص از تمام جملات حافظه
+    response_text: متنی که باید حذف شود
+    """
+    response_text = response_text.strip()
+    data = load_data("memory.json")
 
-        save_data("memory.json", data)
-        return f"<b>پاسخ '{response_text}' از {removed_count} مورد حذف شد!</b>"
+    if "data" not in data:
+        return "<b>حافظه خالی است.</b>"
+
+    removed_count = 0
+    for phrase, responses in data["data"].items():
+        # فیلتر کردن پاسخ‌ها
+        new_responses = [r for r in responses if r.get("text", r) != response_text]
+        if len(new_responses) != len(responses):
+            data["data"][phrase] = new_responses
+            removed_count += len(responses) - len(new_responses)
+
+    if removed_count == 0:
+        return f"<b>پاسخ '{response_text}' در حافظه پیدا نشد.</b>"
+
+    save_data("memory.json", data)
+    return f"<b>پاسخ '{response_text}' از {removed_count} مورد حذف شد!</b>"
+
+
+# ========================= ارسال پیام ایمن در تلگرام =========================
+
+def safe_send_message(bot, chat_id, text, reply_to_message=None, **kwargs):
+    """
+    ارسال پیام ایمن در تلگرام بدون کرش کردن ربات.
+    - bot: شیء ربات
+    - chat_id: شناسه چت
+    - text: متن پیام
+    - reply_to_message: در صورت نیاز، پیام برای پاسخ دادن
+    - kwargs: سایر پارامترها مثل parse_mode، disable_web_page_preview و غیره
+    """
+    try:
+        if reply_to_message:
+            # اگر پیام پاسخ داده شود، بررسی None بودن
+            bot.send_message(
+                chat_id, 
+                text, 
+                reply_to_message_id=getattr(reply_to_message, "message_id", None), 
+                **kwargs
+            )
+        else:
+            bot.send_message(chat_id, text, **kwargs)
+    except AttributeError as e:
+        # وقتی chat یا message None است
+        print(f"⚠️ خطا در ارسال پیام (AttributeError): {e}")
+    except Exception as e:
+        # سایر خطاها
+        print(f"⚠️ خطا در ارسال پیام: {e}")
