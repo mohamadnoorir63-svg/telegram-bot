@@ -6,7 +6,8 @@ import random
 from datetime import datetime
 
 from memory_manager import (
-    load_data, save_data, generate_sentence, evaluate_intelligence, reinforce_learning, get_stats
+    load_data, save_data, generate_sentence, evaluate_intelligence,
+    reinforce_learning, get_stats
 )
 from ai_learning import clean_duplicates, auto_learn_from_text
 from fix_memory import fix_json
@@ -15,9 +16,9 @@ ADMIN_ID = int(os.getenv("ADMIN_ID", "8588347189"))
 BRAIN_STATS_FILE = "auto_brain/brain_stats.json"
 
 
-# ===============================================================
-# 📊 بارگذاری و ذخیره آمار رشد مغز خودکار
-# ===============================================================
+# ------------------------------
+# 📊 آمار
+# ------------------------------
 def load_stats():
     if not os.path.exists(BRAIN_STATS_FILE):
         return {"phrases": 0, "responses": 0, "runs": 0, "last_update": ""}
@@ -36,17 +37,17 @@ def save_stats(stats):
         print(f"[AutoBrain] خطا در ذخیره آمار: {e}")
 
 
-# ===============================================================
-# 🔧 تعمیر فایل‌های حافظه قبل از هر عملیات
-# ===============================================================
+# ------------------------------
+# 🛠 تعمیر فایل‌های حافظه
+# ------------------------------
 def ensure_memory_files():
     for file in ["memory.json", "shadow_memory.json"]:
         fix_json(file)
 
 
-# ===============================================================
-# 🔁 ادغام حافظه سایه با حافظه اصلی
-# ===============================================================
+# ------------------------------
+# 🔁 ادغام حافظه سایه
+# ------------------------------
 def merge_shadow_memory():
     main = load_data("memory.json")
     shadow = load_data("shadow_memory.json")
@@ -58,81 +59,89 @@ def merge_shadow_memory():
     added_responses = 0
 
     for phrase, responses in shadow_data.items():
-        # همه پاسخ‌ها را به صورت dict با وزن 1 ذخیره کن
-        responses_dict = [{"text": r if isinstance(r, str) else r.get("text", ""), "weight": 1} for r in responses]
+
+        new_responses = []
+        for r in responses:
+            if isinstance(r, str):
+                new_responses.append({"text": r, "weight": 1})
+            elif isinstance(r, dict) and "text" in r:
+                new_responses.append({"text": r["text"], "weight": r.get("weight", 1)})
 
         if phrase not in main_data:
-            main_data[phrase] = responses_dict
+            main_data[phrase] = new_responses
             merged_phrases += 1
         else:
-            existing_texts = [r["text"] for r in main_data[phrase]]
-            for r in responses_dict:
-                if r["text"] not in existing_texts:
+            existing = [x["text"] for x in main_data[phrase]]
+            for r in new_responses:
+                if r["text"] not in existing:
                     main_data[phrase].append(r)
                     added_responses += 1
 
     if merged_phrases or added_responses:
         main["data"] = main_data
         save_data("memory.json", main)
+
         shadow["data"] = {}
         save_data("shadow_memory.json", shadow)
 
     return merged_phrases, added_responses
 
 
-# ===============================================================
-# 🧠 تحلیل و رشد خودکار هوش
-# ===============================================================
+# ------------------------------
+# 🧠 عملیات اصلی رشد هوش
+# ------------------------------
 async def analyze_and_grow(bot=None):
-    ensure_memory_files()
-    prev_stats = load_stats()
-    before = {"phrases": prev_stats.get("phrases", 0), "responses": prev_stats.get("responses", 0)}
 
-    # 🔁 ادغام داده‌های سایه
+    ensure_memory_files()
+
+    prev_stats = load_stats()
+    before = {
+        "phrases": prev_stats.get("phrases", 0),
+        "responses": prev_stats.get("responses", 0)
+    }
+
+    # → ادغام حافظه سایه
     merged_phrases, added_responses = merge_shadow_memory()
 
-    # 🧹 پاکسازی حافظه
+    # → پاکسازی
     try:
         clean_duplicates()
     except Exception as e:
         print(f"[AutoBrain] Clean failed: {e}")
 
-    # 🌱 تقویت حافظه پاسخ‌های مفید
-    reinforce_data = {"strengthened": 0, "removed": 0}
+    # → تقویت یادگیری
     try:
         reinforce_data = reinforce_learning(verbose=False)
     except Exception as e:
         print(f"[AutoBrain] Reinforce failed: {e}")
+        reinforce_data = {"strengthened": 0, "removed": 0}
 
-    # 📈 بروزرسانی آمار فعلی
+    # → آمار جدید
     current = get_stats()
 
-    # ✨ تولید جملات خلاق
+    # → جمله‌سازی خلاق
     creative = []
     for _ in range(random.randint(2, 5)):
         s = generate_sentence()
         creative.append(s)
         try:
             auto_learn_from_text(s)
-        except Exception as e:
-            print(f"[AutoBrain] Learn from creative failed: {e}")
+        except Exception:
+            pass
 
-    # 📦 افزودن جملات خلاق به حافظه سایه
+    # ذخیره در حافظه سایه
     shadow = load_data("shadow_memory.json")
     for text in creative:
         shadow["data"][f"✨ {text}"] = ["💡 جمله‌ی ساخته‌شده توسط هوش خودکار"]
     save_data("shadow_memory.json", shadow)
 
-    diff_phrases = current["phrases"] - before["phrases"]
-    diff_responses = current["responses"] - before["responses"]
-
-    # 🧩 ارزیابی هوش خودکار
+    # → ارزیابی هوش
     try:
         aiq = evaluate_intelligence()
     except Exception as e:
-        aiq = {"iq": 0, "level": "❌ خطا در تحلیل هوش", "summary": str(e)}
+        aiq = {"iq": 0, "level": "❌ خطا", "summary": str(e)}
 
-    # 🧾 ذخیره آمار جدید
+    # → ذخیره آمار
     stats = {
         "phrases": current["phrases"],
         "responses": current["responses"],
@@ -141,40 +150,47 @@ async def analyze_and_grow(bot=None):
     }
     save_stats(stats)
 
-    # 💬 گزارش تحلیلی رشد مغز
+    # → گزارش نهایی
     report = (
-        f"🤖 <b>گزارش رشد هوش خودکار</b>\n\n"
-        f"🧩 جملات جدید ادغام‌شده: <b>{merged_phrases}</b>\n"
-        f"💬 پاسخ‌های تازه از حافظه سایه: <b>{added_responses}</b>\n"
-        f"✨ جملات خلاق تولید‌شده: <b>{len(creative)}</b>\n"
-        f"🧠 پاسخ‌های تقویت‌شده: <b>{reinforce_data['strengthened']}</b>\n"
-        f"🗑 پاسخ‌های حذف‌شده: <b>{reinforce_data['removed']}</b>\n\n"
-        f"📈 جملات: {before['phrases']} → {current['phrases']} (+{diff_phrases})\n"
-        f"💭 پاسخ‌ها: {before['responses']} → {current['responses']} (+{diff_responses})\n\n"
-        f"🤯 <b>نمره هوش خودکار:</b> <code>{aiq['iq']}</code>\n"
-        f"🌟 <b>سطح:</b> {aiq['level']}\n"
+        f"🤖 <b>گزارش رشد هوش خودکار</b>\n"
+        f"🧩 ادغام‌شده: <b>{merged_phrases}</b>\n"
+        f"💬 پاسخ‌های جدید: <b>{added_responses}</b>\n"
+        f"✨ خلاقیت‌ها: <b>{len(creative)}</b>\n\n"
+        f"📈 جملات: {before['phrases']} → {stats['phrases']}\n"
+        f"💭 پاسخ‌ها: {before['responses']} → {stats['responses']}\n\n"
+        f"🧠 IQ: <b>{aiq['iq']}</b>\n"
+        f"🌟 سطح: {aiq['level']}\n"
         f"{aiq['summary']}\n\n"
-        f"🕓 آخرین بروزرسانی: <code>{stats['last_update']}</code>\n"
-        f"🔁 دفعات اجرای خودکار: <b>{stats['runs']}</b>\n"
-        f"⚙️ نسخه: <i>AutoBrain+ EmotionSync v3.5</i>"
+        f"🕓 زمان: {stats['last_update']}\n"
+        f"🔁 اجراها: <b>{stats['runs']}</b>"
     )
 
     print(report)
 
+    # =====================
+    # 🛡 ارسال پیام فقط اگر:
+    # 1) bot وجود دارد
+    # 2) ادمین آنرا استارت کرده
+    # =====================
     if bot:
         try:
-            await bot.send_message(chat_id=ADMIN_ID, text=report, parse_mode="HTML")
+            await bot.send_message(
+                chat_id=ADMIN_ID,
+                text=report,
+                parse_mode="HTML",
+                disable_notification=True
+            )
         except Exception as e:
             print(f"[Brain Report Error] {e}")
 
 
-# ===============================================================
-# 🔄 لوپ خودکار مغز — هر ۶ ساعت یکبار
-# ===============================================================
+# ------------------------------
+# 🔁 حلقه ۶ ساعته
+# ------------------------------
 async def start_auto_brain_loop(bot):
     while True:
         try:
             await analyze_and_grow(bot)
         except Exception as e:
             print(f"[AutoBrain Loop Error] {e}")
-        await asyncio.sleep(6 * 60 * 60)  # ۶ ساعت فاصله
+        await asyncio.sleep(6 * 60 * 60)
