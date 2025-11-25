@@ -1665,18 +1665,25 @@ async def broadcast_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
             failed += 1
 
         # بروز رسانی پیشرفت
-        percent = int((idx / total) * 100)
-        if percent % 10 == 0 or percent == 100:
-            try:
-                await progress_msg.edit_text(
-                    f"📨 در حال ارسال...\n"
-                    f"👤 کاربران: {len(users)} | 👥 گروه‌ها: {len(group_ids)}\n"
-                    f"📊 پیشرفت: {percent}%"
-                )
-            except:
-                pass
+        import time
+last_update = 0
 
-        await asyncio.sleep(0.25)
+for idx, (cid, ctype) in enumerate(targets, start=1):
+    # ... ارسال پیام به گیرنده ...
+
+    percent = int((idx / total) * 100)
+
+    # فقط هر ۵ ثانیه پیام را آپدیت کن
+    if time.time() - last_update >= 5 or percent == 100:
+        try:
+            await progress_msg.edit_text(
+                f"📨 در حال ارسال...\n"
+                f"👤 کاربران: {len(users)} | 👥 گروه‌ها: {len(group_ids)}\n"
+                f"📊 پیشرفت: {percent}%"
+            )
+        except:
+            pass
+        last_update = time.time()
 
     # ===== نمایش نتیجه =====
     example_users = "، ".join(user_names[:3]) if user_names else "—"
