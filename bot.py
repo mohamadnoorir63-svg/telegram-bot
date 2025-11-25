@@ -183,36 +183,41 @@ status = {
     "welcome": True,
     "locked": False
 }
-# ────────────────────────────── ترجمه خودکار ──────────────────────────────
+# ────────────────────────────── ترجمه با رپلی ──────────────────────────────
 from telegram import Update
 from telegram.ext import MessageHandler, filters, ContextTypes
 from deep_translator import GoogleTranslator
 
-# تابع ترجمه متن
-async def auto_translate(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    text = update.message.text
+# تابع ترجمه دینامیک
+async def translate_reply_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    msg = update.message
+    if not msg or not msg.reply_to_message:
+        return  # فقط روی پیام‌های رپلی جواب بده
+
+    text = msg.reply_to_message.text
     if not text:
         return
 
+    cmd = msg.text.strip().lower()  # متن دستور خود کاربر
+
+    if "ترجمه به فارسی" in cmd:
+        target_lang = "fa"
+    elif "ترجمه به انگلیسی" in cmd:
+        target_lang = "en"
+    elif "ترجمه به آلمانی" in cmd:
+        target_lang = "de"
+    else:
+        return  # اگر دستور مرتبط نبود کاری نکن
+
     try:
-        # ترجمه به انگلیسی
-        translated_en = GoogleTranslator(source='auto', target='en').translate(text)
-        # ترجمه به آلمانی
-        translated_de = GoogleTranslator(source='auto', target='de').translate(text)
-        # ترجمه به فارسی
-        translated_fa = GoogleTranslator(source='auto', target='fa').translate(text)
-
-        reply_text = (
-            f"🌐 ترجمه به فارسی:\n{translated_fa}\n\n"
-            f"🌐 ترجمه به انگلیسی:\n{translated_en}\n\n"
-            f"🌐 ترجمه به آلمانی:\n{translated_de}"
-        )
-
-        await update.message.reply_text(reply_text)
+        translated = GoogleTranslator(source='auto', target=target_lang).translate(text)
+        await msg.reply_text(f"🌐 ترجمه به {target_lang}:\n{translated}")
     except Exception as e:
-        await update.message.reply_text(f"⚠️ خطا در ترجمه: {e}")
+        await msg.reply_text(f"⚠️ خطا در ترجمه: {e}")
 
-# ────────────────────────────── پایان بخش ترجمه ──────────────────────────────
+# هندلر پیام برای دستورات ترجمه (رپلی)
+application.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), translate_reply_handler))
+# ────────────────────────────── پایان بخش ترجمه رپلی ──────────────────────────────
 # ======================= 🧠 جلوگیری از پاسخ تکراری و پاسخ به خودش =======================
 def is_valid_message(update):
     """فیلتر برای جلوگیری از پاسخ تکراری یا پاسخ به پیام‌های ربات"""
