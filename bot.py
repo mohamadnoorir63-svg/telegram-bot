@@ -2056,20 +2056,12 @@ application.add_handler(
     MessageHandler(filters.Regex("(?i)^ربات$"), sudo_bot_call),
     group=-8
 )
-# در فایل اصلی ربات
 from translator_module.translator import translate_reply
-from telegram.ext import CommandHandler, MessageHandler, filters
 
-# دستور /translate
-app.add_handler(CommandHandler("translate", translate_reply))
-
-# یا ترجمه با متن "ترجمه" روی ریپلای
-app.add_handler(
-    MessageHandler(
-        filters.TEXT & filters.Regex(r"(?i)^ترجمه$"),
-        translate_reply
-    )
-)
+# مثال استفاده روی پیام
+@dp.message_handler(commands=['ترجمه'])
+async def handle_translate(update, context):
+    await translate_reply(update, context, target_lang="en")  # می‌تونی 'fa'، 'es' و غیره هم بذاری
 # ==========================================================
 # 🔹 دستورات اصلی سیستم
 # ==========================================================
