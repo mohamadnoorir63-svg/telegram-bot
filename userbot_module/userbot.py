@@ -276,8 +276,15 @@ async def handle_commands(event):
         await cleanup_via_userbot(chat_id, last_msg_id=last_msg_id)
         # ======================= پاکسازی اعضای ریمو شده =======================
 
+    
     from telethon import events
-from telethon.tl.functions.channels import CreateChannelRequest, EditPhotoRequest, InviteToChannelRequest
+from telethon.tl.functions.channels import (
+    CreateChannelRequest, 
+    EditPhotoRequest, 
+    InviteToChannelRequest, 
+    GetFullChannelRequest
+)
+from telethon.tl.functions.messages import GetFullChatRequest
 from telethon.tl.types import InputChatUploadedPhoto, User
 
 @client.on(events.NewMessage)
@@ -285,64 +292,77 @@ async def transfer_group(event):
     if event.raw_text.strip() != "انتقال گروه":
         return
 
-    sender = event.sender_id
-    if sender not in SUDO_IDS:
+    chat_id = event.chat_id
+    sender_id = event.sender_id
+
+    if sender_id not in SUDO_IDS:
         return await event.reply("⛔ فقط سودو اجازه انتقال گروه را دارد.")
 
-    old_group_id = event.chat_id  # ← دقیقا همان گروهی که دستور داده شده
+    await event.reply("🔄 شروع انتقال گروه… لطفاً منتظر بمانید…")
 
-    await event.reply("🔄 شروع انتقال گروه… لطفاً صبر کنید…")
-
-    # گرفتن اطلاعات کامل گروه
+    # ---------- دریافت اطلاعات گروه ----------
     try:
-        old_group = await client.get_entity(old_group_id)
-        full_info = await client.get_full_chat(old_group_id)
+        entity = await client.get_entity(chat_id)
+
+        # اگر گروه مگاگروه/کانال باشد:
+        if hasattr(entity, "megagroup"):
+            full = await client(GetFullChannelRequest(entity))
+            about = full.full_chat.about
+
+        else:
+            # اگر گروه معمولی باشد:
+            full = await client(GetFullChatRequest(chat_id))
+            about = full.full_chat.about
+
+        title = entity.title
+
     except Exception as e:
         return await event.reply(f"❌ خطا در دریافت اطلاعات گروه:\n{e}")
 
-    # ساخت گروه جدید
+    # ---------- ساخت گروه جدید ----------
     try:
         result = await client(CreateChannelRequest(
-            title=old_group.title,
-            about=full_info.full_chat.about,
+            title=title,
+            about=about,
             megagroup=True
         ))
         new_group = result.chats[0]
-        new_group_id = new_group.id
-    except Exception as e:
-        return await event.reply(f"❌ خطا در ساخت گروه جدید:\n{e}")
+        new_id = new_group.id
 
-    # انتقال عکس گروه
+    except Exception as e:
+        return await event.reply(f"❌ ساخت گروه جدید انجام نشد:\n{e}")
+
+    # ---------- انتقال عکس ----------
     try:
-        if old_group.photo:
-            photo = await client.download_profile_photo(old_group_id)
-            uploaded = await client.upload_file(photo)
+        if entity.photo:
+            photo_path = await client.download_profile_photo(chat_id)
             await client(EditPhotoRequest(
-                new_group_id,
-                InputChatUploadedPhoto(uploaded)
+                new_id,
+                InputChatUploadedPhoto(await client.upload_file(photo_path))
             ))
     except:
         pass
 
-    # انتقال اعضا
+    # ---------- انتقال اعضا ----------
     transferred = 0
-    await event.reply("👥 انتقال اعضا شروع شد… لطفاً منتظر بمانید…")
+    await event.reply("👥 در حال انتقال اعضا…")
 
-    async for user in client.iter_participants(old_group_id):
+    async for user in client.iter_participants(chat_id):
         if isinstance(user, User) and not user.deleted:
             try:
-                await client(InviteToChannelRequest(new_group_id, [user.id]))
+                await client(InviteToChannelRequest(new_id, [user.id]))
                 transferred += 1
-                await asyncio.sleep(0.25)  # جلوگیری از FloodWait
+                await asyncio.sleep(0.25)
             except:
                 pass
 
+    # ---------- پایان ----------
     await event.reply(
-        f"🎉 **انتقال انجام شد!**\n"
-        f"🆕 آیدی گروه جدید: `{new_group_id}`\n"
-        f"👥 اعضای منتقل‌شده: **{transferred} نفر**\n"
-        f"📌 عکس، بیو و نام گروه هم منتقل شد.\n"
-        f"⚠️ Deleted ها منتقل نشدند."
+        f"🎉 انتقال کامل شد!\n"
+        f"🆕 آیدی گروه جدید: `{new_id}`\n"
+        f"👥 تعداد اعضای منتقل‌شده: **{transferred}**\n"
+        f"📸 عکس، نام و بیو نیز منتقل شد.\n"
+        "✅ گروه جدید اکنون آماده است!"
     )
 # ---------- لفت ----------
 
