@@ -1578,17 +1578,26 @@ async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # -------------------- هندلر دکمه‌ها --------------------
 async def broadcast_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    await query.answer()
-    mode = query.data  # فقط broadcast_pv / broadcast_groups / broadcast_all
+
+    # پاسخ فوری به callback برای جلوگیری از timeout
+    try:
+        await query.answer()
+    except:
+        pass
+
+    mode = query.data
 
     if "broadcast" not in context.user_data:
-        return await query.edit_message_text("⚠️ داده‌ای برای ارسال پیدا نشد!")
+        try:
+            return await query.edit_message_text("⚠️ داده‌ای برای ارسال پیدا نشد!")
+        except:
+            return
 
     msg_data = context.user_data.pop("broadcast")
     msg_text = msg_data.get("text")
     msg_media: Message = msg_data.get("media")
 
-    # بارگذاری کاربران
+    # ===== بارگذاری کاربران =====
     users, user_names = [], []
     if os.path.exists(USERS_FILE):
         try:
@@ -1599,7 +1608,7 @@ async def broadcast_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except:
             pass
 
-    # بارگذاری گروه‌ها
+    # ===== بارگذاری گروه‌ها =====
     group_ids, group_names = [], []
     groups_data = load_data("group_data.json").get("groups", {})
     if isinstance(groups_data, dict):
@@ -1612,42 +1621,51 @@ async def broadcast_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 group_ids.append(int(g["id"]))
                 group_names.append(g.get("title", f"Group_{g['id']}"))
 
-    # تعیین لیست هدف
-    targets = []
+    # ===== تعیین هدف =====
     if mode == "broadcast_pv":
         targets = [(uid, "user") for uid in users]
     elif mode == "broadcast_groups":
         targets = [(gid, "group") for gid in group_ids]
-    elif mode == "broadcast_all":
+    else:
         targets = [(uid, "user") for uid in users] + [(gid, "group") for gid in group_ids]
 
     if not targets:
-        return await query.edit_message_text("⚠️ هیچ گیرنده‌ای پیدا نشد!")
+        try:
+            return await query.edit_message_text("⚠️ هیچ گیرنده‌ای پیدا نشد!")
+        except:
+            return
 
-    # پیام پیشرفت
-    sent, failed = 0, 0
+    # ===== ایجاد پیام پیشرفت =====
+    try:
+        progress_msg = await query.edit_message_text("📨 در حال ارسال... 0%")
+    except Exception:
+        # اگر پیام اصلی حذف شده بود، یک پیام جدید بفرست
+        progress_msg = await context.bot.send_message(
+            chat_id=update.effective_user.id,
+            text="📨 در حال ارسال... 0%"
+        )
+
+    # ===== شروع ارسال =====
+    sent = failed = 0
     total = len(targets)
-    progress_msg = await query.edit_message_text(f"📨 در حال ارسال... 0%")
 
     for idx, (cid, ctype) in enumerate(targets, start=1):
         try:
             if msg_media:
-                # ارسال پیام ریپلی (متن + مدیا)
                 if msg_media.text:
                     await context.bot.send_message(chat_id=cid, text=msg_media.text)
                 elif msg_media.photo:
                     await context.bot.send_photo(chat_id=cid, photo=msg_media.photo[-1].file_id, caption=msg_media.caption)
                 elif msg_media.video:
                     await context.bot.send_video(chat_id=cid, video=msg_media.video.file_id, caption=msg_media.caption)
-                # می‌تونی انواع مدیا دیگر هم اضافه کنی (animation, document, audio ...)
             else:
                 await context.bot.send_message(chat_id=cid, text=msg_text)
             sent += 1
         except:
             failed += 1
 
-        # بروزرسانی پیشرفت هر ۱۰٪
-        percent = int(idx / total * 100)
+        # بروز رسانی پیشرفت
+        percent = int((idx / total) * 100)
         if percent % 10 == 0 or percent == 100:
             try:
                 await progress_msg.edit_text(
@@ -1657,33 +1675,27 @@ async def broadcast_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 )
             except:
                 pass
-        await asyncio.sleep(0.3)  # جلوگیری از Flood تلگرام
 
-    # نمایش نتیجه نهایی با نمونه
+        await asyncio.sleep(0.25)
+
+    # ===== نمایش نتیجه =====
     example_users = "، ".join(user_names[:3]) if user_names else "—"
     example_groups = "، ".join(group_names[:3]) if group_names else "—"
 
-    await progress_msg.edit_text(
-        "✅ ارسال همگانی انجام شد!\n\n"
-        f"👤 کاربران: <b>{len(users)}</b>\n"
-        f"👥 گروه‌ها: <b>{len(group_ids)}</b>\n"
-        f"📦 مجموع گیرندگان: <b>{total}</b>\n"
-        f"📤 موفق: <b>{sent}</b>\n"
-        f"⚠️ ناموفق: <b>{failed}</b>\n\n"
-        f"👤 نمونه کاربران: <i>{example_users}</i>\n"
-        f"🏠 نمونه گروه‌ها: <i>{example_groups}</i>",
-        parse_mode="HTML"
-    )
-
-async def handle_left_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
-        my_chat_member = update.my_chat_member
-        if my_chat_member.new_chat_member.status == "left":
-            chat_id = update.effective_chat.id
-            cleanup_group_commands(chat_id)
-            print(f"🧹 دستورات گروه {chat_id} حذف شدند (ربات خارج شد).")
-    except Exception as e:
-        print(f"⚠️ خطا در پاکسازی خودکار گروه: {e}")
+        await progress_msg.edit_text(
+            "✅ ارسال همگانی انجام شد!\n\n"
+            f"👤 کاربران: <b>{len(users)}</b>\n"
+            f"👥 گروه‌ها: <b>{len(group_ids)}</b>\n"
+            f"📦 مجموع گیرندگان: <b>{total}</b>\n"
+            f"📤 موفق: <b>{sent}</b>\n"
+            f"⚠️ ناموفق: <b>{failed}</b>\n\n"
+            f"👤 نمونه کاربران: <i>{example_users}</i>\n"
+            f"🏠 نمونه گروه‌ها: <i>{example_groups}</i>",
+            parse_mode="HTML"
+        )
+    except:
+        pass
 
 # ======================= 🚪 خروج از گروه =======================
 async def leave(update: Update, context: ContextTypes.DEFAULT_TYPE):
