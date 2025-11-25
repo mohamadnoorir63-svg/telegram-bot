@@ -276,182 +276,74 @@ async def handle_commands(event):
         await cleanup_via_userbot(chat_id, last_msg_id=last_msg_id)
         # ======================= پاکسازی اعضای ریمو شده =======================
 
-# ======================= پاکسازی ترکیبی ریموها =======================
-# حذف کامل Deleted Account + پاکسازی پیام‌های مربوطه
-
-from telethon import events
-from telethon.tl.functions.channels import GetParticipantsRequest, EditBannedRequest
-from telethon.tl.types import ChannelParticipantsSearch, User, ChatBannedRights
-
-@client.on(events.NewMessage)
-async def clean_removed_combo(event):
-
-    if event.raw_text.strip() != "پاکسازی ریمو ها":
-        return
-
-    chat_id = event.chat_id
-    sender_id = event.sender_id
-
-    # اجازه فقط برای سودو یا ادمین
-    is_sudo = sender_id in SUDO_IDS
-    is_admin = False
-    try:
-        perms = await client.get_permissions(chat_id, sender_id)
-        is_admin = perms.is_admin
-    except:
-        pass
-
-    if not (is_sudo or is_admin):
-        return await event.reply("⛔ فقط مدیران یا سودو اجازه پاکسازی ریموها را دارند.")
-
-    await event.reply("🔄 در حال پاکسازی ترکیبی…\n"
-                      "🧹 حذف کامل کاربران ریمو + پاکسازی پیام‌هایشان")
-
-    removed_ids = []
-    offset = 0
-    limit = 200
-
-    # جستجو میان تمام اعضا
-    while True:
-        participants = await client(GetParticipantsRequest(
-            channel=chat_id,
-            filter=ChannelParticipantsSearch(""),
-            offset=offset,
-            limit=limit,
-            hash=0
-        ))
-
-        if not participants.users:
-            break
-
-        for user in participants.users:
-            if isinstance(user, User) and user.deleted:
-                removed_ids.append(user.id)
-
-        offset += limit
-
-    if not removed_ids:
-        return await event.reply("✅ هیچ کاربر ریمو شده‌ای یافت نشد.")
-
-    deleted_members = 0
-    deleted_msgs_total = 0
-
-    # گرفتن آخرین پیام‌ها برای پاکسازی
-    last_msg = await client.get_messages(chat_id, limit=1)
-    last_id = last_msg[0].id if last_msg else 1
-
-    for uid in removed_ids:
-
-        # 1) حذف کاربر (Kick واقعی)
-        try:
-            rights = ChatBannedRights(
-                until_date=0,
-                view_messages=True  # Kick واقعی
-            )
-            await client(EditBannedRequest(chat_id, uid, rights))
-            deleted_members += 1
-        except:
-            pass
-
-        # 2) پاکسازی پیام‌های کاربر
-        try:
-            deleted_msgs = 0
-            async for msg in client.iter_messages(chat_id, from_user=uid, limit=5000):
-                try:
-                    await client.delete_messages(chat_id, msg.id)
-                    deleted_msgs += 1
-                    await asyncio.sleep(0.01)
-                except:
-                    pass
-
-            deleted_msgs_total += deleted_msgs
-
-        except:
-            pass
-
-        await asyncio.sleep(0.05)
-
-    await event.reply(
-        f"🧹 **پاکسازی ترکیبی کامل شد**\n"
-        f"👥 کاربران ریمو حذف‌شده: {deleted_members} نفر\n"
-        f"📄 پیام‌های حذف‌شده: {deleted_msgs_total} عدد\n"
-        f"✅ گروه اکنون کاملاً تمیز و بدون هیچ کاربر حذف‌شده‌ای است."
-    )
-    # ======================= انتقال کامل گروه به گروه جدید =======================
-from telethon import events
+    from telethon import events
 from telethon.tl.functions.channels import CreateChannelRequest, EditPhotoRequest, InviteToChannelRequest
 from telethon.tl.types import InputChatUploadedPhoto, User
-
-OLD_GROUP_ID = -1000000000000  # ← اینجا آیدی گروه قدیمی را بزار (حتماً منفی)
 
 @client.on(events.NewMessage)
 async def transfer_group(event):
     if event.raw_text.strip() != "انتقال گروه":
         return
 
-    chat_id = event.chat_id
-    sender_id = event.sender_id
-
-    # فقط سودو اجازه اجرا دارد
-    if sender_id not in SUDO_IDS:
+    sender = event.sender_id
+    if sender not in SUDO_IDS:
         return await event.reply("⛔ فقط سودو اجازه انتقال گروه را دارد.")
 
-    await event.reply("🔄 شروع انتقال گروه…\nلطفاً منتظر بمانید…")
+    old_group_id = event.chat_id  # ← دقیقا همان گروهی که دستور داده شده
 
-    # گرفتن اطلاعات گروه قدیمی
+    await event.reply("🔄 شروع انتقال گروه… لطفاً صبر کنید…")
+
+    # گرفتن اطلاعات کامل گروه
     try:
-        old_group = await client.get_entity(OLD_GROUP_ID)
-        full = await client.get_participants(OLD_GROUP_ID)
+        old_group = await client.get_entity(old_group_id)
+        full_info = await client.get_full_chat(old_group_id)
     except Exception as e:
-        return await event.reply(f"❌ خطا در دریافت اطلاعات گروه قدیمی:\n{e}")
+        return await event.reply(f"❌ خطا در دریافت اطلاعات گروه:\n{e}")
 
     # ساخت گروه جدید
     try:
         result = await client(CreateChannelRequest(
             title=old_group.title,
-            about=old_group.full_chat.about if hasattr(old_group, 'full_chat') else "",
+            about=full_info.full_chat.about,
             megagroup=True
         ))
-
         new_group = result.chats[0]
         new_group_id = new_group.id
-
     except Exception as e:
-        return await event.reply(f"❌ ساخت گروه جدید انجام نشد:\n{e}")
+        return await event.reply(f"❌ خطا در ساخت گروه جدید:\n{e}")
 
     # انتقال عکس گروه
     try:
         if old_group.photo:
-            photo_path = await client.download_profile_photo(OLD_GROUP_ID)
+            photo = await client.download_profile_photo(old_group_id)
+            uploaded = await client.upload_file(photo)
             await client(EditPhotoRequest(
                 new_group_id,
-                InputChatUploadedPhoto(await client.upload_file(photo_path))
+                InputChatUploadedPhoto(uploaded)
             ))
     except:
         pass
 
-    # انتقال اعضای واقعی
+    # انتقال اعضا
     transferred = 0
+    await event.reply("👥 انتقال اعضا شروع شد… لطفاً منتظر بمانید…")
 
-    await event.reply("👥 در حال انتقال اعضا… (Deleted ها رد می‌شوند)")
-
-    async for user in client.iter_participants(OLD_GROUP_ID):
+    async for user in client.iter_participants(old_group_id):
         if isinstance(user, User) and not user.deleted:
             try:
                 await client(InviteToChannelRequest(new_group_id, [user.id]))
                 transferred += 1
-                await asyncio.sleep(0.2)
+                await asyncio.sleep(0.25)  # جلوگیری از FloodWait
             except:
                 pass
 
-    # گزارش نهایی
     await event.reply(
-        f"🎉 **انتقال کامل شد!**\n"
+        f"🎉 **انتقال انجام شد!**\n"
         f"🆕 آیدی گروه جدید: `{new_group_id}`\n"
-        f"👥 اعضای منتقل‌شده: {transferred}\n"
-        f"📸 عکس، نام و بیو گروه هم منتقل شد.\n"
-        f"❗ گروه جدید کاملاً تمیز و بدون هیچ Deleted User است."
-                                )
+        f"👥 اعضای منتقل‌شده: **{transferred} نفر**\n"
+        f"📌 عکس، بیو و نام گروه هم منتقل شد.\n"
+        f"⚠️ Deleted ها منتقل نشدند."
+    )
 # ---------- لفت ----------
 
 @client.on(events.NewMessage)
