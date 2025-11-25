@@ -488,8 +488,7 @@ def delete_phrase(phrase, partial=False):
     save_data("memory.json", data)
     return f"<b>{len(found)} جمله حذف شد:</b>\n" + "\n".join(f"- {k}" for k in found)
     # ========================= حذف پاسخ مشخص از همه جملات =========================
-
-def delete_response(response_text):
+    def delete_response(response_text):
     """
     حذف یک پاسخ خاص از تمام جملات حافظه
     response_text: متنی که باید حذف شود
@@ -502,8 +501,11 @@ def delete_response(response_text):
 
     removed_count = 0
     for phrase, responses in data["data"].items():
-        # فیلتر کردن پاسخ‌ها
-        new_responses = [r for r in responses if r.get("text", r) != response_text]
+        # فیلتر کردن پاسخ‌ها با پشتیبانی از dict و str
+        new_responses = [
+            r for r in responses 
+            if (r.get("text") if isinstance(r, dict) else r) != response_text
+        ]
         if len(new_responses) != len(responses):
             data["data"][phrase] = new_responses
             removed_count += len(responses) - len(new_responses)
@@ -513,4 +515,3 @@ def delete_response(response_text):
 
     save_data("memory.json", data)
     return f"<b>پاسخ '{response_text}' از {removed_count} مورد حذف شد!</b>"
-    
