@@ -92,7 +92,7 @@ from telegram.ext import (
     CallbackQueryHandler,
     filters
 )
-from utils.safe_send import safe_reply, handle_group_reply_mode
+
 # ======================= ⚙️ تنظیمات پایه و سودوها =======================
 from telegram import Update
 from telegram.ext import ContextTypes
@@ -2056,7 +2056,20 @@ application.add_handler(
     MessageHandler(filters.Regex("(?i)^ربات$"), sudo_bot_call),
     group=-8
 )
+# در فایل اصلی ربات
+from translator_module.translator import translate_reply
+from telegram.ext import CommandHandler, MessageHandler, filters
 
+# دستور /translate
+app.add_handler(CommandHandler("translate", translate_reply))
+
+# یا ترجمه با متن "ترجمه" روی ریپلای
+app.add_handler(
+    MessageHandler(
+        filters.TEXT & filters.Regex(r"(?i)^ترجمه$"),
+        translate_reply
+    )
+)
 # ==========================================================
 # 🔹 دستورات اصلی سیستم
 # ==========================================================
