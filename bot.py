@@ -1438,7 +1438,7 @@ async def reset_memory(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await asyncio.sleep(1.2)
     await msg.edit_text(
-        "✅ <b>پاکسازی مغز خنگول کامل شد!</b>\n"
+        "✅ <b>پاکسازی مغز ربات کامل شد!</b>\n"
         "🧠 حافظه جدید ساخته شد و آماده‌ی بوت است.\n\n"
         "🔄 اکنون دستور <b>/reload</b> را برای راه‌اندازی سیستم بفرست.",
         parse_mode="HTML"
@@ -1665,25 +1665,26 @@ async def broadcast_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
             failed += 1
 
         # بروز رسانی پیشرفت
-        import time
-last_update = 0
+        async def broadcast_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
+            import time
+            last_update = 0
 
-for idx, (cid, ctype) in enumerate(targets, start=1):
-    # ... ارسال پیام به گیرنده ...
+            for idx, (cid, ctype) in enumerate(targets, start=1):
+        # ... ارسال پیام به گیرنده ...
 
-    percent = int((idx / total) * 100)
+                percent = int((idx / total) * 100)
 
-    # فقط هر ۵ ثانیه پیام را آپدیت کن
-    if time.time() - last_update >= 5 or percent == 100:
-        try:
-            await progress_msg.edit_text(
-                f"📨 در حال ارسال...\n"
-                f"👤 کاربران: {len(users)} | 👥 گروه‌ها: {len(group_ids)}\n"
-                f"📊 پیشرفت: {percent}%"
-            )
-        except:
-            pass
-        last_update = time.time()
+        # فقط هر ۵ ثانیه پیام را آپدیت کن
+                if time.time() - last_update >= 5 or percent == 100:
+                    try:
+                        await progress_msg.edit_text(
+                            f"📨 در حال ارسال...\n"
+                            f"👤 کاربران: {len(users)} | 👥 گروه‌ها: {len(group_ids)}\n"
+                            f"📊 پیشرفت: {percent}%"
+                        )
+                    except:
+                        pass
+                    last_update = time.time()
 
     # ===== نمایش نتیجه =====
     example_users = "، ".join(user_names[:3]) if user_names else "—"
