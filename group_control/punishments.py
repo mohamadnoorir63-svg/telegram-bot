@@ -162,43 +162,48 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
         return
 
     # ---------- regex دستورات ----------
-    PATTERNS = {
-        "ban": re.compile(r"^بن(?:\s+(@?[A-Za-z0-9_]{3,32}|\d{6,15}))?$"),
-        "unban": re.compile(r"^حذف\s+بن(?:\s+(@?[A-Za-z0-9_]{3,32}|\d{6,15}))?$"),
-        "mute": re.compile(r"^سکوت(?:\s+(@?[A-Za-z0-9_]{3,32}|\d{6,15}))?$"),  # سکوت دائمی
-        "unmute": re.compile(r"^حذف\s+سکوت(?:\s+(@?[A-Za-z0-9_]{3,32}|\d{6,15}))?$"),
-        "warn": re.compile(r"^اخطار(?:\s+(@?[A-Za-z0-9_]{3,32}|\d{6,15}))?$"),
-        "delwarn": re.compile(r"^حذف\s+اخطار(?:\s+(@?[A-Za-z0-9_]{3,32}|\d{6,15}))?$"),
-    }
+    # ---------- regex دستورات ----------
+PATTERNS = {
+    "ban": re.compile(r"^بن(?:\s+(@?[A-Za-z0-9_]{3,32}|\d{6,15}))?$"),
+    "unban": re.compile(r"^حذف\s+بن(?:\s+(@?[A-Za-z0-9_]{3,32}|\d{6,15}))?$"),
+    "mute": re.compile(r"^سکوت(?:\s+(@?[A-Za-z0-9_]{3,32}|\d{6,15}))?$"),
+    "unmute": re.compile(r"^حذف\s+سکوت(?:\s+(@?[A-Za-z0-9_]{3,32}|\d{6,15}))?$"),
+    "warn": re.compile(r"^اخطار(?:\s+(@?[A-Za-z0-9_]{3,32}|\d{6,15}))?$"),
+    "delwarn": re.compile(r"^حذف\s+اخطار(?:\s+(@?[A-Za-z0-9_]{3,32}|\d{6,15}))?$"),
+}
 
-    matched = None
-    cmd_type = None
+# ---------- پیدا کردن دستور ----------
+matched = None
+cmd_type = None
 
-    # ابتدا دستور اصلی را چک کن
-    for k, pat in PATTERNS.items():
-        m = pat.fullmatch(text)
-        if m:
-            cmd_type = k
-            matched = m
-            break
+# 1️⃣ ابتدا متن اصلی را چک کن
+for k, pat in PATTERNS.items():
+    m = pat.fullmatch(text)
+    if m:
+        cmd_type = k
+        matched = m
+        break
 
-    # اگر دستور اصلی match نشد، alias را بررسی کن
-    if not cmd_type:
-        aliases_all = _load_json(ALIAS_FILE)
-        chat_aliases = aliases_all.get(str(chat.id), {})
-        for alias_text, alias_cmd in chat_aliases.items():
-            if text.startswith(alias_text):
-                text = alias_cmd
-                for k, pat in PATTERNS.items():
-                    m = pat.fullmatch(text)
-                    if m:
-                        cmd_type = k
-                        matched = m
-                        break
-                break  # فقط اولین alias match شود
+# 2️⃣ اگر متن اصلی match نشد، aliasها را بررسی کن
+if not cmd_type:
+    aliases_all = _load_json(ALIAS_FILE)
+    chat_aliases = aliases_all.get(str(chat.id), {})
+    for alias_text, alias_cmd in chat_aliases.items():
+        if text.startswith(alias_text):
+            # جایگزینی alias
+            text = alias_cmd + text[len(alias_text):]  # ادامه متن اصلی اضافه شود
+            # بعد از جایگزینی، دوباره PATTERNS را چک کن
+            for k, pat in PATTERNS.items():
+                m = pat.fullmatch(text)
+                if m:
+                    cmd_type = k
+                    matched = m
+                    break
+            break  # فقط اولین alias match شود
 
-    if not cmd_type:
-        return
+# اگر باز هم match نشد، خارج شو
+if not cmd_type:
+    return
 
     if not await _has_access(context, chat.id, user.id):
         return
@@ -226,7 +231,7 @@ async def handle_punishments(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
     # ---------- محدودیت‌ها ----------
     if target_user.id == bot_user.id:
-        reply = await msg.reply_text("🚫 نمی‌توان روی ربات اقدام کرد.")
+        reply = await msg.reply_text("😏جدی منو میخواهی تنبیهی کنی.")
         await asyncio.sleep(10)
         await reply.delete()
         return
