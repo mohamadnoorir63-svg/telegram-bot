@@ -2058,10 +2058,12 @@ application.add_handler(
 )
 from translator_module.translator import translate_reply
 
-# مثال استفاده روی پیام
-@dp.message_handler(commands=['ترجمه'])
-async def handle_translate(update, context):
-    await translate_reply(update, context, target_lang="en")  # می‌تونی 'fa'، 'es' و غیره هم بذاری
+async def translate_command(update, context):
+    text_to_translate = " ".join(context.args)
+    translated_text = translate_reply(text_to_translate, target_lang="en")
+    await update.message.reply_text(translated_text)
+
+app.add_handler(CommandHandler("ترجمه", translate_command))
 # ==========================================================
 # 🔹 دستورات اصلی سیستم
 # ==========================================================
