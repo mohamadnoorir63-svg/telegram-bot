@@ -278,7 +278,8 @@ async def handle_commands(event):
 # ======================= پخش موزیک داخل Voice Chat =======================
 from pytgcalls import PyTgCalls, idle
 from pytgcalls.types import Update
-from pytgcalls.types.events import StreamEnded  # ← این خط را اضافه کن
+from pytgcalls.types.events import StreamEnded  # ← جایگزین StreamAudioEnded
+
 vc = PyTgCalls(client)
 
 # دیکشنری برای نگه داشتن وضعیت موزیک در هر گروه
@@ -324,7 +325,7 @@ async def stop_music(event):
 # وقتی موزیک تموم شد
 @vc.on_stream_end()
 async def on_stream_end(update: Update):
-    if isinstance(update, StreamAudioEnded):
+    if isinstance(update, StreamEnded):  # ← تغییر این خط
         chat_id = update.chat_id
         if chat_id in vc_playing:
             await client.send_message(chat_id, "✅ پخش موزیک تمام شد!")
