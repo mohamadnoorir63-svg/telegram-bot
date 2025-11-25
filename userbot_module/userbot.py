@@ -277,9 +277,8 @@ async def handle_commands(event):
         # ======================= پاکسازی اعضای ریمو شده =======================
 # ======================= پخش موزیک داخل Voice Chat =======================
 from pytgcalls import PyTgCalls, idle
-from pytgcalls.types.stream import StreamAudioEnded
 from pytgcalls.types import Update
-
+from pytgcalls.types.events import StreamEnded  # ← این خط را اضافه کن
 vc = PyTgCalls(client)
 
 # دیکشنری برای نگه داشتن وضعیت موزیک در هر گروه
