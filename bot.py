@@ -186,51 +186,53 @@ status = {
 
 
 # ======================= 💬 ریپلی مود گروهی و محدود به مدیران =======================
+import os
+import json
+from telegram import Update
+from telegram.ext import ContextTypes
+
+# مسیر فایل ریپلی مود
 REPLY_FILE = "reply_status.json"
 
+# ======================= مدیریت فایل ریپلی مود =======================
 def load_reply_status():
     """خواندن وضعیت ریپلی مود برای تمام گروه‌ها"""
     if os.path.exists(REPLY_FILE):
         try:
             with open(REPLY_FILE, "r", encoding="utf-8") as f:
                 return json.load(f)
-        except:
-            pass
+        except Exception as e:
+            print(f"⚠️ خطا در بارگذاری reply_status.json: {e}")
     return {}  # ساختار داده: { "group_id": {"enabled": True/False} }
 
 def save_reply_status(data):
     """ذخیره وضعیت ریپلی مود برای همه گروه‌ها"""
-    with open(REPLY_FILE, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
+    try:
+        with open(REPLY_FILE, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        print(f"⚠️ خطا در ذخیره reply_status.json: {e}")
 
 reply_status = load_reply_status()
 
 # ======================= توابع کمکی ایمن =======================
 def get_message(update: Update):
     """پیام واقعی رو از انواع آپدیت‌ها بگیره یا None برگردونه"""
-    if hasattr(update, "message") and update.message:
-        return update.message
-    if hasattr(update, "edited_message") and update.edited_message:
-        return update.edited_message
-    return None
+    return getattr(update, "message", None) or getattr(update, "edited_message", None)
 
 def get_chat(update: Update):
     """چت واقعی رو برگردونه یا None"""
     msg = get_message(update)
-    if msg and msg.chat:
+    if msg and getattr(msg, "chat", None):
         return msg.chat
-    if hasattr(update, "effective_chat"):
-        return update.effective_chat
-    return None
+    return getattr(update, "effective_chat", None)
 
 def get_user(update: Update):
     """کاربر واقعی رو برگردونه یا None"""
     msg = get_message(update)
-    if msg and msg.from_user:
+    if msg and getattr(msg, "from_user", None):
         return msg.from_user
-    if hasattr(update, "effective_user"):
-        return update.effective_user
-    return None
+    return getattr(update, "effective_user", None)
 
 async def safe_reply(update: Update, context: ContextTypes.DEFAULT_TYPE, text: str, reply_to: bool = True):
     """
@@ -238,11 +240,11 @@ async def safe_reply(update: Update, context: ContextTypes.DEFAULT_TYPE, text: s
     """
     msg = get_message(update)
     chat = get_chat(update)
-    if not msg or not chat:
-        print("⚠️ پیام یا چت موجود نیست، ارسال رد شد.")
+    if not chat:
+        print("⚠️ چت موجود نیست، ارسال رد شد.")
         return
 
-    reply_id = msg.message_id if reply_to else None
+    reply_id = msg.message_id if (reply_to and msg) else None
     try:
         await context.bot.send_message(
             chat_id=chat.id,
@@ -253,6 +255,10 @@ async def safe_reply(update: Update, context: ContextTypes.DEFAULT_TYPE, text: s
     except Exception as e:
         print(f"⚠️ خطا در ارسال پیام: {e}")
 
+# ======================= بررسی فعال بودن ریپلی مود =======================
+def is_group_reply_enabled(chat_id):
+    """بررسی فعال بودن ریپلی مود در گروه خاص"""
+    return reply_status.get(str(chat_id), {}).get("enabled", False)
 # ======================= بررسی وضعیت ریپلی مود =======================
 def is_group_reply_enabled(chat_id):
     """بررسی فعال بودن ریپلی مود در گروه خاص"""
@@ -954,9 +960,6 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if lower_text not in ["جوک", "فال", "ربات", "یادبگیر"]:
             return
 
-    # ======================= پاسخ هوش مصنوعی =======================
-    reply_text = smart_response(text, uid)
-    await safe_reply(update, context, reply_text)
         
     # ✅ درصد هوش منطقی
     if text.lower() == "درصد هوش":
