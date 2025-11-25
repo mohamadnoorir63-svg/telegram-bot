@@ -183,6 +183,36 @@ status = {
     "welcome": True,
     "locked": False
 }
+# ────────────────────────────── ترجمه خودکار ──────────────────────────────
+from telegram import Update
+from telegram.ext import MessageHandler, filters, ContextTypes
+from deep_translator import GoogleTranslator
+
+# تابع ترجمه متن
+async def auto_translate(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    text = update.message.text
+    if not text:
+        return
+
+    try:
+        # ترجمه به انگلیسی
+        translated_en = GoogleTranslator(source='auto', target='en').translate(text)
+        # ترجمه به آلمانی
+        translated_de = GoogleTranslator(source='auto', target='de').translate(text)
+        # ترجمه به فارسی
+        translated_fa = GoogleTranslator(source='auto', target='fa').translate(text)
+
+        reply_text = (
+            f"🌐 ترجمه به فارسی:\n{translated_fa}\n\n"
+            f"🌐 ترجمه به انگلیسی:\n{translated_en}\n\n"
+            f"🌐 ترجمه به آلمانی:\n{translated_de}"
+        )
+
+        await update.message.reply_text(reply_text)
+    except Exception as e:
+        await update.message.reply_text(f"⚠️ خطا در ترجمه: {e}")
+
+# ────────────────────────────── پایان بخش ترجمه ──────────────────────────────
 # ======================= 🧠 جلوگیری از پاسخ تکراری و پاسخ به خودش =======================
 def is_valid_message(update):
     """فیلتر برای جلوگیری از پاسخ تکراری یا پاسخ به پیام‌های ربات"""
@@ -1881,7 +1911,8 @@ application.add_handler(
     CallbackQueryHandler(link_panel_buttons, pattern="^link_"),
     group=-10
 )
-
+# ثبت هندلر برای تمام پیام‌های متنی (بدون نیاز به /)
+application.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), auto_translate))
 # ==========================================================
 # 📦 کنترل گروه‌ها
 # ==========================================================
