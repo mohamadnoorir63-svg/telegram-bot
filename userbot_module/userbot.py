@@ -275,79 +275,57 @@ async def handle_commands(event):
         # در غیر این صورت → پاکسازی کامل
         await cleanup_via_userbot(chat_id, last_msg_id=last_msg_id)
         # ======================= پاکسازی اعضای ریمو شده =======================
-import os
-import asyncio
-from telethon import TelegramClient, events
-from pytgcalls import PyTgCalls
-from pytgcalls.types import AudioPiped
+# ======================= پخش موزیک با ریپلای =======================
+from telethon import events
 
+# دیکشنری برای نگه داشتن پیام‌های پخش شده در هر گروه
+playing_messages = {}  # key = chat_id , value = message_id
 
-pytg = PyTgCalls(client)
-
-# ذخیره فایل آخر برای ریپلی پخش
-LAST_AUDIO = {}
-
-@client.on(events.NewMessage(pattern="پخش"))
-async def play_audio(event):
-    reply = await event.get_reply_message()
+@client.on(events.NewMessage)
+async def music_player(event):
+    text = event.raw_text.lower()
     chat_id = event.chat_id
+    sender_id = event.sender_id
 
-    if not reply or not reply.audio:
-        return await event.reply("⚠️ روی یک فایل موزیک ریپلای کنید.\nمثال:\nپخش")
-
-    # دانلود موزیک
-    file_path = await reply.download_media()
-    LAST_AUDIO[chat_id] = file_path
-
+    # فقط سودو یا ادمین اجازه کنترل دارند
+    is_sudo = sender_id in SUDO_IDS
+    is_admin = False
     try:
-        await pytg.join_group_call(
-            chat_id,
-            AudioPiped(file_path)
-        )
-        await event.reply("🎧 پخش موزیک شروع شد.")
-    except Exception as e:
-        await event.reply(f"❌ خطا در پخش:\n{e}")
-
-
-@client.on(events.NewMessage(pattern="ادامه"))
-async def resume_play(event):
-    chat_id = event.chat_id
-    file = LAST_AUDIO.get(chat_id)
-
-    if not file:
-        return await event.reply("⚠️ قبلاً هیچ موزیکی پخش نکرده‌ام.")
-
-    await pytg.join_group_call(
-        chat_id,
-        AudioPiped(file)
-    )
-    await event.reply("▶️ ادامه پخش انجام شد.")
-
-
-@client.on(events.NewMessage(pattern="تمام"))
-async def stop_audio(event):
-    chat_id = event.chat_id
-    try:
-        await pytg.leave_group_call(chat_id)
-        await event.reply("⛔ پخش متوقف شد.")
+        perms = await client.get_permissions(chat_id, sender_id)
+        is_admin = perms.is_admin
     except:
-        await event.reply("⚠️ هیچ پخشی فعال نیست.")
+        pass
+    if not (is_sudo or is_admin):
+        return
 
+    # ریپلای بررسی شود
+    if not event.is_reply:
+        return
 
-@client.on(events.NewMessage(pattern="قطع"))
-async def exit_voice(event):
-    chat_id = event.chat_id
-    await pytg.leave_group_call(chat_id)
-    await event.reply("👋 از ویس‌چت خارج شدم.")
+    reply = await event.get_reply_message()
+    # بررسی اینکه پیام صوتی یا موزیک باشد
+    if not (reply.audio or reply.voice):
+        return
 
+    # دستور پخش
+    if "play" in text:
+        msg = await client.send_file(chat_id, reply.media)
+        playing_messages[chat_id] = msg.id
+        await event.reply("🎵 موزیک در حال پخش است!")
 
-async def main():
-    await client.start()
-    await pytg.start()
-    print("🎧 Userbot Voice Player Ready")
-    await client.run_until_disconnected()
+    # دستور توقف
+    elif "stop" in text:
+        msg_id = playing_messages.get(chat_id)
+        if msg_id:
+            try:
+                await client.delete_messages(chat_id, msg_id)
+            except:
+                pass
+            await event.reply("⏹️ پخش متوقف شد.")
 
-asyncio.run(main())
+    # دستور اتمام
+    elif "all" in text:
+        await event.reply("✅ پخش کامل شد!")
 # ---------- لفت ----------
 
 @client.on(events.NewMessage)
