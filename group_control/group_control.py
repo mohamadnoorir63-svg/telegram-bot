@@ -495,8 +495,9 @@ async def show_lock_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
         text += f"{fa}: {status}\n"
 
     await update.message.reply_text(text)
+    
     async def my_chat_member_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    status = update.my_chat_member.new_chat_member.status
+        status = update.my_chat_member.new_chat_member.status
     if status in ("administrator", "member"):  # وقتی ربات عضو گروه شد
         await on_bot_added(update, context)
 # ─────────────────────────────── هندلر مرکزی گروه ───────────────────────────────
