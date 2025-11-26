@@ -520,14 +520,6 @@ async def handle_group_message(update: Update, context: ContextTypes.DEFAULT_TYP
     # ───────────── بررسی دستورات قفل / باز کردن محتوا ─────────────
     if text.startswith("قفل ") or text.startswith("باز کردن ") or text.startswith("بازکردن "):
         return await handle_lock_commands(update, context)
-        
-        def register_punishment_handlers(application, group_number: int = 12):
-            application.add_handler(
-        MessageHandler(
-            filters.TEXT & ~filters.COMMAND & filters.ChatType.GROUPS,
-            handle_punishments,
-        ),
-        group=group_number,
-    )
 
-    
+    # ───────────── در نهایت بررسی پیام‌ها مطابق قفل‌ها ─────────────
+    await check_message_locks(update, context)
