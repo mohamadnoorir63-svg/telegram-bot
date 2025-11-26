@@ -1189,7 +1189,6 @@ application.add_handler(
 # 🔹 دستورات اصلی سیستم
 # ==========================================================
 application.add_handler(CommandHandler("start", start))
-application.add_handler(CommandHandler("welcome", toggle_welcome))
 
 # 🎮 پنل اصلی و دکمه‌ها
 application.add_handler(
