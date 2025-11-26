@@ -153,14 +153,9 @@ def save_sudos(data):
         json.dump(data, f, ensure_ascii=False, indent=2)
 
 SUDO_IDS = load_sudos()
-init_files()
 
-status = {
-    "active": True,
-    "learning": True,
-    "welcome": True,
-    "locked": False
-}
+
+
 # ────────────────────────────── ترجمه با رپلی ──────────────────────────────
 async def translate_reply_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message.reply_to_message:
