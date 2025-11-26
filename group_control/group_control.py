@@ -495,6 +495,10 @@ async def show_lock_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
         text += f"{fa}: {status}\n"
 
     await update.message.reply_text(text)
+    async def my_chat_member_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    status = update.my_chat_member.new_chat_member.status
+    if status in ("administrator", "member"):  # وقتی ربات عضو گروه شد
+        await on_bot_added(update, context)
 # ─────────────────────────────── هندلر مرکزی گروه ───────────────────────────────
 async def handle_group_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message:
@@ -522,3 +526,65 @@ async def handle_group_message(update: Update, context: ContextTypes.DEFAULT_TYP
 
     # ───────────── در نهایت بررسی پیام‌ها مطابق قفل‌ها ─────────────
     await check_message_locks(update, context)
+    from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
+from telegram.ext import ContextTypes
+
+# لیست قفل‌های پیشفرض هنگام نصب
+DEFAULT_LOCKS = [
+    "links",
+    "files",
+    "bots",
+    "join",
+    "invite_links",
+    "inline_bots",
+    "text",  # دستورات عمومی
+]
+
+async def on_bot_added(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """وقتی ربات به گروه اضافه شد"""
+    chat = update.effective_chat
+
+    # فعال کردن قفل‌های پیشفرض
+    for lock_key in DEFAULT_LOCKS:
+        _set_lock(chat.id, lock_key, True)
+
+    # شناسایی مالک گروه
+    owner = None
+    admins_list = []
+    try:
+        admins = await context.bot.get_chat_administrators(chat.id)
+        for admin in admins:
+            if admin.status == "creator":
+                owner = admin.user
+            else:
+                admins_list.append(admin.user)
+    except Exception as e:
+        print(f"[⚠️] خطا در دریافت مدیران: {e}")
+
+    owner_name = owner.first_name if owner else "ناشناخته"
+    admins_names = "▸ " + "▸ ".join([a.first_name for a in admins_list]) if admins_list else "هیچ‌کدام"
+
+    # متن پیام خوش‌آمدگویی
+    text = (
+        f"🔰 ربات با موفقیت در گروه نصب شد\n"
+        f"✚ مالک گروه:▸ {owner_name}\n"
+        f"✚ ادمین های گروه: {admins_names}\n"
+        "🛠 بطور پیشفرض قفل های زیر در گروه شما فعال شد:\n"
+        "✅ قفل لینک فعال\n"
+        "✅ قفل فایل فعال\n"
+        "✅ قفل سرویس تلگرام فعال\n"
+        "✅ قفل ورود ربات فعال\n"
+        "✅ قفل اد کننده ربات فعال\n"
+        "✅ قفل تبچی فعال\n"
+        "✅ قفل دستورات عمومی فعال\n"
+        "✅ خوش‌ آمدگویی فعال\n"
+        "📚 برای مشاهده راهنما از دستور راهنما استفاده نمایید\n"
+        "⚙️ درصورت وجود هرگونه مشکل به گروه پشتیبانی مراجعه کنید:"
+    )
+
+    # دکمه شیشه‌ای پشتیبانی
+    keyboard = InlineKeyboardMarkup(
+        [[InlineKeyboardButton("📞 پشتیبانی", url="https://t.me/Dorehaniy")]]
+    )
+
+    await context.bot.send_message(chat.id, text=text, reply_markup=keyboard)
