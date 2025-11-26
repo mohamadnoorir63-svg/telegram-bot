@@ -1,6 +1,8 @@
 """
 tagger.py
 نسخه‌ی کامل، نهایی، سریع و حرفه‌ای — همراه با یوزربات + fallback
+تغییرات: اصلاح ساختار، رفع خطای `await outside function`، safe_send ضدفلود،
+و fallback امن برای زمانی که یوزربات در دسترس نیست.
 """
 
 import os
@@ -16,6 +18,7 @@ from telegram.ext import (
     CallbackQueryHandler,
     filters,
 )
+from telegram.error import RetryAfter, TimedOut, TelegramError
 
 # ===================== تنظیمات =====================
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -100,50 +103,75 @@ async def record_new_member(update: Update, context):
     _save_data(data)
 
 
-# ===================== گرفتن همه اعضا (یوزربات + fallback) =====================
+# ===================== گرفتن همه اعضا (یوزربات + fallback امن) =====================
 async def get_all_members(chat, context):
+    """
+    تلاش می‌کند اول با یوزربات همه اعضا را بگیرد.
+    اگر یوزربات نباشد یا خطا رخ دهد، برای جلوگیری از
+    درخواست‌های سنگین و فلود، fallback امن را اجرا می‌کند:
+      - لیست ادمین‌ها برگردانده می‌شود (اگر لازم است می‌توان این بخش را تغییر داد)
+    توضیح: ربات‌های تلگرام API عمومی برای گرفتن لیست کامل اعضا ندارند
+    (بجز استفاده از userbot / client طرف سوم). بنابراین fallback محدودتر است.
+    """
     # ------------------ 1) یوزربات ------------------
     if userbot_client:
         try:
+            # برخی یوزربات‌ها متد get_participants دارند؛ در برخی نام متفاوت است.
             members = await userbot_client.get_participants(chat.id)
             if members:
-                return [m for m in members if not getattr(m, "bot", False)]
-        except:
+                # تبدیل به آبجکت‌هایی که حداقل .id و .first_name دارند
+                result = [m for m in members if not getattr(m, "bot", False)]
+                return result
+        except Exception:
+            # اگر یوزربات خطا داد، به fallback ادامه بده
             pass
 
-    # ------------------ 2) fallback: ربات اصلی ------------------
+    # ------------------ 2) fallback: امن (فقط ادمین‌ها) ------------------
+    # چرا؟ به‌خاطر اینکه پیمایش count بزرگ باعث ارسال تعداد زیادی درخواست و فلود می‌شود.
     members = []
     try:
-        count = await context.bot.get_chat_member_count(chat.id)
-        for user_id in range(count):
-            try:
-                member = await context.bot.get_chat_member(chat.id, user_id)
-                if member and not member.user.is_bot:
-                    members.append(member.user)
-            except:
-                continue
-    except:
+        admins = await context.bot.get_chat_administrators(chat.id)
+        for a in admins:
+            if a.user and not a.user.is_bot:
+                members.append(a.user)
+    except Exception:
+        # اگر باز هم خطا شد، لیست خالی برگردان
         return []
 
     return members
 
-from telegram.error import RetryAfter, TimedOut
 
+# ===================== safe_send ضدفلود =====================
 async def safe_send(context, chat_id, text):
+    """
+    ارسال امن پیام: اگر تلگرام خطای RetryAfter داد، طبق مقادیر گفته شده
+    صبر می‌کند و دوباره تلاش می‌کند. اگر Timeout یا خطای غیرمنتظره رخ داد،
+    چند ثانیه صبر می‌کند و دوباره سعی می‌کند. در نهایت اگر Markdown باعث
+    خطا شد، بدون parse_mode ارسال می‌کند.
+    """
     while True:
         try:
             return await context.bot.send_message(chat_id, text, parse_mode="Markdown")
         except RetryAfter as e:
-            # صبر به اندازه‌ای که تلگرام گفته
-            await asyncio.sleep(e.retry_after + 1)
+            # تلگرام عدد retry_after به ثانیه می‌دهد
+            wait = (getattr(e, "retry_after", None) or 1)
+            try:
+                # عدد را عددی فرض کن و صبر کن
+                await asyncio.sleep(float(wait) + 1)
+            except Exception:
+                await asyncio.sleep(2)
         except TimedOut:
             await asyncio.sleep(2)
-        except Exception:
-            # اگر Markdown خطا داد، بدون فرمت بفرست
+        except TelegramError as e:
+            # اگر خطای مرتبط با parse_mode یا متن باشه، تلاش کن بدون Markdown
             try:
                 return await context.bot.send_message(chat_id, text)
-            except:
-                await asyncio.sleep(1)
+            except Exception:
+                # اگر باز هم خطا داد، کمی صبر کن و retry کن
+                await asyncio.sleep(2)
+        except Exception:
+            # هر خطای دیگر -> کمی صبر و retry
+            await asyncio.sleep(1)
 
 
 # ===================== ساخت پنل =====================
@@ -179,8 +207,12 @@ async def open_tag_panel(update: Update, context):
 
 # ===================== ساخت متن تگ =====================
 def build_mention_text(items: List[str]) -> List[str]:
+    """
+    items: لیستی از رشته‌های اشاره‌شده (مثلاً '...[name](tg://user?id=...)')
+    خروجی: لیستی از پاراگراف‌ها که هر کدام حداکثر chunk عضو دارند.
+    """
     result = []
-    chunk = 20
+    chunk = 20  # هر پیام چند اشاره قرار بگیرد — می‌توان این را پایین‌تر برد اگر باز هم فلود شد
     for i in range(0, len(items), chunk):
         result.append("     ".join(items[i:i+chunk]))
     return result
@@ -204,14 +236,27 @@ async def handle_tag_panel_click(update: Update, context):
 
     # ------------------ بستن ------------------
     if q.data == "tg_close":
-        await q.message.delete()
+        try:
+            await q.message.delete()
+        except:
+            pass
         return
 
     try:
         # ------------------ همه اعضا ------------------
         if q.data == "tg_all":
             members = await get_all_members(chat, context)
-            mentions = [f"𓃬ꪰ #[{m.first_name}](tg://user?id={m.id})" for m in members]
+            # members ممکن است آبجکت user-like یا آبجکت‌های یوزربات باشند
+            mentions = []
+            for m in members:
+                try:
+                    uid = getattr(m, "id", None) or getattr(m, "user_id", None)
+                    fname = getattr(m, "first_name", None) or getattr(m, "username", None) or "کاربر"
+                    if not uid:
+                        continue
+                    mentions.append(f"𓃬ꪰ #[{fname}](tg://user?id={uid})")
+                except:
+                    continue
 
         # ------------------ ادمین‌ها ------------------
         elif q.data in ("tg_admin_active", "tg_admin_inactive"):
@@ -232,14 +277,22 @@ async def handle_tag_panel_click(update: Update, context):
                 if q.data == "tg_admin_inactive" and not active:
                     mentions.append(f"𓃬ꪰ #[{a.user.first_name}](tg://user?id={a.user.id})")
 
-        # ------------------ همه کاربران ------------------
+        # ------------------ همه کاربران (غیر ادمین) ------------------
         elif q.data == "tg_users_all":
             members = await get_all_members(chat, context)
             admin_ids = [a.user.id for a in await context.bot.get_chat_administrators(chat.id)]
-            mentions = [
-                f"𓃬ꪰ #[{m.first_name}](tg://user?id={m.id})"
-                for m in members if m.id not in admin_ids
-            ]
+            mentions = []
+            for m in members:
+                try:
+                    uid = getattr(m, "id", None) or getattr(m, "user_id", None)
+                    fname = getattr(m, "first_name", None) or getattr(m, "username", None) or "کاربر"
+                    if not uid:
+                        continue
+                    if uid in admin_ids:
+                        continue
+                    mentions.append(f"𓃬ꪰ #[{fname}](tg://user?id={uid})")
+                except:
+                    continue
 
         # ------------------ کاربران فعال/غیرفعال ------------------
         elif q.data in ("tg_users_active", "tg_users_inactive"):
@@ -247,13 +300,16 @@ async def handle_tag_panel_click(update: Update, context):
             act = data.get("activity", {}).get(key, {})
 
             for uid, ts in act.items():
-                active = datetime.utcfromtimestamp(ts) > cutoff
+                try:
+                    active = datetime.utcfromtimestamp(ts) > cutoff
 
-                if q.data == "tg_users_active" and active:
-                    mentions.append(f"𓃬ꪰ #[کاربر](tg://user?id={uid})")
+                    if q.data == "tg_users_active" and active:
+                        mentions.append(f"𓃬ꪰ #[کاربر](tg://user?id={uid})")
 
-                if q.data == "tg_users_inactive" and not active:
-                    mentions.append(f"𓃬ꪰ #[کاربر](tg://user?id={uid})")
+                    if q.data == "tg_users_inactive" and not active:
+                        mentions.append(f"𓃬ꪰ #[کاربر](tg://user?id={uid})")
+                except:
+                    continue
 
         # ------------------ کاربران جدید ------------------
         elif q.data == "tg_new":
@@ -261,8 +317,11 @@ async def handle_tag_panel_click(update: Update, context):
             joined = data.get("joined", {}).get(key, {})
 
             for uid, ts in joined.items():
-                if datetime.utcfromtimestamp(ts) > cutoff:
-                    mentions.append(f"𓃬ꪰ #[کاربر جدید](tg://user?id={uid})")
+                try:
+                    if datetime.utcfromtimestamp(ts) > cutoff:
+                        mentions.append(f"𓃬ꪰ #[کاربر جدید](tg://user?id={uid})")
+                except:
+                    continue
 
         # ------------------ لیست سفارشی ------------------
         elif q.data == "tg_custom":
@@ -274,10 +333,14 @@ async def handle_tag_panel_click(update: Update, context):
             if u and not u.is_bot:
                 mentions.append(f"𓃬ꪰ #[{u.first_name}](tg://user?id={u.id})")
 
-    except:
-        await q.message.edit_text("⚠️ خطا در پردازش!")
-        await asyncio.sleep(1)
-        await q.message.delete()
+    except Exception:
+        # در صورت هر خطا، پیامی به کاربر بده و پنل را حذف کن
+        try:
+            await q.message.edit_text("⚠️ خطا در پردازش!")
+            await asyncio.sleep(1)
+            await q.message.delete()
+        except:
+            pass
         return
 
     # ------------------ بستن پنل ------------------
@@ -287,14 +350,17 @@ async def handle_tag_panel_click(update: Update, context):
         pass
 
     # ------------------ ارسال تگ‌ها ------------------
-    # ------------------ ارسال تگ‌ها ------------------
-if mentions:
-    parts = build_mention_text(mentions)
-    for p in parts:
-        await safe_send(context, chat.id, p)
-        await asyncio.sleep(1.2)   # ضد فلود واقعی
-else:
-    await safe_send(context, chat.id, "⚠️ هیچ کاربری پیدا نشد.")
+    # این بخش حتماً داخل تابع (همینجا) قرار دارد تا از خطای await outside function جلوگیری شود
+    if mentions:
+        parts = build_mention_text(mentions)
+        # اگر تعداد پارتی‌ها خیلی زیاد است، بهتر است chunk را کوچکتر بگیریم
+        for p in parts:
+            await safe_send(context, chat.id, p)
+            # این تأخیر نقش ضدفلود را دارد؛ می‌توانید آن را بر حسب تجربه کاهش/افزایش دهید
+            await asyncio.sleep(1.2)
+    else:
+        await safe_send(context, chat.id, "⚠️ هیچ کاربری پیدا نشد.")
+
 
 # ===================== ثبت هندلرها =====================
 def register_tag_handlers(application, group_number: int = 14):
