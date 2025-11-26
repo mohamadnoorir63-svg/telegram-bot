@@ -14,26 +14,9 @@ from telegram.ext import (
     filters,
     CallbackQueryHandler
 )
-import aiofiles
 
-# 📦 ماژول‌ها
 
-from memory_manager import (
-    init_files,
-    load_data,
-    save_data,
-    learn,
-    long_learn,
-    shadow_learn,
-    get_reply,
-    set_mode,
-    get_stats,
-    enhance_sentence,
-    generate_sentence,
-    list_phrases,
-    delete_phrase,
-    delete_response   # ← این خط اضافه شد
-)
+
 from welcome_module import (
     open_welcome_panel,
     welcome_panel_buttons,
@@ -43,9 +26,7 @@ from welcome_module import (
 from jokes_manager import save_joke, delete_joke, list_jokes, send_random_joke
 from fortune_manager import save_fortune, list_fortunes, send_random_fortune, delete_fortune
 from group_manager import register_group_activity, get_group_stats
-from ai_learning import auto_learn_from_text
 from smart_reply import detect_emotion, smart_response
-from emotion_memory import init_emotion_memory, remember_emotion, get_last_emotion, emotion_context_reply
 from auto_brain.auto_brain import start_auto_brain_loop
 from selective_backup import selective_backup_menu, selective_backup_buttons
 from auto_brain import auto_backup
@@ -211,118 +192,7 @@ async def translate_reply_handler(update: Update, context: ContextTypes.DEFAULT_
     except Exception as e:
         await update.message.reply_text(f"⚠️ خطا در ترجمه: {e}")
 
-# ────────────────────────────── پایان بخش ترجمه رپلی ──────────────────────────────
-# ======================= 🧠 جلوگیری از پاسخ تکراری و پاسخ به خودش =======================
-def is_valid_message(update):
-    """فیلتر برای جلوگیری از پاسخ تکراری یا پاسخ به پیام‌های ربات"""
-    msg = update.effective_message
-    if not msg:
-        return False
 
-    # جلوگیری از پاسخ به خودش (پیام ربات)
-    if msg.from_user and msg.from_user.is_bot:
-        return False
-        # 🚫 جلوگیری از پاسخ سخنگو به پیام‌های دستوری
-
-        
-    text = msg.text or msg.caption or ""
-    if not text.strip():
-        return False
-
-    # حافظه کوتاه برای جلوگیری از تکرار
-    global LAST_MESSAGES
-    if "LAST_MESSAGES" not in globals():
-        LAST_MESSAGES = {}
-
-    user_id = msg.from_user.id if msg.from_user else None
-    last_msg = LAST_MESSAGES.get(user_id)
-
-    if last_msg == text:
-        return False  # پیام تکراری → پاسخ نده
-
-    LAST_MESSAGES[user_id] = text
-    return True
-# ======================= 💬 ریپلی مود گروهی و محدود به مدیران =======================
-REPLY_FILE = "reply_status.json"
-
-def load_reply_status():
-    """خواندن وضعیت ریپلی مود برای تمام گروه‌ها"""
-    import json, os
-    if os.path.exists(REPLY_FILE):
-        try:
-            with open(REPLY_FILE, "r", encoding="utf-8") as f:
-                return json.load(f)
-        except:
-            pass
-    return {}  # ساختار داده: { "group_id": {"enabled": True/False} }
-
-
-def save_reply_status(data):
-    """ذخیره وضعیت ریپلی مود برای همه گروه‌ها"""
-    import json
-    with open(REPLY_FILE, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
-
-
-reply_status = load_reply_status()
-
-
-def is_group_reply_enabled(chat_id):
-    """بررسی فعال بودن ریپلی مود در گروه خاص"""
-    return reply_status.get(str(chat_id), {}).get("enabled", False)
-
-
-async def toggle_reply_mode(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """تغییر وضعیت ریپلی مود — فقط مدیران گروه یا ادمین اصلی مجازند"""
-    chat = update.effective_chat
-    user = update.effective_user
-
-    # فقط در گروه قابل استفاده است
-    if chat.type not in ["group", "supergroup"]:
-        return await update.message.reply_text("⚠️ این دستور فقط داخل گروه کار می‌کند!")
-
-    # بررسی ادمین اصلی یا مدیر گروه بودن
-    is_main_admin = (user.id == ADMIN_ID)
-    is_group_admin = False
-
-    try:
-        member = await context.bot.get_chat_member(chat.id, user.id)
-        if member.status in ["creator", "administrator"]:
-            is_group_admin = True
-    except:
-        pass
-
-    if not (is_main_admin or is_group_admin):
-        return await update.message.reply_text("⛔ فقط مدیران گروه یا ادمین اصلی می‌توانند این تنظیم را تغییر دهند!")
-
-    # تغییر وضعیت مخصوص همان گروه
-    group_id = str(chat.id)
-    current = reply_status.get(group_id, {}).get("enabled", False)
-    reply_status[group_id] = {"enabled": not current}
-    save_reply_status(reply_status)
-
-    if reply_status[group_id]["enabled"]:
-        await update.message.reply_text("💬 ریپلی مود در این گروه فعال شد!\nفقط با ریپلای به پیام‌های من چت کنید 😄")
-    else:
-        await update.message.reply_text("🗨️ ریپلی مود در این گروه غیرفعال شد!\nالان به همه پیام‌ها جواب می‌دهم 😎")
-
-
-# ======================= 🧠 بررسی حالت ریپلی مود گروهی =======================
-async def handle_group_reply_mode(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """اگر ریپلی مود فعال باشد، فقط در صورت ریپلای به ربات پاسخ بده"""
-    if update.effective_chat.type in ["group", "supergroup"]:
-        chat_id = update.effective_chat.id
-        if is_group_reply_enabled(chat_id):
-            text = update.message.text.strip()
-
-            # واکنش به درخواست حضور
-            if text.lower() in ["ربات کجایی", " پینگ ؟", "کجایی ربات"]:
-                return await update.message.reply_text("😄 من اینجام! فقط روی پیام‌هام ریپلای کن 💬")
-
-            # اگر پیام ریپلای به خود ربات نبود، پاسخی نده
-            if not update.message.reply_to_message or update.message.reply_to_message.from_user.id != context.bot.id:
-                return True  # یعنی بقیه تابع reply اجرا نشود
-    return False
 # ======================= 🧾 ثبت کاربر =======================
 import json
 import os
@@ -456,111 +326,66 @@ async def sudo_bot_call(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # 🎲 انتخاب تصادفی پاسخ
     reply = random.choice(replies)
     await update.message.reply_text(reply)
-# ======================= 🎭 تغییر مود =======================
-async def mode_change(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not context.args:
-        return await update.message.reply_text("🎭 استفاده: /mode شوخ / بی‌ادب / غمگین / نرمال")
-
-    mood = context.args[0].lower()
-    if mood in ["شوخ", "بی‌ادب", "غمگین", "نرمال"]:
-        set_mode(mood)
-        await update.message.reply_text(f"🎭 مود به {mood} تغییر کرد 😎")
-    else:
-        await update.message.reply_text("❌ مود نامعتبر است!")
-
-# ======================= ⚙️ کنترل وضعیت =======================
-# حافظه وضعیت گروه‌ها
-GROUP_STATUS = {}  # chat_id: {"active": True, "welcome": True, "locked": False}
-
-# تابع کمکی برای گرفتن یا ساخت وضعیت گروه
-def get_group_status(chat_id: int):
-    if chat_id not in GROUP_STATUS:
-        # پیش‌فرض سخنگو خاموش، بقیه روشن
-        GROUP_STATUS[chat_id] = {"active": False, "welcome": True, "locked": True}
-    return GROUP_STATUS[chat_id]
-
-# ────────────── خاموش/روشن سخنگو برای هر گروه ──────────────
-async def mute_speaker(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """خاموش کردن سخنگو فقط برای این گروه"""
-    chat_id = update.effective_chat.id
-    status = get_group_status(chat_id)
-    status["active"] = False
-    await update.message.reply_text(
-        "😴 سخنگو خاموش شد!\n(جوک و فال همچنان فعال هستند)"
-    )
-
-async def unmute_speaker(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """روشن کردن سخنگو فقط برای این گروه"""
-    chat_id = update.effective_chat.id
-    status = get_group_status(chat_id)
-    status["active"] = True
-    await update.message.reply_text(
-        "✅ سخنگو روشن شد!\n(همه پیام‌ها پاسخ داده می‌شوند)"
-    )
-
-async def toggle_welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """فعال/غیرفعال کردن خوشامد فقط برای این گروه"""
-    chat_id = update.effective_chat.id
-    status = get_group_status(chat_id)
-    status["welcome"] = not status["welcome"]
-    await update.message.reply_text(
-        "👋 خوشامد فعال شد!" if status["welcome"] else "🚫 خوشامد غیرفعال شد!"
-    )
-
-async def lock_learning(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """قفل یادگیری فقط برای این گروه"""
-    chat_id = update.effective_chat.id
-    status = get_group_status(chat_id)
-    status["locked"] = True
-    await update.message.reply_text("🔒 یادگیری قفل شد!")
-
-async def unlock_learning(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """باز کردن یادگیری فقط برای این گروه"""
-    chat_id = update.effective_chat.id
-    status = get_group_status(chat_id)
-    status["locked"] = False
-    await update.message.reply_text("🔓 یادگیری باز شد!")
-    
 # ======================= 📊 آمار ربات واقعی =======================
 async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """نمایش آمار کلی — فقط برای مدیر اصلی یا سودوها"""
+    """نمایش آمار ساده (کاربران + گروه‌ها) — فقط برای سودو"""
+
     ADMIN_ID = int(os.getenv("ADMIN_ID", "8588347189"))
     user = update.effective_user
     user_id = user.id
 
-    # ✅ فقط مدیر اصلی یا سودوها مجازند
+    # فقط مدیر اصلی یا سودو
     if user_id != ADMIN_ID and user_id not in SUDO_IDS:
         return await update.message.reply_text("⛔ فقط مدیر اصلی یا سودوها اجازه مشاهده آمار را دارند.")
 
-    # 🧠 دریافت اطلاعات از حافظه و فایل گروه‌ها
-    data = get_stats()
-    groups_data = load_data("group_data.json").get("groups", [])
+    # =========================
+    # خواندن گروه‌ها
+    # =========================
+    groups_count = 0
+    if os.path.exists("group_data.json"):
+        try:
+            import json
+            with open("group_data.json", "r", encoding="utf-8") as f:
+                groups_file = json.load(f)
 
-    # ✅ شمارش گروه‌ها (سازگار با دیکشنری یا لیست)
-    groups = len(groups_data) if isinstance(groups_data, (dict, list)) else 0
+            groups = groups_file.get("groups", [])
 
-    # ✅ شمارش کاربران از users.json
-    users_list = []
+            # ممکن است لیست یا دیکشنری باشد
+            if isinstance(groups, list):
+                groups_count = len(groups)
+            elif isinstance(groups, dict):
+                groups_count = len(groups.keys())
+
+        except:
+            groups_count = 0
+
+    # =========================
+    # خواندن کاربران
+    # =========================
+    users_count = 0
     if os.path.exists("users.json"):
         try:
             import json
             with open("users.json", "r", encoding="utf-8") as f:
                 users_list = json.load(f)
+
+            if isinstance(users_list, list):
+                users_count = len(users_list)
+            elif isinstance(users_list, dict):
+                users_count = len(users_list.keys())
+
         except:
-            users_list = []
+            users_count = 0
 
-    users = len(users_list)
-
-    # ✅ ساخت پیام نهایی
+    # =========================
+    # پیام نهایی
+    # =========================
     msg = (
-        f"📊 <b> آمار کلی ربات:</b>\n\n"
-        f"👤 کاربران واقعی: <b>{users}</b>\n"
-        f"👥 گروه‌های فعال: <b>{groups}</b>\n"
-        f"🧩 جملات ذخیره‌شده: <b>{data['phrases']}</b>\n"
-        f"💬 پاسخ‌های یادگرفته: <b>{data['responses']}</b>\n"
-        f"🎭 مود فعلی: <b>{data['mode']}</b>\n"
-        f"━━━━━━━━━━━━━━━\n"
-        f"📨 <i>درخواست توسط:</i> <b>{user.first_name}</b> (<code>{user_id}</code>)"
+        f"📊 <b>آمار کلی ربات</b>\n\n"
+        f"👥 گروه‌های فعال: <b>{groups_count}</b>\n"
+        f"👤 کاربران ثبت‌شده: <b>{users_count}</b>\n"
+        f"━━━━━━━━━━━━━━\n"
+        f"📨 درخواست توسط: <b>{user.first_name}</b> (<code>{user_id}</code>)"
     )
 
     await update.message.reply_text(msg, parse_mode="HTML")
@@ -839,341 +664,11 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """پاسخ‌دهی اصلی هوش مصنوعی و سیستم یادگیری"""
 
-    # 🚫 جلوگیری از پاسخ هوشمند در صورت اجرای دستور سفارشی
-    if context.user_data.get("custom_handled"):
-        context.user_data["custom_handled"] = False
-        return
-
-    # 🧩 اطمینان از اینکه پیام معتبره
-    if not update.message or not update.message.text:
-        return
-
-    uid = update.effective_user.id
-    chat_id = update.effective_chat.id
-    text = update.message.text.strip()
-    lower_text = text.lower()
-
-    # 🧠 گرفتن وضعیت گروه (قبل از هر استفاده)
-    status = get_group_status(chat_id)
-
-    # 🧠 ثبت پیام در حافظه کوتاه‌مدت
-    context_memory.add_message(uid, text)
 
     # 🧠 گرفتن کل تاریخچه اخیر کاربر
     recent_context = context_memory.get_context(uid)
     
-   # 🧩 ترکیب سه پیام آخر برای درک بهتر ادامه گفتگو
-    full_context = " ".join(recent_context[-3:]) if recent_context else text
 
-
-    # 🚫 جلوگیری از پاسخ در پیوی (فقط جوک و فال مجازند)
-    if update.effective_chat.type == "private" and lower_text not in ["جوک", "فال"]:
-        return
-
-    if re.search(r"(هوای|آب[\s‌]*و[\s‌]*هوا)", text):
-        return
-
-    # حافظه کوتاه برای جلوگیری از تکرار
-    global LAST_MESSAGES
-    if "LAST_MESSAGES" not in globals():
-        LAST_MESSAGES = {}
-
-    last_msg = LAST_MESSAGES.get(uid)
-    if last_msg == text:
-        return False  # پیام تکراری → پاسخ نده
-
-    # تابع کمکی برای بررسی پیام معتبر
-    def is_valid_message(update):
-        """فیلتر برای جلوگیری از پاسخ تکراری یا پاسخ به پیام‌های ربات"""
-        msg = update.effective_message
-        if not msg:
-            return False
-
-        # ✅ جلوگیری از پاسخ به دستورات خاص (مثل راهنما، خوشامد، ربات و غیره)
-        protected_words = [
-            "راهنما", "ثبت راهنما", "خوشامد", "ثبت خوشامد",
-            "save", "del", "panel", "backup", "cloudsync", "leave"
-        ]
-        if any(lower_text.startswith(word) for word in protected_words):
-            return False
-
-        return True
-
-    if not is_valid_message(update):
-        return
-
-    # 🧠 بررسی حالت ریپلی مود گروهی
-    if await handle_group_reply_mode(update, context):
-        return
-
-    # ثبت کاربر و گروه
-    await register_user(update.effective_user)
-    register_group_activity(chat_id, uid)
-
-    # یادگیری خودکار و شرایط فعال/غیر فعال
-    if not status["locked"]:
-        auto_learn_from_text(text)
-
-    # اگر سخنگو خاموش است → فقط پاسخ هوش مصنوعی غیرفعال شود
-    # دستورات (جوک، فال، یادبگیر، مدیریت،…) همچنان کار می‌کنند
-    if not status["active"]:
-        if lower_text not in ["جوک", "فال" ,"ربات" ,"یادبگیر"]:
-            return
-
-    # ادامه‌ی منطق پاسخ‌دهی هوش مصنوعی...
-        
-    # ✅ درصد هوش منطقی
-    if text.lower() == "درصد هوش":
-        score = 0
-        details = []
-
-        if os.path.exists("memory.json"):
-            data = load_data("memory.json")
-            phrases = len(data.get("phrases", {}))
-            responses = sum(len(v) for v in data.get("phrases", {}).values()) if phrases else 0
-
-            if phrases > 15 and responses > 25:
-                score += 30
-                details.append("🧠 حافظه فعال و گسترده ✅")
-            elif phrases > 5:
-                score += 20
-                details.append("🧩 حافظه محدود ولی کارا 🟢")
-            else:
-                score += 10
-                details.append("⚪ حافظه هنوز در حال یادگیری است")
-
-        if os.path.exists("jokes.json"):
-            data = load_data("jokes.json")
-            count = len(data)
-            if count > 10:
-                score += 15
-                details.append("😂 جوک‌های زیاد و متنوع 😎")
-            elif count > 0:
-                score += 10
-                details.append("😅 چند جوک فعال وجود دارد")
-            else:
-                details.append("⚪ هنوز جوکی ثبت نشده")
-
-        if os.path.exists("fortunes.json"):
-            data = load_data("fortunes.json")
-            count = len(data)
-            if count > 10:
-                score += 15
-                details.append("🔮 فال‌ها متنوع و فعال 💫")
-            elif count > 0:
-                score += 10
-                details.append("🔮 چند فال ثبت شده")
-            else:
-                details.append("⚪ هنوز فالی ثبت نشده")
-
-        try:
-            test = smart_response("سلام", "شاد")
-            if test:
-                score += 25
-                details.append("💬 پاسخ هوشمند فعاله 🤖")
-            else:
-                score += 10
-                details.append("⚪ پاسخ هوشمند غیرفعاله")
-        except:
-            details.append("⚠️ خطا در smart_response")
-
-        essential_files = ["memory.json", "group_data.json", "jokes.json", "fortunes.json"]
-        stable_count = sum(os.path.exists(f) for f in essential_files)
-
-        if stable_count == len(essential_files):
-            score += 15
-            details.append("💾 حافظه و داده‌ها پایدار ✅")
-        elif stable_count >= 2:
-            score += 10
-            details.append("⚠️ برخی فایل‌ها ناقصند")
-        else:
-            details.append("🚫 خطا در حافظه داده")
-
-        if score > 100:
-            score = 100
-
-        result = (
-            f"🤖 درصد هوش فعلی خنگول: *{score}%*\n\n"
-            + "\n".join(details)
-            + f"\n\n📈 نسخه Cloud+ Supreme Pro Stable+\n🕓 {datetime.now().strftime('%Y/%m/%d %H:%M')}"
-        )
-
-        await update.message.reply_text(result, parse_mode="Markdown")
-        return
-        # ✅ درصد هوش اجتماعی
-    if text.lower() == "درصد هوش اجتماعی":
-        score = 0
-        details = []
-
-        memory = load_data("memory.json")
-        users = len(memory.get("users", []))
-        if users > 100:
-            score += 25
-            details.append(f"👤 کاربران زیاد ({users} نفر)")
-        elif users > 30:
-            score += 20
-            details.append(f"👥 کاربران فعال ({users} نفر)")
-        elif users > 10:
-            score += 10
-            details.append(f"🟢 کاربران محدود ({users})")
-        else:
-            details.append("⚪ کاربران کم")
-
-        groups_data = load_data("group_data.json").get("groups", {})
-        group_count = len(groups_data) if isinstance(groups_data, dict) else len(groups_data)
-        if group_count > 15:
-            score += 25
-            details.append(f"🏠 گروه‌های فعال زیاد ({group_count}) ✅")
-        elif group_count > 5:
-            score += 15
-            details.append(f"🏠 گروه‌های متوسط ({group_count})")
-        elif group_count > 0:
-            score += 10
-            details.append(f"🏠 گروه‌های محدود ({group_count})")
-        else:
-            details.append("🚫 هنوز در هیچ گروهی عضو نیست")
-
-        try:
-            activity = get_group_stats()
-            active_chats = activity.get("active_chats", 0)
-            total_msgs = activity.get("messages", 0)
-
-            if active_chats > 10 and total_msgs > 200:
-                score += 25
-                details.append("💬 تعاملات زیاد و مداوم 😎")
-            elif total_msgs > 50:
-                score += 15
-                details.append("💬 تعاملات متوسط")
-            elif total_msgs > 0:
-                score += 10
-                details.append("💬 تعامل کم ولی فعال")
-            else:
-                details.append("⚪ تعامل خاصی ثبت نشده")
-        except:
-            details.append("⚠️ آمار تعاملات در دسترس نیست")
-
-        if os.path.exists("memory.json"):
-            phrases = len(memory.get("phrases", {}))
-            if phrases > 50:
-                score += 20
-                details.append("🧠 حافظه گفتاری قوی")
-            elif phrases > 10:
-                score += 10
-                details.append("🧠 حافظه محدود")
-            else:
-                details.append("⚪ حافظه در حال رشد")
-
-        if score > 100:
-            score = 100
-
-        result = (
-            f"🤖 درصد هوش اجتماعی خنگول: *{score}%*\n\n"
-            + "\n".join(details)
-            + f"\n\n📊 شاخص تعامل اجتماعی فعال 💬\n🕓 {datetime.now().strftime('%Y/%m/%d %H:%M')}"
-        )
-        await update.message.reply_text(result, parse_mode="Markdown")
-        return
-
-    # ✅ هوش کلی (ترکیب هوش منطقی + اجتماعی)
-    if text.lower() == "هوش کلی":
-        score = 0
-        details = []
-
-        # 🧠 حافظه و یادگیری
-        if os.path.exists("memory.json"):
-            data = load_data("memory.json")
-            phrases = len(data.get("phrases", {}))
-            responses = sum(len(v) for v in data.get("phrases", {}).values()) if phrases else 0
-            if phrases > 20 and responses > 30:
-                score += 25
-                details.append("🧠 یادگیری گسترده و دقیق ✅")
-            elif phrases > 10:
-                score += 15
-                details.append("🧩 یادگیری متوسط ولی فعال")
-            else:
-                score += 5
-                details.append("⚪ حافظه در حال رشد")
-
-        # 😂 شوخ‌طبعی و جوک‌ها
-        if os.path.exists("jokes.json"):
-            data = load_data("jokes.json")
-            count = len(data)
-            if count > 10:
-                score += 10
-                details.append("😂 شوخ‌طبع و بامزه 😄")
-            elif count > 0:
-                score += 5
-                details.append("😅 کمی شوخ‌طبع")
-            else:
-                details.append("⚪ هنوز شوخی بلد نیست 😶")
-
-        # 💬 پاسخ‌دهی هوشمند
-        try:
-            test = smart_response("سلام", "شاد")
-            if test:
-                score += 20
-                details.append("💬 پاسخ هوشمند فعال 🤖")
-            else:
-                score += 10
-                details.append("⚪ پاسخ ساده")
-        except:
-            details.append("⚠️ خطا در پاسخ‌دهی هوش مصنوعی")
-
-        # 👥 کاربران و گروه‌ها
-        memory = load_data("memory.json")
-        users = len(memory.get("users", []))
-        groups_data = load_data("group_data.json").get("groups", {})
-        group_count = len(groups_data) if isinstance(groups_data, dict) else len(groups_data)
-
-        if users > 50:
-            score += 10
-            details.append(f"👤 کاربران زیاد ({users})")
-        elif users > 10:
-            score += 5
-            details.append(f"👥 کاربران محدود ({users})")
-
-        if group_count > 10:
-            score += 10
-            details.append(f"🏠 گروه‌های زیاد ({group_count}) ✅")
-        elif group_count > 0:
-            score += 5
-            details.append(f"🏠 گروه‌های محدود ({group_count})")
-
-        # 💾 پایداری سیستم
-        essential_files = ["memory.json", "group_data.json", "jokes.json", "fortunes.json"]
-        stability = sum(os.path.exists(f) for f in essential_files)
-        if stability == len(essential_files):
-            score += 10
-            details.append("💾 سیستم پایدار و سالم ✅")
-        elif stability >= 2:
-            score += 5
-            details.append("⚠️ بخشی از سیستم ناقصه")
-        else:
-            details.append("🚫 حافظه آسیب‌دیده")
-
-        # ✨ محاسبه IQ
-        iq = min(160, int((score / 100) * 160))
-
-        # تعیین سطح هوش
-        if iq >= 130:
-            level = "🌟 نابغه دیجیتال"
-        elif iq >= 110:
-            level = "🧠 باهوش و تحلیل‌گر"
-        elif iq >= 90:
-            level = "🙂 نرمال ولی یادگیرنده"
-        else:
-            level = "🤪 خنگول کلاسیک 😅"
-
-        result = (
-            f"🤖 IQ کلی خنگول: *{iq}*\n"
-            f"{level}\n\n"
-            + "\n".join(details)
-            + f"\n\n📈 نسخه Cloud+ Supreme Pro Stable+\n🕓 {datetime.now().strftime('%Y/%m/%d %H:%M')}"
-        )
-
-        await update.message.reply_text(result, parse_mode="Markdown")
-        return
-        
   # ✅ جوک تصادفی
     if text == "جوک":
         if os.path.exists("jokes.json"):
@@ -1255,285 +750,6 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if text.strip() in ["لیست فال", "لیست فال‌ها", "لیست فال‌", "لیست فالها"]:
         await list_fortunes(update)
         return
-
-
-    # ✅ لیست جملات
-    if text == "لیست":
-        await update.message.reply_text(list_phrases(), parse_mode="HTML")
-        return
-        # ✅ حذف جمله یا جملات از حافظه
-    if text.startswith("حذف جمله"):
-        phrase = text[len("حذف جمله"):].strip()  # مطمئن می‌شویم فاصله اضافی حذف شود
-        if not phrase:
-            await update.message.reply_text(
-                "❗ لطفاً جمله‌ای برای حذف جمله بنویس.\n\n"
-                "📘 مثال:\n"
-                "<code>حذف جمله سلام</code>\n"
-                "یا برای حذف چند جمله مشابه:\n"
-                "<code>حذف جمله سلام*</code>",
-                parse_mode="HTML"
-            )
-            return
-
-        # بررسی ستاره برای حذف جزئی
-        partial = False
-        if phrase.endswith("*"):
-            partial = True
-            phrase = phrase[:-1].strip()
-
-        msg = delete_phrase(phrase, partial=partial)
-        await update.message.reply_text(msg, parse_mode="HTML")
-        return
-        # ✅ حذف پاسخ مشخص
-    if text.startswith("حذف پاسخ "):
-        response_text = text[len("حذف پاسخ"):].strip()
-        if not response_text:
-            await update.message.reply_text(
-                "❗ لطفاً متنی برای حذف پاسخ بنویس.\n\n"
-                "📘 مثال:\n"
-                "<code>حذف پاسخ علیک</code>",
-                parse_mode="HTML"
-            )
-            return
-
-        msg = delete_response(response_text)
-        await update.message.reply_text(msg, parse_mode="HTML")
-        return
-
-        # اگر کاربر ستاره گذاشته باشد یعنی حذف جزئی (partial)
-        partial = phrase.endswith("*")
-        if partial:
-            phrase = phrase[:-1].strip()
-
-        msg = delete_phrase(phrase, partial=partial)
-        await update.message.reply_text(msg, parse_mode="HTML")
-        return
-        # ✅ یادگیری چندخطی (طولانی یادبگیر)
-    if text.startswith("طولانی یادبگیر "):
-        parts = text.replace("طولانی یادبگیر ", "").split("\n")
-
-        if len(parts) > 1:
-            phrase = parts[0].strip()
-            lines = [p.strip() for p in parts[1:] if p.strip()]
-            msg = long_learn(phrase, *lines)
-
-            visual = (
-                f"🧠 <b>یادگیری چندخطی انجام شد!</b>\n"
-                f"💬 <b>جمله:</b> <code>{phrase}</code>\n"
-                f"📜 <b>تعداد خطوط:</b> {len(lines)}\n"
-                f"➕ <i>{msg}</i>"
-            )
-
-            await update.message.reply_text(visual, parse_mode="HTML")
-        else:
-            await update.message.reply_text(
-                "❗ بعد از 'طولانی یادبگیر' جمله‌ی اصلی و متن چندخطی رو بنویس.\n\n"
-                "📘 مثال:\n"
-                "<code>طولانی یادبگیر بیو\n"
-                "ای پادشاه خوبان داد از غم تنهایی دل بی\n"
-                "دل بی‌تو به جان آمد ❤️</code>",
-                parse_mode="HTML"
-            )
-        return
-
-    # ✅ یادگیری دستی با استایل زیبا و خروجی حرفه‌ای
-    if text.startswith("یادبگیر "):
-        parts = text.replace("یادبگیر ", "").split("\n")
-
-        if len(parts) > 1:
-            phrase = parts[0].strip()
-            responses = [p.strip() for p in parts[1:] if p.strip()]
-            msg = learn(phrase, *responses)
-
-            visual = (
-                f"🧠 <b>خنگول یاد گرفت!</b>\n"
-                f"💬 <b>جمله:</b> <code>{phrase}</code>\n"
-                f"✨ <b>تعداد پاسخ‌ها:</b> {len(responses)}\n"
-                f"➕ <i>{msg}</i>\n\n"
-                f"📘 حالا هوش خنگول باهوش‌تر شد 🤖💫"
-            )
-
-            await update.message.reply_text(visual, parse_mode="HTML")
-
-            # 💾 یادگیری سایه برای تقویت حافظه
-            for r in responses:
-                shadow_learn(phrase, r)
-        else:
-            await update.message.reply_text(
-                "❗ بعد از 'یادبگیر' جمله و پاسخ‌هاش رو در خطوط جدا بنویس.\n\n"
-                "📘 مثال:\n"
-                "<code>یادبگیر سلام\nسلام خنگول 😄</code>",
-                parse_mode="HTML"
-            )
-        return
-
-    # ✅ جمله تصادفی
-    if text == "جمله بساز":
-        await update.message.reply_text(generate_sentence())
-        return
-
-    # ✅ پاسخ هوشمند و احساسی
-    learned_reply = get_reply(text)
-    emotion = detect_emotion(text)
-
-    # ذخیره و واکنش احساسی
-    last_emotion = get_last_emotion(uid)
-    context_reply = emotion_context_reply(emotion, last_emotion)
-    remember_emotion(uid, emotion)
-
-    if context_reply:
-        reply_text = enhance_sentence(context_reply)
-    elif learned_reply:
-        reply_text = enhance_sentence(learned_reply)
-    else:
-        reply_text = smart_response(full_context, uid) or enhance_sentence(full_context)
-
-    await update.message.reply_text(reply_text)
-# ======================= 🧹 ریست و ریلود =======================
-import asyncio, os, json, random
-from datetime import datetime
-
-# ======================= 🧹 ریست و 🔄 ریلود لوکس خنگول با افکت =======================
-async def reset_memory(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """پاکسازی کامل مغز خنگول فقط برای مدیر اصلی"""
-    if update.effective_user.id != ADMIN_ID:
-        return await update.message.reply_text("⛔ فقط مدیر اصلی مجازه!")
-
-    loading_text = "🧠 <b>در حال پاکسازی کامل مغز ربات...</b>\n"
-    msg = await update.message.reply_text(loading_text, parse_mode="HTML")
-
-    steps = [
-        "🧹 حذف حافظه جملات...",
-        "🗑 پاکسازی داده‌های گروهی...",
-        "💾 حذف فایل‌های جوک و فال...",
-        "👤 حذف کاربران ذخیره‌شده...",
-        "🧩 بازسازی ساختار حافظه جدید...",
-        "🤖 آماده‌سازی مغز تازه...",
-        "🌙 نهایی‌سازی سیستم هوش مصنوعی..."
-    ]
-
-    files_to_remove = ["memory.json", "group_data.json","data/custom_commands.json", "stickers.json", "jokes.json", "fortunes.json", "users.json"]
-
-    for i, step in enumerate(steps, start=1):
-        percent = int((i / len(steps)) * 100)
-        bar_len = 12
-        filled = "█" * int(bar_len * (percent / 100))
-        empty = "░" * (bar_len - len(filled))
-        bar = f"[{filled}{empty}] {percent}%"
-
-        await asyncio.sleep(random.uniform(0.5, 1.0))
-        try:
-            await msg.edit_text(f"{loading_text}\n{bar}\n\n{step}", parse_mode="HTML")
-        except:
-            pass
-
-        # حذف مرحله‌ای فایل‌ها
-        if i <= len(files_to_remove):
-            f = files_to_remove[i - 1]
-            if os.path.exists(f):
-                os.remove(f)
-
-    init_files()
-
-    await asyncio.sleep(1.2)
-    await msg.edit_text(
-        "✅ <b>پاکسازی مغز خنگول کامل شد!</b>\n"
-        "🧠 حافظه جدید ساخته شد و آماده‌ی بوت است.\n\n"
-        "🔄 اکنون دستور <b>/reload</b> را برای راه‌اندازی سیستم بفرست.",
-        parse_mode="HTML"
-    )
-
-# ======================= 🔄 بوت هوش مصنوعی + افکت نوری =======================
-async def reload_memory(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """بوت سیستم خنگول با افکت نوری و گزارش نهایی — فقط برای مدیر اصلی"""
-    if update.effective_user.id != ADMIN_ID:
-        return await update.message.reply_text("⛔ فقط مدیر اصلی می‌تونه سیستم رو بوت کنه!")
-
-    loading_text = "🤖 <b>در حال بوت سیستم هوش مصنوعی خنگول...</b>\n"
-    msg = await update.message.reply_text(loading_text, parse_mode="HTML")
-
-    steps = [
-        "📡 اتصال به هسته‌ی هوش مصنوعی...",
-        "🔍 بررسی سلامت فایل‌های حافظه...",
-        "🧩 بازسازی ساختار داده‌ها...",
-        "💬 بارگذاری پاسخ‌ها و جملات...",
-        "👥 شناسایی کاربران و گروه‌ها...",
-        "🧠 فعال‌سازی هوش اجتماعی و شوخ‌طبعی...",
-        "⚙️ همگام‌سازی با مغز ابری Cloud+...",
-        "🚀 نهایی‌سازی سیستم خنگول..."
-    ]
-
-    colors = ["🔵", "🟢", "🟣", "🟡", "🔴"]
-    for i, step in enumerate(steps, start=1):
-        percent = int((i / len(steps)) * 100)
-        color = random.choice(colors)
-        bar_len = 14
-        filled = "█" * int(bar_len * (percent / 100))
-        empty = "░" * (bar_len - len(filled))
-        bar = f"{color}[{filled}{empty}] {percent}%"
-
-        await asyncio.sleep(random.uniform(0.6, 1.2))
-        try:
-            await msg.edit_text(f"{loading_text}\n{bar}\n\n{step}", parse_mode="HTML")
-        except:
-            pass
-
-    # بازسازی فایل‌ها
-    init_files()
-
-    # محاسبه آمار
-    def count_items(file):
-        if not os.path.exists(file):
-            return 0
-        try:
-            data = load_data(file)
-            if isinstance(data, dict):
-                return len(data)
-            elif isinstance(data, list):
-                return len(data)
-        except:
-            return 0
-        return 0
-
-    phrases = len(load_data("memory.json").get("phrases", {}))
-    responses = sum(len(v) for v in load_data("memory.json").get("phrases", {}).values())
-    groups = len(load_data("group_data.json").get("groups", []))
-    users = count_items("users.json")
-    jokes = count_items("jokes.json")
-    fortunes = count_items("fortunes.json")
-
-    await asyncio.sleep(1.3)
-    now = datetime.now().strftime("%Y/%m/%d - %H:%M:%S")
-
-    final_text = (
-        "✨ <b>سیستم با موفقیت بوت شد!</b>\n\n"
-        "💻 <b>گزارش نهایی خنگول:</b>\n"
-        f"🧠 جملات: {phrases}\n"
-        f"💬 پاسخ‌ها: {responses}\n"
-        f"👤 کاربران: {users}\n"
-        f"👥 گروه‌ها: {groups}\n"
-        f"😂 جوک‌ها: {jokes}\n"
-        f"🔮 فال‌ها: {fortunes}\n\n"
-        f"🕓 زمان اجرا: <i>{now}</i>\n"
-        "🌙 <b>اتصال به مغز مرکزی برقرار شد.</b>\n"
-        "🤖 هوش اجتماعی و شوخ‌طبعی فعال شدند.\n"
-        "✅ <b>سیستم خنگول Cloud+ آماده‌ به‌ خدمت است!</b>"
-    )
-
-    await msg.edit_text(final_text, parse_mode="HTML")
-
-    # 🎬 افکت نهایی — ارسال استیکر یا انیمیشن
-    try:
-        stickers = [
-            "CAACAgUAAxkBAAIKf2aGZOkzDgP0xldu-7nKn3E7VnyjAAJgAwACGvSIVVRS9HZ5QbPoNgQ",  # برق مغز
-            "CAACAgQAAxkBAAIKfmaGZOmEDEsNbdR7IZNmb0LsvhH7AAKGAQAC-8E0BvZ-QTzM2m0GNgQ",  # سیستم فعال شد
-            "CAACAgIAAxkBAAIKfWaGZOnC7fMZr1bWPSGfOpg8UVltAAI4AAPANk8TfgAAAY7e1LoeNgQ",  # سلام دوباره
-        ]
-        await asyncio.sleep(1.5)
-        await context.bot.send_sticker(chat_id=update.effective_chat.id, sticker=random.choice(stickers))
-    except Exception as e:
-        print(f"[Sticker Error] {e}")
-
 # ======================= 📨 ارسال همگانی =======================
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update, Message
 from telegram.ext import ContextTypes
@@ -1992,9 +1208,6 @@ application.add_handler(
 # ==========================================================
 application.add_handler(CommandHandler("start", start))
 application.add_handler(CommandHandler("welcome", toggle_welcome))
-application.add_handler(CommandHandler("lock", lock_learning))
-application.add_handler(CommandHandler("unlock", unlock_learning))
-application.add_handler(CommandHandler("mode", mode_change))
 
 # 🎮 پنل اصلی و دکمه‌ها
 application.add_handler(
@@ -2030,22 +1243,18 @@ application.add_handler(
 # ==========================================================
 # 📊 آمار، بک‌آپ و کنترل
 # ==========================================================
-application.add_handler(CommandHandler("mute", mute_speaker))
-application.add_handler(CommandHandler("unmute", unmute_speaker))
 application.add_handler(CommandHandler("stats", stats))
 application.add_handler(CommandHandler("fullstats", fullstats))
 application.add_handler(CommandHandler("backup", backup))
 application.add_handler(CommandHandler("selectivebackup", selective_backup_menu))
 application.add_handler(CallbackQueryHandler(selective_backup_buttons, pattern="^selbk_"))
 application.add_handler(CommandHandler("restore", restore))
-application.add_handler(CommandHandler("reset", reset_memory))
-application.add_handler(CommandHandler("reload", reload_memory))
 # -------------------- ثبت هندلرها --------------------
 application.add_handler(CommandHandler("broadcast", broadcast))
 application.add_handler(CallbackQueryHandler(broadcast_buttons, pattern=r"^broadcast_"))
 application.add_handler(CommandHandler("cloudsync", cloudsync))
 application.add_handler(CommandHandler("leave", leave))
-application.add_handler(CommandHandler("reply", toggle_reply_mode))
+
 
 # ==========================================================
 # 🎨 فونت‌ساز خنگول
@@ -2085,11 +1294,6 @@ application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, show_wea
 # ==========================================================
 application.add_handler(MessageHandler(filters.Document.ALL, handle_document), group=1)
 application.add_handler(CallbackQueryHandler(panel_handler), group=1)
-
-# ==========================================================
-# 🎭 سخنگوی خنگول (پاسخ معمولی)
-# ==========================================================
-application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, reply), group=5)
 
 # ==========================================================
 # 📊 سیستم آمار و آیدی خنگول فارسی
