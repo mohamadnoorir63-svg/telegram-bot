@@ -26,8 +26,6 @@ from welcome_module import (
 from jokes_manager import save_joke, delete_joke, list_jokes, send_random_joke
 from fortune_manager import save_fortune, list_fortunes, send_random_fortune, delete_fortune
 from group_manager import register_group_activity, get_group_stats
-from smart_reply import detect_emotion, smart_response
-from auto_brain.auto_brain import start_auto_brain_loop
 from selective_backup import selective_backup_menu, selective_backup_buttons
 from auto_brain import auto_backup
 from command_manager import (
@@ -57,7 +55,6 @@ from panels.panel_menu import (
 
 from group_control.origin_title import register_origin_title_handlers
 from context_memory import ContextMemory
-from brain_bridge_group import process_group_message
 
 # 🧠 حافظه کوتاه‌مدت گفتگو برای Context AI
 context_memory = ContextMemory()
@@ -229,15 +226,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # نمایش مستقیم پنل اصلی
     await show_main_panel(update, context)
-# ======================= ⚙️ خطایاب خودکار =======================
-async def handle_error(update: object, context: ContextTypes.DEFAULT_TYPE):
-    error_text = f"⚠️ خطا در ربات:\n\n{context.error}"
-    print(error_text)
-    try:
-        await context.bot.send_message(chat_id=ADMIN_ID, text=error_text)
-    except:
-        pass
-
 
 # ======================= 👑 شناسایی ورود، خروج و صدا زدن سازنده =======================
 import random
