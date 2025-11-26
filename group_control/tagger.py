@@ -127,6 +127,24 @@ async def get_all_members(chat, context):
 
     return members
 
+from telegram.error import RetryAfter, TimedOut
+
+async def safe_send(context, chat_id, text):
+    while True:
+        try:
+            return await context.bot.send_message(chat_id, text, parse_mode="Markdown")
+        except RetryAfter as e:
+            # صبر به اندازه‌ای که تلگرام گفته
+            await asyncio.sleep(e.retry_after + 1)
+        except TimedOut:
+            await asyncio.sleep(2)
+        except Exception:
+            # اگر Markdown خطا داد، بدون فرمت بفرست
+            try:
+                return await context.bot.send_message(chat_id, text)
+            except:
+                await asyncio.sleep(1)
+
 
 # ===================== ساخت پنل =====================
 def build_tag_panel():
@@ -269,17 +287,14 @@ async def handle_tag_panel_click(update: Update, context):
         pass
 
     # ------------------ ارسال تگ‌ها ------------------
-    if mentions:
-        parts = build_mention_text(mentions)
-        for p in parts:
-            try:
-                await context.bot.send_message(chat.id, p, parse_mode="Markdown")
-            except:
-                await context.bot.send_message(chat.id, p)
-            await asyncio.sleep(0.2)
-    else:
-        await context.bot.send_message(chat.id, "⚠️ هیچ کاربری پیدا نشد.")
-
+    # ------------------ ارسال تگ‌ها ------------------
+if mentions:
+    parts = build_mention_text(mentions)
+    for p in parts:
+        await safe_send(context, chat.id, p)
+        await asyncio.sleep(1.2)   # ضد فلود واقعی
+else:
+    await safe_send(context, chat.id, "⚠️ هیچ کاربری پیدا نشد.")
 
 # ===================== ثبت هندلرها =====================
 def register_tag_handlers(application, group_number: int = 14):
