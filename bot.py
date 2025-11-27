@@ -723,12 +723,6 @@ async def reload_memory(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(final_text)
         
 # ======================= فال جوک =======================
-import os
-import json
-import random
-from telegram import Update
-from telegram.ext import ApplicationBuilder, ContextTypes, MessageHandler, filters
-
 # -----------------------------
 # فایل‌های ذخیره
 # -----------------------------
