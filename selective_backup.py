@@ -16,7 +16,6 @@ BACKUP_DIR = os.path.join(BASE_DIR, "backups")
 os.makedirs(BACKUP_DIR, exist_ok=True)
 
 # ====================== مسیرها ======================
-MEMORY_FILE = os.path.join(BASE_DIR, "memory.json")
 GROUP_DATA_FILE = os.path.join(BASE_DIR, "group_data.json")
 JOKES_FILE = os.path.join(BASE_DIR, "jokes.json")
 FORTUNES_FILE = os.path.join(BASE_DIR, "fortunes.json")
@@ -34,7 +33,6 @@ os.makedirs(os.path.join(BASE_DIR, "group_control"), exist_ok=True)
 FORTUNES_MEDIA_DIR = os.path.join(BASE_DIR, "fortunes_media")
 
 ICONS = {
-    "memory": "🧠",
     "group_data": "💬",
     "jokes": "😂",
     "fortunes": "🔮",
@@ -48,7 +46,6 @@ ICONS = {
 }
 
 BACKUP_TARGETS = {
-    "memory": MEMORY_FILE,
     "group_data": GROUP_DATA_FILE,
     "jokes": JOKES_FILE,
     "fortunes": FORTUNES_FILE,
@@ -62,7 +59,6 @@ BACKUP_TARGETS = {
 }
 
 BACKUP_NAMES = {
-    "memory": "حافظه",
     "group_data": "اطلاعات گروه",
     "jokes": "جوک‌ها",
     "fortunes": "فال‌ها",
