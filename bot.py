@@ -723,16 +723,17 @@ async def reload_memory(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(final_text)
         
 # ======================= فال جوک =======================
+import os
+import json
+import random
+from telegram import Update
+from telegram.ext import ApplicationBuilder, ContextTypes, MessageHandler, filters
+
 # -----------------------------
 # فایل‌های ذخیره
 # -----------------------------
 FILE_JOKES = "jokes.json"
 FILE_FORTUNES = "fortunes.json"
-
-# -----------------------------
-# آیدی سودو (خودت و افراد مورد نظر)
-# -----------------------------
-SUDO_USERS = [8588347189]  # <-- آیدی تلگرام خودت یا سودوها
 
 # -----------------------------
 # توابع کمکی JSON
@@ -751,248 +752,182 @@ def save_data(file_name, data):
         json.dump(data, f, ensure_ascii=False, indent=2)
 
 # -----------------------------
-# بررسی مدیر یا سودو یا پیوی
-# -----------------------------
-async def is_admin_or_private(update: Update):
-    user_id = update.message.from_user.id
-
-    # اگر پیوی هست
-    if update.message.chat.type == "private":
-        return True
-
-    # اگر سودو هست
-    if user_id in SUDO_USERS:
-        return True
-
-    # اگر مدیر گروه هست
-    try:
-        member = await update.message.chat.get_member(user_id)
-        if member.status in ("administrator", "creator"):
-            return True
-    except:
-        return False
-
-    return False
-
-# -----------------------------
 # ---------- جوک -------------
 # -----------------------------
 async def send_random_joke(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not await is_admin_or_private(update):
+    data = load_data(FILE_JOKES)
+    if not data:
+        await update.message.reply_text("هیچ جوکی ثبت نشده 😔")
+        return
+    key, val = random.choice(list(data.items()))
+    await update.message.reply_text(val.get("value"))
+
+async def save_joke(update: Update):
+    reply_msg = update.message.reply_to_message
+    if not reply_msg or not reply_msg.text:
+        await update.message.reply_text("لطفاً روی پیام جوک ریپلای کنید.")
         return
 
     data = load_data(FILE_JOKES)
-    if not data:
-        if update.message.chat.type=="private":
-            await update.message.reply_text("هیچ جوکی ثبت نشده 😔")
+    # جلوگیری از تکراری بودن
+    if any(v.get("value") == reply_msg.text for v in data.values()):
+        await update.message.reply_text("⚠️ این جوک قبلاً ثبت شده است.")
         return
 
-    key, val = random.choice(list(data.items()))
-    content_type = val.get("type","text")
-    value = val.get("value","")
+    new_id = str(max([int(k) for k in data.keys()], default=0) + 1)
+    data[new_id] = {"value": reply_msg.text}
+    save_data(FILE_JOKES, data)
+    await update.message.reply_text("✅ جوک ثبت شد!")
 
-    try:
-        if content_type == "text":
-            sent_msg = await update.message.reply_text(value)
-        elif content_type == "photo":
-            sent_msg = await update.message.reply_photo(photo=value)
-        elif content_type == "video":
-            sent_msg = await update.message.reply_video(video=value)
-        elif content_type == "sticker":
-            sent_msg = await update.message.reply_sticker(sticker=value)
-        else:
-            return
-
-        val["message_id"] = sent_msg.message_id
-        val["chat_id"] = sent_msg.chat.id
-        data[key] = val
-        save_data(FILE_JOKES, data)
-    except:
-        pass
-
-async def save_joke(update: Update):
-    if not await is_admin_or_private(update):
-        return
-
+async def delete_joke(update: Update):
     reply_msg = update.message.reply_to_message
     if not reply_msg:
         await update.message.reply_text("لطفاً روی پیام جوک ریپلای کنید.")
         return
 
     data = load_data(FILE_JOKES)
-    new_id = str(max([int(k) for k in data.keys()], default=0) + 1)
-
-    # بررسی تکراری و ارسال پیام تکی
-    if reply_msg.text:
-        if any(v.get("value") == reply_msg.text for v in data.values()):
-            await update.message.reply_text("⚠️ این جوک قبلاً ثبت شده است.")
-            return
-        sent_msg = await update.message.reply_text(reply_msg.text)
-        data[new_id] = {"type":"text","value":reply_msg.text,
-                         "message_id": sent_msg.message_id,"chat_id":sent_msg.chat.id}
-    elif reply_msg.photo:
-        file_id = reply_msg.photo[-1].file_id
-        if any(v.get("value") == file_id for v in data.values()):
-            await update.message.reply_text("⚠️ این جوک قبلاً ثبت شده است.")
-            return
-        sent_msg = await update.message.reply_photo(photo=file_id)
-        data[new_id] = {"type":"photo","value":file_id,
-                         "message_id": sent_msg.message_id,"chat_id":sent_msg.chat.id}
-    elif reply_msg.video:
-        file_id = reply_msg.video.file_id
-        if any(v.get("value") == file_id for v in data.values()):
-            await update.message.reply_text("⚠️ این جوک قبلاً ثبت شده است.")
-            return
-        sent_msg = await update.message.reply_video(video=file_id)
-        data[new_id] = {"type":"video","value":file_id,
-                         "message_id": sent_msg.message_id,"chat_id":sent_msg.chat.id}
-    elif reply_msg.sticker:
-        file_id = reply_msg.sticker.file_id
-        if any(v.get("value") == file_id for v in data.values()):
-            await update.message.reply_text("⚠️ این جوک قبلاً ثبت شده است.")
-            return
-        sent_msg = await update.message.reply_sticker(sticker=file_id)
-        data[new_id] = {"type":"sticker","value":file_id,
-                         "message_id": sent_msg.message_id,"chat_id":sent_msg.chat.id}
-    else:
-        await update.message.reply_text("⚠️ نوع پیام پشتیبانی نمی‌شود.")
-        return
-
-    save_data(FILE_JOKES, data)
-    await update.message.reply_text("✅ جوک ثبت شد و پیام مستقل ایجاد شد!")
-
-async def delete_joke(update: Update):
-    if not await is_admin_or_private(update):
-        return
-
-    reply_msg = update.message.reply_to_message
-    if not reply_msg:
-        return
-
-    data = load_data(FILE_JOKES)
     to_delete = None
-    for k,v in data.items():
-        if v.get("message_id") == reply_msg.message_id:
+    for k, v in data.items():
+        if v.get("value") == (reply_msg.text or ""):
             to_delete = k
             break
-
     if to_delete:
-        try:
-            await update.bot.delete_message(chat_id=reply_msg.chat.id,message_id=reply_msg.message_id)
-        except:
-            pass
         del data[to_delete]
-        save_data(FILE_JOKES,data)
+        save_data(FILE_JOKES, data)
         await update.message.reply_text("✅ جوک حذف شد!")
+    else:
+        await update.message.reply_text("⚠️ جوک پیدا نشد.")
+
+async def list_jokes(update: Update):
+    data = load_data(FILE_JOKES)
+    if not data:
+        await update.message.reply_text("هیچ جوکی ثبت نشده 😔")
+        return
+
+    msg = "📜 لیست جوک‌ها:\n"
+    for k, v in data.items():
+        msg += f"{k}: {v.get('value')[:50]}{'...' if len(v.get('value',''))>50 else ''}\n"
+    await update.message.reply_text(msg)
 
 # -----------------------------
 # ---------- فال -------------
 # -----------------------------
 async def send_fortune(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not await is_admin_or_private(update):
-        return
-
     data = load_data(FILE_FORTUNES)
     if not data:
-        if update.message.chat.type=="private":
-            await update.message.reply_text("هنوز فالی ثبت نشده 😔")
+        await update.message.reply_text("هنوز فالی ثبت نشده 😔")
         return
 
     key, val = random.choice(list(data.items()))
-    content_type = val.get("type","text")
-    value = val.get("value","")
+    content_type = val.get("type", "text")
+    value = val.get("value", "")
 
     try:
         if content_type == "text":
-            sent_msg = await update.message.reply_text("🔮 "+value)
+            await update.message.reply_text("🔮 " + value)
         elif content_type == "photo":
-            sent_msg = await update.message.reply_photo(photo=value,caption="🔮 تصویری!")
+            await update.message.reply_photo(photo=value, caption="🔮 تصویری!")
         elif content_type == "video":
-            sent_msg = await update.message.reply_video(video=value,caption="🔮 ویدیویی!")
+            await update.message.reply_video(video=value, caption="🔮 ویدیویی!")
         elif content_type == "sticker":
-            sent_msg = await update.message.reply_sticker(sticker=value)
+            await update.message.reply_sticker(sticker=value)
         else:
-            return
-
-        val["message_id"] = sent_msg.message_id
-        val["chat_id"] = sent_msg.chat.id
-        data[key] = val
-        save_data(FILE_FORTUNES,data)
-    except:
-        pass
+            await update.message.reply_text("⚠️ نوع فایل پشتیبانی نمی‌شود.")
+    except Exception as e:
+        await update.message.reply_text(f"⚠️ خطا در ارسال فال: {e}")
 
 async def save_fortune(update: Update):
-    if not await is_admin_or_private(update):
-        return
-
     reply_msg = update.message.reply_to_message
     if not reply_msg:
+        await update.message.reply_text("لطفاً روی پیام فال ریپلای کنید.")
         return
 
     data = load_data(FILE_FORTUNES)
-    new_id = str(max([int(k) for k in data.keys()], default=0)+1)
+    new_id = str(max([int(k) for k in data.keys()], default=0) + 1)
 
-    # بررسی تکراری و ارسال پیام تکی
+    # جلوگیری از تکراری بودن
+    is_duplicate = False
     if reply_msg.text:
-        if any(v.get("value")==reply_msg.text for v in data.values()):
-            await update.message.reply_text("⚠️ این فال قبلاً ثبت شده است.")
-            return
-        sent_msg = await update.message.reply_text(reply_msg.text)
-        data[new_id] = {"type":"text","value":reply_msg.text,
-                         "message_id":sent_msg.message_id,"chat_id":sent_msg.chat.id}
+        is_duplicate = any(v.get("value") == reply_msg.text for v in data.values())
+        if not is_duplicate:
+            data[new_id] = {"type": "text", "value": reply_msg.text}
     elif reply_msg.photo:
         file_id = reply_msg.photo[-1].file_id
-        if any(v.get("value")==file_id for v in data.values()):
-            await update.message.reply_text("⚠️ این فال قبلاً ثبت شده است.")
-            return
-        sent_msg = await update.message.reply_photo(photo=file_id)
-        data[new_id] = {"type":"photo","value":file_id,
-                         "message_id":sent_msg.message_id,"chat_id":sent_msg.chat.id}
+        is_duplicate = any(v.get("value") == file_id for v in data.values())
+        if not is_duplicate:
+            data[new_id] = {"type": "photo", "value": file_id}
     elif reply_msg.video:
         file_id = reply_msg.video.file_id
-        if any(v.get("value")==file_id for v in data.values()):
-            await update.message.reply_text("⚠️ این فال قبلاً ثبت شده است.")
-            return
-        sent_msg = await update.message.reply_video(video=file_id)
-        data[new_id] = {"type":"video","value":file_id,
-                         "message_id":sent_msg.message_id,"chat_id":sent_msg.chat.id}
+        is_duplicate = any(v.get("value") == file_id for v in data.values())
+        if not is_duplicate:
+            data[new_id] = {"type": "video", "value": file_id}
     elif reply_msg.sticker:
         file_id = reply_msg.sticker.file_id
-        if any(v.get("value")==file_id for v in data.values()):
-            await update.message.reply_text("⚠️ این فال قبلاً ثبت شده است.")
-            return
-        sent_msg = await update.message.reply_sticker(sticker=file_id)
-        data[new_id] = {"type":"sticker","value":file_id,
-                         "message_id":sent_msg.message_id,"chat_id":sent_msg.chat.id}
+        is_duplicate = any(v.get("value") == file_id for v in data.values())
+        if not is_duplicate:
+            data[new_id] = {"type": "sticker", "value": file_id}
     else:
+        await update.message.reply_text("⚠️ نوع پیام پشتیبانی نمی‌شود.")
         return
 
-    save_data(FILE_FORTUNES,data)
-    await update.message.reply_text("✅ فال ثبت شد و پیام مستقل ایجاد شد!")
+    if is_duplicate:
+        await update.message.reply_text("⚠️ این فال قبلاً ثبت شده است.")
+        return
+
+    save_data(FILE_FORTUNES, data)
+    await update.message.reply_text("✅ فال ثبت شد!")
 
 async def delete_fortune(update: Update):
-    if not await is_admin_or_private(update):
-        return
-
     reply_msg = update.message.reply_to_message
     if not reply_msg:
+        await update.message.reply_text("لطفاً روی پیام فال ریپلای کنید.")
         return
 
     data = load_data(FILE_FORTUNES)
     to_delete = None
-    for k,v in data.items():
-        if v.get("message_id") == reply_msg.message_id:
+    for k, v in data.items():
+        t = v.get("type")
+        if t == "text" and reply_msg.text == v.get("value"):
             to_delete = k
             break
-
+        elif t == "photo" and reply_msg.photo and reply_msg.photo[-1].file_id == v.get("value"):
+            to_delete = k
+            break
+        elif t == "video" and reply_msg.video and reply_msg.video.file_id == v.get("value"):
+            to_delete = k
+            break
+        elif t == "sticker" and reply_msg.sticker and reply_msg.sticker.file_id == v.get("value"):
+            to_delete = k
+            break
     if to_delete:
-        try:
-            await update.bot.delete_message(chat_id=reply_msg.chat.id,message_id=reply_msg.message_id)
-        except:
-            pass
         del data[to_delete]
-        save_data(FILE_FORTUNES,data)
+        save_data(FILE_FORTUNES, data)
         await update.message.reply_text("✅ فال حذف شد!")
+    else:
+        await update.message.reply_text("⚠️ فال پیدا نشد.")
+
+async def list_fortunes(update: Update):
+    data = load_data(FILE_FORTUNES)
+    if not data:
+        await update.message.reply_text("هنوز فالی ثبت نشده 😔")
+        return
+
+    msg = "📜 لیست فال‌ها:\n"
+    for k, v in data.items():
+        t = v.get("type", "text")
+        if t == "text":
+            content = v.get("value")
+        elif t == "photo":
+            content = "[عکس]"
+        elif t == "video":
+            content = "[ویدیو]"
+        elif t == "sticker":
+            content = "[استیکر]"
+        else:
+            content = "[نوع ناشناخته]"
+        msg += f"{k}: {content}\n"
+
+    await update.message.reply_text(msg)
 
 # -----------------------------
 # تابع اصلی reply
@@ -1012,6 +947,9 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if text == "حذف جوک" and reply_msg:
         await delete_joke(update)
         return
+    if text in ["لیست جوک", "لیست جوک‌ها", "لیست جوکها"]:
+        await list_jokes(update)
+        return
 
     # فال‌ها
     if text == "فال":
@@ -1022,6 +960,9 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     if text == "حذف فال" and reply_msg:
         await delete_fortune(update)
+        return
+    if text in ["لیست فال", "لیست فال‌ها", "لیست فالها"]:
+        await list_fortunes(update)
         return
 
 # ======================= 📨 ارسال همگانی =======================
