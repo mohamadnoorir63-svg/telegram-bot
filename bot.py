@@ -577,7 +577,6 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         # 🧩 فایل‌ها و پوشه‌های مهم برای بازیابی
         important_files = [
-        "memory.json",
         "group_data.json",
         "jokes.json",
         "fortunes.json",
@@ -645,14 +644,15 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
 # ======================= 💬 پاسخ و هوش مصنوعی =======================
 async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """پاسخ‌دهی اصلی هوش مصنوعی و سیستم یادگیری"""
+    # 🆔 آیدی کاربر
+    uid = update.effective_user.id
+    # متن پیام
+    text = update.message.text.strip() if update.message.text else ""
 
-
-    # 🧠 گرفتن کل تاریخچه اخیر کاربر
+    # 🧠 گرفتن تاریخچه اخیر کاربر
     recent_context = context_memory.get_context(uid)
-    
 
-  # ✅ جوک تصادفی
+    # ------------------ جوک تصادفی ------------------
     if text == "جوک":
         if os.path.exists("jokes.json"):
             data = load_data("jokes.json")
@@ -660,7 +660,6 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 key, val = random.choice(list(data.items()))
                 t = val.get("type", "text")
                 v = val.get("value", "")
-
                 try:
                     if t == "text":
                         await update.message.reply_text("😂 " + v)
@@ -680,7 +679,7 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("📂 فایل جوک‌ها پیدا نشد 😕")
         return
 
-    # ✅ فال تصادفی
+    # ------------------ فال تصادفی ------------------
     if text == "فال":
         if os.path.exists("fortunes.json"):
             data = load_data("fortunes.json")
@@ -704,10 +703,8 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else:
             await update.message.reply_text("📂 فایل فال‌ها پیدا نشد 😕")
         return
-    
-    
-    
-    # ✅ ثبت جوک و فال
+
+    # ------------------ ثبت جوک و فال ------------------
     if text.lower() == "ثبت جوک" and update.message.reply_to_message:
         await save_joke(update)
         return
@@ -716,7 +713,7 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await save_fortune(update)
         return
 
-    # 🗑️ حذف جوک و فال
+    # ------------------ حذف جوک و فال ------------------
     if text.lower() == "حذف جوک" and update.message.reply_to_message:
         await delete_joke(update)
         return
@@ -724,8 +721,8 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if text.lower() == "حذف فال" and update.message.reply_to_message:
         await delete_fortune(update)
         return
-        
-        # ✅ لیست‌ها
+
+    # ------------------ لیست جوک و فال ------------------
     if text.strip() in ["لیست جوک", "لیست جوک‌ها", "لیست جوک‌", "لیست جوکها"]:
         await list_jokes(update)
         return
@@ -733,6 +730,8 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if text.strip() in ["لیست فال", "لیست فال‌ها", "لیست فال‌", "لیست فالها"]:
         await list_fortunes(update)
         return
+
+    # اینجا می‌تونی ادامه‌ی کد AI و دستورهای دیگه رو اضافه کنی
 # ======================= 📨 ارسال همگانی =======================
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update, Message
 from telegram.ext import ContextTypes
@@ -906,7 +905,7 @@ async def load_text(file_name, default_text):
     return default_text
 
 
-# ======================= 🎛 پنل اصلی خنگول =======================
+# ======================= 🎛 پنل اصلی ربات =======================
 from datetime import datetime
 
 async def show_main_panel(update: Update, context: ContextTypes.DEFAULT_TYPE, edit=False):
