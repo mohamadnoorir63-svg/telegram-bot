@@ -1168,6 +1168,7 @@ application.add_handler(
     MessageHandler(filters.TEXT & (~filters.COMMAND) & filters.Regex(r"^ترجمه به"), translate_reply_handler),
     group=-9
 )
+application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, reply), group=3)
 # ==========================================================
 #پیام‌های متنی غیر از کامند → هندلر دستورات ذخیره‌شده
 application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_custom_command), group=-4)
