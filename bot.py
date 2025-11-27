@@ -725,14 +725,13 @@ async def reload_memory(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(final_text)
         
 # ======================= فال جوک =======================
- async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """پاسخ‌دهی فقط برای جوک و فال"""
+async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """پاسخ‌دهی فقط جوک و فال و مدیریت آن‌ها"""
 
-    # 🧩 اطمینان از اینکه پیام معتبره
     if not update.message or not update.message.text:
         return
 
-    text = update.message.text.strip().lower()
+    text = update.message.text.strip()
 
     # ✅ جوک تصادفی
     if text == "جوک":
@@ -742,7 +741,6 @@ async def reload_memory(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 key, val = random.choice(list(data.items()))
                 t = val.get("type", "text")
                 v = val.get("value", "")
-
                 try:
                     if t == "text":
                         await update.message.reply_text("😂 " + v)
@@ -787,30 +785,30 @@ async def reload_memory(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("📂 فایل فال‌ها پیدا نشد 😕")
         return
 
-    # ✅ ثبت جوک و فال
-    if text == "ثبت جوک" and update.message.reply_to_message:
+    # ✅ ثبت جوک و فال (در پیام ریپلای)
+    if text.lower() == "ثبت جوک" and update.message.reply_to_message:
         await save_joke(update)
         return
 
-    if text == "ثبت فال" and update.message.reply_to_message:
+    if text.lower() == "ثبت فال" and update.message.reply_to_message:
         await save_fortune(update)
         return
 
-    # 🗑️ حذف جوک و فال
-    if text == "حذف جوک" and update.message.reply_to_message:
+    # ✅ حذف جوک و فال (در پیام ریپلای)
+    if text.lower() == "حذف جوک" and update.message.reply_to_message:
         await delete_joke(update)
         return
 
-    if text == "حذف فال" and update.message.reply_to_message:
+    if text.lower() == "حذف فال" and update.message.reply_to_message:
         await delete_fortune(update)
         return
 
-    # ✅ لیست‌ها
-    if text in ["لیست جوک", "لیست جوک‌ها", "لیست جوک‌", "لیست جوکها"]:
+    # ✅ لیست جوک‌ها و فال‌ها
+    if text.strip() in ["لیست جوک", "لیست جوک‌ها", "لیست جوک‌", "لیست جوکها"]:
         await list_jokes(update)
         return
 
-    if text in ["لیست فال", "لیست فال‌ها", "لیست فال‌", "لیست فالها"]:
+    if text.strip() in ["لیست فال", "لیست فال‌ها", "لیست فال‌", "لیست فالها"]:
         await list_fortunes(update)
         return
 # ======================= 📨 ارسال همگانی =======================
