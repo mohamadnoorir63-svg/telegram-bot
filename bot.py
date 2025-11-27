@@ -725,214 +725,46 @@ async def reload_memory(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(final_text)
         
 # ======================= فال جوک =======================
-import os
-import json
-import random
 from telegram import Update
 from telegram.ext import ContextTypes
-
-# -----------------------------
-# توابع کمکی برای ذخیره و بارگذاری JSON
-# -----------------------------
-def load_data(file_name):
-    if os.path.exists(file_name):
-        with open(file_name, "r", encoding="utf-8") as f:
-            try:
-                return json.load(f)
-            except json.JSONDecodeError:
-                return {}
-    return {}
-
-def save_data(file_name, data):
-    with open(file_name, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=4)
-
-# -----------------------------
-# ذخیره جوک
-# -----------------------------
-async def save_joke(update: Update):
-    message = update.message.reply_to_message
-    if not message:
-        await update.message.reply_text("⚠️ لطفاً جوکی که می‌خواهید ذخیره شود را پاسخ دهید.")
-        return
-
-    data = load_data("jokes.json") or {}
-    new_id = str(len(data) + 1)
-
-    if message.text:
-        data[new_id] = {"type": "text", "value": message.text}
-    elif message.photo:
-        file_id = message.photo[-1].file_id
-        data[new_id] = {"type": "photo", "value": file_id}
-    elif message.video:
-        data[new_id] = {"type": "video", "value": message.video.file_id}
-    elif message.sticker:
-        data[new_id] = {"type": "sticker", "value": message.sticker.file_id}
-    else:
-        await update.message.reply_text("⚠️ این نوع محتوا پشتیبانی نمی‌شود.")
-        return
-
-    save_data("jokes.json", data)
-    await update.message.reply_text("✅ جوک شما با موفقیت ثبت شد!")
-
-# -----------------------------
-# ذخیره فال
-# -----------------------------
-async def save_fortune(update: Update):
-    message = update.message.reply_to_message
-    if not message:
-        await update.message.reply_text("⚠️ لطفاً فالی که می‌خواهید ذخیره شود را پاسخ دهید.")
-        return
-
-    data = load_data("fortunes.json") or {}
-    new_id = str(len(data) + 1)
-
-    if message.text:
-        data[new_id] = {"type": "text", "value": message.text}
-    elif message.photo:
-        file_id = message.photo[-1].file_id
-        data[new_id] = {"type": "photo", "value": file_id}
-    elif message.video:
-        data[new_id] = {"type": "video", "value": message.video.file_id}
-    elif message.sticker:
-        data[new_id] = {"type": "sticker", "value": message.sticker.file_id}
-    else:
-        await update.message.reply_text("⚠️ این نوع محتوا پشتیبانی نمی‌شود.")
-        return
-
-    save_data("fortunes.json", data)
-    await update.message.reply_text("✅ فال شما با موفقیت ثبت شد!")
-
-# -----------------------------
-# حذف جوک و فال
-# -----------------------------
-async def delete_joke(update: Update):
-    message = update.message.reply_to_message
-    if not message:
-        await update.message.reply_text("⚠️ لطفاً جوکی که می‌خواهید حذف شود را پاسخ دهید.")
-        return
-
-    data = load_data("jokes.json") or {}
-    for key, val in list(data.items()):
-        if (message.text and val.get("value") == message.text) or \
-           (message.photo and val.get("value") == message.photo[-1].file_id) or \
-           (message.video and val.get("value") == message.video.file_id) or \
-           (message.sticker and val.get("value") == message.sticker.file_id):
-            del data[key]
-            save_data("jokes.json", data)
-            await update.message.reply_text("✅ جوک با موفقیت حذف شد!")
-            return
-    await update.message.reply_text("⚠️ جوک پیدا نشد.")
-
-async def delete_fortune(update: Update):
-    message = update.message.reply_to_message
-    if not message:
-        await update.message.reply_text("⚠️ لطفاً فالی که می‌خواهید حذف شود را پاسخ دهید.")
-        return
-
-    data = load_data("fortunes.json") or {}
-    for key, val in list(data.items()):
-        if (message.text and val.get("value") == message.text) or \
-           (message.photo and val.get("value") == message.photo[-1].file_id) or \
-           (message.video and val.get("value") == message.video.file_id) or \
-           (message.sticker and val.get("value") == message.sticker.file_id):
-            del data[key]
-            save_data("fortunes.json", data)
-            await update.message.reply_text("✅ فال با موفقیت حذف شد!")
-            return
-    await update.message.reply_text("⚠️ فال پیدا نشد.")
-
-# -----------------------------
-# لیست جوک‌ها و فال‌ها
-# -----------------------------
-async def list_jokes(update: Update):
-    data = load_data("jokes.json") or {}
-    if not data:
-        await update.message.reply_text("هنوز جوکی ثبت نشده 😅")
-        return
-    text = "📃 لیست جوک‌ها:\n\n"
-    for key, val in data.items():
-        text += f"{key}. {val.get('value','')}\n"
-    await update.message.reply_text(text)
-
-async def list_fortunes(update: Update):
-    data = load_data("fortunes.json") or {}
-    if not data:
-        await update.message.reply_text("هنوز فالی ثبت نشده 😔")
-        return
-    text = "📃 لیست فال‌ها:\n\n"
-    for key, val in data.items():
-        text += f"{key}. {val.get('value','')}\n"
-    await update.message.reply_text(text)
-
-# -----------------------------
-# تابع اصلی پاسخگویی
-# -----------------------------
 async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    text = update.message.text if update.message.text else ""
+    message = update.message
+    text = message.text or ""
+    reply_msg = message.reply_to_message
 
-    async def send_content(val, content_type, prefix=""):
-        try:
-            if content_type == "text":
-                await update.message.reply_text(prefix + val)
-            elif content_type == "photo":
-                await update.message.reply_photo(photo=val, caption=prefix + "تصویری!")
-            elif content_type == "video":
-                await update.message.reply_video(video=val, caption=prefix + "ویدیویی!")
-            elif content_type == "sticker":
-                await update.message.reply_sticker(sticker=val)
-            else:
-                await update.message.reply_text("⚠️ نوع فایل پشتیبانی نمی‌شود.")
-        except Exception as e:
-            await update.message.reply_text(f"⚠️ خطا در ارسال محتوا: {e}")
-
-    # جوک تصادفی
-    if text == "جوک":
-        data = load_data("jokes.json")
-        if data:
-            key, val = random.choice(list(data.items()))
-            await send_content(val.get("value", ""), val.get("type", "text"), "😂 ")
-        else:
-            await update.message.reply_text("هنوز جوکی ثبت نشده 😅")
+    # ----------------- جوک -----------------
+    if text.lower() == "جوک":
+        await send_random_joke(update, context)
         return
-
-    # فال تصادفی
-    if text == "فال":
-        data = load_data("fortunes.json")
-        if data:
-            key, val = random.choice(list(data.items()))
-            await send_content(val.get("value", ""), val.get("type", "text"), "🔮 ")
-        else:
-            await update.message.reply_text("هنوز فالی ثبت نشده 😔")
-        return
-
-    # ثبت جوک و فال
-    if text.lower() == "ثبت جوک" and update.message.reply_to_message:
+    if text.lower() == "ثبت جوک" and reply_msg:
         await save_joke(update)
         return
-
-    if text.lower() == "ثبت فال" and update.message.reply_to_message:
-        await save_fortune(update)
-        return
-
-    # حذف جوک و فال
-    if text.lower() == "حذف جوک" and update.message.reply_to_message:
+    if text.lower() == "حذف جوک" and reply_msg:
         await delete_joke(update)
         return
-
-    if text.lower() == "حذف فال" and update.message.reply_to_message:
-        await delete_fortune(update)
-        return
-
-    # لیست‌ها
     if text.strip() in ["لیست جوک", "لیست جوک‌ها", "لیست جوک‌", "لیست جوکها"]:
         await list_jokes(update)
         return
 
+    # ----------------- فال -----------------
+    if text.lower() == "فال":
+        await send_random_fortune(update, context)
+        return
+    if text.lower() == "ثبت فال" and reply_msg:
+        await save_fortune(update)
+        return
+    if text.lower() == "حذف فال" and reply_msg:
+        await delete_fortune(update)
+        return
     if text.strip() in ["لیست فال", "لیست فال‌ها", "لیست فال‌", "لیست فالها"]:
         await list_fortunes(update)
         return
 
+    # ----------------- پیش‌فرض -----------------
+    await update.message.reply_text("⚠️ دستور شناخته نشد.\n\n"
+                                    "📌 دستورات معتبر:\n"
+                                    "جوک / ثبت جوک / حذف جوک / لیست جوک\n"
+                                    "فال / ثبت فال / حذف فال / لیست فال")
 # ======================= 📨 ارسال همگانی =======================
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update, Message
 from telegram.ext import ContextTypes
