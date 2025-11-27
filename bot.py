@@ -979,7 +979,6 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if text == "حذف فال" and reply_msg:
         await delete_fortune(update)
         return
-
 # ======================= 📨 ارسال همگانی =======================
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update, Message
 from telegram.ext import ContextTypes
