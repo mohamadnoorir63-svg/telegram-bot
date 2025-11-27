@@ -727,44 +727,46 @@ async def reload_memory(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ======================= فال جوک =======================
 from telegram import Update
 from telegram.ext import ContextTypes
+
 async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     message = update.message
-    text = message.text or ""
+    text = (message.text or "").strip().lower()
     reply_msg = message.reply_to_message
 
     # ----------------- جوک -----------------
-    if text.lower() == "جوک":
+    if text == "جوک":
         await send_random_joke(update, context)
         return
-    if text.lower() == "ثبت جوک" and reply_msg:
+
+    if text == "ثبت جوک" and reply_msg:
         await save_joke(update)
         return
-    if text.lower() == "حذف جوک" and reply_msg:
+
+    if text == "حذف جوک" and reply_msg:
         await delete_joke(update)
         return
-    if text.strip() in ["لیست جوک", "لیست جوک‌ها", "لیست جوک‌", "لیست جوکها"]:
+
+    if text in ["لیست جوک", "لیست جوک‌ها", "لیست جوک‌", "لیست جوکها"]:
         await list_jokes(update)
         return
 
     # ----------------- فال -----------------
-    if text.lower() == "فال":
+    if text == "فال":
         await send_random_fortune(update, context)
         return
-    if text.lower() == "ثبت فال" and reply_msg:
+
+    if text == "ثبت فال" and reply_msg:
         await save_fortune(update)
         return
-    if text.lower() == "حذف فال" and reply_msg:
+
+    if text == "حذف فال" and reply_msg:
         await delete_fortune(update)
         return
-    if text.strip() in ["لیست فال", "لیست فال‌ها", "لیست فال‌", "لیست فالها"]:
+
+    if text in ["لیست فال", "لیست فال‌ها", "لیست فال‌", "لیست فالها"]:
         await list_fortunes(update)
         return
 
-    # ----------------- پیش‌فرض -----------------
-    await update.message.reply_text("⚠️ دستور شناخته نشد.\n\n"
-                                    "📌 دستورات معتبر:\n"
-                                    "جوک / ثبت جوک / حذف جوک / لیست جوک\n"
-                                    "فال / ثبت فال / حذف فال / لیست فال")
 # ======================= 📨 ارسال همگانی =======================
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update, Message
 from telegram.ext import ContextTypes
