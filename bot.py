@@ -736,6 +736,11 @@ FILE_JOKES = "jokes.json"
 FILE_FORTUNES = "fortunes.json"
 
 # -----------------------------
+# آیدی سودو (خودت و افراد مورد نظر)
+# -----------------------------
+SUDO_USERS = [8588347189]  # <-- آیدی تلگرام خودت یا سودوها
+
+# -----------------------------
 # توابع کمکی JSON
 # -----------------------------
 def load_data(file_name):
@@ -752,13 +757,20 @@ def save_data(file_name, data):
         json.dump(data, f, ensure_ascii=False, indent=2)
 
 # -----------------------------
-# بررسی مدیر یا سودو
+# بررسی مدیر یا سودو یا پیوی
 # -----------------------------
 async def is_admin_or_private(update: Update):
     if update.message.chat.type == "private":
         return True
-    member = await update.message.chat.get_member(update.message.from_user.id)
-    return member.status in ("administrator", "creator")
+    try:
+        member = await update.message.chat.get_member(update.message.from_user.id)
+        if member.status in ("administrator", "creator"):
+            return True
+    except:
+        pass
+    if update.message.from_user.id in SUDO_USERS:
+        return True
+    return False
 
 # -----------------------------
 # ---------- جوک -------------
@@ -768,7 +780,9 @@ async def send_random_joke(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     data = load_data(FILE_JOKES)
     if not data:
-        return await update.message.reply_text("هیچ جوکی ثبت نشده 😔") if update.message.chat.type=="private" else None
+        if update.message.chat.type=="private":
+            await update.message.reply_text("هیچ جوکی ثبت نشده 😔")
+        return
     key, val = random.choice(list(data.items()))
     content_type = val.get("type","text")
     value = val.get("value","")
@@ -866,7 +880,9 @@ async def send_fortune(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     data = load_data(FILE_FORTUNES)
     if not data:
-        return await update.message.reply_text("هنوز فالی ثبت نشده 😔") if update.message.chat.type=="private" else None
+        if update.message.chat.type=="private":
+            await update.message.reply_text("هنوز فالی ثبت نشده 😔")
+        return
     key, val = random.choice(list(data.items()))
     content_type = val.get("type","text")
     value = val.get("value","")
@@ -894,6 +910,7 @@ async def save_fortune(update: Update):
     if not reply_msg: return
     data = load_data(FILE_FORTUNES)
     new_id = str(max([int(k) for k in data.keys()], default=0)+1)
+
     # تکراری و ارسال پیام تکی
     if reply_msg.text:
         if any(v.get("value")==reply_msg.text for v in data.values()):
