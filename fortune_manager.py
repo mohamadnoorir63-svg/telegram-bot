@@ -57,38 +57,42 @@ def save_fortunes(data):
 
 # ========================= ارسال مدیا =========================
 
+import aiohttp
+
 async def send_media(update: Update, media_type: str, val: str, k: str):
-    """ارسال متن یا هر نوع مدیا. URLها ابتدا دانلود می‌شوند."""
     real_path = _abs_media_path(val)
     file = None
 
+    # دانلود فایل اگر URL است
     if _is_valid_url(real_path):
-        temp_path = os.path.join(tempfile.gettempdir(), f"{k}_{os.path.basename(real_path)}")
         try:
+            temp_file = os.path.join(MEDIA_DIR, f"{uuid.uuid4()}")
             async with aiohttp.ClientSession() as session:
                 async with session.get(real_path) as resp:
                     if resp.status == 200:
-                        with open(temp_path, "wb") as f:
+                        with open(temp_file, "wb") as f:
                             f.write(await resp.read())
-                        file = InputFile(temp_path)
+                        file = InputFile(temp_file)
                     else:
                         return await update.message.reply_text(f"⚠️ دانلود فایل ممکن نبود: {real_path}")
         except Exception as e:
-            return await update.message.reply_text(f"⚠️ خطا در دانلود: {e}")
+            return await update.message.reply_text(f"⚠️ خطا در دانلود فایل: {e}")
     else:
         if not os.path.exists(real_path):
             return await update.message.reply_text(f"⚠️ فایل پیدا نشد: {real_path}")
         file = InputFile(real_path)
 
-    if media_type == "photo":
-        await update.message.reply_photo(file, caption=f"🔮 فال شماره {k}")
-    elif media_type == "video":
-        await update.message.reply_video(file, caption=f"🎥 فال شماره {k}")
-    elif media_type == "sticker":
-        await update.message.reply_sticker(file)
-    else:
-        await update.message.reply_text(f"⚠️ نوع ناشناخته: {media_type}")
-
+    try:
+        if media_type == "photo":
+            await update.message.reply_photo(file, caption=f"🔮 فال شماره {k}")
+        elif media_type == "video":
+            await update.message.reply_video(file, caption=f"🎥 فال شماره {k}")
+        elif media_type == "sticker":
+            await update.message.reply_sticker(file)
+        else:
+            await update.message.reply_text(f"⚠️ نوع ناشناخته: {media_type}")
+    except Exception as e:
+        await update.message.reply_text(f"⚠️ خطا در پردازش فایل: {e}")
 # ========================= ثبت فال =========================
 
 async def save_fortune(update: Update):
