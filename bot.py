@@ -222,7 +222,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ======================= 👑 شناسایی ورود، خروج و صدا زدن سازنده =======================
 import random
 import os
-from memory_manager import load_data, save_data
 from telegram import Update
 from telegram.ext import ContextTypes
 
