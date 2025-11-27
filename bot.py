@@ -726,9 +726,6 @@ async def reload_memory(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
 # ======================= 💬 پاسخ و هوش مصنوعی =======================
 SUDO_USERS = [8588347189, 98765432]  # آیدی سودوها
-import os, random
-from fortune_manager import save_fortune, send_random_fortune, list_fortunes, delete_fortune
-from joke_manager import save_joke, send_random_joke, list_jokes, delete_joke  # فرض بر این است که مشابه فال هست
 
 async def reply(update, context):
     uid = update.effective_user.id
