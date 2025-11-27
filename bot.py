@@ -750,23 +750,64 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await list_jokes(update)
         return
 
-    # ----------------- فال -----------------
-    if text == "فال":
-        await send_random_fortune(update, context)
+# -----------------------------
+# توابع کمکی برای ذخیره و بارگذاری JSON
+# -----------------------------
+def load_data(file_name):
+    if os.path.exists(file_name):
+        with open(file_name, "r", encoding="utf-8") as f:
+            try:
+                return json.load(f)
+            except json.JSONDecodeError:
+                return {}
+    return {}
+
+# -----------------------------
+import os
+import json
+import random
+from telegram import Update
+from telegram.ext import ContextTypes
+
+# -----------------------------
+# بارگذاری فال‌ها از JSON
+# -----------------------------
+def load_fortunes():
+    if os.path.exists("fortunes.json"):
+        with open("fortunes.json", "r", encoding="utf-8") as f:
+            try:
+                return json.load(f)
+            except json.JSONDecodeError:
+                return {}
+    return {}
+
+# -----------------------------
+# پاسخگویی به درخواست "فال"
+# -----------------------------
+async def send_fortune(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    data = load_fortunes()
+    if not data:
+        await update.message.reply_text("هنوز فالی ثبت نشده 😔")
         return
 
-    if text == "ثبت فال" and reply_msg:
-        await save_fortune(update)
-        return
+    key, val = random.choice(list(data.items()))
+    content_type = val.get("type", "text")
+    value = val.get("value", "")
 
-    if text == "حذف فال" and reply_msg:
-        await delete_fortune(update)
-        return
-
-    if text in ["لیست فال", "لیست فال‌ها", "لیست فال‌", "لیست فالها"]:
-        await list_fortunes(update)
-        return
-
+    try:
+        if content_type == "text":
+            await update.message.reply_text("🔮 " + value)
+        elif content_type == "photo":
+            await update.message.reply_photo(photo=value, caption="🔮 تصویری!")
+        elif content_type == "video":
+            await update.message.reply_video(video=value, caption="🔮 ویدیویی!")
+        elif content_type == "sticker":
+            await update.message.reply_sticker(sticker=value)
+        else:
+            await update.message.reply_text("⚠️ نوع فایل پشتیبانی نمی‌شود.")
+    except Exception as e:
+        await update.message.reply_text(f"⚠️ خطا در ارسال فال: {e}")
+    
 # ======================= 📨 ارسال همگانی =======================
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update, Message
 from telegram.ext import ContextTypes
