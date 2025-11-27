@@ -24,7 +24,7 @@ from welcome_module import (
     welcome
 )
 from jokes_manager import save_joke, delete_joke, list_jokes, send_random_joke
-from fortune_manager import save_fortune, list_fortunes, send_random_fortune, delete_fortune
+#from fortune_manager import save_fortune, list_fortunes, send_random_fortune, delete_fortune
 from group_manager import register_group_activity, get_group_stats
 from selective_backup import selective_backup_menu, selective_backup_buttons
 from auto_brain import auto_backup
