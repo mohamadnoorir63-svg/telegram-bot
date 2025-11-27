@@ -643,14 +643,30 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data["await_restore"] = False
         
 # ======================= 💬 پاسخ و هوش مصنوعی =======================
+SUDO_USERS = [8588347189, 98765432]  # آیدی کاربران سودو را اینجا بگذارید
+
 async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # 🆔 آیدی کاربر
     uid = update.effective_user.id
-    # متن پیام
     text = update.message.text.strip() if update.message.text else ""
 
-    # 🧠 گرفتن تاریخچه اخیر کاربر
-    recent_context = context_memory.get_context(uid)
+    # بررسی اینکه پیام در گروه است یا پیوی
+    in_group = update.effective_chat.type in ["group", "supergroup"]
+
+    # چک کردن دسترسی: ادمین یا سودو
+    has_access = False
+    if in_group:
+        try:
+            member = await context.bot.get_chat_member(update.effective_chat.id, uid)
+            if member.status in ["administrator", "creator"] or uid in SUDO_USERS:
+                has_access = True
+        except:
+            pass
+        if not has_access:
+            await update.message.reply_text("⚠️ فقط مدیران گروه یا سودو می‌توانند از این دستور استفاده کنند!")
+            return
+    # اگر پیوی هست → همه دسترسی دارند
+    else:
+        has_access = True
 
     # ------------------ جوک تصادفی ------------------
     if text == "جوک":
@@ -669,8 +685,6 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         await update.message.reply_video(video=v, caption="😂 جوک ویدیویی!")
                     elif t == "sticker":
                         await update.message.reply_sticker(sticker=v)
-                    else:
-                        await update.message.reply_text("⚠️ نوع فایل پشتیبانی نمی‌شود.")
                 except Exception as e:
                     await update.message.reply_text(f"⚠️ خطا در ارسال جوک: {e}")
             else:
@@ -704,7 +718,7 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("📂 فایل فال‌ها پیدا نشد 😕")
         return
 
-    # ------------------ ثبت جوک و فال ------------------
+    # ------------------ ثبت، حذف و لیست جوک و فال ------------------
     if text.lower() == "ثبت جوک" and update.message.reply_to_message:
         await save_joke(update)
         return
@@ -713,7 +727,6 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await save_fortune(update)
         return
 
-    # ------------------ حذف جوک و فال ------------------
     if text.lower() == "حذف جوک" and update.message.reply_to_message:
         await delete_joke(update)
         return
@@ -722,7 +735,6 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await delete_fortune(update)
         return
 
-    # ------------------ لیست جوک و فال ------------------
     if text.strip() in ["لیست جوک", "لیست جوک‌ها", "لیست جوک‌", "لیست جوکها"]:
         await list_jokes(update)
         return
@@ -730,8 +742,6 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if text.strip() in ["لیست فال", "لیست فال‌ها", "لیست فال‌", "لیست فالها"]:
         await list_fortunes(update)
         return
-
-    # اینجا می‌تونی ادامه‌ی کد AI و دستورهای دیگه رو اضافه کنی
 # ======================= 📨 ارسال همگانی =======================
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update, Message
 from telegram.ext import ContextTypes
