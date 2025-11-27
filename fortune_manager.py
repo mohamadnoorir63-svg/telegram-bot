@@ -220,32 +220,39 @@ async def delete_fortune(update: Update):
 
 # ========================= ارسال فال تصادفی =========================
 
-async def send_random_fortune(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    data = load_fortunes()
-    if not data:
-        return await update.message.reply_text("📭 هنوز فالی ذخیره نشده.")
+import aiohttp
+import tempfile
+import os
+from telegram import InputFile
 
-    sent_file = os.path.join(BASE_DIR, "sent_fortunes.json")
-    sent = _load_json(sent_file, [])
+async def send_media(update, media_type, val, k):
+    file = None
+    if val.startswith("http://") or val.startswith("https://"):
+        # دانلود فایل موقت
+        temp_path = os.path.join(tempfile.gettempdir(), f"{k}_{os.path.basename(val)}")
+        async with aiohttp.ClientSession() as session:
+            async with session.get(val) as resp:
+                if resp.status == 200:
+                    with open(temp_path, "wb") as f:
+                        f.write(await resp.read())
+                    file = InputFile(temp_path)
+                else:
+                    return await update.message.reply_text(f"⚠️ دانلود فایل ممکن نبود: {val}")
+    else:
+        # مسیر لوکال
+        if not os.path.exists(val):
+            return await update.message.reply_text(f"⚠️ فایل پیدا نشد: {val}")
+        file = InputFile(val)
 
-    keys = list(data.keys())
-    remaining = [k for k in keys if k not in sent]
-
-    if not remaining:
-        sent = []
-        remaining = keys.copy()
-
-    last = sent[-1] if sent else None
-    options = [k for k in remaining if k != last] or remaining
-
-    k = random.choice(options)
-    sent.append(k)
-
-    with open(sent_file, "w", encoding="utf-8") as f:
-        json.dump(sent, f, ensure_ascii=False, indent=2)
-
-    v = data[k]
-    await send_media(update, v["type"], v["value"], k)
+    # ارسال
+    if media_type == "photo":
+        await update.message.reply_photo(file, caption=f"🔮 فال شماره {k}")
+    elif media_type == "video":
+        await update.message.reply_video(file, caption=f"🎥 فال شماره {k}")
+    elif media_type == "sticker":
+        await update.message.reply_sticker(file)
+    else:
+        await update.message.reply_text(f"⚠️ نوع ناشناخته: {media_type}")
 
 # ========================= لیست فال‌ها =========================
 
