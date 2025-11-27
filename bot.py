@@ -24,7 +24,6 @@ from welcome_module import (
     welcome
 )
 from jokes_manager import save_joke, delete_joke, list_jokes, send_random_joke
-#from fortune_manager import save_fortune, list_fortunes, send_random_fortune, delete_fortune
 from group_manager import register_group_activity, get_group_stats
 from selective_backup import selective_backup_menu, selective_backup_buttons
 from auto_brain import auto_backup
@@ -731,28 +730,33 @@ import random
 from telegram import Update
 from telegram.ext import ContextTypes
 
+FILE_FORTUNES = "fortunes.json"
+
 # -----------------------------
-# بارگذاری فال‌ها از JSON
+# توابع کمکی JSON
 # -----------------------------
-def load_fortunes():
-    if os.path.exists("fortunes.json"):
-        with open("fortunes.json", "r", encoding="utf-8") as f:
+def load_data(file_name):
+    if os.path.exists(file_name):
+        with open(file_name, "r", encoding="utf-8") as f:
             try:
                 return json.load(f)
             except json.JSONDecodeError:
                 return {}
     return {}
 
+def save_data(file_name, data):
+    with open(file_name, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
 # -----------------------------
-# پاسخگویی به درخواست "فال"
+# ارسال فال تصادفی
 # -----------------------------
 async def send_fortune(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    data = load_fortunes()
+    data = load_data(FILE_FORTUNES)
     if not data:
         await update.message.reply_text("هنوز فالی ثبت نشده 😔")
         return
 
-    # انتخاب تصادفی فال
     key, val = random.choice(list(data.items()))
     content_type = val.get("type", "text")
     value = val.get("value", "")
@@ -772,7 +776,76 @@ async def send_fortune(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"⚠️ خطا در ارسال فال: {e}")
 
 # -----------------------------
-# افزودن تشخیص متن "فال" در پیام‌ها
+# ثبت فال (با ریپلای)
+# -----------------------------
+async def save_fortune(update: Update):
+    reply_msg = update.message.reply_to_message
+    if not reply_msg:
+        await update.message.reply_text("برای ثبت فال، لطفاً روی پیام فال ریپلای کنید.")
+        return
+
+    data = load_data(FILE_FORTUNES)
+    # تعیین شناسه جدید
+    new_id = str(max([int(k) for k in data.keys()], default=0) + 1)
+
+    if reply_msg.text:
+        data[new_id] = {"type": "text", "value": reply_msg.text}
+    elif reply_msg.photo:
+        file_id = reply_msg.photo[-1].file_id
+        data[new_id] = {"type": "photo", "value": file_id}
+    elif reply_msg.video:
+        file_id = reply_msg.video.file_id
+        data[new_id] = {"type": "video", "value": file_id}
+    elif reply_msg.sticker:
+        file_id = reply_msg.sticker.file_id
+        data[new_id] = {"type": "sticker", "value": file_id}
+    else:
+        await update.message.reply_text("⚠️ نوع پیام پشتیبانی نمی‌شود.")
+        return
+
+    save_data(FILE_FORTUNES, data)
+    await update.message.reply_text("✅ فال با موفقیت ثبت شد!")
+
+# -----------------------------
+# حذف فال (با ریپلای)
+# -----------------------------
+async def delete_fortune(update: Update):
+    reply_msg = update.message.reply_to_message
+    if not reply_msg:
+        await update.message.reply_text("برای حذف فال، لطفاً روی پیام فال ریپلای کنید.")
+        return
+
+    data = load_data(FILE_FORTUNES)
+    # جستجو فال مشابه
+    to_delete = None
+    for k, v in data.items():
+        if (v.get("value") == (reply_msg.text or getattr(reply_msg, 'file_id', None))):
+            to_delete = k
+            break
+
+    if to_delete:
+        del data[to_delete]
+        save_data(FILE_FORTUNES, data)
+        await update.message.reply_text("✅ فال حذف شد!")
+    else:
+        await update.message.reply_text("⚠️ فال پیدا نشد.")
+
+# -----------------------------
+# لیست فال‌ها
+# -----------------------------
+async def list_fortunes(update: Update):
+    data = load_data(FILE_FORTUNES)
+    if not data:
+        await update.message.reply_text("هنوز فالی ثبت نشده 😔")
+        return
+
+    msg = "📜 لیست فال‌ها:\n"
+    for k, v in data.items():
+        msg += f"{k}: {v.get('value')[:50]}{'...' if len(v.get('value',''))>50 else ''}\n"
+    await update.message.reply_text(msg)
+
+# -----------------------------
+# تابع اصلی reply
 # -----------------------------
 async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     message = update.message
@@ -798,8 +871,16 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if text == "فال":
         await send_fortune(update, context)
         return
+    if text == "ثبت فال" and reply_msg:
+        await save_fortune(update)
+        return
+    if text == "حذف فال" and reply_msg:
+        await delete_fortune(update)
+        return
+    if text in ["لیست فال", "لیست فال‌ها", "لیست فالها"]:
+        await list_fortunes(update)
+        return
     # --------------------------------------
-
 # ======================= 📨 ارسال همگانی =======================
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update, Message
 from telegram.ext import ContextTypes
