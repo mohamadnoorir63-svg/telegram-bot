@@ -1,7 +1,6 @@
 import json
 import os
 from datetime import datetime
-from memory_manager import load_data, save_data
 
 GROUP_FILE = "group_data.json"
 
@@ -20,7 +19,6 @@ def load_groups():
     with open(GROUP_FILE, "r", encoding="utf-8") as f:
         try:
             data = json.load(f)
-            # اگر فایل خراب یا رشته بود، اصلاح شود
             if not isinstance(data, dict) or "groups" not in data:
                 data = {"groups": []}
         except:
