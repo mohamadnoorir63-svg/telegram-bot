@@ -725,9 +725,12 @@ async def reload_memory(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(final_text)
         
 # ======================= 💬 پاسخ و هوش مصنوعی =======================
-SUDO_USERS = [8588347189, 98765432]  # آیدی کاربران سودو را اینجا بگذارید
+SUDO_USERS = [8588347189, 98765432]  # آیدی سودوها
+import os, random
+from fortune_manager import save_fortune, send_random_fortune, list_fortunes, delete_fortune
+from joke_manager import save_joke, send_random_joke, list_jokes, delete_joke  # فرض بر این است که مشابه فال هست
 
-async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def reply(update, context):
     uid = update.effective_user.id
     text = update.message.text.strip() if update.message.text else ""
 
@@ -745,81 +748,47 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
             pass
         if not has_access:
             return
-    # اگر پیوی هست → همه دسترسی دارند
     else:
         has_access = True
 
     # ------------------ جوک تصادفی ------------------
     if text == "جوک":
-        if os.path.exists("jokes.json"):
-            data = load_data("jokes.json")
-            if data:
-                key, val = random.choice(list(data.items()))
-                t = val.get("type", "text")
-                v = val.get("value", "")
-                try:
-                    if t == "text":
-                        await update.message.reply_text("😂 " + v)
-                    elif t == "photo":
-                        await update.message.reply_photo(photo=v, caption="😂 جوک تصویری!")
-                    elif t == "video":
-                        await update.message.reply_video(video=v, caption="😂 جوک ویدیویی!")
-                    elif t == "sticker":
-                        await update.message.reply_sticker(sticker=v)
-                except Exception as e:
-                    await update.message.reply_text(f"⚠️ خطا در ارسال جوک: {e}")
-            else:
-                await update.message.reply_text("هنوز جوکی ثبت نشده 😅")
-        else:
-            await update.message.reply_text("📂 فایل جوک‌ها پیدا نشد 😕")
+        await send_random_joke(update, context)
         return
 
     # ------------------ فال تصادفی ------------------
     if text == "فال":
-        if os.path.exists("fortunes.json"):
-            data = load_data("fortunes.json")
-            if data:
-                key, val = random.choice(list(data.items()))
-                t = val.get("type", "text")
-                v = val.get("value", "")
-                try:
-                    if t == "text":
-                        await update.message.reply_text("🔮 " + v)
-                    elif t == "photo":
-                        await update.message.reply_photo(photo=v, caption="🔮 فال تصویری!")
-                    elif t == "video":
-                        await update.message.reply_video(video=v, caption="🔮 فال ویدیویی!")
-                    elif t == "sticker":
-                        await update.message.reply_sticker(sticker=v)
-                except Exception as e:
-                    await update.message.reply_text(f"⚠️ خطا در ارسال فال: {e}")
-            else:
-                await update.message.reply_text("هنوز فالی ثبت نشده 😔")
-        else:
-            await update.message.reply_text("📂 فایل فال‌ها پیدا نشد 😕")
+        await send_random_fortune(update, context)
         return
 
-    # ------------------ ثبت، حذف و لیست جوک و فال ------------------
+    # ------------------ ثبت جوک ------------------
     if text.lower() == "ثبت جوک" and update.message.reply_to_message:
         await save_joke(update)
+        await send_random_joke(update, context)  # ارسال فوری بعد از ثبت
         return
 
+    # ------------------ ثبت فال ------------------
     if text.lower() == "ثبت فال" and update.message.reply_to_message:
         await save_fortune(update)
+        await send_random_fortune(update, context)  # ارسال فوری بعد از ثبت
         return
 
+    # ------------------ حذف جوک ------------------
     if text.lower() == "حذف جوک" and update.message.reply_to_message:
         await delete_joke(update)
         return
 
+    # ------------------ حذف فال ------------------
     if text.lower() == "حذف فال" and update.message.reply_to_message:
         await delete_fortune(update)
         return
 
+    # ------------------ لیست جوک‌ها ------------------
     if text.strip() in ["لیست جوک", "لیست جوک‌ها", "لیست جوک‌", "لیست جوکها"]:
         await list_jokes(update)
         return
 
+    # ------------------ لیست فال‌ها ------------------
     if text.strip() in ["لیست فال", "لیست فال‌ها", "لیست فال‌", "لیست فالها"]:
         await list_fortunes(update)
         return
