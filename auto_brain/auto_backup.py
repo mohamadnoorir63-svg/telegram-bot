@@ -49,8 +49,6 @@ async def cloudsync_internal(bot, reason="Manual Backup"):
         with zipfile.ZipFile(filename, "w", compression=zipfile.ZIP_DEFLATED) as zipf:
             # 🧩 افزودن مسیرهای مهم به‌صورت دستی
             important_files_extra = [
-        "memory.json",
-        "shadow_memory.json",
         "group_data.json",
         "fortunes.json",
         "jokes.json",
@@ -148,8 +146,6 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         # 🧩 فایل‌های مهم برای بازیابی
         important_files = [
-            "memory.json",
-            "shadow_memory.json",
             "group_data.json",
             "jokes.json",
             "fortunes.json",
@@ -177,10 +173,7 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 moved_any = True
                 print(f"♻️ بازیابی فایل: {fname}")
 
-        # 🔁 بازسازی فایل‌های حافظه
-        from memory_manager import init_files
-        init_files()
-
+        
         if moved_any:
             await update.message.reply_text("✅ بازیابی کامل انجام شد!")
         else:
