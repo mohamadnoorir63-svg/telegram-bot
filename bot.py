@@ -760,16 +760,24 @@ def save_data(file_name, data):
 # بررسی مدیر یا سودو یا پیوی
 # -----------------------------
 async def is_admin_or_private(update: Update):
+    user_id = update.message.from_user.id
+
+    # اگر پیوی هست
     if update.message.chat.type == "private":
         return True
+
+    # اگر سودو هست
+    if user_id in SUDO_USERS:
+        return True
+
+    # اگر مدیر گروه هست
     try:
-        member = await update.message.chat.get_member(update.message.from_user.id)
+        member = await update.message.chat.get_member(user_id)
         if member.status in ("administrator", "creator"):
             return True
     except:
-        pass
-    if update.message.from_user.id in SUDO_USERS:
-        return True
+        return False
+
     return False
 
 # -----------------------------
@@ -778,14 +786,17 @@ async def is_admin_or_private(update: Update):
 async def send_random_joke(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await is_admin_or_private(update):
         return
+
     data = load_data(FILE_JOKES)
     if not data:
         if update.message.chat.type=="private":
             await update.message.reply_text("هیچ جوکی ثبت نشده 😔")
         return
+
     key, val = random.choice(list(data.items()))
     content_type = val.get("type","text")
     value = val.get("value","")
+
     try:
         if content_type == "text":
             sent_msg = await update.message.reply_text(value)
@@ -797,6 +808,7 @@ async def send_random_joke(update: Update, context: ContextTypes.DEFAULT_TYPE):
             sent_msg = await update.message.reply_sticker(sticker=value)
         else:
             return
+
         val["message_id"] = sent_msg.message_id
         val["chat_id"] = sent_msg.chat.id
         data[key] = val
@@ -807,10 +819,12 @@ async def send_random_joke(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def save_joke(update: Update):
     if not await is_admin_or_private(update):
         return
+
     reply_msg = update.message.reply_to_message
     if not reply_msg:
         await update.message.reply_text("لطفاً روی پیام جوک ریپلای کنید.")
         return
+
     data = load_data(FILE_JOKES)
     new_id = str(max([int(k) for k in data.keys()], default=0) + 1)
 
@@ -849,25 +863,30 @@ async def save_joke(update: Update):
     else:
         await update.message.reply_text("⚠️ نوع پیام پشتیبانی نمی‌شود.")
         return
+
     save_data(FILE_JOKES, data)
     await update.message.reply_text("✅ جوک ثبت شد و پیام مستقل ایجاد شد!")
 
 async def delete_joke(update: Update):
     if not await is_admin_or_private(update):
         return
+
     reply_msg = update.message.reply_to_message
     if not reply_msg:
         return
+
     data = load_data(FILE_JOKES)
     to_delete = None
     for k,v in data.items():
         if v.get("message_id") == reply_msg.message_id:
             to_delete = k
             break
+
     if to_delete:
         try:
             await update.bot.delete_message(chat_id=reply_msg.chat.id,message_id=reply_msg.message_id)
-        except: pass
+        except:
+            pass
         del data[to_delete]
         save_data(FILE_JOKES,data)
         await update.message.reply_text("✅ جوک حذف شد!")
@@ -878,14 +897,17 @@ async def delete_joke(update: Update):
 async def send_fortune(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await is_admin_or_private(update):
         return
+
     data = load_data(FILE_FORTUNES)
     if not data:
         if update.message.chat.type=="private":
             await update.message.reply_text("هنوز فالی ثبت نشده 😔")
         return
+
     key, val = random.choice(list(data.items()))
     content_type = val.get("type","text")
     value = val.get("value","")
+
     try:
         if content_type == "text":
             sent_msg = await update.message.reply_text("🔮 "+value)
@@ -897,21 +919,26 @@ async def send_fortune(update: Update, context: ContextTypes.DEFAULT_TYPE):
             sent_msg = await update.message.reply_sticker(sticker=value)
         else:
             return
+
         val["message_id"] = sent_msg.message_id
         val["chat_id"] = sent_msg.chat.id
         data[key] = val
         save_data(FILE_FORTUNES,data)
-    except: pass
+    except:
+        pass
 
 async def save_fortune(update: Update):
     if not await is_admin_or_private(update):
         return
+
     reply_msg = update.message.reply_to_message
-    if not reply_msg: return
+    if not reply_msg:
+        return
+
     data = load_data(FILE_FORTUNES)
     new_id = str(max([int(k) for k in data.keys()], default=0)+1)
 
-    # تکراری و ارسال پیام تکی
+    # بررسی تکراری و ارسال پیام تکی
     if reply_msg.text:
         if any(v.get("value")==reply_msg.text for v in data.values()):
             await update.message.reply_text("⚠️ این فال قبلاً ثبت شده است.")
@@ -945,24 +972,30 @@ async def save_fortune(update: Update):
                          "message_id":sent_msg.message_id,"chat_id":sent_msg.chat.id}
     else:
         return
+
     save_data(FILE_FORTUNES,data)
     await update.message.reply_text("✅ فال ثبت شد و پیام مستقل ایجاد شد!")
 
 async def delete_fortune(update: Update):
     if not await is_admin_or_private(update):
         return
+
     reply_msg = update.message.reply_to_message
-    if not reply_msg: return
+    if not reply_msg:
+        return
+
     data = load_data(FILE_FORTUNES)
     to_delete = None
     for k,v in data.items():
         if v.get("message_id") == reply_msg.message_id:
             to_delete = k
             break
+
     if to_delete:
         try:
             await update.bot.delete_message(chat_id=reply_msg.chat.id,message_id=reply_msg.message_id)
-        except: pass
+        except:
+            pass
         del data[to_delete]
         save_data(FILE_FORTUNES,data)
         await update.message.reply_text("✅ فال حذف شد!")
@@ -996,6 +1029,7 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if text == "حذف فال" and reply_msg:
         await delete_fortune(update)
         return
+
 # ======================= 📨 ارسال همگانی =======================
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update, Message
 from telegram.ext import ContextTypes
