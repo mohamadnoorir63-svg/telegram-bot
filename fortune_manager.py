@@ -4,6 +4,8 @@ import json
 import os
 import random
 import uuid
+import aiohttp
+import tempfile
 from datetime import datetime
 from urllib.parse import urlparse
 from telegram import Update, InputFile
@@ -27,7 +29,6 @@ def _is_valid_url(val: str) -> bool:
     return bool(u.scheme and u.netloc)
 
 def _abs_media_path(val: str) -> str:
-    """مسیر کامل فقط یک بار ساخته می‌شود"""
     if not val:
         return val
     if _is_valid_url(val):
@@ -55,48 +56,38 @@ def save_fortunes(data):
         json.dump(data, f, ensure_ascii=False, indent=2)
 
 # ========================= ارسال مدیا =========================
-import aiohttp
-import uuid
-import tempfile
-
-async def download_to_temp(url: str) -> str:
-    """دانلود فایل از URL و ذخیره در فایل موقت"""
-    temp_path = os.path.join(tempfile.gettempdir(), uuid.uuid4().hex)
-    async with aiohttp.ClientSession() as session:
-        async with session.get(url) as resp:
-            if resp.status != 200:
-                raise Exception(f"لینک نامعتبر است: {url}")
-            with open(temp_path, "wb") as f:
-                f.write(await resp.read())
-    return temp_path
-
 
 async def send_media(update: Update, media_type: str, val: str, k: str):
+    """ارسال متن یا هر نوع مدیا. URLها ابتدا دانلود می‌شوند."""
+    real_path = _abs_media_path(val)
+    file = None
 
-    # اگر URL بود → دانلود → تبدیل به فایل
-    if _is_valid_url(val):
+    if _is_valid_url(real_path):
+        temp_path = os.path.join(tempfile.gettempdir(), f"{k}_{os.path.basename(real_path)}")
         try:
-            local_file = await download_to_temp(val)
-            file = InputFile(local_file)
+            async with aiohttp.ClientSession() as session:
+                async with session.get(real_path) as resp:
+                    if resp.status == 200:
+                        with open(temp_path, "wb") as f:
+                            f.write(await resp.read())
+                        file = InputFile(temp_path)
+                    else:
+                        return await update.message.reply_text(f"⚠️ دانلود فایل ممکن نبود: {real_path}")
         except Exception as e:
-            return await update.message.reply_text(f"⚠️ دانلود فایل از URL ممکن نبود: {e}")
-
+            return await update.message.reply_text(f"⚠️ خطا در دانلود: {e}")
     else:
-        # مسیر لوکال
-        val = _abs_media_path(val)
-        if not os.path.exists(val):
-            return await update.message.reply_text(f"⚠️ فایل پیدا نشد: {val}")
-        file = InputFile(val)
+        if not os.path.exists(real_path):
+            return await update.message.reply_text(f"⚠️ فایل پیدا نشد: {real_path}")
+        file = InputFile(real_path)
 
-    # ارسال بر اساس نوع
     if media_type == "photo":
-        await update.message.reply_photo(photo=file, caption=f"🔮 فال شماره {k}")
+        await update.message.reply_photo(file, caption=f"🔮 فال شماره {k}")
     elif media_type == "video":
-        await update.message.reply_video(video=file, caption=f"🎥 فال شماره {k}")
+        await update.message.reply_video(file, caption=f"🎥 فال شماره {k}")
     elif media_type == "sticker":
-        await update.message.reply_sticker(sticker=file)
+        await update.message.reply_sticker(file)
     else:
-        await update.message.reply_text(f"🔮 فال شماره {k}\n\n{file}")
+        await update.message.reply_text(f"⚠️ نوع ناشناخته: {media_type}")
 
 # ========================= ثبت فال =========================
 
@@ -109,13 +100,11 @@ async def save_fortune(update: Update):
     entry = {"type": "text", "value": ""}
 
     try:
-        # ---- متن ----
         if reply.text or reply.caption:
             val = (reply.text or reply.caption).strip()
             entry["type"] = "text"
             entry["value"] = val
 
-        # ---- عکس ----
         elif reply.photo:
             file = await reply.photo[-1].get_file()
             filename = f"photo_{uuid.uuid4()}.jpg"
@@ -124,7 +113,6 @@ async def save_fortune(update: Update):
             entry["type"] = "photo"
             entry["value"] = os.path.relpath(path, BASE_DIR)
 
-        # ---- ویدیو ----
         elif reply.video:
             file = await reply.video.get_file()
             filename = f"video_{uuid.uuid4()}.mp4"
@@ -133,7 +121,6 @@ async def save_fortune(update: Update):
             entry["type"] = "video"
             entry["value"] = os.path.relpath(path, BASE_DIR)
 
-        # ---- استیکر ----
         elif reply.sticker:
             file = await reply.sticker.get_file()
             filename = f"sticker_{uuid.uuid4()}.webp"
@@ -150,7 +137,7 @@ async def save_fortune(update: Update):
             if v.get("type") == entry["type"] and v.get("value") == entry["value"]:
                 return await update.message.reply_text("😅 این فال قبلاً ذخیره شده بود!")
 
-        # پاک‌سازی قدیمی‌ترین
+        # پاکسازی قدیمی‌ترین
         if len(data) >= MAX_FORTUNES:
             oldest = sorted(data.keys())[0]
             old_val = _abs_media_path(data[oldest]["value"])
@@ -158,12 +145,13 @@ async def save_fortune(update: Update):
                 os.remove(old_val)
             data.pop(oldest)
 
-        # کلید یکتا
         key = str(uuid.uuid4())
         data[key] = entry
         save_fortunes(data)
 
-        await update.message.reply_text("✅ فال ذخیره شد!")
+        # بلافاصله ارسال فال ثبت شده
+        await send_media(update, entry["type"], entry["value"], key)
+        await update.message.reply_text("✅ فال ذخیره و ارسال شد!")
 
     except Exception as e:
         await update.message.reply_text(f"⚠️ خطا در ذخیره فال: {e}")
@@ -195,7 +183,6 @@ async def delete_fortune(update: Update):
         return await update.message.reply_text("⚠️ نوع پیام قابل شناسایی نیست.")
 
     target_key = None
-
     for k, v in data.items():
         if v["type"] == delete_type:
             if delete_type == "text":
@@ -209,7 +196,6 @@ async def delete_fortune(update: Update):
     if not target_key:
         return await update.message.reply_text("⚠️ فال موردنظر پیدا نشد.")
 
-    # پاک کردن فایل لوکال
     real_path = _abs_media_path(data[target_key]["value"])
     if os.path.exists(real_path) and not _is_valid_url(real_path):
         os.remove(real_path)
@@ -220,39 +206,32 @@ async def delete_fortune(update: Update):
 
 # ========================= ارسال فال تصادفی =========================
 
-import aiohttp
-import tempfile
-import os
-from telegram import InputFile
+async def send_random_fortune(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    data = load_fortunes()
+    if not data:
+        return await update.message.reply_text("📭 هنوز فالی ذخیره نشده.")
 
-async def send_media(update, media_type, val, k):
-    file = None
-    if val.startswith("http://") or val.startswith("https://"):
-        # دانلود فایل موقت
-        temp_path = os.path.join(tempfile.gettempdir(), f"{k}_{os.path.basename(val)}")
-        async with aiohttp.ClientSession() as session:
-            async with session.get(val) as resp:
-                if resp.status == 200:
-                    with open(temp_path, "wb") as f:
-                        f.write(await resp.read())
-                    file = InputFile(temp_path)
-                else:
-                    return await update.message.reply_text(f"⚠️ دانلود فایل ممکن نبود: {val}")
-    else:
-        # مسیر لوکال
-        if not os.path.exists(val):
-            return await update.message.reply_text(f"⚠️ فایل پیدا نشد: {val}")
-        file = InputFile(val)
+    sent_file = os.path.join(BASE_DIR, "sent_fortunes.json")
+    sent = _load_json(sent_file, [])
 
-    # ارسال
-    if media_type == "photo":
-        await update.message.reply_photo(file, caption=f"🔮 فال شماره {k}")
-    elif media_type == "video":
-        await update.message.reply_video(file, caption=f"🎥 فال شماره {k}")
-    elif media_type == "sticker":
-        await update.message.reply_sticker(file)
-    else:
-        await update.message.reply_text(f"⚠️ نوع ناشناخته: {media_type}")
+    keys = list(data.keys())
+    remaining = [k for k in keys if k not in sent]
+
+    if not remaining:
+        sent = []
+        remaining = keys.copy()
+
+    last = sent[-1] if sent else None
+    options = [k for k in remaining if k != last] or remaining
+
+    k = random.choice(options)
+    sent.append(k)
+
+    with open(sent_file, "w", encoding="utf-8") as f:
+        json.dump(sent, f, ensure_ascii=False, indent=2)
+
+    v = data[k]
+    await send_media(update, v["type"], v["value"], k)
 
 # ========================= لیست فال‌ها =========================
 
@@ -267,13 +246,9 @@ async def list_fortunes(update: Update):
     )
 
     shown = 0
-
-    # فقط ۱۰ فال آخر
     for k in sorted(data.keys())[-10:]:
         v = data[k]
-
         try:
-            # نکته مهم: اینجا مسیر را دیگر تبدیل نمی‌کنیم
             await send_media(update, v["type"], v["value"], k)
             shown += 1
         except Exception as e:
