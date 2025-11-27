@@ -933,8 +933,6 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await list_fortunes(update)
         return
 
-    # پاسخ پیش‌فرض
-    await update.message.reply_text("⚠️ دستور شناخته نشد.")
 # ======================= 📨 ارسال همگانی =======================
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update, Message
 from telegram.ext import ContextTypes
