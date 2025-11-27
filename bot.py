@@ -553,7 +553,29 @@ async def cloudsync(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await cloudsync_internal(context.bot, "Manual Cloud Backup")
 
 # ======================= 💾 بک‌آپ و بازیابی ZIP در چت =======================
+import os, shutil, zipfile, json
+from telegram import Update
+from telegram.ext import ContextTypes
 
+# نمونه‌ی ساده init_files برای بازسازی فایل‌های پایه
+def init_files():
+    base_files = [
+        "group_data.json",
+        "users.json",
+        "data/custom_commands.json",
+        "jokes.json",
+        "fortunes.json"
+    ]
+    for f in base_files:
+        dir_name = os.path.dirname(f)
+        if dir_name and not os.path.exists(dir_name):
+            os.makedirs(dir_name, exist_ok=True)
+        if not os.path.exists(f):
+            if f.endswith(".json"):
+                with open(f, "w", encoding="utf-8") as fp:
+                    json.dump({} if f != "users.json" else [], fp, ensure_ascii=False, indent=2)
+
+# ======================= 💾 بک‌آپ و بازیابی ZIP در چت =======================
 async def backup(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """بک‌آپ دستی و ارسال در چت"""
     await cloudsync_internal(context.bot, "Manual Backup")
@@ -589,22 +611,16 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         # 🧩 فایل‌ها و پوشه‌های مهم برای بازیابی
         important_files = [
-        "group_data.json",
-        "jokes.json",
-        "fortunes.json",
-        "aliases.json",
-        "data/members.json",
-        "users.json",
-
-        # مسیر اصلی
-        "group_control/aliases.json",
-
-        # پوشه رسانه فال‌ها
-        "fortunes_media",
-
-        
-        "custom_commands_backup.json",
-        "data/custom_commands.json"
+            "group_data.json",
+            "jokes.json",
+            "fortunes.json",
+            "aliases.json",
+            "data/members.json",
+            "users.json",
+            "group_control/aliases.json",
+            "fortunes_media",
+            "custom_commands_backup.json",
+            "data/custom_commands.json"
         ]
 
         moved_any = False
@@ -635,8 +651,7 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     moved_any = True
                     print(f"♻️ بازیابی فایل: {fname}")
 
-        # 🔁 بازسازی حافظه‌ها
-        from memory_manager import init_files
+        # 🔁 بازسازی فایل‌های پایه بدون memory_manager
         init_files()
 
         if moved_any:
@@ -653,11 +668,6 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if os.path.exists(restore_dir):
             shutil.rmtree(restore_dir)
         context.user_data["await_restore"] = False
-        
-        import os, json
-from telegram import Update
-from telegram.ext import ContextTypes
-
 # ======================= 🧹 پاکسازی حافظه =======================
 async def reset_memory(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """پاکسازی کامل حافظه ربات — فقط برای مدیر اصلی"""
