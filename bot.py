@@ -654,6 +654,75 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
             shutil.rmtree(restore_dir)
         context.user_data["await_restore"] = False
         
+        import os, json
+from telegram import Update
+from telegram.ext import ContextTypes
+
+# ======================= 🧹 پاکسازی حافظه =======================
+async def reset_memory(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """پاکسازی کامل حافظه ربات — فقط برای مدیر اصلی"""
+    if update.effective_user.id != ADMIN_ID:
+        return await update.message.reply_text("⛔ فقط مدیر اصلی مجازه!")
+
+    files_to_remove = [
+        "group_data.json",
+        "users.json",
+        "data/custom_commands.json",
+        "stickers.json",
+        "jokes.json",
+        "fortunes.json"
+    ]
+
+    for f in files_to_remove:
+        if os.path.exists(f):
+            os.remove(f)
+
+    # بازسازی فایل‌های پایه
+    init_files()
+
+    await update.message.reply_text("✅ حافظه ربات پاکسازی شد و فایل‌های جدید آماده شدند.")
+
+
+# ======================= 🔄 بوت حافظه =======================
+async def reload_memory(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """بوت حافظه ربات — فقط برای مدیر اصلی"""
+    if update.effective_user.id != ADMIN_ID:
+        return await update.message.reply_text("⛔ فقط مدیر اصلی می‌تونه سیستم رو بوت کنه!")
+
+    # بازسازی فایل‌ها
+    init_files()
+
+    # شمارش کاربران و گروه‌ها
+    def count_items(file):
+        if not os.path.exists(file):
+            return 0
+        try:
+            with open(file, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            if isinstance(data, dict):
+                return len(data)
+            elif isinstance(data, list):
+                return len(data)
+        except:
+            return 0
+        return 0
+
+    groups = count_items("group_data.json")
+    users = count_items("users.json")
+    jokes = count_items("jokes.json")
+    fortunes = count_items("fortunes.json")
+
+    final_text = (
+        "────────────────────\n"
+        "✅ سیستم بوت شد!\n\n"
+        f"👤 کاربران: {users}\n"
+        f"👥 گروه‌ها: {groups}\n"
+        f"😂 جوک‌ها: {jokes}\n"
+        f"🔮 فال‌ها: {fortunes}"
+    )
+
+    await update.message.reply_text(final_text)
+        
 # ======================= 💬 پاسخ و هوش مصنوعی =======================
 SUDO_USERS = [8588347189, 98765432]  # آیدی کاربران سودو را اینجا بگذارید
 
