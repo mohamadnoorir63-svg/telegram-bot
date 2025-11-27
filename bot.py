@@ -762,16 +762,7 @@ def load_data(file_name):
                 return {}
     return {}
 
-# -----------------------------
-import os
-import json
-import random
-from telegram import Update
-from telegram.ext import ContextTypes
 
-# -----------------------------
-# بارگذاری فال‌ها از JSON
-# -----------------------------
 def load_fortunes():
     if os.path.exists("fortunes.json"):
         with open("fortunes.json", "r", encoding="utf-8") as f:
