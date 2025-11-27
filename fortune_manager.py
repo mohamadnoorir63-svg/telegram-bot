@@ -55,33 +55,48 @@ def save_fortunes(data):
         json.dump(data, f, ensure_ascii=False, indent=2)
 
 # ========================= ارسال مدیا =========================
+import aiohttp
+import uuid
+import tempfile
+
+async def download_to_temp(url: str) -> str:
+    """دانلود فایل از URL و ذخیره در فایل موقت"""
+    temp_path = os.path.join(tempfile.gettempdir(), uuid.uuid4().hex)
+    async with aiohttp.ClientSession() as session:
+        async with session.get(url) as resp:
+            if resp.status != 200:
+                raise Exception(f"لینک نامعتبر است: {url}")
+            with open(temp_path, "wb") as f:
+                f.write(await resp.read())
+    return temp_path
+
 
 async def send_media(update: Update, media_type: str, val: str, k: str):
-    """فقط یک بار مسیر را تبدیل می‌کنیم"""
-    real_path = _abs_media_path(val)
 
-    # اگر لینک بود
-    if _is_valid_url(real_path):
-        if media_type == "photo":
-            await update.message.reply_photo(photo=real_path, caption=f"🔮 فال شماره {k}")
-        elif media_type == "video":
-            await update.message.reply_video(video=real_path, caption=f"🎥 فال شماره {k}")
-        elif media_type == "sticker":
-            await update.message.reply_sticker(sticker=real_path)
-        return
+    # اگر URL بود → دانلود → تبدیل به فایل
+    if _is_valid_url(val):
+        try:
+            local_file = await download_to_temp(val)
+            file = InputFile(local_file)
+        except Exception as e:
+            return await update.message.reply_text(f"⚠️ دانلود فایل از URL ممکن نبود: {e}")
 
-    # اگر فایل لوکال بود
-    if not os.path.exists(real_path):
-        return await update.message.reply_text(f"⚠️ فایل پیدا نشد:\n{real_path}")
+    else:
+        # مسیر لوکال
+        val = _abs_media_path(val)
+        if not os.path.exists(val):
+            return await update.message.reply_text(f"⚠️ فایل پیدا نشد: {val}")
+        file = InputFile(val)
 
-    file = InputFile(real_path)
-
+    # ارسال بر اساس نوع
     if media_type == "photo":
         await update.message.reply_photo(photo=file, caption=f"🔮 فال شماره {k}")
     elif media_type == "video":
         await update.message.reply_video(video=file, caption=f"🎥 فال شماره {k}")
     elif media_type == "sticker":
         await update.message.reply_sticker(sticker=file)
+    else:
+        await update.message.reply_text(f"🔮 فال شماره {k}\n\n{file}")
 
 # ========================= ثبت فال =========================
 
