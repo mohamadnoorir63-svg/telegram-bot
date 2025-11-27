@@ -726,7 +726,7 @@ async def reload_memory(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
 # ======================= فال جوک =======================
  async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """پاسخ‌دهی فقط برای جوک و فال"""
+        """پاسخ‌دهی فقط برای جوک و فال"""
 
     # 🧩 اطمینان از اینکه پیام معتبره
     if not update.message or not update.message.text:
