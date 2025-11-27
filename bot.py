@@ -54,10 +54,7 @@ from panels.panel_menu import (
 )
 
 from group_control.origin_title import register_origin_title_handlers
-from context_memory import ContextMemory
 
-# 🧠 حافظه کوتاه‌مدت گفتگو برای Context AI
-context_memory = ContextMemory()
 
 from ai_chat.chatgpt_panel import show_ai_panel, chat, start_ai_chat, stop_ai_chat
 from weather_module.weather_panel import show_weather
