@@ -725,6 +725,101 @@ async def reload_memory(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(final_text)
         
 # ======================= فال جوک =======================
+import os
+import json
+import random
+from telegram import Update
+from telegram.ext import ContextTypes
+
+# تابع‌های کمکی برای ذخیره و بارگذاری JSON
+def load_data(file_name):
+    if os.path.exists(file_name):
+        with open(file_name, "r", encoding="utf-8") as f:
+            try:
+                return json.load(f)
+            except json.JSONDecodeError:
+                return {}
+    return {}
+
+def save_data(file_name, data):
+    with open(file_name, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=4)
+
+# ذخیره جوک
+async def save_joke(update: Update):
+    message = update.message.reply_to_message
+    if not message or not message.text:
+        await update.message.reply_text("⚠️ لطفاً پیام متنی را پاسخ دهید تا جوک ذخیره شود.")
+        return
+    data = load_data("jokes.json") or {}
+    new_id = str(len(data) + 1)
+    data[new_id] = {"type": "text", "value": message.text}
+    save_data("jokes.json", data)
+
+# ذخیره فال
+async def save_fortune(update: Update):
+    message = update.message.reply_to_message
+    if not message or not message.text:
+        await update.message.reply_text("⚠️ لطفاً پیام متنی را پاسخ دهید تا فال ذخیره شود.")
+        return
+    data = load_data("fortunes.json") or {}
+    new_id = str(len(data) + 1)
+    data[new_id] = {"type": "text", "value": message.text}
+    save_data("fortunes.json", data)
+
+# حذف جوک
+async def delete_joke(update: Update):
+    message = update.message.reply_to_message
+    if not message or not message.text:
+        await update.message.reply_text("⚠️ لطفاً جوکی که می‌خواهید حذف شود را پاسخ دهید.")
+        return
+    data = load_data("jokes.json") or {}
+    for key, val in list(data.items()):
+        if val.get("value") == message.text:
+            del data[key]
+            save_data("jokes.json", data)
+            await update.message.reply_text("✅ جوک با موفقیت حذف شد!")
+            return
+    await update.message.reply_text("⚠️ جوک پیدا نشد.")
+
+# حذف فال
+async def delete_fortune(update: Update):
+    message = update.message.reply_to_message
+    if not message or not message.text:
+        await update.message.reply_text("⚠️ لطفاً فالی که می‌خواهید حذف شود را پاسخ دهید.")
+        return
+    data = load_data("fortunes.json") or {}
+    for key, val in list(data.items()):
+        if val.get("value") == message.text:
+            del data[key]
+            save_data("fortunes.json", data)
+            await update.message.reply_text("✅ فال با موفقیت حذف شد!")
+            return
+    await update.message.reply_text("⚠️ فال پیدا نشد.")
+
+# لیست جوک‌ها
+async def list_jokes(update: Update):
+    data = load_data("jokes.json") or {}
+    if not data:
+        await update.message.reply_text("هنوز جوکی ثبت نشده 😅")
+        return
+    text = "📃 لیست جوک‌ها:\n\n"
+    for key, val in data.items():
+        text += f"{key}. {val.get('value','')}\n"
+    await update.message.reply_text(text)
+
+# لیست فال‌ها
+async def list_fortunes(update: Update):
+    data = load_data("fortunes.json") or {}
+    if not data:
+        await update.message.reply_text("هنوز فالی ثبت نشده 😔")
+        return
+    text = "📃 لیست فال‌ها:\n\n"
+    for key, val in data.items():
+        text += f"{key}. {val.get('value','')}\n"
+    await update.message.reply_text(text)
+
+# تابع اصلی پاسخگویی
 async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text if update.message.text else ""
 
@@ -746,41 +841,37 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # ✅ جوک تصادفی
     if text == "جوک":
-        if os.path.exists("jokes.json"):
-            data = load_data("jokes.json")
-            if data:
-                key, val = random.choice(list(data.items()))
-                t = val.get("type", "text")
-                v = val.get("value", "")
-                await send_content(v, t, "😂 ")
-            else:
-                await update.message.reply_text("هنوز جوکی ثبت نشده 😅")
+        data = load_data("jokes.json")
+        if data:
+            key, val = random.choice(list(data.items()))
+            t = val.get("type", "text")
+            v = val.get("value", "")
+            await send_content(v, t, "😂 ")
         else:
-            await update.message.reply_text("📂 فایل جوک‌ها پیدا نشد 😕")
+            await update.message.reply_text("هنوز جوکی ثبت نشده 😅")
         return
 
     # ✅ فال تصادفی
     if text == "فال":
-        if os.path.exists("fortunes.json"):
-            data = load_data("fortunes.json")
-            if data:
-                key, val = random.choice(list(data.items()))
-                t = val.get("type", "text")
-                v = val.get("value", "")
-                await send_content(v, t, "🔮 ")
-            else:
-                await update.message.reply_text("هنوز فالی ثبت نشده 😔")
+        data = load_data("fortunes.json")
+        if data:
+            key, val = random.choice(list(data.items()))
+            t = val.get("type", "text")
+            v = val.get("value", "")
+            await send_content(v, t, "🔮 ")
         else:
-            await update.message.reply_text("📂 فایل فال‌ها پیدا نشد 😕")
+            await update.message.reply_text("هنوز فالی ثبت نشده 😔")
         return
 
     # ✅ ثبت جوک و فال
     if text.lower() == "ثبت جوک" and update.message.reply_to_message:
         await save_joke(update)
+        await update.message.reply_text("✅ جوک شما با موفقیت ثبت شد!")
         return
 
     if text.lower() == "ثبت فال" and update.message.reply_to_message:
         await save_fortune(update)
+        await update.message.reply_text("✅ فال شما با موفقیت ثبت شد!")
         return
 
     # 🗑️ حذف جوک و فال
@@ -802,8 +893,7 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     # پاسخ پیش‌فرض
-    reply_text = "⚠️ دستور شناخته نشد."
-    await update.message.reply_text(reply_text)
+    await update.message.reply_text("⚠️ دستور شناخته نشد.")
 # ======================= 📨 ارسال همگانی =======================
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update, Message
 from telegram.ext import ContextTypes
