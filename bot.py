@@ -725,44 +725,15 @@ async def reload_memory(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(final_text)
         
 # ======================= فال جوک =======================
+import os
+import json
+import random
 from telegram import Update
 from telegram.ext import ContextTypes
 
-async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    message = update.message
-    text = (message.text or "").strip().lower()
-    reply_msg = message.reply_to_message
-
-    # ----------------- جوک -----------------
-    if text == "جوک":
-        await send_random_joke(update, context)
-        return
-
-    if text == "ثبت جوک" and reply_msg:
-        await save_joke(update)
-        return
-
-    if text == "حذف جوک" and reply_msg:
-        await delete_joke(update)
-        return
-
-    if text in ["لیست جوک", "لیست جوک‌ها", "لیست جوک‌", "لیست جوکها"]:
-        await list_jokes(update)
-        return
-
 # -----------------------------
-# توابع کمکی برای ذخیره و بارگذاری JSON
+# بارگذاری فال‌ها از JSON
 # -----------------------------
-def load_data(file_name):
-    if os.path.exists(file_name):
-        with open(file_name, "r", encoding="utf-8") as f:
-            try:
-                return json.load(f)
-            except json.JSONDecodeError:
-                return {}
-    return {}
-
-
 def load_fortunes():
     if os.path.exists("fortunes.json"):
         with open("fortunes.json", "r", encoding="utf-8") as f:
@@ -781,6 +752,7 @@ async def send_fortune(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("هنوز فالی ثبت نشده 😔")
         return
 
+    # انتخاب تصادفی فال
     key, val = random.choice(list(data.items()))
     content_type = val.get("type", "text")
     value = val.get("value", "")
@@ -798,7 +770,36 @@ async def send_fortune(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("⚠️ نوع فایل پشتیبانی نمی‌شود.")
     except Exception as e:
         await update.message.reply_text(f"⚠️ خطا در ارسال فال: {e}")
-    
+
+# -----------------------------
+# افزودن تشخیص متن "فال" در پیام‌ها
+# -----------------------------
+async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    message = update.message
+    text = (message.text or "").strip().lower()
+    reply_msg = message.reply_to_message
+
+    # ----------------- جوک -----------------
+    if text == "جوک":
+        await send_random_joke(update, context)
+        return
+    if text == "ثبت جوک" and reply_msg:
+        await save_joke(update)
+        return
+    if text == "حذف جوک" and reply_msg:
+        await delete_joke(update)
+        return
+    if text in ["لیست جوک", "لیست جوک‌ها", "لیست جوک‌", "لیست جوکها"]:
+        await list_jokes(update)
+        return
+    # --------------------------------------
+
+    # ----------------- فال -----------------
+    if text == "فال":
+        await send_fortune(update, context)
+        return
+    # --------------------------------------
+
 # ======================= 📨 ارسال همگانی =======================
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update, Message
 from telegram.ext import ContextTypes
