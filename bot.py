@@ -725,89 +725,71 @@ async def reload_memory(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(final_text)
         
 # ======================= فال جوک =======================
+
 async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """پاسخ‌دهی فقط جوک و فال و مدیریت آن‌ها"""
+    """تابع نهایی پاسخ‌دهی: جوک و فال با متن، عکس، ویدیو و استیکر"""
 
-    if not update.message or not update.message.text:
+    if not update.message:
         return
 
-    text = update.message.text.strip()
+    text = update.message.text or ""
 
-    # ✅ جوک تصادفی
+    # ==================== جوک ====================
     if text == "جوک":
-        if os.path.exists("jokes.json"):
-            data = load_data("jokes.json")
-            if data:
-                key, val = random.choice(list(data.items()))
-                t = val.get("type", "text")
-                v = val.get("value", "")
-                try:
-                    if t == "text":
-                        await update.message.reply_text("😂 " + v)
-                    elif t == "photo":
-                        await update.message.reply_photo(photo=v, caption="😂 جوک تصویری!")
-                    elif t == "video":
-                        await update.message.reply_video(video=v, caption="😂 جوک ویدیویی!")
-                    elif t == "sticker":
-                        await update.message.reply_sticker(sticker=v)
-                    else:
-                        await update.message.reply_text("⚠️ نوع فایل پشتیبانی نمی‌شود.")
-                except Exception as e:
-                    await update.message.reply_text(f"⚠️ خطا در ارسال جوک: {e}")
+        data = load_jokes()
+        if not data:
+            return await update.message.reply_text("📭 هنوز جوکی ذخیره نشده 😅")
+        key, val = random.choice(list(data.items()))
+        t = val.get("type", "text")
+        v = val.get("value", "")
+        try:
+            if t == "text":
+                await update.message.reply_text("😂 " + v)
+            elif t == "photo":
+                if _is_valid_url(v):
+                    await update.message.reply_photo(photo=v, caption="😂 جوک تصویری!")
+                elif os.path.exists(_abs_media_path(v)):
+                    await update.message.reply_photo(photo=InputFile(_abs_media_path(v)), caption="😂 جوک تصویری!")
+                else:
+                    await update.message.reply_text("⚠️ فایل جوک پیدا نشد!")
+            elif t == "video":
+                if _is_valid_url(v):
+                    await update.message.reply_video(video=v, caption="🎥 جوک ویدیویی!")
+                elif os.path.exists(_abs_media_path(v)):
+                    await update.message.reply_video(video=InputFile(_abs_media_path(v)), caption="🎥 جوک ویدیویی!")
+                else:
+                    await update.message.reply_text("⚠️ فایل جوک پیدا نشد!")
+            elif t == "sticker":
+                await update.message.reply_sticker(sticker=v)
             else:
-                await update.message.reply_text("هنوز جوکی ثبت نشده 😅")
-        else:
-            await update.message.reply_text("📂 فایل جوک‌ها پیدا نشد 😕")
+                await update.message.reply_text("⚠️ نوع فایل پشتیبانی نمی‌شود.")
+        except Exception as e:
+            await update.message.reply_text(f"⚠️ خطا در ارسال جوک: {e}")
         return
 
-    # ✅ فال تصادفی
-    if text == "فال":
-        if os.path.exists("fortunes.json"):
-            data = load_data("fortunes.json")
-            if data:
-                key, val = random.choice(list(data.items()))
-                t = val.get("type", "text")
-                v = val.get("value", "")
-                try:
-                    if t == "text":
-                        await update.message.reply_text("🔮 " + v)
-                    elif t == "photo":
-                        await update.message.reply_photo(photo=v, caption="🔮 فال تصویری!")
-                    elif t == "video":
-                        await update.message.reply_video(video=v, caption="🔮 فال ویدیویی!")
-                    elif t == "sticker":
-                        await update.message.reply_sticker(sticker=v)
-                except Exception as e:
-                    await update.message.reply_text(f"⚠️ خطا در ارسال فال: {e}")
-            else:
-                await update.message.reply_text("هنوز فالی ثبت نشده 😔")
-        else:
-            await update.message.reply_text("📂 فایل فال‌ها پیدا نشد 😕")
-        return
-
-    # ✅ ثبت جوک و فال (در پیام ریپلای)
+    # ثبت، حذف و لیست جوک‌ها
     if text.lower() == "ثبت جوک" and update.message.reply_to_message:
         await save_joke(update)
         return
-
-    if text.lower() == "ثبت فال" and update.message.reply_to_message:
-        await save_fortune(update)
-        return
-
-    # ✅ حذف جوک و فال (در پیام ریپلای)
     if text.lower() == "حذف جوک" and update.message.reply_to_message:
         await delete_joke(update)
         return
-
-    if text.lower() == "حذف فال" and update.message.reply_to_message:
-        await delete_fortune(update)
-        return
-
-    # ✅ لیست جوک‌ها و فال‌ها
     if text.strip() in ["لیست جوک", "لیست جوک‌ها", "لیست جوک‌", "لیست جوکها"]:
         await list_jokes(update)
         return
 
+    # ==================== فال ====================
+    if text == "فال":
+        await send_random_fortune(update, context)
+        return
+
+    # ثبت، حذف و لیست فال‌ها
+    if text.lower() == "ثبت فال" and update.message.reply_to_message:
+        await save_fortune(update)
+        return
+    if text.lower() == "حذف فال" and update.message.reply_to_message:
+        await delete_fortune(update)
+        return
     if text.strip() in ["لیست فال", "لیست فال‌ها", "لیست فال‌", "لیست فالها"]:
         await list_fortunes(update)
         return
