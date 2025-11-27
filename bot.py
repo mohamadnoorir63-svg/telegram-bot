@@ -724,52 +724,34 @@ async def reload_memory(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(final_text)
         
-# ======================= 💬 پاسخ و هوش مصنوعی =======================
-SUDO_USERS = [8588347189, 98765432]  # آیدی سودوها
+# ======================= فال جوک =======================
+ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """پاسخ‌دهی فقط برای جوک و فال"""
 
-async def reply(update, context):
-    uid = update.effective_user.id
-    text = update.message.text.strip() if update.message.text else ""
+    # 🧩 اطمینان از اینکه پیام معتبره
+    if not update.message or not update.message.text:
+        return
 
-    # بررسی اینکه پیام در گروه است یا پیوی
-    in_group = update.effective_chat.type in ["group", "supergroup"]
+    text = update.message.text.strip().lower()
 
-    # چک کردن دسترسی: ادمین یا سودو
-    has_access = False
-    if in_group:
-        try:
-            member = await context.bot.get_chat_member(update.effective_chat.id, uid)
-            if member.status in ["administrator", "creator"] or uid in SUDO_USERS:
-                has_access = True
-        except:
-            pass
-        if not has_access:
-            return
-    else:
-        has_access = True
-
-    # ------------------ جوک و فال ------------------
-
-    async def handle_joke(update):
-        """ارسال جوک تصادفی با پشتیبانی از متن و مدیا"""
+    # ✅ جوک تصادفی
+    if text == "جوک":
         if os.path.exists("jokes.json"):
             data = load_data("jokes.json")
             if data:
                 key, val = random.choice(list(data.items()))
                 t = val.get("type", "text")
                 v = val.get("value", "")
+
                 try:
                     if t == "text":
                         await update.message.reply_text("😂 " + v)
                     elif t == "photo":
-                        path = v if v.startswith("http") else os.path.join(os.path.dirname(__file__), v)
-                        await update.message.reply_photo(photo=path, caption="😂 جوک تصویری!")
+                        await update.message.reply_photo(photo=v, caption="😂 جوک تصویری!")
                     elif t == "video":
-                        path = v if v.startswith("http") else os.path.join(os.path.dirname(__file__), v)
-                        await update.message.reply_video(video=path, caption="😂 جوک ویدیویی!")
+                        await update.message.reply_video(video=v, caption="😂 جوک ویدیویی!")
                     elif t == "sticker":
-                        path = v if v.startswith("http") else os.path.join(os.path.dirname(__file__), v)
-                        await update.message.reply_sticker(sticker=path)
+                        await update.message.reply_sticker(sticker=v)
                     else:
                         await update.message.reply_text("⚠️ نوع فایل پشتیبانی نمی‌شود.")
                 except Exception as e:
@@ -778,9 +760,10 @@ async def reply(update, context):
                 await update.message.reply_text("هنوز جوکی ثبت نشده 😅")
         else:
             await update.message.reply_text("📂 فایل جوک‌ها پیدا نشد 😕")
+        return
 
-    async def handle_fortune(update):
-        """ارسال فال تصادفی با پشتیبانی از متن و مدیا"""
+    # ✅ فال تصادفی
+    if text == "فال":
         if os.path.exists("fortunes.json"):
             data = load_data("fortunes.json")
             if data:
@@ -791,59 +774,43 @@ async def reply(update, context):
                     if t == "text":
                         await update.message.reply_text("🔮 " + v)
                     elif t == "photo":
-                        path = v if v.startswith("http") else os.path.join(os.path.dirname(__file__), v)
-                        await update.message.reply_photo(photo=path, caption="🔮 فال تصویری!")
+                        await update.message.reply_photo(photo=v, caption="🔮 فال تصویری!")
                     elif t == "video":
-                        path = v if v.startswith("http") else os.path.join(os.path.dirname(__file__), v)
-                        await update.message.reply_video(video=path, caption="🔮 فال ویدیویی!")
+                        await update.message.reply_video(video=v, caption="🔮 فال ویدیویی!")
                     elif t == "sticker":
-                        path = v if v.startswith("http") else os.path.join(os.path.dirname(__file__), v)
-                        await update.message.reply_sticker(sticker=path)
-                    else:
-                        await update.message.reply_text("⚠️ نوع فایل پشتیبانی نمی‌شود.")
+                        await update.message.reply_sticker(sticker=v)
                 except Exception as e:
                     await update.message.reply_text(f"⚠️ خطا در ارسال فال: {e}")
             else:
                 await update.message.reply_text("هنوز فالی ثبت نشده 😔")
         else:
             await update.message.reply_text("📂 فایل فال‌ها پیدا نشد 😕")
-
-    # ---------- بررسی متن و فراخوانی مناسب ----------
-
-    # جوک تصادفی
-    if text == "جوک":
-        await handle_joke(update)
         return
 
-    # فال تصادفی
-    if text == "فال":
-        await handle_fortune(update)
-        return
-
-    # ثبت جوک و فال
-    if text.lower() == "ثبت جوک" and update.message.reply_to_message:
+    # ✅ ثبت جوک و فال
+    if text == "ثبت جوک" and update.message.reply_to_message:
         await save_joke(update)
         return
 
-    if text.lower() == "ثبت فال" and update.message.reply_to_message:
+    if text == "ثبت فال" and update.message.reply_to_message:
         await save_fortune(update)
         return
 
-    # حذف جوک و فال
-    if text.lower() == "حذف جوک" and update.message.reply_to_message:
+    # 🗑️ حذف جوک و فال
+    if text == "حذف جوک" and update.message.reply_to_message:
         await delete_joke(update)
         return
 
-    if text.lower() == "حذف فال" and update.message.reply_to_message:
+    if text == "حذف فال" and update.message.reply_to_message:
         await delete_fortune(update)
         return
 
-    # لیست جوک و فال
-    if text.strip() in ["لیست جوک", "لیست جوک‌ها", "لیست جوک‌", "لیست جوکها"]:
+    # ✅ لیست‌ها
+    if text in ["لیست جوک", "لیست جوک‌ها", "لیست جوک‌", "لیست جوکها"]:
         await list_jokes(update)
         return
 
-    if text.strip() in ["لیست فال", "لیست فال‌ها", "لیست فال‌", "لیست فالها"]:
+    if text in ["لیست فال", "لیست فال‌ها", "لیست فال‌", "لیست فالها"]:
         await list_fortunes(update)
         return
 # ======================= 📨 ارسال همگانی =======================
