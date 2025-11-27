@@ -725,8 +725,85 @@ async def reload_memory(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(final_text)
         
 # ======================= فال جوک =======================
+async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    text = update.message.text if update.message.text else ""
 
+    # تابع کمکی برای ارسال محتوا بر اساس نوع
+    async def send_content(val, content_type, prefix=""):
+        try:
+            if content_type == "text":
+                await update.message.reply_text(prefix + val)
+            elif content_type == "photo":
+                await update.message.reply_photo(photo=val, caption=prefix + "تصویری!")
+            elif content_type == "video":
+                await update.message.reply_video(video=val, caption=prefix + "ویدیویی!")
+            elif content_type == "sticker":
+                await update.message.reply_sticker(sticker=val)
+            else:
+                await update.message.reply_text("⚠️ نوع فایل پشتیبانی نمی‌شود.")
+        except Exception as e:
+            await update.message.reply_text(f"⚠️ خطا در ارسال محتوا: {e}")
 
+    # ✅ جوک تصادفی
+    if text == "جوک":
+        if os.path.exists("jokes.json"):
+            data = load_data("jokes.json")
+            if data:
+                key, val = random.choice(list(data.items()))
+                t = val.get("type", "text")
+                v = val.get("value", "")
+                await send_content(v, t, "😂 ")
+            else:
+                await update.message.reply_text("هنوز جوکی ثبت نشده 😅")
+        else:
+            await update.message.reply_text("📂 فایل جوک‌ها پیدا نشد 😕")
+        return
+
+    # ✅ فال تصادفی
+    if text == "فال":
+        if os.path.exists("fortunes.json"):
+            data = load_data("fortunes.json")
+            if data:
+                key, val = random.choice(list(data.items()))
+                t = val.get("type", "text")
+                v = val.get("value", "")
+                await send_content(v, t, "🔮 ")
+            else:
+                await update.message.reply_text("هنوز فالی ثبت نشده 😔")
+        else:
+            await update.message.reply_text("📂 فایل فال‌ها پیدا نشد 😕")
+        return
+
+    # ✅ ثبت جوک و فال
+    if text.lower() == "ثبت جوک" and update.message.reply_to_message:
+        await save_joke(update)
+        return
+
+    if text.lower() == "ثبت فال" and update.message.reply_to_message:
+        await save_fortune(update)
+        return
+
+    # 🗑️ حذف جوک و فال
+    if text.lower() == "حذف جوک" and update.message.reply_to_message:
+        await delete_joke(update)
+        return
+
+    if text.lower() == "حذف فال" and update.message.reply_to_message:
+        await delete_fortune(update)
+        return
+
+    # ✅ لیست‌ها
+    if text.strip() in ["لیست جوک", "لیست جوک‌ها", "لیست جوک‌", "لیست جوکها"]:
+        await list_jokes(update)
+        return
+
+    if text.strip() in ["لیست فال", "لیست فال‌ها", "لیست فال‌", "لیست فالها"]:
+        await list_fortunes(update)
+        return
+
+    # پاسخ پیش‌فرض
+    reply_text = "⚠️ دستور شناخته نشد."
+    await update.message.reply_text(reply_text)
 # ======================= 📨 ارسال همگانی =======================
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update, Message
 from telegram.ext import ContextTypes
