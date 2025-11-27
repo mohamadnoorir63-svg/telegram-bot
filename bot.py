@@ -287,17 +287,33 @@ import random
 from telegram import Update
 from telegram.ext import ContextTypes
 
+SUDO_USERS = [8588347189, 98765432]  # آیدی سودوها
+
 async def sudo_bot_call(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """وقتی سازنده پیام «ربات» بفرسته — پاسخ‌های مخصوص فقط برای سودو اصلی"""
+    """وقتی کاربر پیام 'ربات' فرستاد — پاسخ مخصوص سودو یا مدیران گروه"""
     ADMIN_ID = int(os.getenv("ADMIN_ID", "8588347189"))
     user_id = update.effective_user.id
+    chat_type = update.effective_chat.type
 
-    # 🚫 فقط برای ادمین اصلی (سودو)
-    if user_id != ADMIN_ID:
-        return
+    has_access = False
+
+    # پیام در گروه → فقط مدیران یا سودوها
+    if chat_type in ["group", "supergroup"]:
+        try:
+            member = await context.bot.get_chat_member(update.effective_chat.id, user_id)
+            if member.status in ["administrator", "creator"] or user_id in SUDO_USERS:
+                has_access = True
+        except:
+            pass
+    else:  # پیوی → فقط سودو اصلی
+        if user_id == ADMIN_ID or user_id in SUDO_USERS:
+            has_access = True
+
+    if not has_access:
+        return  # سکوت برای بقیه
 
     replies = [
-        "👑 جانم سودو؟ 😎",
+        "👑 جانم فدات؟ 😎",
         "🤖 در خدمتتم رئیس!",
         "⚡ بفرما قربان!",
         "🧠 گوش به فرمانتم!",
@@ -306,7 +322,7 @@ async def sudo_bot_call(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "🔥 بگو رئیس، منتظرم!"
     ]
 
-    # 🎲 انتخاب تصادفی پاسخ
+    # انتخاب تصادفی پاسخ
     reply = random.choice(replies)
     await update.message.reply_text(reply)
 # ======================= 📊 آمار ربات واقعی =======================
@@ -643,7 +659,7 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data["await_restore"] = False
         
 # ======================= 💬 پاسخ و هوش مصنوعی =======================
-SUDO_USERS = [8588347189, 98765432]  # آیدی کاربران سودو
+SUDO_USERS = [8588347189, 98765432]  # آیدی کاربران سودو را اینجا بگذارید
 
 async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     uid = update.effective_user.id
@@ -662,10 +678,10 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except:
             pass
         if not has_access:
-            # ⚠️ این خط حذف شد → سکوت می‌کنیم
             return
+    # اگر پیوی هست → همه دسترسی دارند
     else:
-        has_access = True  # در پیوی همه دسترسی دارند
+        has_access = True
 
     # ------------------ جوک تصادفی ------------------
     if text == "جوک":
@@ -686,6 +702,10 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         await update.message.reply_sticker(sticker=v)
                 except Exception as e:
                     await update.message.reply_text(f"⚠️ خطا در ارسال جوک: {e}")
+            else:
+                await update.message.reply_text("هنوز جوکی ثبت نشده 😅")
+        else:
+            await update.message.reply_text("📂 فایل جوک‌ها پیدا نشد 😕")
         return
 
     # ------------------ فال تصادفی ------------------
@@ -707,6 +727,10 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         await update.message.reply_sticker(sticker=v)
                 except Exception as e:
                     await update.message.reply_text(f"⚠️ خطا در ارسال فال: {e}")
+            else:
+                await update.message.reply_text("هنوز فالی ثبت نشده 😔")
+        else:
+            await update.message.reply_text("📂 فایل فال‌ها پیدا نشد 😕")
         return
 
     # ------------------ ثبت، حذف و لیست جوک و فال ------------------
