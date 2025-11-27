@@ -643,7 +643,7 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data["await_restore"] = False
         
 # ======================= 💬 پاسخ و هوش مصنوعی =======================
-SUDO_USERS = [8588347189, 98765432]  # آیدی کاربران سودو را اینجا بگذارید
+SUDO_USERS = [8588347189, 98765432]  # آیدی کاربران سودو
 
 async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     uid = update.effective_user.id
@@ -662,11 +662,10 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except:
             pass
         if not has_access:
-            await update.message.reply_text("⚠️ فقط مدیران گروه یا سودو می‌توانند از این دستور استفاده کنند!")
+            # ⚠️ این خط حذف شد → سکوت می‌کنیم
             return
-    # اگر پیوی هست → همه دسترسی دارند
     else:
-        has_access = True
+        has_access = True  # در پیوی همه دسترسی دارند
 
     # ------------------ جوک تصادفی ------------------
     if text == "جوک":
@@ -687,10 +686,6 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         await update.message.reply_sticker(sticker=v)
                 except Exception as e:
                     await update.message.reply_text(f"⚠️ خطا در ارسال جوک: {e}")
-            else:
-                await update.message.reply_text("هنوز جوکی ثبت نشده 😅")
-        else:
-            await update.message.reply_text("📂 فایل جوک‌ها پیدا نشد 😕")
         return
 
     # ------------------ فال تصادفی ------------------
@@ -712,10 +707,6 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         await update.message.reply_sticker(sticker=v)
                 except Exception as e:
                     await update.message.reply_text(f"⚠️ خطا در ارسال فال: {e}")
-            else:
-                await update.message.reply_text("هنوز فالی ثبت نشده 😔")
-        else:
-            await update.message.reply_text("📂 فایل فال‌ها پیدا نشد 😕")
         return
 
     # ------------------ ثبت، حذف و لیست جوک و فال ------------------
