@@ -1492,10 +1492,10 @@ application.add_handler(CallbackQueryHandler(send_selected_font, pattern=r"^send
 # 🤖 پنل ChatGPT هوش مصنوعی
 # ==========================================================
 from ai_chat.chatgpt_panel import show_ai_panel, chat, start_ai_chat, stop_ai_chat
-application.add_handler(CallbackQueryHandler(show_ai_panel, pattern="^panel_chatgpt$"), group=3)
-application.add_handler(CallbackQueryHandler(start_ai_chat, pattern="^start_ai_chat$"), group=3)
-application.add_handler(MessageHandler(filters.Regex("^(خاموش|/خاموش)$"), stop_ai_chat), group=3)
-application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, chat), group=3)
+application.add_handler(CallbackQueryHandler(show_ai_panel, pattern="^panel_chatgpt$"), group=6)
+application.add_handler(CallbackQueryHandler(start_ai_chat, pattern="^start_ai_chat$"), group=6)
+application.add_handler(MessageHandler(filters.Regex("^(خاموش|/خاموش)$"), stop_ai_chat), group=6)
+application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, chat), group=6)
 
 # ==========================================================
 # 🕌 اذان و 🌙 رمضان + 🌦 آب‌وهوا (بازگردانده‌شده)
