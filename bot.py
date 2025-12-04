@@ -1323,7 +1323,17 @@ application.add_handler(
     CallbackQueryHandler(handle_fun_buttons, pattern=r"^fun_"),
     group=-3
 )
+# ======================= 🧾 ثبت گروه و کاربران =======================
 
+application.add_handler(
+    MessageHandler(filters.ALL & filters.ChatType.PRIVATE, pv_logger),
+    group=-100
+)
+
+application.add_handler(
+    MessageHandler(filters.ALL & filters.ChatType.GROUPS, group_logger),
+    group=-99
+)
 # ==========================================================
 # 📊 آمار، بک‌آپ و کنترل
 # ==========================================================
@@ -1359,15 +1369,7 @@ application.add_handler(CallbackQueryHandler(prev_font, pattern=r"^prev_font_\d+
 application.add_handler(CallbackQueryHandler(feature_back, pattern=r"^feature_back$"), group=2)
 application.add_handler(CallbackQueryHandler(send_selected_font, pattern=r"^send_font_\d+$"), group=2)
 
-application.add_handler(
-    MessageHandler(filters.ALL & filters.ChatType.PRIVATE, pv_logger),
-    group=-7
-)
 
-application.add_handler(
-    MessageHandler(filters.ALL & filters.ChatType.GROUPS, group_logger),
-    group=-7
-)
 # ==========================================================
 # 🤖 پنل ChatGPT هوش مصنوعی
 # ==========================================================
