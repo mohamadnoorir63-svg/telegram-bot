@@ -180,17 +180,7 @@ async def translate_reply_handler(update: Update, context: ContextTypes.DEFAULT_
     except Exception as e:
         await update.message.reply_text(f"⚠️ خطا در ترجمه: {e}")
         
-        # ======================= 🧾 ثبت گروه و کاربران =======================
-
-async def pv_logger(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_chat.type == "private":
-        register_private_user(update.effective_user)
-
-
-async def group_logger(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_chat.type in ["group", "supergroup"]:
-        register_group(update.effective_chat, update.effective_user)
-
+        
 # ======================= 🧠 شروع ساده بدون افکت =======================
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """شروع ساده بدون انیمیشن یا افکت"""
