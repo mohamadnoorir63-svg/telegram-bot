@@ -363,6 +363,7 @@ def init_files():
     "fortunes.json",
     "stickers.json"
     "backup/dynamic_buttons/buttons.json"
+    "backup/dynamic_buttons"
 ]
     for f in base_files:
         dir_name = os.path.dirname(f)
@@ -392,6 +393,7 @@ def _should_include_in_backup(path: str) -> bool:
         "data/custom_commands.json",
         "fortunes_media"
         "backup/dynamic_buttons/buttons.json"
+        "backup/dynamic_buttons"
     ]
 
     return any(path.endswith(f) or f in path for f in important_files) or lowered.endswith(
@@ -495,6 +497,7 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "custom_commands_backup.json",
             "data/custom_commands.json"
             "backup/dynamic_buttons/buttons.json"
+            "backup/dynamic_buttons"
         ]
 
         moved_any = False
@@ -557,6 +560,7 @@ async def reset_memory(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "jokes.json",
         "fortunes.json"
         "backup/dynamic_buttons/buttons.json"
+        "backup/dynamic_buttons"
     ]
 
     for f in files_to_remove:
