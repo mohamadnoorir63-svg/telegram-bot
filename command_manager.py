@@ -131,11 +131,14 @@ async def handle_custom_command(update: Update, context: ContextTypes.DEFAULT_TY
 
     cmd = commands[text]
 
-    # چک کردن دسترسی: فقط سودو یا مدیر گروه
-    is_admin = False
+    # چک کردن دسترسی
+is_admin = False
+
+if chat and chat.type in ["group", "supergroup"]:
+    # در گروه → فقط سودو یا مدیرها
     if user.id == ADMIN_ID:
         is_admin = True
-    elif chat and chat.type in ["group", "supergroup"]:
+    else:
         try:
             member = await chat.get_member(user.id)
             if member.status in ["administrator", "creator"]:
@@ -144,8 +147,11 @@ async def handle_custom_command(update: Update, context: ContextTypes.DEFAULT_TY
             pass
 
     if not is_admin:
-        # کاربر عادی → سکوت و اجازه بده ادامه‌ی پردازش (مثلاً سخنگو) انجام بشه
-        return
+        return  # کاربران عادی گروه اجازه استفاده ندارند
+
+else:
+    # در پیوی → همه اجازه دارند
+    is_admin = True
 
     responses = cmd.get("responses", [])
 
