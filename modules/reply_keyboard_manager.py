@@ -1,28 +1,31 @@
+# modules/reply_keyboard_manager.py
+
 import json
 import os
+from typing import Dict, Any
+
 from telegram import Update, ReplyKeyboardMarkup
 from telegram.ext import ContextTypes
 
-# ===============================
-# 🟦 سیستم سودو بدون import حلقه‌ای
-# ===============================
-ADMIN_ID = int(os.getenv("ADMIN_ID", "8588347189"))
-SUDO_FILE = "data/sudo_list.json"
+# -------------------- تنظیم مسیر فایل --------------------
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DATA_DIR = os.path.join(BASE_DIR, "data")
+os.makedirs(DATA_DIR, exist_ok=True)
 
-if not os.path.exists(SUDO_FILE):
-    with open(SUDO_FILE, "w") as f:
-        json.dump([ADMIN_ID], f)
+FILE = os.path.join(DATA_DIR, "reply_keyboard.json")
 
-with open(SUDO_FILE, "r") as f:
-    SUDO_IDS = json.load(f)
-
-# ===============================
-# 🟫 مسیر ذخیره منوها
-# ===============================
-FILE = "data/reply_keyboard.json"
+# -------------------- حالت مدیریت ------------------------
+# کلید: user_id  / مقدار: اسم منوی فعلی
+ADMIN_MODE: Dict[int, str] = {}
 
 
-def load_data():
+# -------------------- بارگذاری / ذخیره --------------------
+def save_data(data: Dict[str, Any]):
+    with open(FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
+
+def load_data() -> Dict[str, Any]:
     if not os.path.exists(FILE):
         base = {
             "menus": {
@@ -37,226 +40,272 @@ def load_data():
         return base
 
     with open(FILE, "r", encoding="utf-8") as f:
-        return json.load(f)
+        data = json.load(f)
+
+    # 🔁 مهاجرت از نسخه قدیمی (فقط keyboard) به ساختار جدید
+    if "menus" not in data:
+        keyboard = data.get("keyboard", [
+            ["🙂 یه جوک بگو", "🔮 فال بگیر"],
+            ["❓ راهنما"]
+        ])
+        data = {
+            "menus": {"main": keyboard},
+            "links": {}
+        }
+        save_data(data)
+
+    # اطمینان از وجود کلیدها
+    data.setdefault("menus", {})
+    data.setdefault("links", {})
+    if "main" not in data["menus"]:
+        data["menus"]["main"] = [
+            ["🙂 یه جوک بگو", "🔮 فال بگیر"],
+            ["❓ راهنما"]
+        ]
+        save_data(data)
+
+    return data
 
 
-def save_data(data):
-    with open(FILE, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
-
-
-# ===============================
-# 📌 نمایش یک منو
-# ===============================
-async def show_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, menu="main"):
+# -------------------- نمایش منوی فعلی ---------------------
+async def show_menu(update: Update,
+                    context: ContextTypes.DEFAULT_TYPE,
+                    menu: str = "main"):
     data = load_data()
     kb = data["menus"].get(menu, [])
-
-    # افزودن Admin فقط برای سودو
-    kb = [row[:] for row in kb]
-    if update.effective_user.id in SUDO_IDS:
-        if ["⚙️ Admin"] not in kb:
-            kb.append(["⚙️ Admin"])
+    if not kb:
+        kb = [["❌ منو خالی است"]]
 
     markup = ReplyKeyboardMarkup(kb, resize_keyboard=True)
-    context.user_data["current_menu"] = menu
+    context.user_data["rk_current_menu"] = menu
 
     if update.message:
-        await update.message.reply_text("👇 منوت:", reply_markup=markup)
+        await update.message.reply_text("👇 منوی فعلی:", reply_markup=markup)
     else:
-        await update.callback_query.message.reply_text("👇 منوت:", reply_markup=markup)
+        await update.callback_query.message.reply_text(
+            "👇 منوی فعلی:", reply_markup=markup
+        )
 
 
-# ===============================
-# 🎛 پنل مدیریت
-# ===============================
-ADMIN_MENU = [
+# -------------------- پنل مدیریت --------------------------
+ADMIN_KEYBOARD = [
     ["➕ افزودن دکمه", "❌ حذف دکمه"],
     ["✏️ تغییر نام دکمه"],
     ["📂 ساخت زیرمنو"],
-    ["🔙 بازگشت"]
+    ["🔙 بازگشت به منوی اصلی"]
 ]
 
 
-async def admin_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """دستور /admin → پنل مدیریت"""
-    if update.effective_user.id not in SUDO_IDS:
-        return await update.message.reply_text("⛔ فقط سودو!")
+async def open_admin_panel(update: Update,
+                           context: ContextTypes.DEFAULT_TYPE):
+    """فقط از /admin صدا زده می‌شود (چک سودو در bot.py)."""
+    user_id = update.effective_user.id
+    # شروع مدیریت از منوی اصلی
+    ADMIN_MODE[user_id] = context.user_data.get("rk_current_menu", "main")
 
-    return await open_admin_panel(update, context)
+    # پاک کردن وضعیت‌های قبلی
+    for key in ["rk_add_menu", "rk_remove_menu", "rk_rename_step",
+                "rk_old_name", "rk_make_submenu"]:
+        context.user_data.pop(key, None)
 
-
-async def open_admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    markup = ReplyKeyboardMarkup(ADMIN_MENU, resize_keyboard=True)
-    context.user_data["admin_mode"] = True
+    markup = ReplyKeyboardMarkup(ADMIN_KEYBOARD, resize_keyboard=True)
     await update.message.reply_text("⚙️ پنل مدیریت:", reply_markup=markup)
 
 
-# ===============================
-# 🎚 انتخاب از پنل مدیریت
-# ===============================
-async def admin_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not context.user_data.get("admin_mode"):
-        return
+# -------------------- هندلر اصلی پنل مدیریت ----------------
+async def admin_handler(update: Update,
+                        context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    if user_id not in ADMIN_MODE:
+        return  # خارج از مود مدیریت؛ کاری نکن
 
-    text = update.message.text
+    text = (update.message.text or "").strip()
 
     if text == "➕ افزودن دکمه":
-        return await add_button(update, context)
+        await update.message.reply_text("✏️ متن دکمه جدید را بفرست:")
+        # منویی که الان داخلش هستیم
+        context.user_data["rk_add_menu"] = ADMIN_MODE[user_id]
 
     elif text == "❌ حذف دکمه":
-        return await remove_button(update, context)
+        data = load_data()
+        menu = ADMIN_MODE[user_id]
+        rows = data["menus"].get(menu, [])
+        msg = "📌 دکمه‌های این منو:\n"
+        for row in rows:
+            for b in row:
+                msg += f"• {b}\n"
+        await update.message.reply_text(
+            msg + "\n✏️ نام دکمه‌ای که می‌خوای حذف کنی را بفرست:"
+        )
+        context.user_data["rk_remove_menu"] = menu
 
     elif text == "✏️ تغییر نام دکمه":
-        return await rename_button(update, context)
+        await update.message.reply_text("✏️ نام فعلی دکمه را بفرست:")
+        context.user_data["rk_rename_step"] = "old"
 
     elif text == "📂 ساخت زیرمنو":
-        return await create_submenu(update, context)
+        await update.message.reply_text(
+            "📂 نام دکمه‌ای که تبدیل به زیرمنو شود را بفرست:"
+        )
+        context.user_data["rk_make_submenu"] = True
 
-    elif text == "🔙 بازگشت":
-        context.user_data["admin_mode"] = False
-        return await show_menu(update, context)
-
-
-# ===============================
-# ➕ افزودن دکمه
-# ===============================
-async def add_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    menu = context.user_data.get("current_menu", "main")
-    context.user_data["add_btn"] = menu
-    await update.message.reply_text("✏️ متن دکمه جدید را بفرست:")
+    elif text == "🔙 بازگشت به منوی اصلی":
+        # خروج از مود مدیریت
+        ADMIN_MODE.pop(user_id, None)
+        await show_menu(update, context, "main")
 
 
-async def handle_add_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    menu = context.user_data.get("add_btn")
-    if not menu:
+# -------------------- افزودن دکمه -------------------------
+async def handle_add_button(update: Update,
+                            context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    if user_id not in ADMIN_MODE:
         return
 
-    text = update.message.text.strip()
-    data = load_data()
+    menu = context.user_data.get("rk_add_menu")
+    if not menu:
+        return  # الان در حالت افزودن نیستیم
 
-    data["menus"][menu].append([text])
+    btn_text = (update.message.text or "").strip()
+    if not btn_text:
+        return
+
+    data = load_data()
+    data["menus"].setdefault(menu, [])
+    data["menus"][menu].append([btn_text])
     save_data(data)
 
-    context.user_data["add_btn"] = None
+    context.user_data["rk_add_menu"] = None
     await update.message.reply_text("✅ دکمه اضافه شد.")
     await show_menu(update, context, menu)
 
 
-# ===============================
-# ❌ حذف دکمه
-# ===============================
-async def remove_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    menu = context.user_data.get("current_menu", "main")
+# -------------------- حذف دکمه -----------------------------
+async def handle_remove_button(update: Update,
+                               context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    if user_id not in ADMIN_MODE:
+        return
 
-    kb = load_data()["menus"].get(menu, [])
-    txt = "📌 لیست دکمه‌ها:\n"
-    for row in kb:
-        for b in row:
-            txt += f"• {b}\n"
-
-    context.user_data["remove_btn"] = menu
-    await update.message.reply_text(txt + "\n✏️ نام دکمه را بفرست:")
-
-
-async def handle_remove_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    menu = context.user_data.get("remove_btn")
+    menu = context.user_data.get("rk_remove_menu")
     if not menu:
         return
 
-    btn = update.message.text.strip()
+    btn = (update.message.text or "").strip()
     data = load_data()
 
+    rows = data["menus"].get(menu, [])
     new_rows = []
-    for row in data["menus"][menu]:
-        if btn not in row:
-            new_rows.append(row)
+    for row in rows:
+        new_row = [b for b in row if b != btn]
+        if new_row:
+            new_rows.append(new_row)
 
     data["menus"][menu] = new_rows
     save_data(data)
 
-    context.user_data["remove_btn"] = None
+    context.user_data["rk_remove_menu"] = None
     await update.message.reply_text("🗑 دکمه حذف شد.")
     await show_menu(update, context, menu)
 
 
-# ===============================
-# ✏️ تغییر نام دکمه
-# ===============================
-async def rename_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    context.user_data["rename_step"] = "old"
-    await update.message.reply_text("✏️ نام فعلی را بفرست:")
+# -------------------- تغییر نام دکمه -----------------------
+async def handle_rename(update: Update,
+                        context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    if user_id not in ADMIN_MODE:
+        return
 
+    step = context.user_data.get("rk_rename_step")
+    if not step:
+        return
 
-async def handle_rename(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    step = context.user_data.get("rename_step")
-    menu = context.user_data.get("current_menu", "main")
+    menu = ADMIN_MODE[user_id]
 
     if step == "old":
-        context.user_data["old_name"] = update.message.text.strip()
-        context.user_data["rename_step"] = "new"
-        return await update.message.reply_text("✏️ نام جدید را بفرست:")
+        context.user_data["rk_old_name"] = (update.message.text or "").strip()
+        context.user_data["rk_rename_step"] = "new"
+        await update.message.reply_text("✏️ نام جدید را بفرست:")
+        return
 
     if step == "new":
-        old = context.user_data["old_name"]
-        new = update.message.text.strip()
+        old = context.user_data.get("rk_old_name")
+        new = (update.message.text or "").strip()
+        if not old or not new:
+            context.user_data["rk_rename_step"] = None
+            return
 
         data = load_data()
-
-        for row in data["menus"][menu]:
+        rows = data["menus"].get(menu, [])
+        for r_idx, row in enumerate(rows):
             for i, b in enumerate(row):
                 if b == old:
-                    row[i] = new
+                    rows[r_idx][i] = new
 
+        data["menus"][menu] = rows
         save_data(data)
 
-        context.user_data["rename_step"] = None
-        await update.message.reply_text("✨ نام تغییر کرد.")
+        context.user_data["rk_rename_step"] = None
+        context.user_data["rk_old_name"] = None
+
+        await update.message.reply_text("✨ نام دکمه تغییر کرد.")
         await show_menu(update, context, menu)
 
 
-# ===============================
-# 📂 ساخت زیرمنو (ID منو خودکار تولید می‌شود)
-# ===============================
-async def create_submenu(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    context.user_data["make_submenu"] = True
-    await update.message.reply_text("📂 نام دکمه‌ای که زیرمنو شود را بفرست:")
-
-
-async def handle_create_submenu(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not context.user_data.get("make_submenu"):
+# -------------------- ساخت زیرمنو --------------------------
+async def handle_create_submenu(update: Update,
+                                context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    if user_id not in ADMIN_MODE:
         return
 
-    btn = update.message.text.strip()
-    menu = context.user_data.get("current_menu", "main")
+    if not context.user_data.get("rk_make_submenu"):
+        return
 
-    submenu_id = f"{menu}_{btn}_submenu"
+    btn = (update.message.text or "").strip()
+    menu = ADMIN_MODE[user_id]
 
     data = load_data()
+
+    submenu_id = f"{menu}:{btn}"
+    # ایجاد زیرمنو با یک دکمه برگشت
     data["menus"][submenu_id] = [["🔙 بازگشت"]]
     data["links"][submenu_id] = menu
-
     save_data(data)
 
-    context.user_data["make_submenu"] = None
+    context.user_data["rk_make_submenu"] = None
+    ADMIN_MODE[user_id] = submenu_id
+
     await update.message.reply_text("📂 زیرمنو ساخته شد.")
     await show_menu(update, context, submenu_id)
 
 
-# ===============================
-# 🔙 ناوبری و بازگشت
-# ===============================
-async def handle_navigation(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    text = update.message.text.strip()
-    menu = context.user_data.get("current_menu", "main")
+# -------------------- ناوبری بین منوها ---------------------
+async def handle_navigation(update: Update,
+                            context: ContextTypes.DEFAULT_TYPE):
+    """برای زمانی که دکمه‌های خود منو را می‌زنیم (زیرمنو / بازگشت)."""
+    text = (update.message.text or "").strip()
     data = load_data()
 
-    # برگشت
+    # منوی فعلی را از user_data می‌گیریم
+    menu = context.user_data.get("rk_current_menu", "main")
+
+    # دکمه برگشت در زیرمنوها
     if text == "🔙 بازگشت":
         parent = data["links"].get(menu, "main")
-        return await show_menu(update, context, parent)
+        context.user_data["rk_current_menu"] = parent
+        await show_menu(update, context, parent)
+        # اگر در مود مدیریت هستیم، منوی مدیریت را هم آپدیت کنیم
+        user_id = update.effective_user.id
+        if user_id in ADMIN_MODE:
+            ADMIN_MODE[user_id] = parent
+        return
 
-    # زیرمنو
-    submenu = f"{menu}_{text}_submenu"
-    if submenu in data["menus"]:
-        return await show_menu(update, context, submenu)
+    # اگر دکمه‌ای اسم زیرمنو بود → برو داخلش
+    submenu_id = f"{menu}:{text}"
+    if submenu_id in data["menus"]:
+        context.user_data["rk_current_menu"] = submenu_id
+        user_id = update.effective_user.id
+        if user_id in ADMIN_MODE:
+            ADMIN_MODE[user_id] = submenu_id
+        await show_menu(update, context, submenu_id)
