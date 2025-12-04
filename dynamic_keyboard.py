@@ -3,87 +3,81 @@ import json
 from telegram import ReplyKeyboardMarkup, Update
 from telegram.ext import ContextTypes
 
-# مسیر ذخیره دکمه‌ها
+# ===========================
+# 📁 مسیر فایل مرکزی ذخیره‌سازی
+# ===========================
 FOLDER = "backup/dynamic_buttons"
 os.makedirs(FOLDER, exist_ok=True)
 
+FILE = os.path.join(FOLDER, "buttons.json")
 
-# -----------------------------
-# مسیر فایل هر دکمه
-# -----------------------------
-def file_path(name):
-    safe = name.replace("/", "_")
-    return os.path.join(FOLDER, f"{safe}.json")
-
-
-# -----------------------------
-# بارگذاری دکمه
-# -----------------------------
-def load_button(name):
-    path = file_path(name)
-    if not os.path.exists(path):
-        data = {"name": name, "responses": [], "submenu": []}
-        save_button(name, data)
-        return data
-
-    try:
-        with open(path, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except:
-        return {"name": name, "responses": [], "submenu": []}
+# اگر فایل وجود نداشت → دوتا دکمه تست بساز
+if not os.path.exists(FILE):
+    with open(FILE, "w", encoding="utf-8") as f:
+        json.dump(
+            {
+                "فال": {"responses": [], "submenu": []},
+                "جوک": {"responses": [], "submenu": []}
+            },
+            f,
+            ensure_ascii=False,
+            indent=2
+        )
 
 
-# -----------------------------
-# ذخیره دکمه
-# -----------------------------
-def save_button(name, data):
-    path = file_path(name)
-    with open(path, "w", encoding="utf-8") as f:
+# ===========================
+# 🔧 لود دکمه‌ها
+# ===========================
+def load_all():
+    with open(FILE, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+
+# ===========================
+# 💾 ذخیره دکمه‌ها
+# ===========================
+def save_all(data):
+    with open(FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
 
-# -----------------------------
-# گرفتن لیست دکمه‌ها
-# -----------------------------
-def list_all_buttons():
-    return [
-        f.replace(".json", "")
-        for f in os.listdir(FOLDER)
-        if f.endswith(".json")
-    ]
-
-
-# -----------------------------
-# ساخت کیبورد اصلی
-# -----------------------------
+# ===========================
+# 🎛 ساخت کیبورد
+# ===========================
 def build_keyboard():
-    buttons = list_all_buttons()
+    data = load_all()
+    buttons = list(data.keys())
+
     if not buttons:
         return ReplyKeyboardMarkup([["هیچ دکمه‌ای نیست"]], resize_keyboard=True)
 
-    rows = [buttons[i:i+2] for i in range(0, len(buttons), 2)]
+    rows = [buttons[i:i + 2] for i in range(0, len(buttons), 2)]
     return ReplyKeyboardMarkup(rows, resize_keyboard=True)
 
 
-# ============================================================
-#  /start → نمایش کیبورد
-# ============================================================
+# ===========================
+# /start → نمایش کیبورد
+# ===========================
 async def start_fixed(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(
-        "👇 یکی از گزینه‌ها رو انتخاب کن:",
-        reply_markup=build_keyboard()
-    )
+    await update.message.reply_text("👇 یکی از گزینه‌ها رو انتخاب کن:",
+                                    reply_markup=build_keyboard())
 
 
-# ============================================================
-#  /mkbtn → ساخت دکمه جدید
-# ============================================================
+# ===========================
+# /addbtn → ساخت دکمه جدید
+# ===========================
 async def add_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.args:
         return await update.message.reply_text("❗ استفاده: /addbtn نام_دکمه")
 
-    name = " ".join(context.args)
-    load_button(name)
+    name = " ".join(context.args).strip()
+    data = load_all()
+
+    if name in data:
+        return await update.message.reply_text("⚠️ این دکمه قبلاً وجود دارد!")
+
+    data[name] = {"responses": [], "submenu": []}
+    save_all(data)
 
     await update.message.reply_text(
         f"✅ دکمه <b>{name}</b> ساخته شد!",
@@ -92,15 +86,18 @@ async def add_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 
-# ============================================================
-# /savebtn → ذخیره پاسخ برای دکمه (با ریپلای)
-# ============================================================
+# ===========================
+# /savebtn → ذخیره پاسخ برای دکمه
+# ===========================
 async def save_button_response(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.args:
-        return await update.message.reply_text("❗ استفاده: /savebtn نام_دکمه (روی پیام ریپلای بده)")
+        return await update.message.reply_text("❗ استفاده: /savebtn نام_دکمه (روی پیام ریپلای کنید)")
 
-    name = " ".join(context.args)
-    data = load_button(name)
+    name = " ".join(context.args).strip()
+    data = load_all()
+
+    if name not in data:
+        return await update.message.reply_text("⚠️ همچین دکمه‌ای وجود ندارد!")
 
     reply = update.message.reply_to_message
     if not reply:
@@ -129,56 +126,59 @@ async def save_button_response(update: Update, context: ContextTypes.DEFAULT_TYP
     else:
         return await update.message.reply_text("⚠️ این نوع پیام پشتیبانی نمی‌شود.")
 
-    data["responses"].append(entry)
-    save_button(name, data)
+    data[name]["responses"].append(entry)
+    save_all(data)
 
     await update.message.reply_text(
-        f"🎉 پاسخ ذخیره شد برای دکمه <b>{name}</b>!", parse_mode="HTML"
+        f"🎉 پاسخ برای <b>{name}</b> ثبت شد!",
+        parse_mode="HTML"
     )
 
 
-# ============================================================
+# ===========================
 # /delbtn → حذف دکمه
-# ============================================================
+# ===========================
 async def remove_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.args:
         return await update.message.reply_text("❗ استفاده: /delbtn نام_دکمه")
 
-    name = " ".join(context.args)
-    path = file_path(name)
+    name = " ".join(context.args).strip()
+    data = load_all()
 
-    if os.path.exists(path):
-        os.remove(path)
-        await update.message.reply_text("🗑 دکمه حذف شد!", reply_markup=build_keyboard())
-    else:
-        await update.message.reply_text("❌ همچین دکمه‌ای وجود ندارد!")
+    if name not in data:
+        return await update.message.reply_text("❌ همچین دکمه‌ای وجود ندارد!")
+
+    del data[name]
+    save_all(data)
+
+    await update.message.reply_text("🗑 دکمه حذف شد!", reply_markup=build_keyboard())
 
 
-# ============================================================
+# ===========================
 # /listbtn → لیست دکمه‌ها
-# ============================================================
+# ===========================
 async def list_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    buttons = list_all_buttons()
-    txt = "📌 دکمه‌های فعلی:\n\n" + "\n".join([f"— {b}" for b in buttons])
-
+    data = load_all()
+    txt = "📌 دکمه‌های فعلی:\n\n" + "\n".join([f"— {b}" for b in data.keys()])
     await update.message.reply_text(txt)
 
 
-# ============================================================
-# وقتی کاربر روی دکمه کلیک می‌کند → پاسخ بده
-# ============================================================
+# ===========================
+# هندلر اصلی → کلیک روی دکمه
+# ===========================
 async def fixed_button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
-    buttons = list_all_buttons()
+    data = load_all()
 
-    if text not in buttons:
-        return  # هیچ کاری نکن
+    if text not in data:
+        return
 
-    data = load_button(text)
-    if not data["responses"]:
+    btn = data[text]
+
+    if not btn["responses"]:
         return await update.message.reply_text("ℹ️ هنوز پاسخی برای این دکمه ثبت نشده.")
 
-    resp = data["responses"][0]  # فعلاً اولین پاسخ
+    resp = btn["responses"][0]  # فعلاً اولین پاسخ
 
     t = resp["type"]
 
