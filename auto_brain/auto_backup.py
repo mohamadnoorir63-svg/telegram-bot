@@ -28,17 +28,16 @@ def _should_include_in_backup(path: str) -> bool:
     # فایل مهم سفارشی
     if os.path.basename(path) in ["custom_commands.json", "custom_commands_backup.json"]:
         return True
-
-    # فایل‌های مهم عمومی
-    important_files = [
-        "data/groups.json",
-        "data/users.json",
-        "jokes.json",
-        "fortunes.json",
-        "data/custom_commands.json",
-        "fortunes_media",
-        "data/dynamic_buttons/buttons.json"
-
+# فایل‌های مهم عمومی
+important_files = [
+    "data/groups.json",
+    "data/users.json",
+    "jokes.json",
+    "fortunes.json",
+    "data/custom_commands.json",
+    "fortunes_media",
+    "backup/dynamic_buttons/buttons.json"
+]
     if any(path.endswith(f) or f in path for f in important_files):
         return True
 
