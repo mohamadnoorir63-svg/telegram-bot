@@ -131,54 +131,48 @@ async def handle_custom_command(update: Update, context: ContextTypes.DEFAULT_TY
 
     cmd = commands[text]
 
-    # چک کردن دسترسی
-is_admin = False
+    # ================= 🎯 منطق دسترسی =================
+    is_allowed = False
 
-if chat and chat.type in ["group", "supergroup"]:
-    # در گروه → فقط سودو یا مدیرها
-    if user.id == ADMIN_ID:
-        is_admin = True
+    if chat and chat.type in ["group", "supergroup"]:
+        # فقط مدیرها یا ADMIN اصلی
+        if user.id == ADMIN_ID:
+            is_allowed = True
+        else:
+            try:
+                member = await chat.get_member(user.id)
+                if member.status in ["administrator", "creator"]:
+                    is_allowed = True
+            except:
+                pass
+
+        if not is_allowed:
+            return  # یوزر عادی گروه → اجازه نداره
+
     else:
-        try:
-            member = await chat.get_member(user.id)
-            if member.status in ["administrator", "creator"]:
-                is_admin = True
-        except:
-            pass
+        # در پیوی همه مجاز هستند
+        is_allowed = True
 
-    if not is_admin:
-        return  # کاربران عادی گروه اجازه استفاده ندارند
-
-else:
-    # در پیوی → همه اجازه دارند
-    is_admin = True
-
+    # ================= اجرای پاسخ =================
     responses = cmd.get("responses", [])
 
     if not responses:
         return await update.message.reply_text("⚠️ هنوز پاسخی برای این دستور ثبت نشده.")
 
-    # لیست استفاده‌شده‌ (ایندکس‌ها)
     used = cmd.get("last_used", [])
 
-    # اگر همه استفاده شده‌اند → ریست کن
     if len(used) >= len(responses):
         used = []
 
-    # پیدا کردن ایندکس‌های استفاده نشده
-    unused_indexes = [i for i in range(len(responses)) if i not in used]
-
-    # انتخاب یکی بدون تکرار
-    chosen_index = random.choice(unused_indexes)
+    unused = [i for i in range(len(responses)) if i not in used]
+    chosen_index = random.choice(unused)
     chosen = responses[chosen_index]
 
-    # ثبت در لیست استفاده‌شده‌ها
     used.append(chosen_index)
     cmd["last_used"] = used
     commands[text] = cmd
     save_commands_local(commands)
 
-    # ارسال پاسخ انتخاب‌شده
     r_type = chosen.get("type")
 
     if r_type == "text":
@@ -195,6 +189,9 @@ else:
         await update.message.reply_animation(chosen["file_id"], caption=chosen.get("caption"))
 
     context.user_data["custom_handled"] = True
+
+
+# ================= لیست دستورها =================
 async def list_commands(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     if user.id != ADMIN_ID:
@@ -214,7 +211,6 @@ async def list_commands(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 def cleanup_group_commands(chat_id: int):
-    """حذف دستورهایی که در گروه خاص ساخته شده‌اند."""
     try:
         commands = load_commands()
         new_data = {}
@@ -228,7 +224,8 @@ def cleanup_group_commands(chat_id: int):
         print(f"[command_manager] cleaned {removed} commands from group {chat_id}")
     except Exception as e:
         print(f"[command_manager] cleanup error: {e}")
-        
+
+
 # ================= حذف یک دستور =================
 async def delete_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
