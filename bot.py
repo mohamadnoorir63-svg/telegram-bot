@@ -1355,21 +1355,22 @@ application.add_handler(
     MessageHandler(filters.ALL & filters.ChatType.GROUPS, group_logger),
     group=-99
                              )
-# نمایش کیبورد
+
+# نمایش کیبورد اصلی در پیوی (مثلاً با /menu)
 application.add_handler(CommandHandler("menu", show_reply_keyboard))
 
-# مدیریت دکمه‌ها
+# مدیریت دکمه‌های کیبورد (فقط مدیر اصلی)
 application.add_handler(CommandHandler("addbtn", add_button))
 application.add_handler(CommandHandler("delbtn", remove_button))
 
-# دریافت متن برای اضافه/حذف
+# گرفتن متن برای اضافه/حذف دکمه
 application.add_handler(
     MessageHandler(filters.TEXT & ~filters.COMMAND, handle_add_button),
-    group=0
+    group=-7
 )
 application.add_handler(
     MessageHandler(filters.TEXT & ~filters.COMMAND, handle_remove_button),
-    group=0
+    group=-7
 )
 # ==========================================================
 # 📊 آمار، بک‌آپ و کنترل
