@@ -39,7 +39,6 @@ def _should_include_in_backup(path: str) -> bool:
         "fortunes.json",
         "data/custom_commands.json",
         "fortunes_media",
-        "backup/dynamic_buttons/buttons.json"
     ]
 
     if any(path.endswith(f) or f in path for f in important_files):
@@ -75,7 +74,6 @@ async def cloudsync_internal(bot, reason="Manual Backup"):
                 "aliases.json",
                 "data/custom_commands.json",
                 "custom_commands_backup.json",
-                "data/dynamic_buttons/buttons.json"
             ]
 
             for imp in important_files_extra:
@@ -178,6 +176,7 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "aliases.json",
             "group_control/aliases.json",
             "data/custom_commands.json",
+        ]
             
 
         moved_any = False
