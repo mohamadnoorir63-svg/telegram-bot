@@ -188,8 +188,7 @@ async def translate_reply_handler(update: Update, context: ContextTypes.DEFAULT_
         await update.message.reply_text(f"⚠️ خطا در ترجمه: {e}")
         
 # ======================= 🧠 شروع ساده بدون افکت =======================
-from reply_keyboard_fixed import MAIN_KEYBOARD
-
+from dynamic_keyboard import MAIN_KEYBOARD
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """استارت → نمایش پنل اصلی + فعال کردن کیبورد ثابت"""
 
