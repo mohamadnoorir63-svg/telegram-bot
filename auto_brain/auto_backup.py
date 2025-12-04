@@ -37,9 +37,7 @@ def _should_include_in_backup(path: str) -> bool:
         "fortunes.json",
         "data/custom_commands.json",
         "fortunes_media",
-        "backup/dynamic_buttons/buttons.json"
-        "backup/dynamic_buttons"
-    ]
+        "data/dynamic_buttons/buttons.json"
 
     if any(path.endswith(f) or f in path for f in important_files):
         return True
