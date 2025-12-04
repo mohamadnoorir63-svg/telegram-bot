@@ -355,12 +355,13 @@ ADMIN_ID = int(os.getenv("ADMIN_ID", "8588347189"))
 def init_files():
     """بازسازی فایل‌های پایه در صورت عدم وجود"""
     base_files = [
-        "data/groups.json"
-        "data/users.jso
-        "data/custom_commands.json",
-        "jokes.json",
-        "fortunes.json"
-    ]
+    "data/groups.json",
+    "data/users.json",
+    "data/custom_commands.json",
+    "jokes.json",
+    "fortunes.json",
+    "stickers.json"
+]
     for f in base_files:
         dir_name = os.path.dirname(f)
         if dir_name and not os.path.exists(dir_name):
