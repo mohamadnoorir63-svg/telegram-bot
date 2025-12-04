@@ -1320,16 +1320,35 @@ application.add_handler(
 # 🔹 دستورات اصلی سیستم
 # ==========================================================
 application.add_handler(CommandHandler("start", start))
-# ===================== 🟦 Admin Panel Keyboard Manager =====================
-application.add_handler(CommandHandler("admin", open_admin_panel), group=-20)
+# ===================== 📌 Reply Keyboard Admin System ====================
+# فقط وقتی سودو داخل مود مدیریت است کار می‌کند
 
-application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, admin_handler), group=-20)
-application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_add_button), group=-20)
-application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_remove_button), group=-20)
-application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_rename), group=-20)
-application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_create_submenu), group=-20)
-application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_navigation), group=-20)
+admin_group = -30  # بالاتر از همه
 
+application.add_handler(
+    MessageHandler(filters.TEXT & ~filters.COMMAND, admin_handler),
+    group=admin_group
+)
+application.add_handler(
+    MessageHandler(filters.TEXT & ~filters.COMMAND, handle_add_button),
+    group=admin_group
+)
+application.add_handler(
+    MessageHandler(filters.TEXT & ~filters.COMMAND, handle_remove_button),
+    group=admin_group
+)
+application.add_handler(
+    MessageHandler(filters.TEXT & ~filters.COMMAND, handle_rename),
+    group=admin_group
+)
+application.add_handler(
+    MessageHandler(filters.TEXT & ~filters.COMMAND, handle_create_submenu),
+    group=admin_group
+)
+application.add_handler(
+    MessageHandler(filters.TEXT & ~filters.COMMAND, handle_navigation),
+    group=admin_group
+)
 # 🎮 پنل اصلی و دکمه‌ها
 application.add_handler(
     MessageHandler(filters.TEXT & filters.Regex(r"^راهنما$"), Tastatur_menu),
@@ -1374,6 +1393,7 @@ application.add_handler(
 # 📊 آمار، بک‌آپ و کنترل
 # ==========================================================
 application.add_handler(CommandHandler("stats", stats))
+application.add_handler(CommandHandler("admin", open_admin_panel), group=-20)
 application.add_handler(CommandHandler("fullstats", fullstats))
 application.add_handler(CommandHandler("backup", backup))
 application.add_handler(CommandHandler("selectivebackup", selective_backup_menu))
