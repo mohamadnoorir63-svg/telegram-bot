@@ -352,26 +352,34 @@ from telegram.ext import ContextTypes
 BACKUP_FOLDER = "backups"
 ADMIN_ID = int(os.getenv("ADMIN_ID", "8588347189"))
 
+
 # ======================= ⚙️ بازسازی فایل‌های پایه =======================
 def init_files():
     """بازسازی فایل‌های پایه در صورت عدم وجود"""
     base_files = [
-    "data/groups.json",
-    "data/users.json",
-    "data/custom_commands.json",
-    "jokes.json",
-    "fortunes.json",
-    "stickers.json"
-    
-]
+        "data/groups.json",
+        "data/users.json",
+        "data/custom_commands.json",
+        "jokes.json",
+        "fortunes.json",
+        "stickers.json",
+    ]
+
     for f in base_files:
         dir_name = os.path.dirname(f)
         if dir_name and not os.path.exists(dir_name):
             os.makedirs(dir_name, exist_ok=True)
+
         if not os.path.exists(f):
-            if f.endswith(".json"):
-                with open(f, "w", encoding="utf-8") as fp:
-                    json.dump({} if f != "users.json" else [], fp, ensure_ascii=False, indent=2)
+            base = os.path.basename(f)
+            # تصمیم برای نوع دادهٔ پیش‌فرض
+            if base in ["users.json", "jokes.json", "fortunes.json", "stickers.json"]:
+                default_data = []
+            else:
+                default_data = {}
+            with open(f, "w", encoding="utf-8") as fp:
+                json.dump(default_data, fp, ensure_ascii=False, indent=2)
+
 
 # ======================= ⚙️ تعیین فایل‌های مهم برای بک‌آپ =======================
 def _should_include_in_backup(path: str) -> bool:
@@ -379,24 +387,34 @@ def _should_include_in_backup(path: str) -> bool:
     lowered = path.lower()
     skip_dirs = ["__pycache__", ".git", "venv", "restore_temp", BACKUP_FOLDER]
 
+    # حذف پوشه‌های ناخواسته
     if any(sd in lowered for sd in skip_dirs):
         return False
+
+    # حذف خود فایل‌های بک‌آپ
     if lowered.endswith(".zip") or os.path.basename(lowered).startswith("backup_"):
         return False
 
     important_files = [
         "data/groups.json",
         "data/users.json",
+        "data/custom_commands.json",
         "jokes.json",
         "fortunes.json",
-        "data/custom_commands.json",
-        "fortunes_media"
-        
+        "stickers.json",
+        "fortunes_media",
     ]
 
-    return any(path.endswith(f) or f in path for f in important_files) or lowered.endswith(
-        (".jpg", ".png", ".webp", ".mp3", ".ogg")
-    )
+    # اگر در مسیر یکی از فایل‌های مهم بود یا مدیای مرتبط (عکس، صدا، ...)
+    if any(path.endswith(f) or f in path for f in important_files):
+        return True
+
+    # مدیاهای عمومی (مثلاً عکس و صدا) – اگر می‌خواهی محدودتر شود، این بخش را می‌توانی حذف کنی
+    if lowered.endswith((".jpg", ".jpeg", ".png", ".webp", ".mp3", ".ogg")):
+        return True
+
+    return False
+
 
 # ======================= ☁️ بک‌آپ خودکار =======================
 async def auto_backup(bot):
@@ -405,6 +423,7 @@ async def auto_backup(bot):
         await cloudsync_internal(bot, "Auto Backup")
         await asyncio.sleep(6 * 60 * 60)
 
+
 # ======================= 💾 ایجاد و ارسال بک‌آپ =======================
 async def cloudsync_internal(bot, reason="Manual Backup"):
     """ایجاد و ارسال فایل ZIP به ادمین"""
@@ -412,6 +431,7 @@ async def cloudsync_internal(bot, reason="Manual Backup"):
     filename = f"backup_{now}.zip"
 
     try:
+        # ساخت فایل ZIP
         with zipfile.ZipFile(filename, "w", compression=zipfile.ZIP_DEFLATED) as zipf:
             for root, _, files in os.walk("."):
                 for file in files:
@@ -428,26 +448,39 @@ async def cloudsync_internal(bot, reason="Manual Backup"):
             f"☁️ نوع: {reason}"
         )
 
+        # ارسال به ادمین
         with open(filename, "rb") as f:
-            await bot.send_document(chat_id=ADMIN_ID, document=f, caption=caption, parse_mode="HTML")
+            await bot.send_document(
+                chat_id=ADMIN_ID,
+                document=f,
+                caption=caption,
+                parse_mode="HTML",
+            )
         print(f"✅ بک‌آپ ارسال شد ({size_mb:.2f} MB)")
 
     except Exception as e:
         print(f"[CLOUD BACKUP ERROR] {e}")
         try:
-            await bot.send_message(chat_id=ADMIN_ID, text=f"⚠️ خطا در Cloud Backup:\n{e}")
+            await bot.send_message(
+                chat_id=ADMIN_ID,
+                text=f"⚠️ خطا در Cloud Backup:\n{e}",
+            )
         except:
             pass
+
     finally:
         if os.path.exists(filename):
             os.remove(filename)
+
 
 # ======================= 💬 دستور /cloudsync برای مدیر =======================
 async def cloudsync(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """اجرای دستی بک‌آپ ابری"""
     if update.effective_user.id != ADMIN_ID:
         return await update.message.reply_text("⛔ فقط مدیر اصلی مجازه!")
+
     await cloudsync_internal(context.bot, "Manual Cloud Backup")
+
 
 # ======================= 💾 بک‌آپ و بازیابی در چت =======================
 async def backup(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -455,15 +488,42 @@ async def backup(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await cloudsync_internal(context.bot, "Manual Backup")
     await update.message.reply_text("✅ بک‌آپ کامل گرفته شد و ارسال شد!")
 
+
 async def restore(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """شروع فرآیند بازیابی"""
+    if update.effective_user.id != ADMIN_ID:
+        return await update.message.reply_text("⛔ فقط مدیر اصلی مجازه!")
     await update.message.reply_text("📂 لطفاً فایل ZIP بک‌آپ را ارسال کنید.")
     context.user_data["await_restore"] = True
+
+
+def _find_in_extracted(root_dir: str, target: str):
+    """
+    جست‌وجوی فایل/پوشه در ساختار استخراج‌شده،
+    حتی اگر داخل یک فولدر ریشه‌ای (مثل backup_...) باشد.
+    """
+    candidates = []
+    for root, dirs, files in os.walk(root_dir):
+        # جست‌وجوی دایرکتوری
+        for d in dirs:
+            rel = os.path.relpath(os.path.join(root, d), root_dir)
+            if rel.replace("\\", "/").endswith(target):
+                candidates.append(os.path.join(root, d))
+        # جست‌وجوی فایل
+        for f in files:
+            rel = os.path.relpath(os.path.join(root, f), root_dir)
+            if rel.replace("\\", "/").endswith(target):
+                candidates.append(os.path.join(root, f))
+    return candidates
+
 
 async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """پردازش فایل ZIP و بازیابی ایمن"""
     if not context.user_data.get("await_restore"):
         return
+
+    if update.effective_user.id != ADMIN_ID:
+        return await update.message.reply_text("⛔ فقط مدیر اصلی مجازه!")
 
     doc = update.message.document
     if not doc or not doc.file_name.lower().endswith(".zip"):
@@ -473,13 +533,16 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
     restore_dir = "restore_temp"
 
     try:
+        # دریافت فایل از تلگرام
         tg_file = await doc.get_file()
         await tg_file.download_to_drive(restore_zip)
 
+        # آماده‌سازی پوشهٔ استخراج
         if os.path.exists(restore_dir):
             shutil.rmtree(restore_dir)
         os.makedirs(restore_dir, exist_ok=True)
 
+        # استخراج
         with zipfile.ZipFile(restore_zip, "r") as zip_ref:
             zip_ref.extractall(restore_dir)
 
@@ -488,45 +551,56 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "jokes.json",
             "fortunes.json",
             "aliases.json",
-            "data/groups.json"
-            "data/users.json"
+            "data/groups.json",
+            "data/users.json",
             "data/custom_commands.json",
             "group_control/aliases.json",
             "fortunes_media",
             "custom_commands_backup.json",
-            
         ]
 
         moved_any = False
+
         for fname in important_files:
-            src = os.path.join(restore_dir, fname)
+            # جست‌وجو در کل ساختار استخراج‌شده
+            candidates = _find_in_extracted(restore_dir, fname)
+            if not candidates:
+                continue
+
+            # اولین کاندید مناسب را انتخاب می‌کنیم
+            src = candidates[0]
             dest = fname
             dest_dir = os.path.dirname(dest)
 
-            if os.path.exists(src):
-                try:
-                    if os.path.isdir(src):
-                        if not os.path.exists(dest):
-                            os.makedirs(dest, exist_ok=True)
-                        for root, _, files in os.walk(src):
-                            for file in files:
-                                file_src = os.path.join(root, file)
-                                rel_path = os.path.relpath(file_src, src)
-                                file_dest = os.path.join(dest, rel_path)
-                                os.makedirs(os.path.dirname(file_dest), exist_ok=True)
-                                shutil.move(file_src, file_dest)
-                        moved_any = True
-                        print(f"♻️ بازیابی پوشه: {fname}")
-                    else:
-                        if dest_dir and not os.path.exists(dest_dir):
-                            os.makedirs(dest_dir, exist_ok=True)
-                        shutil.move(src, dest)
-                        moved_any = True
-                        print(f"♻️ بازیابی فایل: {fname}")
-                except Exception as e:
-                    print(f"⚠️ نادیده گرفتن خطا در فایل {fname}: {e}")
+            try:
+                if os.path.isdir(src):
+                    # پوشه (مثل fortunes_media)
+                    if not os.path.exists(dest):
+                        os.makedirs(dest, exist_ok=True)
+                    for root, _, files in os.walk(src):
+                        for file in files:
+                            file_src = os.path.join(root, file)
+                            rel_path = os.path.relpath(file_src, src)
+                            file_dest = os.path.join(dest, rel_path)
+                            os.makedirs(os.path.dirname(file_dest), exist_ok=True)
+                            if os.path.exists(file_dest):
+                                os.remove(file_dest)
+                            shutil.move(file_src, file_dest)
+                    moved_any = True
+                    print(f"♻️ بازیابی پوشه: {fname}")
+                else:
+                    # فایل
+                    if dest_dir and not os.path.exists(dest_dir):
+                        os.makedirs(dest_dir, exist_ok=True)
+                    if os.path.exists(dest):
+                        os.remove(dest)
+                    shutil.move(src, dest)
+                    moved_any = True
+                    print(f"♻️ بازیابی فایل: {fname}")
+            except Exception as e:
+                print(f"⚠️ نادیده گرفتن خطا در فایل {fname}: {e}")
 
-        # بازسازی فایل‌های پایه بدون memory_manager
+        # بازسازی فایل‌های پایه
         init_files()
 
         if moved_any:
@@ -543,6 +617,8 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if os.path.exists(restore_dir):
             shutil.rmtree(restore_dir)
         context.user_data["await_restore"] = False
+
+
 # ======================= 🧹 پاکسازی حافظه =======================
 async def reset_memory(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """پاکسازی کامل حافظه ربات — فقط برای مدیر اصلی"""
@@ -550,13 +626,12 @@ async def reset_memory(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return await update.message.reply_text("⛔ فقط مدیر اصلی مجازه!")
 
     files_to_remove = [
-        "data/groups.json"
-        "data/users.json"
+        "data/groups.json",
+        "data/users.json",
         "data/custom_commands.json",
         "stickers.json",
         "jokes.json",
-        "fortunes.json"
-        
+        "fortunes.json",
     ]
 
     for f in files_to_remove:
@@ -579,11 +654,11 @@ async def reload_memory(update: Update, context: ContextTypes.DEFAULT_TYPE):
     init_files()
 
     # شمارش کاربران و گروه‌ها
-    def count_items(file):
-        if not os.path.exists(file):
+    def count_items(file_path: str) -> int:
+        if not os.path.exists(file_path):
             return 0
         try:
-            with open(file, "r", encoding="utf-8") as f:
+            with open(file_path, "r", encoding="utf-8") as f:
                 data = json.load(f)
             if isinstance(data, dict):
                 return len(data)
@@ -593,8 +668,8 @@ async def reload_memory(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return 0
         return 0
 
-    groups = count_items("group_data.json")
-    users = count_items("users.json")
+    groups = count_items("data/groups.json")
+    users = count_items("data/users.json")
     jokes = count_items("jokes.json")
     fortunes = count_items("fortunes.json")
 
@@ -608,7 +683,6 @@ async def reload_memory(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
     await update.message.reply_text(final_text)
-        
 # ======================= فال جوک =======================
 import os
 import json
