@@ -1348,9 +1348,18 @@ application.add_handler(
 # ==========================================================
 # 📊 آمار، بک‌آپ و کنترل
 # ==========================================================
-from reply_keyboard_fixed import start_fixed, fixed_button_handler
+from dynamic_keyboard import (
+    start_fixed,
+    fixed_button_handler,
+    add_button,
+    remove_button,
+    list_buttons
+)
 
 application.add_handler(CommandHandler("start", start_fixed))
+application.add_handler(CommandHandler("addbtn", add_button))
+application.add_handler(CommandHandler("delbtn", remove_button))
+application.add_handler(CommandHandler("listbtn", list_buttons))
 application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, fixed_button_handler))
 application.add_handler(CommandHandler("stats", stats))
 application.add_handler(CommandHandler("fullstats", fullstats))
