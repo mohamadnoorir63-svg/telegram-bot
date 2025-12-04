@@ -70,8 +70,7 @@ async def cloudsync_internal(bot, reason="Manual Backup"):
                 "aliases.json",
                 "data/custom_commands.json",
                 "custom_commands_backup.json"
-                "backup/dynamic_buttons/buttons.json"
-                "backup/dynamic_buttons"
+                "data/dynamic_buttons/buttons.json"
             ]
 
             for imp in important_files_extra:
@@ -164,8 +163,7 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "aliases.json",
             "group_control/aliases.json",
             "data/custom_commands.json",
-            "backup/dynamic_buttons/buttons.json"
-            "backup/dynamic_buttons"
+            "data/dynamic_buttons/buttons.json"
         ]
 
         moved_any = False
