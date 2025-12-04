@@ -15,7 +15,7 @@ from telegram.ext import (
     CallbackQueryHandler
 )
 
-
+from reply_keyboard_fixed import MAIN_KEYBOARD, fixed_button_handler
 
 from welcome_module import (
     open_welcome_panel,
@@ -1351,21 +1351,8 @@ application.add_handler(
 # ==========================================================
 # 📊 آمار، بک‌آپ و کنترل
 # ==========================================================
-from dynamic_keyboard import (
-    start_fixed,
-    add_button,
-    save_button_response,
-    remove_button,
-    list_buttons,
-    fixed_button_handler
-)
-
-application.add_handler(CommandHandler("start", start))
-application.add_handler(CommandHandler("addbtn", add_button))
-application.add_handler(CommandHandler("savebtn", save_button_response))
-application.add_handler(CommandHandler("delbtn", remove_button))
-application.add_handler(CommandHandler("listbtn", list_buttons))
 application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, fixed_button_handler))
+application.add_handler(CommandHandler("start", start))
 application.add_handler(CommandHandler("stats", stats))
 application.add_handler(CommandHandler("fullstats", fullstats))
 application.add_handler(CommandHandler("backup", backup))
