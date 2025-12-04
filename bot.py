@@ -15,6 +15,16 @@ from telegram.ext import (
     CallbackQueryHandler
 )
 
+from modules.reply_keyboard_manager import (
+    show_menu,
+    admin_handler,
+    open_admin_panel,
+    handle_add_button,
+    handle_remove_button,
+    handle_rename,
+    handle_create_submenu,
+    handle_navigation
+)
 
 
 from welcome_module import (
@@ -41,11 +51,7 @@ from group_control.daily_stats import (
     show_group_stats,   # تابع آمار گروه
     send_nightly_stats
 )
-from modules.reply_keyboard_manager import (
-    show_reply_keyboard,
-    add_button, handle_add_button,
-    remove_button, handle_remove_button
-)
+
 from panels.panel_menu import (
     Tastatur_menu,
     Tastatur_buttons,
@@ -1355,23 +1361,21 @@ application.add_handler(
     MessageHandler(filters.ALL & filters.ChatType.GROUPS, group_logger),
     group=-99
                              )
+# در استارت:
+application.add_handler(CommandHandler("start", show_menu))
 
-# نمایش کیبورد اصلی در پیوی (مثلاً با /menu)
-application.add_handler(CommandHandler("menu", show_reply_keyboard))
+# پنل مدیریت
+application.add_handler(MessageHandler(filters.Regex("^⚙️ Admin$"), open_admin_panel))
+application.add_handler(MessageHandler(filters.TEXT, admin_handler))
 
-# مدیریت دکمه‌های کیبورد (فقط مدیر اصلی)
-application.add_handler(CommandHandler("addbtn", add_button))
-application.add_handler(CommandHandler("delbtn", remove_button))
+# عملیات اداری
+application.add_handler(MessageHandler(filters.TEXT, handle_add_button))
+application.add_handler(MessageHandler(filters.TEXT, handle_remove_button))
+application.add_handler(MessageHandler(filters.TEXT, handle_rename))
+application.add_handler(MessageHandler(filters.TEXT, handle_create_submenu))
 
-# گرفتن متن برای اضافه/حذف دکمه
-application.add_handler(
-    MessageHandler(filters.TEXT & ~filters.COMMAND, handle_add_button),
-    group=-7
-)
-application.add_handler(
-    MessageHandler(filters.TEXT & ~filters.COMMAND, handle_remove_button),
-    group=-7
-)
+# جابه‌جایی بین منوها
+application.add_handler(MessageHandler(filters.TEXT, handle_navigation))
 # ==========================================================
 # 📊 آمار، بک‌آپ و کنترل
 # ==========================================================
