@@ -52,9 +52,6 @@ from panels.panel_menu import (
 )
 
 from group_control.origin_title import register_origin_title_handlers
-from data_manager import register_group, register_private_user
-
-
 from ai_chat.chatgpt_panel import show_ai_panel, chat, start_ai_chat, stop_ai_chat
 from weather_module.weather_panel import show_weather
 from modules.azan_module import get_azan_time, get_ramadan_status
@@ -1313,17 +1310,7 @@ application.add_handler(
     CallbackQueryHandler(handle_fun_buttons, pattern=r"^fun_"),
     group=-3
 )
-# ======================= 🧾 ثبت گروه و کاربران =======================
 
-application.add_handler(
-    MessageHandler(filters.ALL & filters.ChatType.PRIVATE, pv_logger),
-    group=-100
-)
-
-application.add_handler(
-    MessageHandler(filters.ALL & filters.ChatType.GROUPS, group_logger),
-    group=-99
-)
 # ==========================================================
 # 📊 آمار، بک‌آپ و کنترل
 # ==========================================================
