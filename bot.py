@@ -1051,35 +1051,31 @@ async def show_main_panel(update: Update, context: ContextTypes.DEFAULT_TYPE, ed
     )
 
     keyboard = [
-        [
-            InlineKeyboardButton("💻 ارتباط با سازنده", url="https://t.me/NOORI_NOOR"),
-            InlineKeyboardButton("💭 گروه پشتیبانی", url="https://t.me/+CuXueaUaWQo1Yzhi")
-        ],
-        [
-            InlineKeyboardButton("➕ افزودن به گروه", url="https://t.me/AFGR63_bot?startgroup=true"),
-            InlineKeyboardButton("🧩 قابلیت‌های ربات", callback_data="panel_features")
-        ],
-        [
-            InlineKeyboardButton("🤖 راهنمای ربات", callback_data="panel_about"),
-            InlineKeyboardButton("👨‍💻 درباره تیم ما", callback_data="panel_team")
-        ],
-        [
-            InlineKeyboardButton("🔮 فال امروز", callback_data="panel_fortune"),
-            InlineKeyboardButton("😂 جوک خنده‌دار", callback_data="panel_joke")
-        ],
-        [
-            InlineKeyboardButton("🎨 فونت‌ساز حرفه‌ای", callback_data="panel_font"),
-            InlineKeyboardButton("💳 آیدی من", callback_data="panel_stats")
-        ],
-        [
-            InlineKeyboardButton("🧠 گفتگوی ChatGPT", callback_data="panel_chatgpt")
-        ],
-        [
-            InlineKeyboardButton("🌤 آب و هوا", callback_data="panel_weather"),
-            InlineKeyboardButton("🕌 اوقات شرعی / اذان", callback_data="panel_azan")
-        ]
+    [
+        InlineKeyboardButton("💻 ارتباط با سازنده", url="https://t.me/NOORI_NOOR"),
+        InlineKeyboardButton("💭 گروه پشتیبانی", url="https://t.me/+CuXueaUaWQo1Yzhi")
+    ],
+    [
+        InlineKeyboardButton("➕ افزودن به گروه", url="https://t.me/AFGR63_bot?startgroup=true"),
+        InlineKeyboardButton("🧩 قابلیت‌های ربات", callback_data="panel_features")
+    ],
+    [
+        InlineKeyboardButton("🤖 راهنمای ربات", callback_data="panel_about"),
+        InlineKeyboardButton("👨‍💻 درباره تیم ما", callback_data="panel_team")
+    ],
+    [
+        InlineKeyboardButton("🎨 فونت‌ساز حرفه‌ای", callback_data="panel_font"),
+        InlineKeyboardButton("💳 آیدی من", callback_data="panel_stats")
+    ],
+    [
+        InlineKeyboardButton("🧠 گفتگوی ChatGPT", callback_data="panel_chatgpt")
+    ],
+    [
+        InlineKeyboardButton("🌤 آب و هوا", callback_data="panel_weather"),
+        InlineKeyboardButton("🕌 اوقات شرعی / اذان", callback_data="panel_azan")
     ]
-
+]
+    
     markup = InlineKeyboardMarkup(keyboard)
 
     if edit:
@@ -1161,12 +1157,7 @@ async def panel_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # ✅ نمایش وضعیت رمضان و تاریخ‌های قمری/شمسی/میلادی
         await get_ramadan_status(update, context)
 
-    elif query.data == "panel_fortune":
-        await query.message.reply_text("🔮 لطفاً کلمه فال رو بفرستید تا فال ارسال شود:\n<b> فال </b>", parse_mode="HTML")
-
-    elif query.data == "panel_joke":
-        await query.message.reply_text("🎭 لطفاً کلمه جوک رو بفرستید تا جوک ارسال شود:\n<b> جوک </b>", parse_mode="HTML")
-        
+    
     elif query.data == "panel_font":
         await query.message.reply_text("🎨 برای ساخت فونت بنویس:\n<b> فونت اسمت </b>", parse_mode="HTML")
 
