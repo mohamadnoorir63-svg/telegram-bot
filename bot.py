@@ -383,14 +383,17 @@ def _should_include_in_backup(path: str) -> bool:
         return False
 
     important_files = [
-        "data/groups.json"
-        "data/users.jso
+        "data/groups.json",
+        "data/users.json",
         "jokes.json",
         "fortunes.json",
         "data/custom_commands.json",
         "fortunes_media"
     ]
-    return any(path.endswith(f) or f in path for f in important_files) or lowered.endswith((".jpg", ".png", ".webp", ".mp3", ".ogg"))
+
+    return any(path.endswith(f) or f in path for f in important_files) or lowered.endswith(
+        (".jpg", ".png", ".webp", ".mp3", ".ogg")
+    )
 
 # ======================= ☁️ بک‌آپ خودکار =======================
 async def auto_backup(bot):
