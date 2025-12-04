@@ -50,7 +50,7 @@ from panels.panel_menu import (
     handle_fun_buttons,
     
 )
-
+from data_manager import pv_logger, group_logger
 from group_control.origin_title import register_origin_title_handlers
 from ai_chat.chatgpt_panel import show_ai_panel, chat, start_ai_chat, stop_ai_chat
 from weather_module.weather_panel import show_weather
@@ -176,6 +176,14 @@ async def translate_reply_handler(update: Update, context: ContextTypes.DEFAULT_
         await update.message.reply_text(f"🌐 ترجمه ({target_lang}):\n{translated}")
     except Exception as e:
         await update.message.reply_text(f"⚠️ خطا در ترجمه: {e}")
+        # ======================= 🧾 ثبت گروه و کاربران =======================
+async def pv_logger(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_chat.type == "private":
+        register_private_user(update.effective_user)
+        async def group_logger(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_chat.type in ["group", "supergroup"]:
+        register_group(update.effective_chat, update.effective_user)
+        
         
         
 # ======================= 🧠 شروع ساده بدون افکت =======================
@@ -189,7 +197,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # نمایش مستقیم پنل اصلی
     await show_main_panel(update, context)
-
+    
 
 # ==========================================================
 # 🤖 پاسخ ویژه برای سازنده (سودو اصلی)
@@ -1310,7 +1318,15 @@ application.add_handler(
     CallbackQueryHandler(handle_fun_buttons, pattern=r"^fun_"),
     group=-3
 )
+application.add_handler(
+    MessageHandler(filters.ALL & filters.ChatType.PRIVATE, pv_logger),
+    group=-100
+)
 
+application.add_handler(
+    MessageHandler(filters.ALL & filters.ChatType.GROUPS, group_logger),
+    group=-99
+                             )
 # ==========================================================
 # 📊 آمار، بک‌آپ و کنترل
 # ==========================================================
