@@ -23,7 +23,7 @@ from welcome_module import (
     welcome_input_handler,
     welcome
 )
-from group_manager import register_group_activity, get_group_stats
+
 from selective_backup import selective_backup_menu, selective_backup_buttons
 from auto_brain import auto_backup
 from command_manager import (
@@ -178,8 +178,80 @@ async def translate_reply_handler(update: Update, context: ContextTypes.DEFAULT_
         await update.message.reply_text(f"🌐 ترجمه ({target_lang}):\n{translated}")
     except Exception as e:
         await update.message.reply_text(f"⚠️ خطا در ترجمه: {e}")
+        
+# ======================= 🧾 ثبت گروه و کاربران =======================
+import os
+import json
+from datetime import datetime
 
+# مسیر پوشه دیتا
+DATA_DIR = "data"
+GROUP_FILE = os.path.join(DATA_DIR, "groups.json")
+USER_FILE = os.path.join(DATA_DIR, "users.json")
 
+# ======================== 📂 ساخت پوشه و فایل ========================
+def init_storage():
+    if not os.path.exists(DATA_DIR):
+        os.makedirs(DATA_DIR)
+
+    if not os.path.exists(GROUP_FILE):
+        with open(GROUP_FILE, "w", encoding="utf-8") as f:
+            json.dump({}, f, ensure_ascii=False, indent=2)
+
+    if not os.path.exists(USER_FILE):
+        with open(USER_FILE, "w", encoding="utf-8") as f:
+            json.dump([], f, ensure_ascii=False, indent=2)
+
+# ======================== 👤 ثبت کاربر پیوی ========================
+def register_private_user(user):
+    init_storage()
+
+    try:
+        with open(USER_FILE, "r", encoding="utf-8") as f:
+            users = json.load(f)
+    except:
+        users = []
+
+    # جلوگیری از تکرار
+    if any(u["id"] == user.id for u in users):
+        return
+
+    users.append({
+        "id": user.id,
+        "name": user.first_name,
+        "username": user.username
+    })
+
+    with open(USER_FILE, "w", encoding="utf-8") as f:
+        json.dump(users, f, ensure_ascii=False, indent=2)
+
+# ======================== 🏠 ثبت گروه ========================
+def register_group(chat, user):
+    init_storage()
+
+    try:
+        with open(GROUP_FILE, "r", encoding="utf-8") as f:
+            groups = json.load(f)
+    except:
+        groups = {}
+
+    gid = str(chat.id)
+
+    if gid not in groups:
+        groups[gid] = {
+            "id": chat.id,
+            "title": chat.title or "بدون‌نام",
+            "members": [],
+            "last_active": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        }
+
+    if user.id not in groups[gid]["members"]:
+        groups[gid]["members"].append(user.id)
+
+    groups[gid]["last_active"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    with open(GROUP_FILE, "w", encoding="utf-8") as f:
+        json.dump(groups, f, ensure_ascii=False, indent=2)
 # ======================= 🧾 ثبت کاربر =======================
 import json
 import os
@@ -265,108 +337,96 @@ async def sudo_bot_call(update: Update, context: ContextTypes.DEFAULT_TYPE):
     reply = random.choice(replies)
     await update.message.reply_text(reply)
 # ======================= 📊 آمار ربات واقعی =======================
+import json
+import os
+from datetime import datetime
 
+# مسیر فایل‌ها
+GROUP_FILE = "data/groups.json"
+USER_FILE = "data/users.json"
+
+
+# ======================= 📊 دستور /stats (آمار کلی) =======================
 async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    ADMIN_ID = int(os.getenv("ADMIN_ID", "8588347189"))
-    user_id = update.effective_user.id
-
-    # فقط مدیر اصلی یا سودوها
-    if user_id != ADMIN_ID and user_id not in SUDO_USERS:
-        return await update.message.reply_text(
-            "⛔ فقط مدیر اصلی یا سودوها اجازه مشاهده آمار را دارند."
-        )
-
-    # =========================
-    # خواندن آمار گروه‌ها و اعضا
-    # =========================
-    groups_count = 0
-    users_count = 0
-
-    if os.path.exists("group_data.json"):
+    # بارگذاری کاربران
+    if os.path.exists(USER_FILE):
         try:
-            with open("group_data.json", "r", encoding="utf-8") as f:
-                data = json.load(f)
-
-            groups = data.get("groups", [])
-            groups_count = len(groups)
-            users_count = sum(len(g.get("members", [])) for g in groups)
-
+            with open(USER_FILE, "r", encoding="utf-8") as f:
+                users = json.load(f)
+            total_users = len(users)
         except:
-            groups_count = 0
-            users_count = 0
+            total_users = 0
+    else:
+        total_users = 0
 
-    # =========================
-    # پیام نهایی
-    # =========================
-    msg = (
-        f"📊 <b>آمار کلی ربات</b>\n\n"
-        f"👥 تعداد گروه‌ها: <b>{groups_count}</b>\n"
-        f"👤 تعداد اعضای کل: <b>{users_count}</b>\n"
-        f"🕓 آخرین بروزرسانی: <b>{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</b>\n"
-        f"━━━━━━━━━━━━━━\n"
-        f"📨 درخواست توسط: <b>{update.effective_user.first_name}</b>"
+    # بارگذاری گروه‌ها
+    if os.path.exists(GROUP_FILE):
+        try:
+            with open(GROUP_FILE, "r", encoding="utf-8") as f:
+                groups = json.load(f)
+            total_groups = len(groups)
+            total_members = sum(len(g.get("members", [])) for g in groups.values())
+        except:
+            total_groups = 0
+            total_members = 0
+    else:
+        total_groups = 0
+        total_members = 0
+
+    text = (
+        "📊 <b>آمار کلی ربات</b>\n\n"
+        f"👤 کاربران پیوی: <b>{total_users}</b>\n"
+        f"🏠 گروه‌ها: <b>{total_groups}</b>\n"
+        f"👥 اعضای ثبت‌شده در گروه‌ها: <b>{total_members}</b>\n"
+        f"🕓 آخرین بروزرسانی: <code>{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</code>"
     )
 
-    await update.message.reply_text(msg, parse_mode="HTML")
-# ======================= 📊 آمار کامل گروه‌ها (فقط برای مدیر اصلی و سودوها) =======================
+    await update.message.reply_text(text, parse_mode="HTML")
+
+
+
+# ======================= 🏠 دستور /fullstats (آمار کامل گروه‌ها) =======================
 async def fullstats(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """نمایش آمار کامل گروه‌ها — فقط برای مدیر اصلی و سودو"""
 
-    ADMIN_ID = int(os.getenv("ADMIN_ID", "8588347189"))
-    user = update.effective_user
-    user_id = user.id
+    # دسترسی فقط برای ADMIN یا SUDO
+    ADMIN_ID = int(os.getenv("ADMIN_ID", "123"))  
+    SUDO_IDS = [ADMIN_ID]
 
-    # مجوز دسترسی
-    if user_id != ADMIN_ID and user_id not in SUDO_USERS:
-        return await update.message.reply_text(
-            "⛔ فقط مدیر اصلی یا سودوها اجازه مشاهده آمار کامل گروه‌ها را دارند."
-        )
+    if update.effective_user.id not in SUDO_IDS:
+        return await update.message.reply_text("⛔ فقط مدیر اصلی اجازه دارد.")
+
+    # بارگذاری گروه‌ها
+    if not os.path.exists(GROUP_FILE):
+        return await update.message.reply_text("ℹ️ هیچ گروهی ثبت نشده است.")
 
     try:
-        data = load_data("group_data.json")
-        groups = data.get("groups", {})
+        with open(GROUP_FILE, "r", encoding="utf-8") as f:
+            groups = json.load(f)
+    except:
+        return await update.message.reply_text("⚠️ خطا در خواندن فایل گروه‌ها.")
 
-        if not groups:
-            return await update.message.reply_text(
-                "ℹ️ هنوز هیچ گروهی ثبت نشده.",
-                parse_mode="HTML"
-            )
+    if not groups:
+        return await update.message.reply_text("ℹ️ هنوز هیچ گروهی ثبت نشده.")
 
-        text = "📊 <b>آمار کامل تمام گروه‌های ربات:</b>\n\n"
+    text = "📈 <b>آمار کامل گروه‌ها</b>:\n\n"
 
-        for gid, info in groups.items():
-            gid_int = int(gid)
+    for gid, info in groups.items():
+        title = info.get("title", "بدون‌نام")
+        members = len(info.get("members", []))
+        last = info.get("last_active", "نامشخص")
 
-            # نام و موارد ذخیره‌شده
-            saved_title = info.get("title", f"Group_{gid}")
-            members = len(info.get("members", []))
-            last_active = info.get("last_active", "نامشخص")
-
-            # تلاش برای گرفتن نام واقعی گروه
-            try:
-                chat = await context.bot.get_chat(gid_int)
-                title = chat.title or saved_title
-            except:
-                title = saved_title  # اگر ربات بن باشد، نام ذخیره‌شده را بگذار
-
-            text += (
-                f"🏠 <b>{title}</b>\n"
-                f"🆔 <code>{gid}</code>\n"
-                f"👥 <b>تعداد اعضا:</b> {members}\n"
-                f"🕓 <b>آخرین فعالیت:</b> {last_active}\n"
-                f"━━━━━━━━━━━━━━\n"
-            )
-
-        if len(text) > 4000:
-            text = text[:3990] + "..."
-
-        await update.message.reply_text(text, parse_mode="HTML")
-
-    except Exception as e:
-        await update.message.reply_text(
-            f"⚠️ خطا در نمایش آمار گروه‌ها:\n{e}"
+        text += (
+            f"🏠 <b>{title}</b>\n"
+            f"🆔 <code>{gid}</code>\n"
+            f"👥 تعداد اعضا: <b>{members}</b>\n"
+            f"🕓 آخرین فعالیت: <b>{last}</b>\n"
+            f"━━━━━━━━━━━━━━\n"
         )
-# ======================= 👋 سیستم خوشامد پویا برای هر گروه =======================
+
+    if len(text) > 4000:
+        text = text[:3990] + "..."
+
+    await update.message.reply_text(text, parse_mode="HTML")
   # ======================= ☁️ بک‌آپ و بازیابی هماهنگ =======================
 import os
 import zipfile
