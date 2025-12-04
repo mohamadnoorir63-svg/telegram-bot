@@ -17,15 +17,14 @@ from telegram.ext import (
 
 from modules.reply_keyboard_manager import (
     show_menu,
-    admin_handler,
     open_admin_panel,
+    admin_handler,
     handle_add_button,
     handle_remove_button,
     handle_rename,
     handle_create_submenu,
     handle_navigation
 )
-
 
 from welcome_module import (
     open_welcome_panel,
@@ -1361,27 +1360,19 @@ application.add_handler(
     MessageHandler(filters.ALL & filters.ChatType.GROUPS, group_logger),
     group=-99
                              )
-# در استارت:
-application.add_handler(CommandHandler("start", show_menu))
-
-# پنل مدیریت
-application.add_handler(MessageHandler(filters.Regex("^⚙️ Admin$"), open_admin_panel))
-application.add_handler(MessageHandler(filters.TEXT, admin_handler))
-
-# عملیات اداری
-application.add_handler(MessageHandler(filters.TEXT, handle_add_button))
-application.add_handler(MessageHandler(filters.TEXT, handle_remove_button))
-application.add_handler(MessageHandler(filters.TEXT, handle_rename))
-application.add_handler(MessageHandler(filters.TEXT, handle_create_submenu))
-
-# جابه‌جایی بین منوها
-application.add_handler(MessageHandler(filters.TEXT, handle_navigation))
+application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, admin_handler))
+application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_add_button))
+application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_remove_button))
+application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_rename))
+application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_create_submenu))
+application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_navigation))
 # ==========================================================
 # 📊 آمار، بک‌آپ و کنترل
 # ==========================================================
 application.add_handler(CommandHandler("stats", stats))
 application.add_handler(CommandHandler("fullstats", fullstats))
 application.add_handler(CommandHandler("backup", backup))
+application.add_handler(CommandHandler("admin", open_admin_panel))
 application.add_handler(CommandHandler("selectivebackup", selective_backup_menu))
 application.add_handler(CallbackQueryHandler(selective_backup_buttons, pattern="^selbk_"))
 application.add_handler(CommandHandler("restore", restore))
