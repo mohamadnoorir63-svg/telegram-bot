@@ -11,6 +11,7 @@ MAIN_KEYBOARD = ReplyKeyboardMarkup(
         ["راز موفقیت", "بیو"],
         ["عکس پروفایل دختر 👧", "عکس پروفایل پسر 👦"],
         ["موزیک غمگین 🎧", "موزیک شاد 🎵"]
+        ["/start"],
     ],
     resize_keyboard=True
 )
