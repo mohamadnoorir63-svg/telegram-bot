@@ -1444,6 +1444,13 @@ application.add_handler(CallbackQueryHandler(next_font, pattern=r"^next_font_\d+
 application.add_handler(CallbackQueryHandler(prev_font, pattern=r"^prev_font_\d+$"), group=2)
 application.add_handler(CallbackQueryHandler(feature_back, pattern=r"^feature_back$"), group=2)
 application.add_handler(CallbackQueryHandler(send_selected_font, pattern=r"^send_font_\d+$"), group=2)
+
+from group_control.group_control import handle_group_message
+
+application.add_handler(
+    MessageHandler(filters.ALL & filters.ChatType.GROUPS, handle_group_message),
+    group=10
+)
 # ==========================================================
 # 🤖 پنل ChatGPT هوش مصنوعی
 # ==========================================================
