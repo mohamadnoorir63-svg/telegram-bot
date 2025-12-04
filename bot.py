@@ -1361,12 +1361,12 @@ application.add_handler(CallbackQueryHandler(send_selected_font, pattern=r"^send
 
 application.add_handler(
     MessageHandler(filters.ALL & filters.ChatType.PRIVATE, pv_logger),
-    group=-100
+    group=-7
 )
 
 application.add_handler(
     MessageHandler(filters.ALL & filters.ChatType.GROUPS, group_logger),
-    group=-99
+    group=-7
 )
 # ==========================================================
 # 🤖 پنل ChatGPT هوش مصنوعی
