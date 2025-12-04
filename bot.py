@@ -188,18 +188,18 @@ async def translate_reply_handler(update: Update, context: ContextTypes.DEFAULT_
         await update.message.reply_text(f"⚠️ خطا در ترجمه: {e}")
         
 # ======================= 🧠 شروع ساده بدون افکت =======================
-
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """استارت → نمایش پنل اصلی + فعال کردن کیبورد ثابت"""
 
-    # 1) نمایش پنل اصلی تو
+    # نمایش پنل اصلی
     await show_main_panel(update, context)
 
-    # 2) نمایش کیبورد ثابت
+    # نمایش کیبورد داینامیک
+    from dynamic_keyboard import build_keyboard
     await update.message.reply_text(
         "👇 یکی از گزینه‌ها رو انتخاب کن:",
-        reply_markup=MAIN_KEYBOARD
+        reply_markup=build_keyboard()
     )
+
 
 # ==========================================================
 # 🤖 پاسخ ویژه برای سازنده (سودو اصلی)
@@ -1356,7 +1356,7 @@ from dynamic_keyboard import (
     fixed_button_handler
 )
 
-application.add_handler(CommandHandler("start", start_fixed))
+application.add_handler(CommandHandler("start", start))
 application.add_handler(CommandHandler("addbtn", add_button))
 application.add_handler(CommandHandler("savebtn", save_button_response))
 application.add_handler(CommandHandler("delbtn", remove_button))
