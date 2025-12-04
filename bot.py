@@ -188,17 +188,19 @@ async def translate_reply_handler(update: Update, context: ContextTypes.DEFAULT_
         await update.message.reply_text(f"⚠️ خطا در ترجمه: {e}")
         
 # ======================= 🧠 شروع ساده بدون افکت =======================
+from reply_keyboard_fixed import MAIN_KEYBOARD
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """شروع ساده بدون انیمیشن یا افکت"""
-    from datetime import datetime
-    user = update.effective_user
-    now = datetime.now().strftime("%Y/%m/%d - %H:%M:%S")
+    """استارت → نمایش پنل اصلی + فعال کردن کیبورد ثابت"""
 
-    
-
-    # نمایش مستقیم پنل اصلی
+    # 1) نمایش پنل اصلی تو
     await show_main_panel(update, context)
-    
+
+    # 2) نمایش کیبورد ثابت
+    await update.message.reply_text(
+        "👇 یکی از گزینه‌ها رو انتخاب کن:",
+        reply_markup=MAIN_KEYBOARD
+    )
 
 # ==========================================================
 # 🤖 پاسخ ویژه برای سازنده (سودو اصلی)
