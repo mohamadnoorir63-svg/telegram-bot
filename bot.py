@@ -51,6 +51,16 @@ from panels.panel_menu import (
     
 )
 from data_manager import register_private_user, register_group
+# ======================= 🧾 ثبت گروه و کاربران =======================
+
+async def pv_logger(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_chat.type == "private":
+        register_private_user(update.effective_user)
+
+
+async def group_logger(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_chat.type in ["group", "supergroup"]:
+        register_group(update.effective_chat, update.effective_user)
 from group_control.origin_title import register_origin_title_handlers
 from ai_chat.chatgpt_panel import show_ai_panel, chat, start_ai_chat, stop_ai_chat
 from weather_module.weather_panel import show_weather
@@ -176,16 +186,7 @@ async def translate_reply_handler(update: Update, context: ContextTypes.DEFAULT_
         await update.message.reply_text(f"🌐 ترجمه ({target_lang}):\n{translated}")
     except Exception as e:
         await update.message.reply_text(f"⚠️ خطا در ترجمه: {e}")
-        # ======================= 🧾 ثبت گروه و کاربران =======================
-
-    async def pv_logger(update: Update, context: ContextTypes.DEFAULT_TYPE):
-        if update.effective_chat.type == "private":
-            register_private_user(update.effective_user)
-
-
-    async def group_logger(update: Update, context: ContextTypes.DEFAULT_TYPE):
-        if update.effective_chat.type in ["group", "supergroup"]:
-            register_group(update.effective_chat, update.effective_user)
+        
 # ======================= 🧠 شروع ساده بدون افکت =======================
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """شروع ساده بدون انیمیشن یا افکت"""
