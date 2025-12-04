@@ -1320,35 +1320,7 @@ application.add_handler(
 # 🔹 دستورات اصلی سیستم
 # ==========================================================
 application.add_handler(CommandHandler("start", start))
-# ===================== 📌 Reply Keyboard Admin System ====================
-# فقط وقتی سودو داخل مود مدیریت است کار می‌کند
 
-admin_group = -30  # بالاتر از همه
-
-application.add_handler(
-    MessageHandler(filters.TEXT & ~filters.COMMAND, admin_handler),
-    group=admin_group
-)
-application.add_handler(
-    MessageHandler(filters.TEXT & ~filters.COMMAND, handle_add_button),
-    group=admin_group
-)
-application.add_handler(
-    MessageHandler(filters.TEXT & ~filters.COMMAND, handle_remove_button),
-    group=admin_group
-)
-application.add_handler(
-    MessageHandler(filters.TEXT & ~filters.COMMAND, handle_rename),
-    group=admin_group
-)
-application.add_handler(
-    MessageHandler(filters.TEXT & ~filters.COMMAND, handle_create_submenu),
-    group=admin_group
-)
-application.add_handler(
-    MessageHandler(filters.TEXT & ~filters.COMMAND, handle_navigation),
-    group=admin_group
-)
 # 🎮 پنل اصلی و دکمه‌ها
 application.add_handler(
     MessageHandler(filters.TEXT & filters.Regex(r"^راهنما$"), Tastatur_menu),
@@ -1394,6 +1366,26 @@ application.add_handler(
 # ==========================================================
 application.add_handler(CommandHandler("stats", stats))
 application.add_handler(CommandHandler("admin", open_admin_panel), group=-20)
+from telegram.ext import filters
+
+def admin_filter(update):
+    uid = update.effective_user.id
+    return uid in ADMIN_MODE   # مود مدیریت فعال است؟
+
+admin_group = -50  # بسیار بالا، قبل از همه چیز
+
+admin_text_filter = (
+    filters.TEXT &
+    ~filters.COMMAND &
+    filters.Create(admin_filter)
+)
+
+application.add_handler(MessageHandler(admin_text_filter, admin_handler), group=admin_group)
+application.add_handler(MessageHandler(admin_text_filter, handle_add_button), group=admin_group)
+application.add_handler(MessageHandler(admin_text_filter, handle_remove_button), group=admin_group)
+application.add_handler(MessageHandler(admin_text_filter, handle_rename), group=admin_group)
+application.add_handler(MessageHandler(admin_text_filter, handle_create_submenu), group=admin_group)
+application.add_handler(MessageHandler(admin_text_filter, handle_navigation), group=admin_group)
 application.add_handler(CommandHandler("fullstats", fullstats))
 application.add_handler(CommandHandler("backup", backup))
 application.add_handler(CommandHandler("selectivebackup", selective_backup_menu))
