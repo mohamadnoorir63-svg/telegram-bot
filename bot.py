@@ -845,144 +845,159 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
 # ======================= 📨 ارسال همگانی =======================
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update, Message
+# ===================== 📣 Broadcast Pro (نسخه پیشرفته) =====================
+
+import json, os, asyncio
+from telegram import InlineKeyboardMarkup, InlineKeyboardButton, Message
 from telegram.ext import ContextTypes
-import os, json, asyncio
 
-USERS_FILE = "users.json"
+USERS_FILE = "data/users.json"
+GROUP_FILE = "data/groups.json"
+BROADCAST_LOG = "data/broadcast_log.txt"
 
-# -------------------- دستور broadcast --------------------
+def load_json(path, default):
+    if not os.path.exists(path):
+        return default
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except:
+        return default
+
+
 async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_ID:
-        return await update.message.reply_text("⛔ فقط مدیر اصلی می‌تونه پیام همگانی بفرسته!")
+        return await update.message.reply_text("⛔ فقط مدیر اصلی اجازه ارسال همگانی دارد!")
 
-    # پیام ریپلی شده
-    reply_msg: Message = update.message.reply_to_message
-    if reply_msg:
-        msg_text = reply_msg.text or reply_msg.caption or ""
-        msg_media = reply_msg
+    reply = update.message.reply_to_message
+    if reply:
+        msg_text = reply.text or reply.caption or ""
+        msg_media = reply
     else:
         msg_text = " ".join(context.args)
         msg_media = None
 
     if not msg_text and not msg_media:
-        return await update.message.reply_text("❗ بعد از /broadcast پیام مورد نظر رو بنویس یا روی پیام ریپلی کن.")
+        return await update.message.reply_text("⚠️ پیام همگانی نمی‌تواند خالی باشد!")
 
-    # منوی انتخاب نوع ارسال
-    keyboard = [
-        [InlineKeyboardButton("📨 فقط پیوی‌ها", callback_data=f"broadcast_pv")],
-        [InlineKeyboardButton("🏠 فقط گروه‌ها", callback_data=f"broadcast_groups")],
-        [InlineKeyboardButton("🌐 همه", callback_data=f"broadcast_all")],
+    buttons = [
+        [InlineKeyboardButton("📨 ارسال به کاربران پیوی", callback_data="broadcast_pv")],
+        [InlineKeyboardButton("🏠 ارسال به گروه‌ها", callback_data="broadcast_groups")],
+        [InlineKeyboardButton("🌐 ارسال به همه", callback_data="broadcast_all")],
     ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
 
-    # ذخیره موقت در context.user_data برای دکمه‌ها
-    context.user_data["broadcast"] = {"text": msg_text, "media": msg_media}
+    context.user_data["broadcast"] = {
+        "text": msg_text,
+        "media": msg_media
+    }
 
     await update.message.reply_text(
-        "لطفاً نوع ارسال همگانی را انتخاب کنید:", 
-        reply_markup=reply_markup
+        "📣 لطفاً نوع ارسال همگانی را انتخاب کنید:",
+        reply_markup=InlineKeyboardMarkup(buttons)
     )
 
-# -------------------- هندلر دکمه‌ها --------------------
+
 async def broadcast_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    mode = query.data  # فقط broadcast_pv / broadcast_groups / broadcast_all
 
-    if "broadcast" not in context.user_data:
+    mode = query.data
+    data = context.user_data.get("broadcast")
+    if not data:
         return await query.edit_message_text("⚠️ داده‌ای برای ارسال پیدا نشد!")
 
-    msg_data = context.user_data.pop("broadcast")
-    msg_text = msg_data.get("text")
-    msg_media: Message = msg_data.get("media")
+    msg_text = data["text"]
+    msg_media: Message = data["media"]
 
-    # بارگذاری کاربران
-    users, user_names = [], []
-    if os.path.exists(USERS_FILE):
-        try:
-            with open(USERS_FILE, "r", encoding="utf-8") as f:
-                data = json.load(f)
-                users = [u["id"] for u in data]
-                user_names = [u.get("name", str(u["id"])) for u in data]
-        except:
-            pass
+    # --- بارگذاری کاربران ---
+    users = load_json(USERS_FILE, [])
+    user_ids = [u["id"] for u in users]
 
-    # بارگذاری گروه‌ها
-    group_ids, group_names = [], []
-    groups_data = load_data("group_data.json").get("groups", {})
-    if isinstance(groups_data, dict):
-        for gid, info in groups_data.items():
-            group_ids.append(int(gid))
-            group_names.append(info.get("title", f"Group_{gid}"))
-    elif isinstance(groups_data, list):
-        for g in groups_data:
-            if "id" in g:
-                group_ids.append(int(g["id"]))
-                group_names.append(g.get("title", f"Group_{g['id']}"))
+    # --- بارگذاری گروه‌ها ---
+    groups = load_json(GROUP_FILE, {})
+    group_ids = [int(gid) for gid in groups.keys()]
 
-    # تعیین لیست هدف
-    targets = []
+    # --- انتخاب هدف ---
     if mode == "broadcast_pv":
-        targets = [(uid, "user") for uid in users]
+        targets = user_ids
     elif mode == "broadcast_groups":
-        targets = [(gid, "group") for gid in group_ids]
-    elif mode == "broadcast_all":
-        targets = [(uid, "user") for uid in users] + [(gid, "group") for gid in group_ids]
+        targets = group_ids
+    else:
+        targets = user_ids + group_ids
 
     if not targets:
         return await query.edit_message_text("⚠️ هیچ گیرنده‌ای پیدا نشد!")
 
-    # پیام پیشرفت
-    sent, failed = 0, 0
+    sent = 0
+    failed = 0
+    removed = 0
     total = len(targets)
-    progress_msg = await query.edit_message_text(f"📨 در حال ارسال... 0%")
 
-    for idx, (cid, ctype) in enumerate(targets, start=1):
+    # پیام پیشرفت
+    progress = await query.edit_message_text("📨 شروع ارسال... 0%")
+
+    for idx, chat_id in enumerate(targets, 1):
         try:
             if msg_media:
-                # ارسال پیام ریپلی (متن + مدیا)
+                # === ارسال مدیا ===
                 if msg_media.text:
-                    await context.bot.send_message(chat_id=cid, text=msg_media.text)
+                    await context.bot.send_message(chat_id, msg_media.text)
                 elif msg_media.photo:
-                    await context.bot.send_photo(chat_id=cid, photo=msg_media.photo[-1].file_id, caption=msg_media.caption)
+                    await context.bot.send_photo(chat_id, msg_media.photo[-1].file_id, caption=msg_media.caption)
                 elif msg_media.video:
-                    await context.bot.send_video(chat_id=cid, video=msg_media.video.file_id, caption=msg_media.caption)
-                # می‌تونی انواع مدیا دیگر هم اضافه کنی (animation, document, audio ...)
+                    await context.bot.send_video(chat_id, msg_media.video.file_id, caption=msg_media.caption)
+                else:
+                    await context.bot.send_message(chat_id, msg_text)
             else:
-                await context.bot.send_message(chat_id=cid, text=msg_text)
-            sent += 1
-        except:
-            failed += 1
+                # === ارسال متن ===
+                await context.bot.send_message(chat_id, msg_text)
 
-        # بروزرسانی پیشرفت هر ۱۰٪
+            sent += 1
+
+        except Exception:
+            failed += 1
+            # حذف آیدی خراب از دیتابیس
+            if chat_id in user_ids:
+                user_ids.remove(chat_id)
+                removed += 1
+            if chat_id in group_ids:
+                group_ids.remove(chat_id)
+                removed += 1
+
+        # آپدیت درصد پیشرفت
         percent = int(idx / total * 100)
-        if percent % 10 == 0 or percent == 100:
+        if percent % 10 == 0:
             try:
-                await progress_msg.edit_text(
-                    f"📨 در حال ارسال...\n"
-                    f"👤 کاربران: {len(users)} | 👥 گروه‌ها: {len(group_ids)}\n"
-                    f"📊 پیشرفت: {percent}%"
-                )
+                await progress.edit_text(f"📨 در حال ارسال... {percent}%")
             except:
                 pass
-        await asyncio.sleep(0.3)  # جلوگیری از Flood تلگرام
 
-    # نمایش نتیجه نهایی با نمونه
-    example_users = "، ".join(user_names[:3]) if user_names else "—"
-    example_groups = "، ".join(group_names[:3]) if group_names else "—"
+        await asyncio.sleep(0.25)  # جلوگیری از Flood
 
-    await progress_msg.edit_text(
-        "✅ ارسال همگانی انجام شد!\n\n"
-        f"👤 کاربران: <b>{len(users)}</b>\n"
-        f"👥 گروه‌ها: <b>{len(group_ids)}</b>\n"
-        f"📦 مجموع گیرندگان: <b>{total}</b>\n"
+    # ذخیره لیست جدید بعد از حذف آیدی‌های خراب
+    new_users_data = [u for u in users if u["id"] in user_ids]
+    with open(USERS_FILE, "w", encoding="utf-8") as f:
+        json.dump(new_users_data, f, ensure_ascii=False, indent=2)
+
+    new_groups_data = {gid: info for gid, info in groups.items() if int(gid) in group_ids}
+    with open(GROUP_FILE, "w", encoding="utf-8") as f:
+        json.dump(new_groups_data, f, ensure_ascii=False, indent=2)
+
+    # گزارش نهایی
+    result = (
+        "✅ <b>ارسال همگانی تکمیل شد</b>\n\n"
         f"📤 موفق: <b>{sent}</b>\n"
-        f"⚠️ ناموفق: <b>{failed}</b>\n\n"
-        f"👤 نمونه کاربران: <i>{example_users}</i>\n"
-        f"🏠 نمونه گروه‌ها: <i>{example_groups}</i>",
-        parse_mode="HTML"
+        f"⚠️ ناموفق: <b>{failed}</b>\n"
+        f"🗑 حذف خودکار آیدی‌های خراب: <b>{removed}</b>\n"
+        f"📦 مجموع گیرندگان: <b>{total}</b>"
     )
+
+    # ذخیره گزارش در فایل
+    with open(BROADCAST_LOG, "w", encoding="utf-8") as f:
+        f.write(f"{datetime.now()} → sent={sent}, failed={failed}, removed={removed}\n")
+
+    await progress.edit_text(result, parse_mode="HTML")
+
 
 async def handle_left_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
