@@ -4,14 +4,14 @@ from telegram import ReplyKeyboardMarkup, Update
 from telegram.ext import ContextTypes
 
 # ===========================
-# 📁 مسیر فایل مرکزی ذخیره‌سازی
+# 📁 مسیر درست سازگار با Heroku
 # ===========================
-FOLDER = "backup/dynamic_buttons"
+FOLDER = "data/dynamic_buttons"
 os.makedirs(FOLDER, exist_ok=True)
 
 FILE = os.path.join(FOLDER, "buttons.json")
 
-# اگر فایل وجود نداشت → دوتا دکمه تست بساز
+# اگر فایل وجود نداشت → ساخت خودکار
 if not os.path.exists(FILE):
     with open(FILE, "w", encoding="utf-8") as f:
         json.dump(
@@ -56,7 +56,7 @@ def build_keyboard():
 
 
 # ===========================
-# /start → نمایش کیبورد
+# /start → کیبورد
 # ===========================
 async def start_fixed(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("👇 یکی از گزینه‌ها رو انتخاب کن:",
@@ -64,7 +64,7 @@ async def start_fixed(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 # ===========================
-# /addbtn → ساخت دکمه جدید
+# /addbtn
 # ===========================
 async def add_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.args:
@@ -87,7 +87,7 @@ async def add_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 # ===========================
-# /savebtn → ذخیره پاسخ برای دکمه
+# /savebtn
 # ===========================
 async def save_button_response(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.args:
@@ -101,7 +101,7 @@ async def save_button_response(update: Update, context: ContextTypes.DEFAULT_TYP
 
     reply = update.message.reply_to_message
     if not reply:
-        return await update.message.reply_text("📎 باید روی یک پیام ریپلای کنید.")
+        return await update.message.reply_text("📎 باید روی پیام ریپلای کنید.")
 
     entry = {}
 
@@ -136,7 +136,7 @@ async def save_button_response(update: Update, context: ContextTypes.DEFAULT_TYP
 
 
 # ===========================
-# /delbtn → حذف دکمه
+# /delbtn
 # ===========================
 async def remove_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.args:
@@ -155,7 +155,7 @@ async def remove_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 # ===========================
-# /listbtn → لیست دکمه‌ها
+# /listbtn
 # ===========================
 async def list_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data = load_all()
@@ -164,7 +164,7 @@ async def list_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 # ===========================
-# هندلر اصلی → کلیک روی دکمه
+# هندلر کلیک روی دکمه
 # ===========================
 async def fixed_button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
@@ -178,7 +178,7 @@ async def fixed_button_handler(update: Update, context: ContextTypes.DEFAULT_TYP
     if not btn["responses"]:
         return await update.message.reply_text("ℹ️ هنوز پاسخی برای این دکمه ثبت نشده.")
 
-    resp = btn["responses"][0]  # فعلاً اولین پاسخ
+    resp = btn["responses"][0]
 
     t = resp["type"]
 
