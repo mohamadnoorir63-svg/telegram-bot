@@ -16,15 +16,6 @@ from telegram.ext import (
 )
 
 from modules.reply_keyboard_manager import (
-    show_menu,
-    open_admin_panel,
-    admin_handler,
-    handle_add_button,
-    handle_remove_button,
-    handle_rename,
-    handle_create_submenu,
-    handle_navigation,
-)
 
 from welcome_module import (
     open_welcome_panel,
@@ -1364,42 +1355,11 @@ application.add_handler(
 # ==========================================================
 # 📊 آمار، بک‌آپ و کنترل
 # ==========================================================
+from reply_keyboard_fixed import start_fixed, fixed_button_handler
+
+application.add_handler(CommandHandler("start", start_fixed))
+application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, fixed_button_handler))
 application.add_handler(CommandHandler("stats", stats))
-async def admin_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # فقط سودوها
-    if update.effective_user.id not in SUDO_IDS:
-        return await update.message.reply_text("⛔ فقط سودوها اجازه دارند!")
-    await open_admin_panel(update, context)
-
-application.add_handler(CommandHandler("admin", admin_cmd), group=-20)
-rk_group = -30
-
-application.add_handler(
-    MessageHandler(filters.TEXT & ~filters.COMMAND, admin_handler),
-    group=rk_group
-)
-application.add_handler(
-    MessageHandler(filters.TEXT & ~filters.COMMAND, handle_add_button),
-    group=rk_group
-)
-application.add_handler(
-    MessageHandler(filters.TEXT & ~filters.COMMAND, handle_remove_button),
-    group=rk_group
-)
-application.add_handler(
-    MessageHandler(filters.TEXT & ~filters.COMMAND, handle_rename),
-    group=rk_group
-)
-application.add_handler(
-    MessageHandler(filters.TEXT & ~filters.COMMAND, handle_create_submenu),
-    group=rk_group
-)
-application.add_handler(
-    MessageHandler(filters.TEXT & ~filters.COMMAND, handle_navigation),
-    group=rk_group
-)
-
-
 application.add_handler(CommandHandler("fullstats", fullstats))
 application.add_handler(CommandHandler("backup", backup))
 application.add_handler(CommandHandler("selectivebackup", selective_backup_menu))
