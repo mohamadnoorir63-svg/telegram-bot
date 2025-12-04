@@ -217,61 +217,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # نمایش مستقیم پنل اصلی
     await show_main_panel(update, context)
 
-# ======================= 👑 شناسایی ورود، خروج و صدا زدن سازنده =======================
-import random
-import os
-from telegram import Update
-from telegram.ext import ContextTypes
-
-async def detect_admin_movement(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """تشخیص ورود، خروج یا بازگشت سازنده خنگول در گروه‌ها (حتی اگر خوشامد خاموش باشد)"""
-    ADMIN_ID = int(os.getenv("ADMIN_ID", "8588347189"))
-    chat = update.effective_chat
-    message = update.message
-
-    if not message:
-        return
-
-    # 📥 ورود سازنده
-    if message.new_chat_members:
-        for member in message.new_chat_members:
-            if member.id == ADMIN_ID:
-                data = load_data("group_data.json")
-                sudo_status = data.setdefault("sudo_status", {})
-
-                if str(chat.id) in sudo_status:
-                    text = (
-                        f"👑 <b>بازگشت دوباره‌ی {member.first_name}!</b>\n"
-                        f"🎉 خوش اومدی رئیس! مغز ربات دوباره بیدار شد 🤖✨"
-                    )
-                else:
-                    text = (
-                        f"👑 <b>سازنده‌ی ربات وارد گروه شد!</b>\n"
-                        f"✨ حضور {member.first_name} باعث افتخار خنگوله 😎\n"
-                        f"🧠 حالت مدیریتی فعال شد و همه آماده‌ی خدمتن!"
-                    )
-
-                sudo_status[str(chat.id)] = True
-                save_data("group_data.json", data)
-
-                await message.reply_text(text, parse_mode="HTML")
-                return
-
-    # 📤 خروج سازنده
-    if message.left_chat_member and message.left_chat_member.id == ADMIN_ID:
-        data = load_data("group_data.json")
-        sudo_status = data.get("sudo_status", {})
-
-        if str(chat.id) in sudo_status:
-            sudo_status.pop(str(chat.id))
-            save_data("group_data.json", data)
-
-        text = (
-            f"😢 <b>سازنده از گروه خارج شد...</b>\n"
-            f"🔕 حالت مدیریتی موقتاً غیرفعال شد.\n"
-            f"🕯️ تا بازگشت دوباره‌ی ربات در حالت خودکار می‌مونیم."
-        )
-        await message.reply_text(text, parse_mode="HTML")
 
 # ==========================================================
 # 🤖 پاسخ ویژه برای سازنده (سودو اصلی)
@@ -320,56 +265,49 @@ async def sudo_bot_call(update: Update, context: ContextTypes.DEFAULT_TYPE):
     reply = random.choice(replies)
     await update.message.reply_text(reply)
 # ======================= 📊 آمار ربات واقعی =======================
-from telegram import Update
-from telegram.ext import ContextTypes
 
-# ======================= 📊 آمار کلی ربات =======================
 async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """نمایش آمار کلی گروه‌ها و اعضا"""
-    data = load_groups()
-    groups = data.get("groups", [])
-    total_groups = len(groups)
-    total_members = sum(len(g.get("members", [])) for g in groups)
+    ADMIN_ID = int(os.getenv("ADMIN_ID", "8588347189"))
+    user_id = update.effective_user.id
 
+    # فقط مدیر اصلی یا سودوها
+    if user_id != ADMIN_ID and user_id not in SUDO_USERS:
+        return await update.message.reply_text(
+            "⛔ فقط مدیر اصلی یا سودوها اجازه مشاهده آمار را دارند."
+        )
+
+    # =========================
+    # خواندن آمار گروه‌ها و اعضا
+    # =========================
+    groups_count = 0
+    users_count = 0
+
+    if os.path.exists("group_data.json"):
+        try:
+            with open("group_data.json", "r", encoding="utf-8") as f:
+                data = json.load(f)
+
+            groups = data.get("groups", [])
+            groups_count = len(groups)
+            users_count = sum(len(g.get("members", [])) for g in groups)
+
+        except:
+            groups_count = 0
+            users_count = 0
+
+    # =========================
+    # پیام نهایی
+    # =========================
     msg = (
         f"📊 <b>آمار کلی ربات</b>\n\n"
-        f"👥 تعداد گروه‌ها: <b>{total_groups}</b>\n"
-        f"👤 تعداد کل اعضا: <b>{total_members}</b>\n"
-        f"🕓 آخرین بروزرسانی: <b>{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</b>"
+        f"👥 تعداد گروه‌ها: <b>{groups_count}</b>\n"
+        f"👤 تعداد اعضای کل: <b>{users_count}</b>\n"
+        f"🕓 آخرین بروزرسانی: <b>{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</b>\n"
+        f"━━━━━━━━━━━━━━\n"
+        f"📨 درخواست توسط: <b>{update.effective_user.first_name}</b>"
     )
 
     await update.message.reply_text(msg, parse_mode="HTML")
-
-# ======================= 🏘 آمار کامل گروه‌ها =======================
-async def fullstats(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """نمایش جزئیات تمام گروه‌ها و اعضای آن‌ها"""
-    data = load_groups()
-    groups = data.get("groups", [])
-
-    if not groups:
-        await update.message.reply_text("ℹ️ هنوز هیچ گروهی ثبت نشده.", parse_mode="HTML")
-        return
-
-    text = "📈 <b>آمار کامل گروه‌ها:</b>\n\n"
-    for g in groups:
-        title = g.get("title", "بدون‌نام")
-        group_id = g.get("id")
-        members_count = len(g.get("members", []))
-        last_active = g.get("last_active", "نامشخص")
-
-        text += (
-            f"🏠 <b>گروه:</b> {title}\n"
-            f"🆔 <code>{group_id}</code>\n"
-            f"👥 <b>تعداد اعضا:</b> {members_count}\n"
-            f"🕓 <b>آخرین فعالیت:</b> {last_active}\n"
-            f"━━━━━━━━━━━━━━\n"
-        )
-
-    # جلوگیری از پیام خیلی طولانی
-    if len(text) > 4000:
-        text = text[:3990] + "..."
-
-    await update.message.reply_text(text, parse_mode="HTML")
 # ======================= 📊 آمار کامل گروه‌ها (فقط برای مدیر اصلی و سودوها) =======================
 async def fullstats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """نمایش آمار کامل گروه‌ها — فقط برای مدیر اصلی و سودو"""
@@ -1376,19 +1314,6 @@ application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, reply), 
 # ==========================================================
 #پیام‌های متنی غیر از کامند → هندلر دستورات ذخیره‌شده
 application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_custom_command), group=-4)
-
-# ==========================================================
-# 👑 مدیریت وضعیت ادمین (ورود و خروج)
-# ==========================================================
-application.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, detect_admin_movement))
-application.add_handler(MessageHandler(filters.StatusUpdate.LEFT_CHAT_MEMBER, detect_admin_movement))
-application.add_handler(MessageHandler(filters.StatusUpdate.LEFT_CHAT_MEMBER, handle_left_chat))
-
-application.add_handler(
-    MessageHandler(filters.Regex("(?i)^ربات$"), sudo_bot_call),
-    group=-8
-)
-
 # ==========================================================
 # 🔹 دستورات اصلی سیستم
 # ==========================================================
