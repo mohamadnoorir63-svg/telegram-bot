@@ -2,19 +2,35 @@ import json
 import os
 from datetime import datetime
 
-GROUP_FILE = "group_data.json"
+# ======================= 📁 مسیر فایل‌ها =======================
+BASE_FOLDER = "data"
+GROUP_FOLDER = os.path.join(BASE_FOLDER, "groups")
+GROUP_FILE = os.path.join(GROUP_FOLDER, "group_data.json")
+USER_FILE = os.path.join(BASE_FOLDER, "users.json")
 
-# ======================= 📦 راه‌اندازی فایل گروه‌ها =======================
-def init_group_file():
-    """اگر فایل گروه وجود نداشت، ایجادش می‌کند"""
+# ======================= 📦 ایجاد پوشه‌های لازم =======================
+def init_folders():
+    if not os.path.exists(BASE_FOLDER):
+        os.makedirs(BASE_FOLDER)
+
+    if not os.path.exists(GROUP_FOLDER):
+        os.makedirs(GROUP_FOLDER)
+
+# ======================= 📂 ایجاد فایل‌ها =======================
+def init_files():
+    init_folders()
+
     if not os.path.exists(GROUP_FILE):
         with open(GROUP_FILE, "w", encoding="utf-8") as f:
             json.dump({"groups": {}}, f, ensure_ascii=False, indent=2)
 
-# ======================= 📥 بارگذاری =======================
+    if not os.path.exists(USER_FILE):
+        with open(USER_FILE, "w", encoding="utf-8") as f:
+            json.dump([], f, ensure_ascii=False, indent=2)
+
+# ======================= 📥 بارگذاری گروه‌ها =======================
 def load_groups():
-    if not os.path.exists(GROUP_FILE):
-        init_group_file()
+    init_files()
 
     try:
         with open(GROUP_FILE, "r", encoding="utf-8") as f:
@@ -22,22 +38,14 @@ def load_groups():
     except:
         data = {"groups": {}}
 
-    # اگر قدیمی بود و لیست بود → تبدیل کن
-    if isinstance(data.get("groups"), list):
-        new_dict = {}
-        for g in data["groups"]:
-            gid = str(g.get("id"))
-            new_dict[gid] = g
-        data["groups"] = new_dict
-        save_groups(data)
-
     if "groups" not in data or not isinstance(data["groups"], dict):
         data["groups"] = {}
 
     return data
 
-# ======================= 💾 ذخیره =======================
+# ======================= 💾 ذخیره گروه‌ها =======================
 def save_groups(data):
+    init_files()
     with open(GROUP_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
@@ -48,7 +56,6 @@ def register_group_activity(group_id, user_id, title="بدون‌نام"):
 
     gid = str(group_id)
 
-    # اگر وجود ندارد، بساز
     if gid not in groups:
         groups[gid] = {
             "id": group_id,
@@ -57,14 +64,34 @@ def register_group_activity(group_id, user_id, title="بدون‌نام"):
             "last_active": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         }
 
-    # ثبت عضو
     if user_id not in groups[gid]["members"]:
         groups[gid]["members"].append(user_id)
 
-    # بروزرسانی فعالیت
     groups[gid]["last_active"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     save_groups(data)
+
+# ======================= 👤 ثبت کاربران پیوی =======================
+def register_private_user(user):
+    init_files()
+
+    try:
+        with open(USER_FILE, "r", encoding="utf-8") as f:
+            users = json.load(f)
+    except:
+        users = []
+
+    existed = any(u["id"] == user.id for u in users)
+
+    if not existed:
+        users.append({
+            "id": user.id,
+            "name": user.first_name,
+            "username": user.username
+        })
+
+        with open(USER_FILE, "w", encoding="utf-8") as f:
+            json.dump(users, f, ensure_ascii=False, indent=2)
 
 # ======================= 📊 آمار کلی =======================
 def get_group_stats():
@@ -94,6 +121,7 @@ def list_groups():
         title = info.get("title", "بدون‌نام")
         members = len(info.get("members", []))
         last = info.get("last_active", "نامشخص")
+
         text += (
             f"🏠 گروه: {title}\n"
             f"🆔 {gid}\n"
