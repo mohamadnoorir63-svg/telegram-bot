@@ -1302,6 +1302,11 @@ application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, reply), 
 # ==========================================================
 #پیام‌های متنی غیر از کامند → هندلر دستورات ذخیره‌شده
 application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_custom_command), group=-4)
+
+application.add_handler(
+    MessageHandler(filters.Regex("(?i)^ربات$"), sudo_bot_call),
+    group=-8
+)
 # ==========================================================
 # 🔹 دستورات اصلی سیستم
 # ==========================================================
