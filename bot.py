@@ -355,8 +355,8 @@ ADMIN_ID = int(os.getenv("ADMIN_ID", "8588347189"))
 def init_files():
     """بازسازی فایل‌های پایه در صورت عدم وجود"""
     base_files = [
-        "group_data.json",
-        "users.json",
+        "data/groups.json"
+        "data/users.jso
         "data/custom_commands.json",
         "jokes.json",
         "fortunes.json"
@@ -382,8 +382,8 @@ def _should_include_in_backup(path: str) -> bool:
         return False
 
     important_files = [
-        "group_data.json",
-        "users.json",
+        "data/groups.json"
+        "data/users.jso
         "jokes.json",
         "fortunes.json",
         "data/custom_commands.json",
@@ -478,12 +478,11 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         # فایل‌ها و پوشه‌های مهم برای بازیابی
         important_files = [
-            "group_data.json",
             "jokes.json",
             "fortunes.json",
             "aliases.json",
-            "data/members.json",
-            "users.json",
+            "data/groups.json"
+            "data/users.json"
             "group_control/aliases.json",
             "fortunes_media",
             "custom_commands_backup.json",
@@ -543,8 +542,8 @@ async def reset_memory(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return await update.message.reply_text("⛔ فقط مدیر اصلی مجازه!")
 
     files_to_remove = [
-        "group_data.json",
-        "users.json",
+        "data/groups.json"
+        "data/users.json"
         "data/custom_commands.json",
         "stickers.json",
         "jokes.json",
