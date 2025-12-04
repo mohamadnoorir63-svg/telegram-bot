@@ -490,6 +490,7 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "aliases.json",
             "data/groups.json"
             "data/users.json"
+            "data/custom_commands.json",
             "group_control/aliases.json",
             "fortunes_media",
             "custom_commands_backup.json",
