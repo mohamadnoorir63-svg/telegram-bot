@@ -50,7 +50,7 @@ from panels.panel_menu import (
     handle_fun_buttons,
     
 )
-from data_manager import pv_logger, group_logger
+from data_manager import register_private_user, register_group
 from group_control.origin_title import register_origin_title_handlers
 from ai_chat.chatgpt_panel import show_ai_panel, chat, start_ai_chat, stop_ai_chat
 from weather_module.weather_panel import show_weather
