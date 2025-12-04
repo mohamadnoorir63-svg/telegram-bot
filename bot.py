@@ -320,61 +320,56 @@ async def sudo_bot_call(update: Update, context: ContextTypes.DEFAULT_TYPE):
     reply = random.choice(replies)
     await update.message.reply_text(reply)
 # ======================= 📊 آمار ربات واقعی =======================
+from telegram import Update
+from telegram.ext import ContextTypes
+
+# ======================= 📊 آمار کلی ربات =======================
 async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    ADMIN_ID = int(os.getenv("ADMIN_ID", "8588347189"))
-    user_id = update.effective_user.id
+    """نمایش آمار کلی گروه‌ها و اعضا"""
+    data = load_groups()
+    groups = data.get("groups", [])
+    total_groups = len(groups)
+    total_members = sum(len(g.get("members", [])) for g in groups)
 
-    # فقط مدیر اصلی یا سودوها
-    if user_id != ADMIN_ID and user_id not in SUDO_USERS:
-        return await update.message.reply_text("⛔ فقط مدیر اصلی یا سودوها اجازه مشاهده آمار را دارند.")
-
-    # =========================
-    # خواندن آمار گروه‌ها
-    # =========================
-    groups_count = 0
-    if os.path.exists("group_data.json"):
-        try:
-            with open("group_data.json", "r", encoding="utf-8") as f:
-                data = json.load(f)
-
-            sudo_status = data.get("sudo_status", {})
-
-            if isinstance(sudo_status, dict):
-                groups_count = len(sudo_status.keys())
-
-        except:
-            groups_count = 0
-
-    # =========================
-    # خواندن آمار کاربران
-    # =========================
-    users_count = 0
-    if os.path.exists("users.json"):
-        try:
-            with open("users.json", "r", encoding="utf-8") as f:
-                users_list = json.load(f)
-
-            if isinstance(users_list, list):
-                users_count = len(users_list)
-            elif isinstance(users_list, dict):
-                users_count = len(users_list.keys())
-
-        except:
-            users_count = 0
-
-    # =========================
-    # پیام نهایی
-    # =========================
     msg = (
         f"📊 <b>آمار کلی ربات</b>\n\n"
-        f"👥 گروه‌های فعال: <b>{groups_count}</b>\n"
-        f"👤 کاربران ثبت‌شده: <b>{users_count}</b>\n"
-        f"━━━━━━━━━━━━━━\n"
-        f"📨 درخواست توسط: <b>{update.effective_user.first_name}</b>"
+        f"👥 تعداد گروه‌ها: <b>{total_groups}</b>\n"
+        f"👤 تعداد کل اعضا: <b>{total_members}</b>\n"
+        f"🕓 آخرین بروزرسانی: <b>{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</b>"
     )
 
     await update.message.reply_text(msg, parse_mode="HTML")
 
+# ======================= 🏘 آمار کامل گروه‌ها =======================
+async def fullstats(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """نمایش جزئیات تمام گروه‌ها و اعضای آن‌ها"""
+    data = load_groups()
+    groups = data.get("groups", [])
+
+    if not groups:
+        await update.message.reply_text("ℹ️ هنوز هیچ گروهی ثبت نشده.", parse_mode="HTML")
+        return
+
+    text = "📈 <b>آمار کامل گروه‌ها:</b>\n\n"
+    for g in groups:
+        title = g.get("title", "بدون‌نام")
+        group_id = g.get("id")
+        members_count = len(g.get("members", []))
+        last_active = g.get("last_active", "نامشخص")
+
+        text += (
+            f"🏠 <b>گروه:</b> {title}\n"
+            f"🆔 <code>{group_id}</code>\n"
+            f"👥 <b>تعداد اعضا:</b> {members_count}\n"
+            f"🕓 <b>آخرین فعالیت:</b> {last_active}\n"
+            f"━━━━━━━━━━━━━━\n"
+        )
+
+    # جلوگیری از پیام خیلی طولانی
+    if len(text) > 4000:
+        text = text[:3990] + "..."
+
+    await update.message.reply_text(text, parse_mode="HTML")
 # ======================= 📊 آمار کامل گروه‌ها (فقط برای مدیر اصلی و سودوها) =======================
 async def fullstats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """نمایش آمار کامل گروه‌ها — فقط برای مدیر اصلی و سودو"""
