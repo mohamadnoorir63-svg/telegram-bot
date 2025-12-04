@@ -103,5 +103,6 @@ async def fixed_button_handler(update: Update, context: ContextTypes.DEFAULT_TYP
 
     if text in buttons:
         return await update.message.reply_text(text)
+        MAIN_KEYBOARD = build_keyboard()
 
     # اگر دکمه نباشد → هیچ کاری نکن
