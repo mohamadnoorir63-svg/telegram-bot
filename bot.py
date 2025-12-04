@@ -41,10 +41,10 @@ from group_control.daily_stats import (
     show_group_stats,   # تابع آمار گروه
     send_nightly_stats
 )
-from modules.custom_keyboard import (
-    show_dynamic_keyboard,
-    custom_keyboard_callback,
-    custom_keyboard_text_handler
+from modules.reply_keyboard_manager import (
+    show_reply_keyboard,
+    add_button, handle_add_button,
+    remove_button, handle_remove_button
 )
 from panels.panel_menu import (
     Tastatur_menu,
@@ -1355,16 +1355,21 @@ application.add_handler(
     MessageHandler(filters.ALL & filters.ChatType.GROUPS, group_logger),
     group=-99
                              )
-# نمایش منوی اصلی کیبورد پویا
-application.add_handler(CommandHandler("menu", show_dynamic_keyboard))
+# نمایش کیبورد
+application.add_handler(CommandHandler("menu", show_reply_keyboard))
 
-# هندلر دکمه‌ها
-application.add_handler(CallbackQueryHandler(custom_keyboard_callback, pattern="^ck_"))
+# مدیریت دکمه‌ها
+application.add_handler(CommandHandler("addbtn", add_button))
+application.add_handler(CommandHandler("delbtn", remove_button))
 
-# هندلر متن‌ها (افزودن/تغییرنام)
+# دریافت متن برای اضافه/حذف
 application.add_handler(
-    MessageHandler(filters.TEXT & ~filters.COMMAND, custom_keyboard_text_handler),
-    group=2
+    MessageHandler(filters.TEXT & ~filters.COMMAND, handle_add_button),
+    group=0
+)
+application.add_handler(
+    MessageHandler(filters.TEXT & ~filters.COMMAND, handle_remove_button),
+    group=0
 )
 # ==========================================================
 # 📊 آمار، بک‌آپ و کنترل
