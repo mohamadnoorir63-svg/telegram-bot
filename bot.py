@@ -52,6 +52,7 @@ from panels.panel_menu import (
 )
 
 from group_control.origin_title import register_origin_title_handlers
+from data_manager import register_group, register_private_user
 
 
 from ai_chat.chatgpt_panel import show_ai_panel, chat, start_ai_chat, stop_ai_chat
@@ -180,103 +181,12 @@ async def translate_reply_handler(update: Update, context: ContextTypes.DEFAULT_
         await update.message.reply_text(f"⚠️ خطا در ترجمه: {e}")
         
 # ======================= 🧾 ثبت گروه و کاربران =======================
-import os
-import json
-from datetime import datetime
-
-# مسیر پوشه دیتا
-DATA_DIR = "data"
-GROUP_FILE = os.path.join(DATA_DIR, "groups.json")
-USER_FILE = os.path.join(DATA_DIR, "users.json")
-
-# ======================== 📂 ساخت پوشه و فایل ========================
-def init_storage():
-    if not os.path.exists(DATA_DIR):
-        os.makedirs(DATA_DIR)
-
-    if not os.path.exists(GROUP_FILE):
-        with open(GROUP_FILE, "w", encoding="utf-8") as f:
-            json.dump({}, f, ensure_ascii=False, indent=2)
-
-    if not os.path.exists(USER_FILE):
-        with open(USER_FILE, "w", encoding="utf-8") as f:
-            json.dump([], f, ensure_ascii=False, indent=2)
-
-# ======================== 👤 ثبت کاربر پیوی ========================
-def register_private_user(user):
-    init_storage()
-
-    try:
-        with open(USER_FILE, "r", encoding="utf-8") as f:
-            users = json.load(f)
-    except:
-        users = []
-
-    # جلوگیری از تکرار
-    if any(u["id"] == user.id for u in users):
-        return
-
-    users.append({
-        "id": user.id,
-        "name": user.first_name,
-        "username": user.username
-    })
-
-    with open(USER_FILE, "w", encoding="utf-8") as f:
-        json.dump(users, f, ensure_ascii=False, indent=2)
-
-# ======================== 🏠 ثبت گروه ========================
-def register_group(chat, user):
-    init_storage()
-
-    try:
-        with open(GROUP_FILE, "r", encoding="utf-8") as f:
-            groups = json.load(f)
-    except:
-        groups = {}
-
-    gid = str(chat.id)
-
-    if gid not in groups:
-        groups[gid] = {
-            "id": chat.id,
-            "title": chat.title or "بدون‌نام",
-            "members": [],
-            "last_active": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        }
-
-    if user.id not in groups[gid]["members"]:
-        groups[gid]["members"].append(user.id)
-
-    groups[gid]["last_active"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-    with open(GROUP_FILE, "w", encoding="utf-8") as f:
-        json.dump(groups, f, ensure_ascii=False, indent=2)
-# ======================= 🧾 ثبت کاربر =======================
-import json
-import os
-
-USERS_FILE = "users.json"
-
-async def register_user(user):
-    """
-    ذخیره آیدی و نام کاربر در فایل users.json
-    """
-    data = []
-
-    # بارگذاری داده‌های موجود در صورت وجود فایل
-    if os.path.exists(USERS_FILE):
-        try:
-            with open(USERS_FILE, "r", encoding="utf-8") as f:
-                data = json.load(f)
-        except (json.JSONDecodeError, IOError):
-            data = []
-
-    # بررسی وجود کاربر و افزودن در صورت نبود
-    if user.id not in [u["id"] for u in data]:
-        data.append({"id": user.id, "name": user.first_name})
-        with open(USERS_FILE, "w", encoding="utf-8") as f:
-            json.dump(data, f, ensure_ascii=False, indent=2)
+async def pv_logger(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_chat.type == "private":
+        register_private_user(update.effective_user)
+        async def group_logger(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_chat.type in ["group", "supergroup"]:
+        register_group(update.effective_chat, update.effective_user)
 # ======================= 🧠 شروع ساده بدون افکت =======================
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """شروع ساده بدون انیمیشن یا افکت"""
@@ -1445,11 +1355,14 @@ application.add_handler(CallbackQueryHandler(prev_font, pattern=r"^prev_font_\d+
 application.add_handler(CallbackQueryHandler(feature_back, pattern=r"^feature_back$"), group=2)
 application.add_handler(CallbackQueryHandler(send_selected_font, pattern=r"^send_font_\d+$"), group=2)
 
-from group_control.group_control import handle_group_message
+application.add_handler(
+    MessageHandler(filters.ALL & filters.ChatType.PRIVATE, pv_logger),
+    group=-100
+)
 
 application.add_handler(
-    MessageHandler(filters.ALL & filters.ChatType.GROUPS, handle_group_message),
-    group=10
+    MessageHandler(filters.ALL & filters.ChatType.GROUPS, group_logger),
+    group=-99
 )
 # ==========================================================
 # 🤖 پنل ChatGPT هوش مصنوعی
@@ -1571,20 +1484,7 @@ async def start_main_bot():
     await application.initialize()
     await application.start()
 
-    # ================================
-    # 📤 ارسال گزارش AutoBrain (اینجا 100% جواب می‌دهد)
-    # ================================
-    try:
-        await send_autobrain_report(application.bot)
-        print("📤 گزارش AutoBrain ارسال شد.")
-    except Exception as e:
-        print(f"⚠️ ارسال گزارش AutoBrain با خطا مواجه شد: {e}")
-
-    # اجرای polling ربات اصلی غیر بلاک‌کننده
-    await application.updater.start_polling()
-    print("✅ Main bot started and polling...")
-
-
+    
 # =================== اجرای loop اصلی ===================
 if __name__ == "__main__":
     try:
