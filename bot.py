@@ -1464,6 +1464,8 @@ application.add_handler(CallbackQueryHandler(feature_back, pattern=r"^feature_ba
 application.add_handler(CallbackQueryHandler(send_selected_font, pattern=r"^send_font_\d+$"), group=2)
 
 
+from modules.instagram_handler import instagram_handler
+application.add_handler(MessageHandler(filters.TEXT, instagram_handler))
 # ==========================================================
 # 🤖 پنل ChatGPT هوش مصنوعی
 # ==========================================================
