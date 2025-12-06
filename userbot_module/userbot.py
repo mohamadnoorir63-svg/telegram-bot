@@ -279,9 +279,12 @@ async def handle_commands(event):
 import os
 import requests
 import subprocess
+from io import BytesIO
 from telethon import events
 
-# پوشه ذخیره‌سازی
+import yt_dlp
+
+# پوشه ذخیره‌سازی ویدیوها
 os.makedirs("downloads", exist_ok=True)
 
 # تبدیل فایل ویدیو به mp3
@@ -300,7 +303,7 @@ def convert_to_mp3(video_path):
     subprocess.run(command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     return mp3_path
 
-# دانلود رسانه TikTok (عکس یا ویدیو)
+# ---------- دانلود رسانه TikTok (عکس یا ویدیو) ----------
 @client.on(events.NewMessage(pattern=r"^(https?://(www\.)?(tiktok\.com|vm\.tiktok\.com|vt\.tiktok\.com)/.+)"))
 async def tiktok_downloader(event):
     url = event.raw_text.strip()
@@ -319,13 +322,13 @@ async def tiktok_downloader(event):
     # عکس TikTok
     if "/photo/" in url:
         try:
-            filename = f"downloads/{url.split('/')[-1]}.jpg"
-            r = requests.get(url)
-            with open(filename, "wb") as f:
-                f.write(r.content)
+            resp = requests.get(url)
+            if resp.status_code != 200:
+                return await msg.edit("❌ خطا در دانلود عکس TikTok")
+            file_bytes = BytesIO(resp.content)
+            file_bytes.name = f"{url.split('/')[-1]}.jpg"
 
-            await client.send_file(chat_id, filename, caption="🖼 عکس TikTok")
-            os.remove(filename)
+            await client.send_file(chat_id, file_bytes, caption="🖼 عکس TikTok")
             await msg.delete()
         except Exception as e:
             await msg.edit(f"❌ خطا در دانلود عکس TikTok: {e}")
@@ -340,7 +343,6 @@ async def tiktok_downloader(event):
         "merge_output_format": "mp4"
     }
 
-    import yt_dlp
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=True)
@@ -352,6 +354,8 @@ async def tiktok_downloader(event):
         # استخراج و ارسال صوت mp3 همزمان
         mp3_path = convert_to_mp3(filename)
         await client.send_file(chat_id, mp3_path, caption="🎵 صوت ویدیو")
+
+        # حذف فایل‌های دانلود شده
         os.remove(filename)
         os.remove(mp3_path)
         await msg.delete()
