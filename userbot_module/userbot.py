@@ -274,12 +274,12 @@ async def handle_commands(event):
             return
         # در غیر این صورت → پاکسازی کامل
         await cleanup_via_userbot(chat_id, last_msg_id=last_msg_id)
+        
         import os
 from telethon import events
 import yt_dlp
 
-# ---------- دانلود ویدیو TikTok ----------
-@client.on(events.NewMessage(pattern=r"^(https?://(www\.)?tiktok\.com/.+)"))
+@client.on(events.NewMessage(pattern=r"^(https?://(www\.)?(tiktok\.com|vm\.tiktok\.com|vt\.tiktok\.com)/.+)"))
 async def tiktok_downloader(event):
     url = event.raw_text.strip()
     chat_id = event.chat_id
@@ -296,12 +296,10 @@ async def tiktok_downloader(event):
     }
 
     try:
-        # دانلود ویدیو
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=True)
             filename = ydl.prepare_filename(info)
 
-        # ارسال ویدیو به چت
         await client.send_file(chat_id, filename, caption=f"🎬 {info.get('title', 'TikTok Video')}")
         os.remove(filename)
         await msg.delete()
