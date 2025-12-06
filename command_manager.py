@@ -11,7 +11,6 @@ from telegram.ext import ContextTypes
 # ====== تنظیمات ======
 ADMIN_ID = 8588347189
 
-# مسیر همان پوشه‌ای که bot.py و این فایل کنار هم هستند
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.path.join(BASE_DIR, "data")
 DATA_FILE = os.path.join(DATA_DIR, "custom_commands.json")
@@ -60,7 +59,7 @@ def save_commands_local(data: Dict[str, Any]):
 
 # ================= API اصلی =================
 
-# ذخیره دستور به صورت پکیج چندپیامی
+# ذخیره دستور به صورت پکیج چندپیامی (چند پیام روی هم)
 async def save_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     chat = update.effective_chat
@@ -100,27 +99,51 @@ async def save_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return {"type": "animation", "file_id": msg.animation.file_id, "caption": msg.caption or ""}
         return None
 
-    # ایجاد پکیج تک‌پیامی از پیام ریپلای شده
-    package = []
     obj = create_message_obj(reply)
     if not obj:
         return await update.message.reply_text("⚠️ این نوع پیام پشتیبانی نمی‌شود!")
-    package.append(obj)
 
-    # جلوگیری از تکراری بودن پکیج
-    if package not in doc["responses"]:
-        doc["responses"].append(package)
-        while len(doc["responses"]) > 200:
-            doc["responses"].pop(0)
+    # اگر آخرین پاسخ در دسترس باشد و هنوز ارسال نشده، پکیج را ادامه می‌دهیم
+    if doc["responses"] and "pending" in doc["responses"][-1] and doc["responses"][-1]["pending"]:
+        doc["responses"][-1]["messages"].append(obj)
+    else:
+        # ایجاد یک پکیج جدید
+        doc["responses"].append({
+            "messages": [obj],
+            "pending": True
+        })
 
+    # حداکثر ۲۰۰ پاسخ نگه داشته شود
+    while len(doc["responses"]) > 200:
+        doc["responses"].pop(0)
+
+    commands[name] = doc
+    save_commands_local(commands)
+    await update.message.reply_text(
+        f"✅ پیام به پکیج دستور <b>{name}</b> اضافه شد. ({len(doc['responses'])}/200)",
+        parse_mode="HTML"
+    )
+
+
+# تکمیل پکیج و آماده ارسال
+async def finish_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    if not context.args:
+        return await update.message.reply_text("❗ استفاده: /finish <نام دستور>")
+
+    name = " ".join(context.args).strip().lower()
+    commands = load_commands()
+    if name not in commands:
+        return await update.message.reply_text("⚠️ چنین دستوری وجود ندارد.")
+
+    doc = commands[name]
+    if doc["responses"] and "pending" in doc["responses"][-1] and doc["responses"][-1]["pending"]:
+        doc["responses"][-1]["pending"] = False
         commands[name] = doc
         save_commands_local(commands)
-        await update.message.reply_text(
-            f"✅ پکیج پاسخ برای دستور <b>{name}</b> ذخیره شد. ({len(doc['responses'])}/200)",
-            parse_mode="HTML"
-        )
+        await update.message.reply_text(f"✅ پکیج دستور <b>{name}</b> تکمیل شد.", parse_mode="HTML")
     else:
-        await update.message.reply_text("⚠️ این پکیج قبلا ذخیره شده و تکراری نمی‌شود.")
+        await update.message.reply_text("⚠️ هیچ پکیج باز و در حال ساخت وجود ندارد.")
 
 
 # اجرای دستور با ارسال کل پکیج
@@ -156,7 +179,7 @@ async def handle_custom_command(update: Update, context: ContextTypes.DEFAULT_TY
         is_allowed = True
 
     # اجرای پاسخ
-    responses = cmd.get("responses", [])
+    responses = [r for r in cmd.get("responses", []) if not r.get("pending", False)]
     if not responses:
         return await update.message.reply_text("⚠️ هنوز پاسخی برای این دستور ثبت نشده.")
 
@@ -166,28 +189,27 @@ async def handle_custom_command(update: Update, context: ContextTypes.DEFAULT_TY
 
     unused = [i for i in range(len(responses)) if i not in used]
     chosen_index = random.choice(unused)
-    chosen_package = responses[chosen_index]
+    chosen_package = responses[chosen_index]["messages"]
     used.append(chosen_index)
 
     cmd["last_used"] = used
     commands[text] = cmd
     save_commands_local(commands)
 
-    # ارسال کل پکیج
-    for chosen in chosen_package:
-        r_type = chosen.get("type")
+    for msg in chosen_package:
+        r_type = msg.get("type")
         if r_type == "text":
-            await update.message.reply_text(chosen.get("data", ""))
+            await update.message.reply_text(msg.get("data", ""))
         elif r_type == "photo":
-            await update.message.reply_photo(chosen.get("file_id"), caption=chosen.get("caption", ""))
+            await update.message.reply_photo(msg.get("file_id"), caption=msg.get("caption", ""))
         elif r_type == "video":
-            await update.message.reply_video(chosen.get("file_id"), caption=chosen.get("caption", ""))
+            await update.message.reply_video(msg.get("file_id"), caption=msg.get("caption", ""))
         elif r_type == "document":
-            await update.message.reply_document(chosen.get("file_id"), caption=chosen.get("caption", ""))
+            await update.message.reply_document(msg.get("file_id"), caption=msg.get("caption", ""))
         elif r_type == "audio":
-            await update.message.reply_audio(chosen.get("file_id"), caption=chosen.get("caption", ""))
+            await update.message.reply_audio(msg.get("file_id"), caption=msg.get("caption", ""))
         elif r_type == "animation":
-            await update.message.reply_animation(chosen.get("file_id"), caption=chosen.get("caption", ""))
+            await update.message.reply_animation(msg.get("file_id"), caption=msg.get("caption", ""))
 
     context.user_data["custom_handled"] = True
 
