@@ -4,10 +4,13 @@ import shutil
 import subprocess
 import yt_dlp
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import ContextTypes, CallbackQueryHandler
+from telegram.ext import ContextTypes
 
 DOWNLOAD_FOLDER = "downloads"
 os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
+
+# 🔹 دیکشنری موقت برای نگهداری URLها
+TRACKS_CACHE = {}
 
 async def convert_to_mp3(file_path: str) -> str:
     mp3_path = file_path.rsplit(".", 1)[0] + ".mp3"
@@ -21,9 +24,6 @@ async def convert_to_mp3(file_path: str) -> str:
     subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     return mp3_path
 
-# -------------------------------
-# جستجوی آهنگ و نمایش دکمه
-# -------------------------------
 async def soundcloud_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message or not update.message.text:
         return
@@ -31,7 +31,6 @@ async def soundcloud_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
     text = update.message.text.strip()
     chat_id = update.effective_chat.id
 
-    # فقط وقتی متن با "آهنگ" شروع شد
     if not text.lower().startswith("آهنگ "):
         return
 
@@ -40,7 +39,7 @@ async def soundcloud_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
         await update.message.reply_text("❌ لطفاً نام یا متن آهنگ را وارد کنید.")
         return
 
-    msg = await update.message.reply_text(f"🔍 در حال جستجو در SoundCloud ...")
+    msg = await update.message.reply_text("🔍 در حال جستجو در SoundCloud ...")
 
     ydl_opts = {
         "format": "bestaudio/best",
@@ -52,9 +51,7 @@ async def soundcloud_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            # جستجو روی SoundCloud
             info = ydl.extract_info(query, download=False)
-
             if not info or "entries" not in info or not info["entries"]:
                 await msg.edit_text("❌ آهنگ پیدا نشد.")
                 return
@@ -63,22 +60,28 @@ async def soundcloud_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
             title = track.get("title", "SoundCloud Track")
             track_url = track.get("webpage_url")
 
-            # دکمه دانلود آهنگ
+            # 🔹 ذخیره URL در دیکشنری با شناسه کوتاه
+            track_id = str(track.get("id"))
+            TRACKS_CACHE[track_id] = track_url
+
             keyboard = InlineKeyboardMarkup([
-                [InlineKeyboardButton(f"⬇ دانلود: {title}", callback_data=f"music_select:{track_url}")]
+                [InlineKeyboardButton(f"⬇ دانلود: {title}", callback_data=f"music_select:{track_id}")]
             ])
             await msg.edit_text(f"🎵 آهنگ پیدا شد: {title}", reply_markup=keyboard)
 
     except Exception as e:
         await msg.edit_text(f"❌ خطا در جستجوی موزیک:\n{e}")
 
-# -------------------------------
-# هندلر دانلود آهنگ پس از انتخاب دکمه
-# -------------------------------
 async def music_select_handler(update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    track_url = query.data.split(":", 1)[1]
+    track_id = query.data.split(":", 1)[1]
+
+    # 🔹 بازیابی URL واقعی از دیکشنری
+    track_url = TRACKS_CACHE.get(track_id)
+    if not track_url:
+        await query.edit_message_text("❌ آهنگ پیدا نشد یا منقضی شده است.")
+        return
 
     msg = await query.edit_message_text("⬇️ در حال دانلود آهنگ... لطفا صبر کنید.")
 
