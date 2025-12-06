@@ -274,19 +274,31 @@ async def handle_commands(event):
             return
         # در غیر این صورت → پاکسازی کامل
         await cleanup_via_userbot(chat_id, last_msg_id=last_msg_id)
-        import os
+            
+         import os
 import requests
 from telethon import events, Button
 import yt_dlp
 
+# پوشه ذخیره‌سازی
 os.makedirs("downloads", exist_ok=True)
 MEDIA_MAP = {}  # key = message_id, value = {"file": path, "title": title}
 
-@client.on(events.NewMessage(pattern=r"^(https?://(www\.)?(tiktok\.com|vm\.tiktok\.com|vt\.tiktok\.com)/.+)"))
-async def tiktok_media(event):
+# ---------- دانلود رسانه TikTok و Instagram ----------
+@client.on(events.NewMessage(pattern=r"^(https?://(www\.)?(tiktok\.com|vm\.tiktok\.com|vt\.tiktok\.com|instagram\.com/p/|instagr\.am/p/).+)"))
+async def media_downloader(event):
     url = event.raw_text.strip()
     chat_id = event.chat_id
-    msg = await event.reply("⬇️ در حال پردازش رسانه TikTok ...")
+    msg = await event.reply("⬇️ در حال پردازش رسانه ...")
+
+    # ریدایرکت لینک کوتاه TikTok
+    if "vm.tiktok.com" in url or "vt.tiktok.com" in url:
+        try:
+            resp = requests.get(url, allow_redirects=True)
+            url = resp.url
+        except Exception as e:
+            await msg.edit(f"❌ خطا در ریدایرکت لینک TikTok: {e}")
+            return
 
     # عکس TikTok
     if "/photo/" in url:
@@ -296,7 +308,7 @@ async def tiktok_media(event):
             with open(filename, "wb") as f:
                 f.write(r.content)
 
-            sent = await client.send_file(
+            await client.send_file(
                 chat_id,
                 filename,
                 caption="🖼 عکس TikTok"
@@ -304,10 +316,10 @@ async def tiktok_media(event):
             os.remove(filename)
             await msg.delete()
         except Exception as e:
-            await msg.edit(f"❌ خطا در دانلود عکس: {e}")
+            await msg.edit(f"❌ خطا در دانلود عکس TikTok: {e}")
         return
 
-    # ویدیو TikTok
+    # دانلود ویدیو (TikTok یا Instagram)
     ydl_opts = {
         "format": "mp4",
         "outtmpl": "downloads/%(id)s.%(ext)s",
@@ -324,7 +336,7 @@ async def tiktok_media(event):
         sent_msg = await client.send_file(
             chat_id,
             filename,
-            caption=f"🎬 {info.get('title', 'TikTok Video')}",
+            caption=f"🎬 {info.get('title', 'Media Video')}",
             buttons=[
                 [Button.inline("🎵 دانلود صوتی", data=f"download_music|{filename}")]
             ]
@@ -334,7 +346,7 @@ async def tiktok_media(event):
         await msg.delete()
 
     except Exception as e:
-        await msg.edit(f"❌ خطا در دانلود ویدیو TikTok: {e}")
+        await msg.edit(f"❌ خطا در دانلود ویدیو: {e}")
         print(e)
 
 # ---------- هندل دکمه دانلود صوتی ----------
@@ -366,7 +378,6 @@ async def download_music(event):
     except Exception as e:
         await event.reply(f"❌ خطا در استخراج موزیک: {e}")
         print(e)
-         
       # =================== شروع بخش موزیک (Jamendo) ===================
 
 import aiohttp
