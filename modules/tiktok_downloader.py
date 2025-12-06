@@ -25,9 +25,17 @@ async def convert_to_mp3(video_path: str) -> str:
 
 async def media_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """دانلود ویدیو TikTok، Instagram و YouTube و ارسال صوت، پیام خطا برای عکس"""
+    if not update.message or not update.message.text:
+        return  # پیام خالی یا غیرمتنی → نادیده گرفته شود
+
     url = update.message.text.strip()
     chat_id = update.effective_chat.id
     msg = await update.message.reply_text("⬇️ در حال پردازش رسانه ...")
+
+    # فقط لینک‌های معتبر
+    if not any(x in url for x in ["tiktok.com", "instagram.com", "youtu.be", "youtube.com"]):
+        await msg.edit_text("❌ این لینک پشتیبانی نمی‌شود.")
+        return
 
     # ریدایرکت لینک کوتاه TikTok و Instagram
     if any(x in url for x in ["vm.tiktok.com", "vt.tiktok.com", "instagram.com/p/", "instagram.com/reel/"]):
@@ -43,28 +51,28 @@ async def media_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await msg.edit_text("❌ عکس‌ها پشتیبانی نمی‌شوند.")
         return
 
-    # تنظیمات yt-dlp برای TikTok، Instagram و YouTube
+    # تنظیمات yt-dlp
     ydl_opts = {
         "format": "mp4",
         "outtmpl": os.path.join(DOWNLOAD_FOLDER, "%(id)s.%(ext)s"),
         "quiet": True,
-        "noplaylist": False,  # پلی‌لیست‌ها و Carousel پشتیبانی شود
+        "noplaylist": False,
         "merge_output_format": "mp4",
         "ignoreerrors": True,
-        "playlistend": 10,  # محدود کردن تعداد ویدیوها در پلی‌لیست (اختیاری)
+        "playlistend": 10,
     }
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=True)
 
-            if info is None:
+            if not info:
                 await msg.edit_text("❌ لینک پشتیبانی نمی‌شود یا ویدیو قابل دانلود نیست.")
                 return
 
-            # اگر چند ویدیو باشد (Instagram Carousel یا YouTube Playlist)
             entries = info.get("entries")
             if entries:
+                # چند ویدیو (Instagram Carousel یا YouTube Playlist)
                 for video_info in entries:
                     filename = ydl.prepare_filename(video_info)
                     if os.path.exists(filename):
