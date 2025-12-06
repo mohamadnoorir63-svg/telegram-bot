@@ -1133,16 +1133,16 @@ async def show_main_panel(update: Update, context: ContextTypes.DEFAULT_TYPE, ed
     ],
     [
         InlineKeyboardButton("➕ افزودن به گروه", url="https://t.me/AFGR63_bot?startgroup=true"),
-        InlineKeyboardButton("🧩 قابلیت ربات", callback_data="panel_features")
+        InlineKeyboardButton("🧩 قابلیت‌های ربات", callback_data="panel_features")
     ],
     [
         InlineKeyboardButton("🤖 راهنمای ربات", callback_data="panel_about"),
-        InlineKeyboardButton("آهنگ🔍Music🔍اغنية📥", callback_data="panel_team")
+        InlineKeyboardButton("🎵 جستجوی موزیک", callback_data="panel_team")
     ],
     [
         InlineKeyboardButton("🎨 فونت‌ساز حرفه‌ای", callback_data="panel_font"),
         InlineKeyboardButton("💳 آیدی من", callback_data="panel_stats"),
-        InlineKeyboardButton("📥 دانلود از تیک تاک", callback_data="panel_tiktok")  # ← دکمه جدید
+        InlineKeyboardButton("📥 دانلود از تیک تاک", callback_data="panel_tiktok")
     ],
     [
         InlineKeyboardButton("🧠 گفتگوی ChatGPT", callback_data="panel_chatgpt")
@@ -1237,7 +1237,7 @@ async def panel_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif query.data == "panel_tiktok":
         await query.edit_message_text(
         "📥 لطفاً لینک ویدیوی TikTok مورد نظر خود را ارسال کنید تا دانلود شود.\n\n"
-        "مثال: https://www.tiktok.com/@username/video/1234567890",
+        "مثال:https://vm.tiktok.com/ZNR8p9QB2/ ",
             parse_mode="HTML"
             )
 
