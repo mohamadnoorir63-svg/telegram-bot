@@ -1276,9 +1276,7 @@ if __name__ == "__main__":
     )
 
     
-    from modules.tiktok_downloader import register_tiktok_handler
-
-    register_tiktok_handler(application)
+    
     # ==========================================================
     # 🧹 پاکسازی داده‌های گروه وقتی ربات حذف یا بیرون انداخته می‌شود
     # ==========================================================
@@ -1422,7 +1420,16 @@ application.add_handler(
     MessageHandler(filters.ALL & filters.ChatType.GROUPS, group_logger),
     group=-99
                              )
+from modules.tiktok_downloader import tiktok_handler
 
+# ثبت هندلر TikTok
+application.add_handler(
+    MessageHandler(
+        filters.TEXT & filters.Regex(r"https?://(www\.)?(tiktok\.com|vm\.tiktok\.com|vt\.tiktok\.com)/.+"),
+        tiktok_handler
+    ),
+    group=5  # می‌تونی گروه مناسب بدهی
+)
 # ==========================================================
 # 📊 آمار، بک‌آپ و کنترل
 # ==========================================================
