@@ -7,6 +7,7 @@ import asyncio
 from concurrent.futures import ThreadPoolExecutor
 from telegram import Update
 from telegram.ext import ContextTypes
+import uuid
 
 DOWNLOAD_FOLDER = "downloads"
 os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
@@ -44,24 +45,27 @@ async def media_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 return
 
         # بررسی عکس‌ها
-        if "/photo/" in url or (("instagram.com/p/" in url or "instagram.com/reel/" in url) and "media/?size=l" in url):
+        if "/photo/" in url or "/media/?size=l" in url:
             await msg.edit("❌ عکس‌ها پشتیبانی نمی‌شوند.")
             return
 
-        # yt-dlp options
+        # نام فایل یکتا برای جلوگیری از تداخل cache
+        unique_id = str(uuid.uuid4())
         ydl_opts = {
             "format": "mp4",
-            "outtmpl": os.path.join(DOWNLOAD_FOLDER, "%(id)s.%(ext)s"),
+            "outtmpl": os.path.join(DOWNLOAD_FOLDER, f"{unique_id}.%(ext)s"),
             "quiet": True,
             "noplaylist": True,
             "merge_output_format": "mp4",
-            "http_headers": {
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
-            }
+            "rm_cache_dir": True,  # پاکسازی کش yt-dlp
+            "http_headers": {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"},
         }
 
-        # دانلود ویدیو
         info = await download_video(url, ydl_opts)
+        if not info:
+            await msg.edit("❌ ویدیو پیدا نشد یا پشتیبانی نمی‌شود.")
+            return
+
         filename = yt_dlp.YoutubeDL(ydl_opts).prepare_filename(info)
 
         # ارسال ویدیو
