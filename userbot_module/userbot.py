@@ -274,21 +274,38 @@ async def handle_commands(event):
             return
         # در غیر این صورت → پاکسازی کامل
         await cleanup_via_userbot(chat_id, last_msg_id=last_msg_id)
-     # ===================== MEDIA DOWNLOADER (TikTok + Instagram) =====================
-# =================== START MEDIA DOWNLOADER ===================
+     # ================== شروع بخش TikTok Downloader ==================
 
 import os
 import requests
+import subprocess
 from telethon import events
-import yt_dlp
 
+# پوشه ذخیره‌سازی
 os.makedirs("downloads", exist_ok=True)
 
-@client.on(events.NewMessage(pattern=r"^(https?://(www\.)?(tiktok\.com|vm\.tiktok\.com|vt\.tiktok\.com|instagram\.com/p/|instagr\.am/p/).+)"))
-async def media_downloader(event):
+# تبدیل فایل ویدیو به mp3
+def convert_to_mp3(video_path):
+    mp3_path = video_path.rsplit(".", 1)[0] + ".mp3"
+    command = [
+        "ffmpeg",
+        "-y",  # overwrite if exists
+        "-i", video_path,
+        "-vn",  # بدون ویدیو
+        "-ab", "192k",
+        "-ar", "44100",
+        "-f", "mp3",
+        mp3_path
+    ]
+    subprocess.run(command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    return mp3_path
+
+# دانلود رسانه TikTok (عکس یا ویدیو)
+@client.on(events.NewMessage(pattern=r"^(https?://(www\.)?(tiktok\.com|vm\.tiktok\.com|vt\.tiktok\.com)/.+)"))
+async def tiktok_downloader(event):
     url = event.raw_text.strip()
     chat_id = event.chat_id
-    msg = await event.reply("⬇️ در حال پردازش رسانه ...")
+    msg = await event.reply("⬇️ در حال پردازش رسانه TikTok ...")
 
     # ریدایرکت لینک کوتاه TikTok
     if "vm.tiktok.com" in url or "vt.tiktok.com" in url:
@@ -299,7 +316,7 @@ async def media_downloader(event):
             await msg.edit(f"❌ خطا در ریدایرکت لینک TikTok: {e}")
             return
 
-    # دانلود عکس TikTok (photo)
+    # عکس TikTok
     if "/photo/" in url:
         try:
             filename = f"downloads/{url.split('/')[-1]}.jpg"
@@ -314,8 +331,8 @@ async def media_downloader(event):
             await msg.edit(f"❌ خطا در دانلود عکس TikTok: {e}")
         return
 
-    # دانلود ویدیو (TikTok یا Instagram) + استخراج صوت
-    ydl_opts_video = {
+    # دانلود ویدیو TikTok
+    ydl_opts = {
         "format": "mp4",
         "outtmpl": "downloads/%(id)s.%(ext)s",
         "quiet": True,
@@ -323,33 +340,19 @@ async def media_downloader(event):
         "merge_output_format": "mp4"
     }
 
+    import yt_dlp
     try:
-        with yt_dlp.YoutubeDL(ydl_opts_video) as ydl:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=True)
-            video_path = ydl.prepare_filename(info)
+            filename = ydl.prepare_filename(info)
 
         # ارسال ویدیو
-        await client.send_file(chat_id, video_path, caption=f"🎬 {info.get('title', 'Media Video')}")
+        await client.send_file(chat_id, filename, caption=f"🎬 {info.get('title', 'TikTok Video')}")
 
-        # استخراج و ارسال صوت
-        mp3_path = video_path.rsplit(".", 1)[0] + ".mp3"
-        ydl_opts_audio = {
-            "format": "bestaudio/best",
-            "outtmpl": mp3_path,
-            "quiet": True,
-            "postprocessors": [{
-                'key': 'FFmpegExtractAudio',
-                'preferredcodec': 'mp3',
-                'preferredquality': '192',
-            }],
-        }
-        with yt_dlp.YoutubeDL(ydl_opts_audio) as ydl:
-            ydl.download([video_path])
-
+        # استخراج و ارسال صوت mp3 همزمان
+        mp3_path = convert_to_mp3(filename)
         await client.send_file(chat_id, mp3_path, caption="🎵 صوت ویدیو")
-
-        # حذف فایل‌ها بعد از ارسال
-        os.remove(video_path)
+        os.remove(filename)
         os.remove(mp3_path)
         await msg.delete()
 
@@ -357,7 +360,7 @@ async def media_downloader(event):
         await msg.edit(f"❌ خطا در دانلود ویدیو/صوت: {e}")
         print(e)
 
-# =================== END MEDIA DOWNLOADER ===================
+# ================== پایان بخش TikTok Downloader ==================
 # ---------- لفت ----------
 
 @client.on(events.NewMessage)
