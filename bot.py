@@ -1469,8 +1469,9 @@ application.add_handler(
 from modules.soundcloud_handler import soundcloud_handler
 from telegram.ext import MessageHandler, filters
 
+# هندلر جستجوی موزیک با کلمه آهنگ (بدون /)
 application.add_handler(
-    MessageHandler(filters.TEXT & filters.Regex(r" آهنگ "), soundcloud_handler),
+    MessageHandler(filters.TEXT & filters.Regex(r"^آهنگ\s+"), soundcloud_handler),
     group=-2000
 )
 # ==========================================================
