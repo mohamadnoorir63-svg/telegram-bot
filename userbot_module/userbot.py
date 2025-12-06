@@ -274,51 +274,80 @@ async def handle_commands(event):
             return
         # در غیر این صورت → پاکسازی کامل
         await cleanup_via_userbot(chat_id, last_msg_id=last_msg_id)
-        # ========== FULL MUSIC DOWNLOADER (NO API KEY) ==========
-
-import os
+        import os
 import requests
 from telethon import events
 
+async def download_file(url, filename):
+    r = requests.get(url, stream=True)
+    with open(filename, "wb") as f:
+        for chunk in r.iter_content(1024):
+            f.write(chunk)
+
+
 @client.on(events.NewMessage(pattern=r"^/music (.+)"))
-async def saavn_downloader(event):
+async def music(event):
     query = event.pattern_match.group(1).strip()
     chat = event.chat_id
 
     msg = await event.reply(f"🎵 در حال جستجوی آهنگ: **{query}** ...")
 
-    # ========== جستجو ==========
-    search_url = f"https://saavn.me/search/songs?query={query}"
-    r = requests.get(search_url).json()
+    # ========== 1) API اصلی ==========
+    try:
+        r = requests.get(f"https://saavn.me/search/songs?query={query}", timeout=4).json()
+        data = r["data"]["results"][0]
+        title = data["name"]
+        artist = data["primaryArtists"]
+        mp3_link = data["downloadUrl"][-1]["link"]
 
-    if "data" not in r or "results" not in r["data"] or len(r["data"]["results"]) == 0:
-        return await msg.edit("❌ آهنگی پیدا نشد!")
+        filename = f"downloads/{title}.mp3"
+        os.makedirs("downloads", exist_ok=True)
+        await download_file(mp3_link, filename)
 
-    track = r["data"]["results"][0]
-    title = track["name"]
-    artist = track["primaryArtists"]
+        await client.send_file(chat, filename, caption=f"🎶 {title}\n👤 {artist}")
+        os.remove(filename)
+        return await msg.delete()
+    except:
+        pass  # میره سراغ API دوم
 
-    # ========== لینک دانلود ==========
-    download_info = track["downloadUrl"]
-    mp3_link = download_info[-1]["link"]   # بهترین کیفیت
+    # ========== 2) API پشتیبان ==========
+    try:
+        r = requests.get(f"https://saavn-api.vercel.app/search?query={query}", timeout=4).json()
+        data = r["data"][0]
+        title = data["title"]
+        artist = data["singers"]
+        mp3_link = data["downloadUrl"][-1]["url"]
 
-    if not mp3_link:
-        return await msg.edit("❌ لینک دانلود یافت نشد.")
+        filename = f"downloads/{title}.mp3"
+        os.makedirs("downloads", exist_ok=True)
+        await download_file(mp3_link, filename)
 
-    # ========== دانلود فایل ==========
-    os.makedirs("downloads", exist_ok=True)
-    filename = f"downloads/{title}.mp3"
+        await client.send_file(chat, filename, caption=f"🎶 {title}\n👤 {artist}")
+        os.remove(filename)
+        return await msg.delete()
+    except:
+        pass
 
-    music = requests.get(mp3_link)
+    # ========== 3) RAAG.FM (فول موزیک افغانستانی و هندی) ==========
+    try:
+        r = requests.get(f"https://raag.fm/api/search/?q={query}", timeout=4).json()
+        song = r["songs"][0]
 
-    with open(filename, "wb") as f:
-        f.write(music.content)
+        title = song["song"]
+        artist = song["singers"]
+        mp3_link = song["link"]  # مستقیم
 
-    # ========== ارسال فایل ==========
-    await client.send_file(chat, filename, caption=f"🎶 {title}\n👤 {artist}")
+        filename = f"downloads/{title}.mp3"
+        os.makedirs("downloads", exist_ok=True)
+        await download_file(mp3_link, filename)
 
-    os.remove(filename)
-    await msg.delete()
+        await client.send_file(chat, filename, caption=f"🎶 {title}\n👤 {artist}")
+        os.remove(filename)
+        return await msg.delete()
+    except:
+        pass
+
+    await msg.edit("❌ هیچ لینکی برای دانلود پیدا نشد.")
       # =================== شروع بخش موزیک (Jamendo) ===================
 
 import aiohttp
