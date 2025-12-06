@@ -116,6 +116,7 @@ async def save_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         await update.message.reply_text("⚠️ این پاسخ قبلا ذخیره شده و تکراری نمی‌شود.")
 
+
 # اجرای دستور بدون تکرار تا مصرف تمام پاسخ‌ها
 async def handle_custom_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message or not update.message.text:
@@ -135,7 +136,6 @@ async def handle_custom_command(update: Update, context: ContextTypes.DEFAULT_TY
     is_allowed = False
 
     if chat and chat.type in ["group", "supergroup"]:
-        # فقط مدیرها یا ADMIN اصلی
         if user.id == ADMIN_ID:
             is_allowed = True
         else:
@@ -147,7 +147,7 @@ async def handle_custom_command(update: Update, context: ContextTypes.DEFAULT_TY
                 pass
 
         if not is_allowed:
-            return  # یوزر عادی گروه → اجازه نداره
+            return
 
     else:
         # در پیوی همه مجاز هستند
@@ -178,15 +178,15 @@ async def handle_custom_command(update: Update, context: ContextTypes.DEFAULT_TY
     if r_type == "text":
         await update.message.reply_text(chosen.get("data", ""))
     elif r_type == "photo":
-        await update.message.reply_photo(chosen["file_id"], caption=chosen.get("caption"))
+        await update.message.reply_photo(chosen.get("file_id"), caption=chosen.get("caption", ""))
     elif r_type == "video":
-        await update.message.reply_video(chosen["file_id"], caption=chosen.get("caption"))
+        await update.message.reply_video(chosen.get("file_id"), caption=chosen.get("caption", ""))
     elif r_type == "document":
-        await update.message.reply_document(chosen["file_id"], caption=chosen.get("caption"))
+        await update.message.reply_document(chosen.get("file_id"), caption=chosen.get("caption", ""))
     elif r_type == "audio":
-        await update.message.reply_audio(chosen["file_id"], caption=chosen.get("caption"))
+        await update.message.reply_audio(chosen.get("file_id"), caption=chosen.get("caption", ""))
     elif r_type == "animation":
-        await update.message.reply_animation(chosen["file_id"], caption=chosen.get("caption"))
+        await update.message.reply_animation(chosen.get("file_id"), caption=chosen.get("caption", ""))
 
     context.user_data["custom_handled"] = True
 
