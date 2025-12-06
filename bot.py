@@ -1466,11 +1466,9 @@ application.add_handler(
     group=-1000
 )
 
-from modules.instagram_handler import instagram_handler
-application.add_handler(
-    MessageHandler(filters.TEXT & ~filters.COMMAND, instagram_handler),
-    group=-999
-)
+from modules.music_handler import music_handler
+
+application.add_handler(CommandHandler("music", music_handler))
 # ==========================================================
 # 🤖 پنل ChatGPT هوش مصنوعی
 # ==========================================================
