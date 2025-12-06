@@ -7,6 +7,7 @@ from telegram.ext import ContextTypes
 
 DOWNLOAD_FOLDER = "downloads"
 os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
+RESULTS_PER_PAGE = 5  # تعداد نتایج در هر صفحه
 
 async def convert_to_mp3(video_path: str) -> str:
     """تبدیل ویدیو/آهنگ به MP3"""
@@ -22,7 +23,7 @@ async def convert_to_mp3(video_path: str) -> str:
     return mp3_path
 
 async def soundcloud_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """جستجو و نمایش نتایج اولیه از SoundCloud"""
+    """جستجو موزیک در SoundCloud و نمایش نتایج صفحه‌بندی"""
     if not update.message or not update.message.text:
         return
 
@@ -54,50 +55,87 @@ async def soundcloud_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
             await msg.edit_text("❌ آهنگ پیدا نشد.")
             return
 
-        # نمایش ۵ نتیجه اول
-        keyboard = []
-        for i, track in enumerate(info["entries"][:5], start=1):
-            title = track.get("title", "SoundCloud")
-            track_id = track.get("id")
-            keyboard.append([InlineKeyboardButton(f"{i}. {title}", callback_data=f"music_select:{track_id}")])
+        # ذخیره نتایج در context برای صفحه‌بندی
+        context.user_data["sc_results"] = info["entries"]
+        context.user_data["sc_page"] = 0
 
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        await msg.edit_text("🎵 یکی از آهنگ‌ها را انتخاب کنید:", reply_markup=reply_markup)
+        await _send_results_page(update, context, msg)
 
     except Exception as e:
         await msg.edit_text(f"❌ خطا در جستجوی موزیک:\n{e}")
 
+
+async def _send_results_page(update: Update, context: ContextTypes.DEFAULT_TYPE, msg=None):
+    """ارسال صفحه مشخصی از نتایج"""
+    page = context.user_data.get("sc_page", 0)
+    entries = context.user_data.get("sc_results", [])
+    start = page * RESULTS_PER_PAGE
+    end = start + RESULTS_PER_PAGE
+    current_entries = entries[start:end]
+
+    keyboard = []
+    for i, track in enumerate(current_entries, start=1):
+        title = track.get("title", "SoundCloud")
+        track_id = track.get("id")
+        keyboard.append([InlineKeyboardButton(f"{start+i}. {title}", callback_data=f"music_select:{track_id}")])
+
+    nav_buttons = []
+    if start > 0:
+        nav_buttons.append(InlineKeyboardButton("⏮️ قبلی", callback_data="music_page_prev"))
+    if end < len(entries):
+        nav_buttons.append(InlineKeyboardButton("⏭️ بعدی", callback_data="music_page_next"))
+
+    if nav_buttons:
+        keyboard.append(nav_buttons)
+
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    if msg:
+        await msg.edit_text("🎵 یکی از آهنگ‌ها را انتخاب کنید:", reply_markup=reply_markup)
+    else:
+        await update.callback_query.message.edit_text("🎵 یکی از آهنگ‌ها را انتخاب کنید:", reply_markup=reply_markup)
+
+
 async def music_select_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """دانلود و ارسال آهنگ انتخابی"""
+    """دانلود آهنگ انتخابی"""
     query = update.callback_query
     await query.answer()
-    track_id = query.data.split(":")[1]
 
-    ydl_opts = {
-        "format": "bestaudio/best",
-        "quiet": True,
-        "noplaylist": True,
-        "outtmpl": os.path.join(DOWNLOAD_FOLDER, "%(id)s.%(ext)s"),
-    }
+    if query.data.startswith("music_select:"):
+        track_id = query.data.split(":")[1]
 
-    msg = await query.message.edit_text("⬇️ در حال دانلود آهنگ... لطفاً صبر کنید...")
+        ydl_opts = {
+            "format": "bestaudio/best",
+            "quiet": True,
+            "noplaylist": True,
+            "outtmpl": os.path.join(DOWNLOAD_FOLDER, "%(id)s.%(ext)s"),
+        }
 
-    try:
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(f"https://soundcloud.com/i/tracks/{track_id}", download=True)
-            filename = ydl.prepare_filename(info)
+        msg = await query.message.edit_text("⬇️ در حال دانلود آهنگ... لطفاً صبر کنید...")
 
-        mp3_path = await convert_to_mp3(filename)
-        if mp3_path and os.path.exists(mp3_path):
-            await query.message.reply_audio(mp3_path, caption=f"🎵 {info.get('title','SoundCloud')}")
-            os.remove(mp3_path)
-        else:
-            await query.message.reply_document(filename, caption=f"🎵 {info.get('title','SoundCloud')}")
+        try:
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                info = ydl.extract_info(f"https://soundcloud.com/i/tracks/{track_id}", download=True)
+                filename = ydl.prepare_filename(info)
 
-        if os.path.exists(filename):
-            os.remove(filename)
+            mp3_path = await convert_to_mp3(filename)
+            if mp3_path and os.path.exists(mp3_path):
+                await query.message.reply_audio(mp3_path, caption=f"🎵 {info.get('title','SoundCloud')}")
+                os.remove(mp3_path)
+            else:
+                await query.message.reply_document(filename, caption=f"🎵 {info.get('title','SoundCloud')}")
 
-        await msg.delete()
+            if os.path.exists(filename):
+                os.remove(filename)
 
-    except Exception as e:
-        await msg.edit_text(f"❌ خطا در دانلود موزیک:\n{e}")
+            await msg.delete()
+        except Exception as e:
+            await msg.edit_text(f"❌ خطا در دانلود موزیک:\n{e}")
+
+    # صفحه بعدی/قبلی
+    elif query.data == "music_page_next":
+        context.user_data["sc_page"] += 1
+        await _send_results_page(update, context)
+    elif query.data == "music_page_prev":
+        context.user_data["sc_page"] -= 1
+        await _send_results_page(update, context)
