@@ -7,7 +7,6 @@ from telegram.ext import ContextTypes
 MAIN_KEYBOARD = ReplyKeyboardMarkup(
     [
         ["فال", "جوک"],
-        ["آهنگ شاد" ,"آهنگ غمگین"],
         ["راز موفقیت", "بیو"],
         ["عکس پروفایل دختر 👧", "عکس پروفایل پسر 👦"],
         ["موزیک غمگین 🎧", "موزیک شاد 🎵"],
