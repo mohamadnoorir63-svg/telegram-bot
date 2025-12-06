@@ -14,7 +14,7 @@ os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
 async def convert_to_mp3(video_path: str) -> str:
     mp3_path = video_path.rsplit(".", 1)[0] + ".mp3"
     if not shutil.which("ffmpeg"):
-        return None  # ffmpeg موجود نیست
+        return None  # ffmpeg نصب نشده
     cmd = [
         "ffmpeg", "-y", "-i", video_path,
         "-vn", "-ab", "192k", "-ar", "44100",
@@ -23,13 +23,13 @@ async def convert_to_mp3(video_path: str) -> str:
     subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     return mp3_path
 
-# هندلر TikTok
+# هندلر TikTok برای ربات اصلی
 async def tiktok_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     url = update.message.text.strip()
     chat_id = update.effective_chat.id
     msg = await update.message.reply_text("⬇️ در حال پردازش رسانه TikTok ...")
 
-    # لینک کوتاه TikTok
+    # لینک کوتاه TikTok → ریدایرکت به لینک اصلی
     if "vm.tiktok.com" in url or "vt.tiktok.com" in url:
         try:
             resp = requests.get(url, allow_redirects=True)
