@@ -25,8 +25,9 @@ async def convert_to_mp3(video_path: str) -> str:
     subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     return mp3_path
 
+
 async def instagram_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """دانلود ویدیوهای Instagram"""
+    """دانلود ویدیوهای Instagram با session جدید برای هر لینک"""
     if not update.message or not update.message.text:
         return
 
@@ -51,7 +52,7 @@ async def instagram_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except:
         pass
 
-    # مسیر یکتا برای جلوگیری از تداخل
+    # هر بار یک session جدید و مسیر یکتا برای فایل
     outtmpl = os.path.join(DOWNLOAD_FOLDER, f"%(id)s_{uuid.uuid4().hex}.%(ext)s")
     ydl_opts = {
         "quiet": True,
@@ -61,10 +62,15 @@ async def instagram_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "merge_output_format": "mp4",
         "ignoreerrors": True,
         "extract_flat": False,
-        "cachedir": False
+        "cachedir": False,
+        "nocheckcertificate": True,      # گاهی certificate مشکل ایجاد می‌کنه
+        "noprogress": True,
+        "restrictfilenames": True,       # جلوگیری از کاراکترهای عجیب در نام فایل
+        "force_generic_extractor": True, # استفاده از generic extractor برای session جدید
     }
 
     try:
+        # هر بار یک instance جدا از YoutubeDL
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=True)
 
@@ -72,7 +78,7 @@ async def instagram_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await msg.edit_text("❌ امکان دانلود این پست وجود ندارد.")
             return
 
-        # حالت چند ویدیو (Carousel)
+        # چند ویدیو (Carousel)
         entries = info.get("entries")
         if entries:
             for item in entries:
