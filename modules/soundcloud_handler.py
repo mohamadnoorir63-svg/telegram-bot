@@ -11,6 +11,13 @@ os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
 
 track_store = {}
 
+# پیام‌های سه‌زبانه
+LANG_MESSAGES = {
+    "fa": {"downloading": "⬇️ در حال دانلود آهنگ... لطفا صبر کنید."},
+    "en": {"downloading": "⬇️ Downloading song... Please wait."},
+    "ar": {"downloading": "⬇️ جاري تنزيل الأغنية... يرجى الانتظار."},
+}
+
 # تبدیل به MP3
 async def convert_to_mp3(file_path: str) -> str:
     mp3_path = file_path.rsplit(".", 1)[0] + ".mp3"
@@ -39,15 +46,23 @@ async def soundcloud_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
     if not any(text.lower().startswith(t) for t in triggers):
         return
 
-    # حذف کلمه دستور
+    # تعیین زبان و حذف دستور از متن
+    lang = "fa"  # پیش‌فرض فارسی
     for t in triggers:
         if text.lower().startswith(t):
             query = text[len(t):].strip()
+            if t.startswith("music"):
+                lang = "en"
+            elif t.startswith(("اغنية", "أغنية")):
+                lang = "ar"
             break
 
     if not query:
         await update.message.reply_text("❌ لطفاً نام یا متن آهنگ را وارد کنید.")
         return
+
+    # ذخیره زبان برای callback
+    context.user_data["music_lang"] = lang
 
     msg = await update.message.reply_text("🔍 در حال جستجو در SoundCloud ...")
 
@@ -104,7 +119,11 @@ async def music_select_handler(update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text("❌ خطا: آهنگ پیدا نشد.")
         return
 
-    msg = await query.edit_message_text("⬇️ در حال دانلود آهنگ... لطفا صبر کنید.")
+    # استفاده از زبان ذخیره شده
+    lang = context.user_data.get("music_lang", "fa")
+    downloading_text = LANG_MESSAGES.get(lang, LANG_MESSAGES["fa"])["downloading"]
+
+    msg = await query.edit_message_text(downloading_text)
 
     ydl_opts = {
         "format": "bestaudio/best",
