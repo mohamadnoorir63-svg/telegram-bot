@@ -1460,11 +1460,11 @@ application.add_handler(CallbackQueryHandler(send_selected_font, pattern=r"^send
 # 🎬 Instagram & TikTok Download Handlers
 # =======================
 
-from modules.tiktok_handler import tiktok_handler
-application.add_handler(
-    MessageHandler(filters.TEXT & ~filters.COMMAND, tiktok_handler),
-    group=-1000
-)
+#from modules.tiktok_handler import tiktok_handler
+#application.add_handler(
+   # MessageHandler(filters.TEXT & ~filters.COMMAND, tiktok_handler),
+ #   group=-1000
+#)
 
 from modules.instagram_handler import instagram_handler
 application.add_handler(
