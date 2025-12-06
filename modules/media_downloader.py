@@ -17,12 +17,11 @@ async def convert_to_mp3(video_path: str) -> str:
     mp3_path = video_path.rsplit(".", 1)[0] + ".mp3"
     if not shutil.which("ffmpeg"):
         return None
-    cmd = [
+    subprocess.run([
         "ffmpeg", "-y", "-i", video_path,
         "-vn", "-ab", "192k", "-ar", "44100",
         "-f", "mp3", mp3_path
-    ]
-    subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     return mp3_path
 
 async def download_video(url: str, ydl_opts: dict):
@@ -49,7 +48,7 @@ async def media_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await msg.edit("❌ عکس‌ها پشتیبانی نمی‌شوند.")
             return
 
-        # نام فایل یکتا برای جلوگیری از تداخل cache
+        # نام یکتا برای جلوگیری از overwrite/cache
         unique_id = str(uuid.uuid4())
         ydl_opts = {
             "format": "mp4",
@@ -57,16 +56,24 @@ async def media_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "quiet": True,
             "noplaylist": True,
             "merge_output_format": "mp4",
-            "rm_cache_dir": True,  # پاکسازی کش yt-dlp
+            "rm_cache_dir": True,
+            "no_warnings": True,
+            "ignoreerrors": True,
             "http_headers": {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"},
         }
 
         info = await download_video(url, ydl_opts)
+
         if not info:
             await msg.edit("❌ ویدیو پیدا نشد یا پشتیبانی نمی‌شود.")
             return
-
+        if "entries" in info:
+            # در صورتی که playlist بود، اولین ویدیو بگیریم
+            info = info["entries"][0]
         filename = yt_dlp.YoutubeDL(ydl_opts).prepare_filename(info)
+        if not os.path.exists(filename):
+            await msg.edit("❌ دانلود انجام نشد. لینک ممکن است محدود باشد.")
+            return
 
         # ارسال ویدیو
         await context.bot.send_video(chat_id, filename, caption=f"🎬 {info.get('title','Video')}")
