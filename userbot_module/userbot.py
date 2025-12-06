@@ -276,8 +276,15 @@ async def handle_commands(event):
         await cleanup_via_userbot(chat_id, last_msg_id=last_msg_id)
         
         import os
-from telethon import events
+import asyncio
+from telethon import events, Button
 import yt_dlp
+
+# پوشه ذخیره‌سازی
+os.makedirs("downloads", exist_ok=True)
+
+# نگهداری mapping بین پیام و ویدیو
+VIDEO_MAP = {}  # key = message_id, value = file_path
 
 @client.on(events.NewMessage(pattern=r"^(https?://(www\.)?(tiktok\.com|vm\.tiktok\.com|vt\.tiktok\.com)/.+)"))
 async def tiktok_downloader(event):
@@ -286,7 +293,6 @@ async def tiktok_downloader(event):
 
     msg = await event.reply("⬇️ در حال دانلود ویدیو TikTok ...")
 
-    os.makedirs("downloads", exist_ok=True)
     ydl_opts = {
         "format": "mp4",
         "outtmpl": "downloads/%(id)s.%(ext)s",
@@ -300,12 +306,57 @@ async def tiktok_downloader(event):
             info = ydl.extract_info(url, download=True)
             filename = ydl.prepare_filename(info)
 
-        await client.send_file(chat_id, filename, caption=f"🎬 {info.get('title', 'TikTok Video')}")
-        os.remove(filename)
+        # ذخیره mapping
+        VIDEO_MAP[msg.id] = filename
+
+        # ارسال ویدیو با دکمه دانلود موزیک
+        await client.send_file(
+            chat_id,
+            filename,
+            caption=f"🎬 {info.get('title', 'TikTok Video')}",
+            buttons=[
+                [Button.inline("🎵 دانلود موزیک", data=f"music|{msg.id}")]
+            ]
+        )
         await msg.delete()
 
     except Exception as e:
         await msg.edit(f"❌ خطا در دانلود ویدیو TikTok: {e}")
+        print(e)
+
+# ---------- هندل کردن دکمه دانلود موزیک ----------
+@client.on(events.CallbackQuery(pattern=r"music\|(\d+)"))
+async def tiktok_music_callback(event):
+    orig_msg_id = int(event.pattern_match.group(1))
+    if orig_msg_id not in VIDEO_MAP:
+        return await event.answer("❌ فایل پیدا نشد یا حذف شده!", alert=True)
+
+    video_path = VIDEO_MAP[orig_msg_id]
+    mp3_path = video_path.rsplit(".", 1)[0] + ".mp3"
+
+    await event.answer("⬇️ در حال استخراج موزیک ...", alert=True)
+
+    # تبدیل به MP3
+    ydl_opts = {
+        "format": "bestaudio/best",
+        "outtmpl": mp3_path,
+        "quiet": True,
+        "postprocessors": [{
+            'key': 'FFmpegExtractAudio',
+            'preferredcodec': 'mp3',
+            'preferredquality': '192',
+        }],
+    }
+
+    try:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            ydl.download([video_path])
+
+        await client.send_file(event.chat_id, mp3_path, caption="🎶 موزیک ویدیو")
+        os.remove(mp3_path)
+
+    except Exception as e:
+        await event.reply(f"❌ خطا در استخراج موزیک: {e}")
         print(e)
       # =================== شروع بخش موزیک (Jamendo) ===================
 
