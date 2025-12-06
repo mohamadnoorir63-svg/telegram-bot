@@ -1141,7 +1141,8 @@ async def show_main_panel(update: Update, context: ContextTypes.DEFAULT_TYPE, ed
     ],
     [
         InlineKeyboardButton("🎨 فونت‌ساز حرفه‌ای", callback_data="panel_font"),
-        InlineKeyboardButton("💳 آیدی من", callback_data="panel_stats")
+        InlineKeyboardButton("💳 آیدی من", callback_data="panel_stats"),
+        InlineKeyboardButton("📥 دانلود از تیک تاک", callback_data="panel_tiktok")  # ← دکمه جدید
     ],
     [
         InlineKeyboardButton("🧠 گفتگوی ChatGPT", callback_data="panel_chatgpt")
@@ -1232,6 +1233,13 @@ async def panel_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif query.data == "panel_ramadan":
         # ✅ نمایش وضعیت رمضان و تاریخ‌های قمری/شمسی/میلادی
         await get_ramadan_status(update, context)
+        
+    elif query.data == "panel_tiktok":
+        await query.edit_message_text(
+        "📥 لطفاً لینک ویدیوی TikTok مورد نظر خود را ارسال کنید تا دانلود شود.\n\n"
+        "مثال: https://www.tiktok.com/@username/video/1234567890",
+            parse_mode="HTML"
+            )
 
     
     elif query.data == "panel_font":
