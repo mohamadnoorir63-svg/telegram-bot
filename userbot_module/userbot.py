@@ -274,25 +274,40 @@ async def handle_commands(event):
             return
         # در غیر این صورت → پاکسازی کامل
         await cleanup_via_userbot(chat_id, last_msg_id=last_msg_id)
-        
         import os
+import requests
 from telethon import events, Button
 import yt_dlp
 
-# پوشه ذخیره‌سازی
 os.makedirs("downloads", exist_ok=True)
-
-# نگهداری mapping بین پیام و فایل‌ها
 MEDIA_MAP = {}  # key = message_id, value = {"file": path, "title": title}
 
-# ---------- دانلود ویدیو یا عکس TikTok ----------
 @client.on(events.NewMessage(pattern=r"^(https?://(www\.)?(tiktok\.com|vm\.tiktok\.com|vt\.tiktok\.com)/.+)"))
-async def tiktok_media_downloader(event):
+async def tiktok_media(event):
     url = event.raw_text.strip()
     chat_id = event.chat_id
+    msg = await event.reply("⬇️ در حال پردازش رسانه TikTok ...")
 
-    msg = await event.reply("⬇️ در حال دانلود رسانه TikTok ...")
+    # عکس TikTok
+    if "/photo/" in url:
+        try:
+            filename = f"downloads/{url.split('/')[-1]}.jpg"
+            r = requests.get(url)
+            with open(filename, "wb") as f:
+                f.write(r.content)
 
+            sent = await client.send_file(
+                chat_id,
+                filename,
+                caption="🖼 عکس TikTok"
+            )
+            os.remove(filename)
+            await msg.delete()
+        except Exception as e:
+            await msg.edit(f"❌ خطا در دانلود عکس: {e}")
+        return
+
+    # ویدیو TikTok
     ydl_opts = {
         "format": "mp4",
         "outtmpl": "downloads/%(id)s.%(ext)s",
@@ -306,31 +321,26 @@ async def tiktok_media_downloader(event):
             info = ydl.extract_info(url, download=True)
             filename = ydl.prepare_filename(info)
 
-        MEDIA_MAP[msg.id] = {"file": filename, "title": info.get("title", "TikTok Media")}
-
-        # ارسال رسانه با دکمه دانلود صوتی (Inline)
-        await client.send_file(
+        sent_msg = await client.send_file(
             chat_id,
             filename,
-            caption=f"🎬 {info.get('title', 'TikTok Media')}",
+            caption=f"🎬 {info.get('title', 'TikTok Video')}",
             buttons=[
-                [Button.inline("🎵 دانلود صوتی", data=f"download_music|{msg.id}")]
+                [Button.inline("🎵 دانلود صوتی", data=f"download_music|{filename}")]
             ]
         )
+        MEDIA_MAP[filename] = filename
+        os.remove(filename)
         await msg.delete()
 
     except Exception as e:
-        await msg.edit(f"❌ خطا در دانلود رسانه TikTok: {e}")
+        await msg.edit(f"❌ خطا در دانلود ویدیو TikTok: {e}")
         print(e)
 
 # ---------- هندل دکمه دانلود صوتی ----------
-@client.on(events.CallbackQuery(pattern=r"download_music\|(\d+)"))
-async def tiktok_music_callback(event):
-    orig_msg_id = int(event.pattern_match.group(1))
-    if orig_msg_id not in MEDIA_MAP:
-        return await event.answer("❌ فایل پیدا نشد یا حذف شده!", alert=True)
-
-    video_path = MEDIA_MAP[orig_msg_id]["file"]
+@client.on(events.CallbackQuery(pattern=r"download_music\|(.+)"))
+async def download_music(event):
+    video_path = event.pattern_match.group(1)
     mp3_path = video_path.rsplit(".", 1)[0] + ".mp3"
 
     await event.answer("⬇️ در حال استخراج صوت ...", alert=True)
@@ -356,6 +366,7 @@ async def tiktok_music_callback(event):
     except Exception as e:
         await event.reply(f"❌ خطا در استخراج موزیک: {e}")
         print(e)
+         
       # =================== شروع بخش موزیک (Jamendo) ===================
 
 import aiohttp
