@@ -51,4 +51,4 @@ yt-dlp
 ffmpeg   # لینوکس
 youtube-search
 mutagen
-
+rapidfuzz==3.9.1
