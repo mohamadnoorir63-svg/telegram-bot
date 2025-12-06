@@ -50,4 +50,5 @@ deep-translator==1.11.4
 yt-dlp
 ffmpeg   # لینوکس
 youtube-search
+mutagen
 
