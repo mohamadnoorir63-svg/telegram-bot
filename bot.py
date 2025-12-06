@@ -1456,12 +1456,21 @@ application.add_handler(CallbackQueryHandler(next_font, pattern=r"^next_font_\d+
 application.add_handler(CallbackQueryHandler(prev_font, pattern=r"^prev_font_\d+$"), group=2)
 application.add_handler(CallbackQueryHandler(feature_back, pattern=r"^feature_back$"), group=2)
 application.add_handler(CallbackQueryHandler(send_selected_font, pattern=r"^send_font_\d+$"), group=2)
-from modules.tiktok_handler import tiktok_handler
-application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, tiktok_handler))
+# =======================
+# 🎬 Instagram & TikTok Download Handlers
+# =======================
 
+from modules.tiktok_handler import tiktok_handler
+application.add_handler(
+    MessageHandler(filters.TEXT & ~filters.COMMAND, tiktok_handler),
+    group=-1000
+)
 
 from modules.instagram_handler import instagram_handler
-application.add_handler(MessageHandler(filters.TEXT, instagram_handler))
+application.add_handler(
+    MessageHandler(filters.TEXT & ~filters.COMMAND, instagram_handler),
+    group=-999
+)
 # ==========================================================
 # 🤖 پنل ChatGPT هوش مصنوعی
 # ==========================================================
