@@ -278,10 +278,11 @@ async def handle_commands(event):
 from telethon import events
 import yt_dlp
 
+# ---------- دانلود ویدیو TikTok ----------
 @client.on(events.NewMessage(pattern=r"^(https?://(www\.)?tiktok\.com/.+)"))
 async def tiktok_downloader(event):
     url = event.raw_text.strip()
-    chat = event.chat_id
+    chat_id = event.chat_id
 
     msg = await event.reply("⬇️ در حال دانلود ویدیو TikTok ...")
 
@@ -295,16 +296,19 @@ async def tiktok_downloader(event):
     }
 
     try:
+        # دانلود ویدیو
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=True)
             filename = ydl.prepare_filename(info)
 
-        await client.send_file(chat, filename)
+        # ارسال ویدیو به چت
+        await client.send_file(chat_id, filename, caption=f"🎬 {info.get('title', 'TikTok Video')}")
         os.remove(filename)
         await msg.delete()
 
     except Exception as e:
         await msg.edit(f"❌ خطا در دانلود ویدیو TikTok: {e}")
+        print(e)
       # =================== شروع بخش موزیک (Jamendo) ===================
 
 import aiohttp
