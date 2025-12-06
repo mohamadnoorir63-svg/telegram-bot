@@ -26,7 +26,7 @@ async def convert_to_mp3(video_path: str) -> str:
     return mp3_path
 
 async def instagram_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """دانلود ویدیوهای Instagram بدون محدودیت"""
+    """دانلود ویدیوهای Instagram"""
     if not update.message or not update.message.text:
         return
 
@@ -51,7 +51,7 @@ async def instagram_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except:
         pass
 
-    # هر بار یک object جدید از YoutubeDL با مسیر یکتا
+    # مسیر یکتا برای جلوگیری از تداخل
     outtmpl = os.path.join(DOWNLOAD_FOLDER, f"%(id)s_{uuid.uuid4().hex}.%(ext)s")
     ydl_opts = {
         "quiet": True,
