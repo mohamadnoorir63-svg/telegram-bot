@@ -1137,7 +1137,7 @@ async def show_main_panel(update: Update, context: ContextTypes.DEFAULT_TYPE, ed
     ],
     [
         InlineKeyboardButton("🤖 راهنمای ربات", callback_data="panel_about"),
-        InlineKeyboardButton("📥آهنگ🔍Music🔍اغنية📥", callback_data="panel_team")
+        InlineKeyboardButton("آهنگ🔍Music🔍اغنية📥", callback_data="panel_team")
     ],
     [
         InlineKeyboardButton("🎨 فونت‌ساز حرفه‌ای", callback_data="panel_font"),
