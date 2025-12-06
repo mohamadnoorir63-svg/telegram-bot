@@ -9,8 +9,11 @@ from telegram.ext import ContextTypes
 DOWNLOAD_FOLDER = "downloads"
 os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
 
+# حافظه موقت برای نگهداری URL آهنگ‌ها
+track_store = {}  # track_id -> url
+
 async def convert_to_mp3(file_path: str) -> str:
-    """تبدیل فایل به MP3"""
+    """تبدیل ویدیو/آهنگ به MP3"""
     mp3_path = file_path.rsplit(".", 1)[0] + ".mp3"
     if not shutil.which("ffmpeg"):
         return None
@@ -22,8 +25,8 @@ async def convert_to_mp3(file_path: str) -> str:
     subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     return mp3_path
 
+# =================== جستجو و نمایش دکمه ===================
 async def soundcloud_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """جستجو و نمایش گزینه‌های دانلود از SoundCloud"""
     if not update.message or not update.message.text:
         return
 
@@ -39,40 +42,49 @@ async def soundcloud_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
         await update.message.reply_text("❌ لطفاً نام یا متن آهنگ را وارد کنید.")
         return
 
-    msg = await update.message.reply_text(f"🔍 در حال جستجو در SoundCloud ...")
+    msg = await update.message.reply_text("🔍 در حال جستجو در SoundCloud ...")
 
     ydl_opts = {
         "format": "bestaudio/best",
         "quiet": True,
         "noplaylist": True,
+        "outtmpl": os.path.join(DOWNLOAD_FOLDER, "%(id)s.%(ext)s"),
     }
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            # جستجوی 5 نتیجه اول
+            # جستجو
             info = ydl.extract_info(f"scsearch5:{query}", download=False)
+
             if not info or "entries" not in info or not info["entries"]:
                 await msg.edit_text("❌ آهنگ پیدا نشد.")
                 return
 
+            # دکمه‌ها با شناسه کوتاه
             buttons = []
-            for track in info["entries"]:
+            for i, track in enumerate(info["entries"], start=1):
                 title = track.get("title", "SoundCloud Track")
                 url = track.get("webpage_url")
-                buttons.append([InlineKeyboardButton(title, callback_data=f"music_select:{url}")])
+                track_id = f"sc{i}"
+                track_store[track_id] = url
+                buttons.append([InlineKeyboardButton(title, callback_data=f"music_select:{track_id}")])
 
             keyboard = InlineKeyboardMarkup(buttons)
-            await msg.edit_text("🎵 آهنگ‌ها پیدا شدند، یکی را انتخاب کنید:", reply_markup=keyboard)
+            await msg.edit_text(f"🎵 نتیجه‌های پیدا شده برای: {query}", reply_markup=keyboard)
 
     except Exception as e:
         await msg.edit_text(f"❌ خطا در جستجوی موزیک:\n{e}")
 
-
+# =================== دانلود با کلیک روی دکمه ===================
 async def music_select_handler(update, context: ContextTypes.DEFAULT_TYPE):
-    """دانلود آهنگ از SoundCloud بعد از انتخاب"""
     query = update.callback_query
     await query.answer()
-    track_url = query.data.split(":", 1)[1]
+    track_id = query.data.split(":", 1)[1]
+
+    track_url = track_store.get(track_id)
+    if not track_url:
+        await query.edit_message_text("❌ خطا: آهنگ یافت نشد!")
+        return
 
     msg = await query.edit_message_text("⬇️ در حال دانلود آهنگ... لطفا صبر کنید.")
 
