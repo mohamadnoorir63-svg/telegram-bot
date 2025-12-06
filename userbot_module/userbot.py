@@ -272,8 +272,8 @@ async def handle_commands(event):
             mids = [int(x) for x in parts[3].split(",") if x.isdigit()]
             await cleanup_via_userbot(chat_id, mids=mids)
             return
-        # در غیر این صورت → پاکسازی کامل
-       await cleanup_via_userbot(chat_id, last_msg_id=last_msg_id)
+            # در غیر این صورت → پاکسازی کامل
+           await cleanup_via_userbot(chat_id, last_msg_id=last_msg_id)
     
       # =================== شروع بخش موزیک (Jamendo) ===================
 
