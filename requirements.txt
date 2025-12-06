@@ -49,4 +49,5 @@ nest_asyncio==1.5.8
 deep-translator==1.11.4
 yt-dlp
 ffmpeg   # لینوکس
+youtube-search
 
