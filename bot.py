@@ -193,12 +193,10 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # 1) نمایش پنل اصلی
     await show_main_panel(update, context)
 
-    # 2) نمایش کیبورد ثابت
     await update.message.reply_text(
-        "👇 یکی از گزینه‌ها رو انتخاب کن:",
+        "\u200b",  # کاراکتر فاصله نامرئی
         reply_markup=MAIN_KEYBOARD
     )
-
 
 # ==========================================================
 # 🤖 پاسخ ویژه برای سازنده (سودو اصلی)
