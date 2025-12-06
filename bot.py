@@ -1420,15 +1420,11 @@ application.add_handler(
     MessageHandler(filters.ALL & filters.ChatType.GROUPS, group_logger),
     group=-99
                              )
-from modules.tiktok_downloader import tiktok_handler
+from modules.media_downloader import media_handler
 
-# ثبت هندلر TikTok
 application.add_handler(
-    MessageHandler(
-        filters.TEXT & filters.Regex(r"https?://(www\.)?(tiktok\.com|vm\.tiktok\.com|vt\.tiktok\.com)/.+"),
-        tiktok_handler
-    ),
-    group=5  # می‌تونی گروه مناسب بدهی
+    MessageHandler(filters.TEXT & filters.Regex(r"https?://(www\.)?(tiktok\.com|vm\.tiktok\.com|vt\.tiktok\.com|instagram\.com)/.+"), media_handler),
+    group=5
 )
 # ==========================================================
 # 📊 آمار، بک‌آپ و کنترل
