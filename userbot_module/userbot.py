@@ -4,12 +4,13 @@ import aiohttp
 from telethon import TelegramClient, events, sessions
 
 API_ID = int(os.environ.get("API_ID"))
-API_HASH = os.environ.get("API_HASH")
+API_HASH = os.environ.get("API_HASH"))
 SESSION_STRING = os.environ.get("SESSION_STRING")
-CLIENT_ID = os.environ.get("JAMENDO_CLIENT_ID")  # ← اینو از Jamendo داشبورد می‌گیری
+CLIENT_ID = os.environ.get("JAMENDO_CLIENT_ID")  # Jamendo client_id
 
 client = TelegramClient(sessions.StringSession(SESSION_STRING), API_ID, API_HASH)
 
+# ---------- دانلود موزیک از Jamendo ----------
 async def fetch_jamendo_track(query):
     url = (
         "https://api.jamendo.com/v3.0/tracks"
@@ -26,14 +27,14 @@ async def fetch_jamendo_track(query):
             if not results:
                 return None
             track = results[0]
-            dl = track.get("audiodownload")
-            return dl  # url مستقیم دانلود موزیک
+            return track.get("audiodownload")
 
+# ---------- فرمان موزیک ----------
 @client.on(events.NewMessage(pattern=r"^/music (.+)"))
 async def music_command(event):
     query = event.pattern_match.group(1).strip()
     chat_id = event.chat_id
-    msg = await client.send_message(chat_id, f"🔍 جستجوی موزیک: {query}")
+    msg = await client.send_message(chat_id, f"🔍 در حال جستجو برای: {query}")
     try:
         dl_url = await fetch_jamendo_track(query)
         if not dl_url:
@@ -51,5 +52,12 @@ async def music_command(event):
     except Exception as e:
         await msg.edit(f"❌ خطا در دانلود موزیک: {e}")
 
+# ---------- فانکشن استارت یوزربات ----------
+async def start_userbot():
+    await client.start()
+    print("✅ Userbot ready and listening...")
+    await client.run_until_disconnected()
+
+# ---------- اجرا مستقیم ----------
 if __name__ == "__main__":
-    asyncio.run(client.start(), client.run_until_disconnected())
+    asyncio.run(start_userbot())
