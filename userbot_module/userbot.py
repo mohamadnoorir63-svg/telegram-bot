@@ -274,6 +274,51 @@ async def handle_commands(event):
             return
         # در غیر این صورت → پاکسازی کامل
         await cleanup_via_userbot(chat_id, last_msg_id=last_msg_id)
+        # ========== FULL MUSIC DOWNLOADER (NO API KEY) ==========
+
+import os
+import requests
+from telethon import events
+
+@client.on(events.NewMessage(pattern=r"^/music (.+)"))
+async def saavn_downloader(event):
+    query = event.pattern_match.group(1).strip()
+    chat = event.chat_id
+
+    msg = await event.reply(f"🎵 در حال جستجوی آهنگ: **{query}** ...")
+
+    # ========== جستجو ==========
+    search_url = f"https://saavn.me/search/songs?query={query}"
+    r = requests.get(search_url).json()
+
+    if "data" not in r or "results" not in r["data"] or len(r["data"]["results"]) == 0:
+        return await msg.edit("❌ آهنگی پیدا نشد!")
+
+    track = r["data"]["results"][0]
+    title = track["name"]
+    artist = track["primaryArtists"]
+
+    # ========== لینک دانلود ==========
+    download_info = track["downloadUrl"]
+    mp3_link = download_info[-1]["link"]   # بهترین کیفیت
+
+    if not mp3_link:
+        return await msg.edit("❌ لینک دانلود یافت نشد.")
+
+    # ========== دانلود فایل ==========
+    os.makedirs("downloads", exist_ok=True)
+    filename = f"downloads/{title}.mp3"
+
+    music = requests.get(mp3_link)
+
+    with open(filename, "wb") as f:
+        f.write(music.content)
+
+    # ========== ارسال فایل ==========
+    await client.send_file(chat, filename, caption=f"🎶 {title}\n👤 {artist}")
+
+    os.remove(filename)
+    await msg.delete()
       # =================== شروع بخش موزیک (Jamendo) ===================
 
 import aiohttp
