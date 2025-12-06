@@ -60,7 +60,7 @@ def save_commands_local(data: Dict[str, Any]):
 
 # ================= API اصلی =================
 
-# ذخیره دستور با پشتیبانی از چند بخش در یک پکیج
+# ذخیره دستور با جلوگیری از تکرار و حداکثر 200 پاسخ
 async def save_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     chat = update.effective_chat
@@ -78,81 +78,55 @@ async def save_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     commands = load_commands()
     doc = commands.get(name, {
         "name": name,
-        "packages": [],
+        "responses": [],
         "created": datetime.now().isoformat(),
         "group_id": chat.id if chat and chat.type in ["group", "supergroup"] else None,
         "owner_id": user.id
     })
 
-    package = []  # یک پکیج شامل چند پیام
+    # ======= ساخت ساختار چندبخشی =======
+    parts = []
 
-    # متن
-    if reply.text or reply.caption:
-        package.append({
-            "type": "text",
-            "data": (reply.text or reply.caption).strip()
-        })
-
-    # عکس
+    if reply.text:
+        parts.append({"type": "text", "data": reply.text.strip()})
+    if reply.caption:
+        parts.append({"type": "text", "data": reply.caption.strip()})
     if reply.photo:
-        package.append({
-            "type": "photo",
-            "file_id": reply.photo[-1].file_id,
-            "caption": reply.caption or ""
-        })
-
-    # ویدیو
+        parts.append({"type": "photo", "file_id": reply.photo[-1].file_id})
     if reply.video:
-        package.append({
-            "type": "video",
-            "file_id": reply.video.file_id,
-            "caption": reply.caption or ""
-        })
-
-    # فایل
+        parts.append({"type": "video", "file_id": reply.video.file_id})
     if reply.document:
-        package.append({
-            "type": "document",
-            "file_id": reply.document.file_id,
-            "caption": reply.caption or ""
-        })
-
-    # موزیک
+        parts.append({"type": "document", "file_id": reply.document.file_id})
     if reply.audio:
-        package.append({
-            "type": "audio",
-            "file_id": reply.audio.file_id,
-            "caption": reply.caption or ""
-        })
-
-    # گیف
+        parts.append({"type": "audio", "file_id": reply.audio.file_id})
     if reply.animation:
-        package.append({
-            "type": "animation",
-            "file_id": reply.animation.file_id,
-            "caption": reply.caption or ""
-        })
+        parts.append({"type": "animation", "file_id": reply.animation.file_id})
 
-    if not package:
+    if not parts:
         return await update.message.reply_text("⚠️ این نوع پیام پشتیبانی نمی‌شود!")
 
-    # اضافه کردن پکیج
-    doc["packages"].append(package)
+    entry = {
+        "type": "multi",
+        "parts": parts
+    }
 
-    # محدودیت 200 پکیج
-    if len(doc["packages"]) > 200:
-        doc["packages"] = doc["packages"][-200:]
+    # جلوگیری از ذخیره‌ی تکراری
+    if entry not in doc["responses"]:
+        doc["responses"].append(entry)
+        while len(doc["responses"]) > 200:
+            doc["responses"].pop(0)
 
-    commands[name] = doc
-    save_commands_local(commands)
+        commands[name] = doc
+        save_commands_local(commands)
+        await update.message.reply_text(
+            f"✅ پاسخ برای دستور <b>{name}</b> ذخیره شد. ({len(doc['responses'])}/200)",
+            parse_mode="HTML"
+        )
+    else:
+        await update.message.reply_text("⚠️ این پاسخ قبلا ذخیره شده و تکراری نمی‌شود.")
 
-    await update.message.reply_text(
-        f"✅ پکیج جدید برای دستور <b>{name}</b> ذخیره شد. ({len(doc['packages'])}/200)",
-        parse_mode="HTML"
-    )
 
-
-# ================= اجرای دستور =================
+# اجرای دستور بدون تکرار تا مصرف تمام پاسخ‌ها
 async def handle_custom_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message or not update.message.text:
         return
@@ -163,12 +137,13 @@ async def handle_custom_command(update: Update, context: ContextTypes.DEFAULT_TY
     commands = load_commands()
 
     if text not in commands:
-        return
+        return  # دستور سفارشی نیست
 
     cmd = commands[text]
 
-    # ===== کنترل دسترسی =====
+    # ================= 🎯 منطق دسترسی =================
     is_allowed = False
+
     if chat and chat.type in ["group", "supergroup"]:
         if user.id == ADMIN_ID:
             is_allowed = True
@@ -184,46 +159,40 @@ async def handle_custom_command(update: Update, context: ContextTypes.DEFAULT_TY
     else:
         is_allowed = True
 
-    packages = cmd.get("packages", [])
-    if not packages:
-        return await update.message.reply_text("⚠️ هنوز پکیجی ثبت نشده.")
+    # ================= اجرای پاسخ =================
+    responses = cmd.get("responses", [])
+    if not responses:
+        return await update.message.reply_text("⚠️ هنوز پاسخی برای این دستور ثبت نشده.")
 
-    # ===== انتخاب پکیج رندومی بدون تکرار =====
     used = cmd.get("last_used", [])
-
-    if len(used) >= len(packages):
+    if len(used) >= len(responses):
         used = []
 
-    unused = [i for i in range(len(packages)) if i not in used]
+    unused = [i for i in range(len(responses)) if i not in used]
     chosen_index = random.choice(unused)
-    chosen_package = packages[chosen_index]
+    chosen = responses[chosen_index]
 
     used.append(chosen_index)
     cmd["last_used"] = used
     commands[text] = cmd
     save_commands_local(commands)
 
-    # ===== ارسال کل پکیج =====
-    for part in chosen_package:
-        t = part["type"]
-
-        if t == "text":
-            await update.message.reply_text(part["data"])
-
-        elif t == "photo":
-            await update.message.reply_photo(part["file_id"], caption=part.get("caption"))
-
-        elif t == "video":
-            await update.message.reply_video(part["file_id"], caption=part.get("caption"))
-
-        elif t == "document":
-            await update.message.reply_document(part["file_id"], caption=part.get("caption"))
-
-        elif t == "audio":
-            await update.message.reply_audio(part["file_id"], caption=part.get("caption"))
-
-        elif t == "animation":
-            await update.message.reply_animation(part["file_id"], caption=part.get("caption"))
+    # ====== ارسال چندبخشی ======
+    if chosen["type"] == "multi":
+        for p in chosen["parts"]:
+            t = p["type"]
+            if t == "text":
+                await update.message.reply_text(p["data"])
+            elif t == "photo":
+                await update.message.reply_photo(p["file_id"])
+            elif t == "video":
+                await update.message.reply_video(p["file_id"])
+            elif t == "document":
+                await update.message.reply_document(p["file_id"])
+            elif t == "audio":
+                await update.message.reply_audio(p["file_id"])
+            elif t == "animation":
+                await update.message.reply_animation(p["file_id"])
 
     context.user_data["custom_handled"] = True
 
@@ -241,13 +210,29 @@ async def list_commands(update: Update, context: ContextTypes.DEFAULT_TYPE):
     txt = "📜 <b>لیست دستورها:</b>\n\n"
     for name, info in commands.items():
         owner = "👑 سودو" if info.get("owner_id") == ADMIN_ID else f"👤 {info.get('owner_id')}"
-        count = len(info.get("packages", []))
-        txt += f"🔹 <b>{name}</b> ({count} پکیج) — {owner}\n"
+        count = len(info.get("responses", []))
+        txt += f"🔹 <b>{name}</b> ({count}) — {owner}\n"
 
     await update.message.reply_text(txt[:4000], parse_mode="HTML")
 
 
-# ================= حذف دستور =================
+def cleanup_group_commands(chat_id: int):
+    try:
+        commands = load_commands()
+        new_data = {}
+        removed = 0
+        for name, info in commands.items():
+            if info.get("group_id") == chat_id and info.get("owner_id") != ADMIN_ID:
+                removed += 1
+                continue
+            new_data[name] = info
+        save_commands_local(new_data)
+        print(f"[command_manager] cleaned {removed} commands from group {chat_id}")
+    except Exception as e:
+        print(f"[command_manager] cleanup error: {e}")
+
+
+# ================= حذف یک دستور =================
 async def delete_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
 
