@@ -1468,9 +1468,12 @@ application.add_handler(
 from modules.soundcloud_handler import soundcloud_handler, music_select_handler
 from telegram.ext import MessageHandler, filters, CallbackQueryHandler
 
-# جستجو با کلمه آهنگ
+# جستجو با فرمان سه‌زبانه آهنگ / music / اغنية
 application.add_handler(
-    MessageHandler(filters.TEXT & filters.Regex(r"^آهنگ\s+"), soundcloud_handler),
+    MessageHandler(
+        filters.TEXT & filters.Regex(r"^(آهنگ|music|اغنية|أغنية)\s+"),
+        soundcloud_handler
+    ),
     group=-2000
 )
 
