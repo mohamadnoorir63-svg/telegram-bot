@@ -29,8 +29,8 @@ async def media_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
     msg = await update.message.reply_text("⬇️ در حال پردازش رسانه ...")
 
-    # ریدایرکت لینک کوتاه TikTok
-    if "vm.tiktok.com" in url or "vt.tiktok.com" in url:
+    # ریدایرکت لینک کوتاه TikTok و Instagram
+    if any(x in url for x in ["vm.tiktok.com", "vt.tiktok.com", "instagram.com/p/", "instagram.com/reel/"]):
         try:
             resp = requests.get(url, allow_redirects=True)
             url = resp.url
@@ -39,35 +39,52 @@ async def media_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
 
     # بررسی عکس‌ها
-    if ("/photo/" in url) or ("instagram.com/p/" in url and "media/?size=" in url):
+    if ("/photo/" in url) or ("instagram.com/p/" in url and "/media/" in url):
         await msg.edit_text("❌ عکس‌ها پشتیبانی نمی‌شوند.")
         return
 
-    # دانلود ویدیو با yt-dlp
+    # تنظیمات yt-dlp برای TikTok، Instagram و YouTube
     ydl_opts = {
         "format": "mp4",
         "outtmpl": os.path.join(DOWNLOAD_FOLDER, "%(id)s.%(ext)s"),
         "quiet": True,
-        "noplaylist": True,
-        "merge_output_format": "mp4"
+        "noplaylist": False,  # پلی‌لیست‌ها و Carousel پشتیبانی شود
+        "merge_output_format": "mp4",
+        "ignoreerrors": True,
+        "playlistend": 10,  # محدود کردن تعداد ویدیوها در پلی‌لیست (اختیاری)
     }
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=True)
-            filename = ydl.prepare_filename(info)
 
-        # ارسال ویدیو
-        await context.bot.send_video(chat_id, filename, caption=f"🎬 {info.get('title','Video')}")
+            if info is None:
+                await msg.edit_text("❌ لینک پشتیبانی نمی‌شود یا ویدیو قابل دانلود نیست.")
+                return
 
-        # ارسال صوت
-        mp3_path = await convert_to_mp3(filename)
-        if mp3_path and os.path.exists(mp3_path):
-            await context.bot.send_audio(chat_id, mp3_path, caption="🎵 صوت ویدیو")
-            os.remove(mp3_path)
+            # اگر چند ویدیو باشد (Instagram Carousel یا YouTube Playlist)
+            entries = info.get("entries")
+            if entries:
+                for video_info in entries:
+                    filename = ydl.prepare_filename(video_info)
+                    if os.path.exists(filename):
+                        await context.bot.send_video(chat_id, filename, caption=f"🎬 {video_info.get('title','Video')}")
+                        mp3_path = await convert_to_mp3(filename)
+                        if mp3_path and os.path.exists(mp3_path):
+                            await context.bot.send_audio(chat_id, mp3_path, caption="🎵 صوت ویدیو")
+                            os.remove(mp3_path)
+                        os.remove(filename)
+            else:
+                # یک ویدیو
+                filename = ydl.prepare_filename(info)
+                await context.bot.send_video(chat_id, filename, caption=f"🎬 {info.get('title','Video')}")
+                mp3_path = await convert_to_mp3(filename)
+                if mp3_path and os.path.exists(mp3_path):
+                    await context.bot.send_audio(chat_id, mp3_path, caption="🎵 صوت ویدیو")
+                    os.remove(mp3_path)
+                os.remove(filename)
 
-        os.remove(filename)
-        await msg.delete()
+            await msg.delete()
 
     except yt_dlp.utils.DownloadError:
         await msg.edit_text("❌ لینک پشتیبانی نمی‌شود یا ویدیو قابل دانلود نیست.")
