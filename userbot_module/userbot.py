@@ -275,38 +275,48 @@ async def handle_commands(event):
         # در غیر این صورت → پاکسازی کامل
         await cleanup_via_userbot(chat_id, last_msg_id=last_msg_id)
      # ===================== MEDIA DOWNLOADER (TikTok + Instagram) =====================
+# =================== START MEDIA DOWNLOADER ===================
+
 import os
-import asyncio
-from telethon import events, Button
+import requests
+from telethon import events
 import yt_dlp
 
-# پوشه ذخیره‌سازی
 os.makedirs("downloads", exist_ok=True)
 
-# نگهداری mapping برای دکمه‌ها
-MEDIA_MAP = {}  # key = message_id, value = file_path
-
-# ---------- دانلود رسانه TikTok و Instagram ----------
 @client.on(events.NewMessage(pattern=r"^(https?://(www\.)?(tiktok\.com|vm\.tiktok\.com|vt\.tiktok\.com|instagram\.com/p/|instagr\.am/p/).+)"))
 async def media_downloader(event):
     url = event.raw_text.strip()
     chat_id = event.chat_id
-
     msg = await event.reply("⬇️ در حال پردازش رسانه ...")
 
     # ریدایرکت لینک کوتاه TikTok
     if "vm.tiktok.com" in url or "vt.tiktok.com" in url:
         try:
-            import requests
             resp = requests.get(url, allow_redirects=True)
             url = resp.url
         except Exception as e:
             await msg.edit(f"❌ خطا در ریدایرکت لینک TikTok: {e}")
             return
 
-    # تنظیمات yt-dlp
-    ydl_opts = {
-        "format": "bestvideo+bestaudio/best",
+    # دانلود عکس TikTok (photo)
+    if "/photo/" in url:
+        try:
+            filename = f"downloads/{url.split('/')[-1]}.jpg"
+            r = requests.get(url)
+            with open(filename, "wb") as f:
+                f.write(r.content)
+
+            await client.send_file(chat_id, filename, caption="🖼 عکس TikTok")
+            os.remove(filename)
+            await msg.delete()
+        except Exception as e:
+            await msg.edit(f"❌ خطا در دانلود عکس TikTok: {e}")
+        return
+
+    # دانلود ویدیو (TikTok یا Instagram) + استخراج صوت
+    ydl_opts_video = {
+        "format": "mp4",
         "outtmpl": "downloads/%(id)s.%(ext)s",
         "quiet": True,
         "noplaylist": True,
@@ -314,22 +324,16 @@ async def media_downloader(event):
     }
 
     try:
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        with yt_dlp.YoutubeDL(ydl_opts_video) as ydl:
             info = ydl.extract_info(url, download=True)
-            filename = ydl.prepare_filename(info)
+            video_path = ydl.prepare_filename(info)
 
-        # ارسال فایل اصلی
-        sent_msg = await client.send_file(
-            chat_id,
-            filename,
-            caption=f"🎬 {info.get('title', 'Media')}",
-            buttons=[[Button.inline("🎵 دانلود صوتی", data=f"music|{filename}")]]
-        )
-        MEDIA_MAP[sent_msg.id] = filename
+        # ارسال ویدیو
+        await client.send_file(chat_id, video_path, caption=f"🎬 {info.get('title', 'Media Video')}")
 
-        # همزمان استخراج و ارسال صوت
-        mp3_path = filename.rsplit(".", 1)[0] + ".mp3"
-        ydl_audio_opts = {
+        # استخراج و ارسال صوت
+        mp3_path = video_path.rsplit(".", 1)[0] + ".mp3"
+        ydl_opts_audio = {
             "format": "bestaudio/best",
             "outtmpl": mp3_path,
             "quiet": True,
@@ -339,49 +343,21 @@ async def media_downloader(event):
                 'preferredquality': '192',
             }],
         }
-        with yt_dlp.YoutubeDL(ydl_audio_opts) as ydl:
-            ydl.download([filename])
+        with yt_dlp.YoutubeDL(ydl_opts_audio) as ydl:
+            ydl.download([video_path])
 
-        await client.send_file(chat_id, mp3_path, caption=f"🎵 موزیک ویدیو: {info.get('title', 'Media')}")
+        await client.send_file(chat_id, mp3_path, caption="🎵 صوت ویدیو")
+
+        # حذف فایل‌ها بعد از ارسال
+        os.remove(video_path)
         os.remove(mp3_path)
-        os.remove(filename)
         await msg.delete()
 
     except Exception as e:
-        await msg.edit(f"❌ خطا در دانلود ویدیو/عکس: {e}")
+        await msg.edit(f"❌ خطا در دانلود ویدیو/صوت: {e}")
         print(e)
 
-# ---------- هندل دکمه دانلود صوتی ----------
-@client.on(events.CallbackQuery(pattern=r"music\|(.+)"))
-async def download_music(event):
-    video_path = event.pattern_match.group(1)
-    mp3_path = video_path.rsplit(".", 1)[0] + ".mp3"
-
-    await event.answer("⬇️ در حال استخراج صوت ...", alert=True)
-
-    ydl_opts = {
-        "format": "bestaudio/best",
-        "outtmpl": mp3_path,
-        "quiet": True,
-        "postprocessors": [{
-            'key': 'FFmpegExtractAudio',
-            'preferredcodec': 'mp3',
-            'preferredquality': '192',
-        }],
-    }
-
-    try:
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            ydl.download([video_path])
-
-        await client.send_file(event.chat_id, mp3_path, caption="🎵 موزیک ویدیو")
-        os.remove(mp3_path)
-
-    except Exception as e:
-        await event.reply(f"❌ خطا در استخراج موزیک: {e}")
-        print(e)
-
-# ===================================================================== 
+# =================== END MEDIA DOWNLOADER ===================
 # ---------- لفت ----------
 
 @client.on(events.NewMessage)
