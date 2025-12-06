@@ -14,94 +14,6 @@ from telegram.ext import (
     filters,
     CallbackQueryHandler
 )
-
-# ================== TikTok Downloader اصلاح‌شده ==================
-
-import os
-import requests
-from io import BytesIO
-import subprocess
-from telethon import events
-import yt_dlp
-
-os.makedirs("downloads", exist_ok=True)
-
-def convert_to_mp3(video_path):
-    mp3_path = video_path.rsplit(".", 1)[0] + ".mp3"
-    command = [
-        "ffmpeg", "-y", "-i", video_path,
-        "-vn", "-ab", "192k", "-ar", "44100", "-f", "mp3", mp3_path
-    ]
-    subprocess.run(command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    return mp3_path
-
-@client.on(events.NewMessage(pattern=r"^(https?://(www\.)?(tiktok\.com|vm\.tiktok\.com|vt\.tiktok\.com)/.+)"))
-async def tiktok_downloader(event):
-    url = event.raw_text.strip()
-    chat_id = event.chat_id
-    msg = await event.reply("⬇️ در حال پردازش رسانه TikTok ...")
-
-    # ریدایرکت لینک کوتاه
-    if "vm.tiktok.com" in url or "vt.tiktok.com" in url:
-        try:
-            resp = requests.get(url, allow_redirects=True)
-            url = resp.url
-        except Exception as e:
-            await msg.edit(f"❌ خطا در ریدایرکت لینک TikTok: {e}")
-            return
-
-    # عکس TikTok
-    if "/photo/" in url:
-        try:
-            resp = requests.get(url)
-            html = resp.text
-            # استخراج لینک عکس از تگ meta
-            import re
-            match = re.search(r'<meta property="og:image" content="(.+?)"', html)
-            if not match:
-                return await msg.edit("❌ نتوانستم لینک عکس را پیدا کنم.")
-            image_url = match.group(1)
-            img_data = requests.get(image_url).content
-
-            file_bytes = BytesIO(img_data)
-            file_bytes.name = "tiktok_photo.jpg"
-            await client.send_file(chat_id, file_bytes, caption="🖼 عکس TikTok")
-            await msg.delete()
-        except Exception as e:
-            await msg.edit(f"❌ خطا در دانلود عکس TikTok: {e}")
-        return
-
-    # دانلود ویدیو TikTok
-    ydl_opts = {
-        "format": "mp4",
-        "outtmpl": "downloads/%(id)s.%(ext)s",
-        "quiet": True,
-        "noplaylist": True,
-        "merge_output_format": "mp4"
-    }
-
-    try:
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(url, download=True)
-            filename = ydl.prepare_filename(info)
-
-        # ارسال ویدیو
-        await client.send_file(chat_id, filename, caption=f"🎬 {info.get('title', 'TikTok Video')}")
-
-        # استخراج و ارسال صوت mp3 همزمان
-        mp3_path = convert_to_mp3(filename)
-        await client.send_file(chat_id, mp3_path, caption="🎵 صوت ویدیو")
-
-        # حذف فایل‌ها
-        os.remove(filename)
-        os.remove(mp3_path)
-        await msg.delete()
-
-    except Exception as e:
-        await msg.edit(f"❌ خطا در دانلود ویدیو/صوت: {e}")
-        print(e)
-
-# ================== پایان بخش TikTok Downloader ==================
 from reply_keyboard_fixed import MAIN_KEYBOARD, fixed_button_handler
 
 from welcome_module import (
@@ -1508,7 +1420,10 @@ application.add_handler(
     MessageHandler(filters.ALL & filters.ChatType.GROUPS, group_logger),
     group=-99
                              )
+from modules.tiktok_downloader import register_tiktok_handler
 
+# بعد از ساخت app یا client:
+register_tiktok_handler(app)
 # ==========================================================
 # 📊 آمار، بک‌آپ و کنترل
 # ==========================================================
