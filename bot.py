@@ -1126,31 +1126,39 @@ async def show_main_panel(update: Update, context: ContextTypes.DEFAULT_TYPE, ed
     )
 
     keyboard = [
-        [
-            InlineKeyboardButton("💻 ارتباط با سازنده", url="https://t.me/NOORI_NOOR"),
-            InlineKeyboardButton("💭 گروه پشتیبانی", url="https://t.me/+CuXueaUaWQo1Yzhi")
-        ],
-        [
-            InlineKeyboardButton("➕ افزودن به گروه", url="https://t.me/AFGR63_bot?startgroup=true"),
-            InlineKeyboardButton("🧩 قابلیت‌های ربات", callback_data="panel_features")
-        ],
-        [
-            InlineKeyboardButton("🤖 راهنمای ربات", callback_data="panel_about"),
-            InlineKeyboardButton("🔍آهنگMusicاغنية", callback_data="panel_team")
-        ],
-        [
-            InlineKeyboardButton("🎨 فونت‌ساز حرفه‌ای", callback_data="panel_font"),
-            InlineKeyboardButton("💳 آیدی من", callback_data="panel_stats"),
-            InlineKeyboardButton("DownloadTikTok", callback_data="panel_tiktok")
-        ],
-        [
-            InlineKeyboardButton("🧠 گفتگوی ChatGPT", callback_data="panel_chatgpt")
-        ],
-        [
-            InlineKeyboardButton("🌤 آب و هوا", callback_data="panel_weather"),
-            InlineKeyboardButton("🕌 اوقات شرعی / اذان", callback_data="panel_azan")
-        ]
+    [
+        InlineKeyboardButton("💻 ارتباط با سازنده", url="https://t.me/NOORI_NOOR"),
+        InlineKeyboardButton("💭 گروه پشتیبانی", url="https://t.me/+CuXueaUaWQo1Yzhi")
+    ],
+    [
+        InlineKeyboardButton("➕ افزودن به گروه", url="https://t.me/AFGR63_bot?startgroup=true"),
+        InlineKeyboardButton("🧩 قابلیت‌های ربات", callback_data="panel_features")
+    ],
+    [
+        InlineKeyboardButton("🤖 راهنمای ربات", callback_data="panel_about")
+    ],
+    [
+        InlineKeyboardButton("🔍 Music", callback_data="panel_team")
+    ],
+    [
+        InlineKeyboardButton("📥 Download TikTok", callback_data="panel_tiktok")
+    ],
+    [
+        InlineKeyboardButton("🎨 فونت‌ساز حرفه‌ای", callback_data="panel_font")
+    ],
+    [
+        InlineKeyboardButton("💳 آیدی من", callback_data="panel_stats")
+    ],
+    [
+        InlineKeyboardButton("🧠 گفتگوی ChatGPT", callback_data="panel_chatgpt")
+    ],
+    [
+        InlineKeyboardButton("🌤 آب و هوا", callback_data="panel_weather")
+    ],
+    [
+        InlineKeyboardButton("🕌 اوقات شرعی / اذان", callback_data="panel_azan")
     ]
+]
 
     markup = InlineKeyboardMarkup(keyboard)
 
