@@ -10,7 +10,6 @@ DOWNLOAD_FOLDER = "downloads"
 os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
 
 async def convert_to_mp3(video_path: str) -> str:
-    """تبدیل ویدیو/آهنگ به MP3"""
     mp3_path = video_path.rsplit(".", 1)[0] + ".mp3"
     if not shutil.which("ffmpeg"):
         return None
@@ -23,24 +22,23 @@ async def convert_to_mp3(video_path: str) -> str:
     return mp3_path
 
 async def soundcloud_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """جستجو و دانلود آهنگ از SoundCloud"""
+    """جستجو و دانلود آهنگ از SoundCloud با متن یا بخشی از شعر"""
     if not update.message or not update.message.text:
         return
 
     text = update.message.text.strip()
     chat_id = update.effective_chat.id
 
-    if not text.startswith("/موزیک "):
+    if not text.startswith(("آهنگ ", "موزیک ")):
         return
 
-    query = text.replace("/موزیک ", "", 1).strip()
+    query = text.split(" ", 1)[1].strip()
     if not query:
-        await update.message.reply_text("❌ لطفاً نام آهنگ را وارد کنید.")
+        await update.message.reply_text("❌ لطفاً نام آهنگ یا بخشی از شعر را وارد کنید.")
         return
 
     msg = await update.message.reply_text("🔍 در حال جستجو در SoundCloud...")
 
-    # yt-dlp تنظیمات
     ydl_opts = {
         "format": "bestaudio/best",
         "quiet": True,
@@ -50,24 +48,27 @@ async def soundcloud_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            # جستجو روی SoundCloud
-            info = ydl.extract_info(f"scsearch:{query}", download=True)
+            # فقط جستجو (بدون دانلود)
+            info = ydl.extract_info(f"scsearch5:{query}", download=False)
 
             if not info or "entries" not in info or not info["entries"]:
                 await msg.edit_text("❌ آهنگ پیدا نشد.")
                 return
 
-            # اولین نتیجه
+            # اولین نتیجه نزدیک‌ترین آهنگ
             track = info["entries"][0]
-            filename = ydl.prepare_filename(track)
+            url = track.get("webpage_url")
 
-            # ارسال ویدیو/صوت
+            # دانلود آهنگ واقعی
+            info2 = ydl.extract_info(url, download=True)
+            filename = ydl.prepare_filename(info2)
+
+            # تبدیل به mp3 و ارسال
             mp3_path = await convert_to_mp3(filename)
             if mp3_path and os.path.exists(mp3_path):
                 await context.bot.send_audio(chat_id, mp3_path, caption=f"🎵 {track.get('title','SoundCloud')}")
                 os.remove(mp3_path)
             else:
-                # اگر تبدیل نشد، فایل اصلی ارسال می‌شود
                 await context.bot.send_document(chat_id, filename, caption=f"🎵 {track.get('title','SoundCloud')}")
 
             if os.path.exists(filename):
