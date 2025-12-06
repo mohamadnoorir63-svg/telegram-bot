@@ -13,7 +13,6 @@ from telegram.ext import ContextTypes
 ADMIN_ID = 8588347189
 
 # مسیر همان پوشه‌ای که bot.py و این فایل کنار هم هستند
-
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.path.join(BASE_DIR, "data")
 DATA_FILE = os.path.join(DATA_DIR, "custom_commands.json")
@@ -59,7 +58,6 @@ def save_commands_local(data: Dict[str, Any]):
 # ================= API اصلی =================
 
 # ذخیره دستور با جلوگیری از تکرار و حداکثر 200 پاسخ
-
 async def save_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     chat = update.effective_chat
@@ -82,18 +80,50 @@ async def save_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     })
 
     entry = {}
-    if reply.text or reply.caption:
-        entry = {"type": "text", "data": (reply.text or reply.caption).strip()}
-    elif reply.photo:
-        entry = {"type": "photo", "file_id": reply.photo[-1].file_id, "caption": reply.caption or ""}
+
+    # متن یا کپشن پیام
+    text_part = ""
+    if reply.text:
+        text_part = reply.text.strip()
+    elif reply.caption:
+        text_part = reply.caption.strip()
+
+    # فایل‌ها همراه با کپشن
+    if reply.photo:
+        entry = {
+            "type": "photo",
+            "file_id": reply.photo[-1].file_id,
+            "caption": text_part
+        }
     elif reply.video:
-        entry = {"type": "video", "file_id": reply.video.file_id, "caption": reply.caption or ""}
+        entry = {
+            "type": "video",
+            "file_id": reply.video.file_id,
+            "caption": text_part
+        }
     elif reply.document:
-        entry = {"type": "document", "file_id": reply.document.file_id, "caption": reply.caption or ""}
+        entry = {
+            "type": "document",
+            "file_id": reply.document.file_id,
+            "caption": text_part
+        }
     elif reply.audio:
-        entry = {"type": "audio", "file_id": reply.audio.file_id, "caption": reply.caption or ""}
+        entry = {
+            "type": "audio",
+            "file_id": reply.audio.file_id,
+            "caption": text_part
+        }
     elif reply.animation:
-        entry = {"type": "animation", "file_id": reply.animation.file_id, "caption": reply.caption or ""}
+        entry = {
+            "type": "animation",
+            "file_id": reply.animation.file_id,
+            "caption": text_part
+        }
+    elif text_part:
+        entry = {
+            "type": "text",
+            "data": text_part
+        }
     else:
         return await update.message.reply_text("⚠️ این نوع پیام پشتیبانی نمی‌شود!")
 
@@ -114,7 +144,6 @@ async def save_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("⚠️ این پاسخ قبلا ذخیره شده و تکراری نمی‌شود.")
 
 # اجرای دستور بدون تکرار تا مصرف تمام پاسخ‌ها
-
 async def handle_custom_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message or not update.message.text:
         return
@@ -185,7 +214,6 @@ async def handle_custom_command(update: Update, context: ContextTypes.DEFAULT_TY
     context.user_data["custom_handled"] = True
 
 # ================= لیست دستورها =================
-
 async def list_commands(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     if user.id != ADMIN_ID:
@@ -218,7 +246,6 @@ def cleanup_group_commands(chat_id: int):
         print(f"[command_manager] cleanup error: {e}")
 
 # ================= حذف یک دستور =================
-
 async def delete_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     if user.id != ADMIN_ID:
