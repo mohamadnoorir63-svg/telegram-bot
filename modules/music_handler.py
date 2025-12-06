@@ -1,94 +1,79 @@
 # modules/soundcloud_handler.py
 import os
-import requests
+import shutil
 import subprocess
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+import yt_dlp
+from telegram import Update
 from telegram.ext import ContextTypes
 
 DOWNLOAD_FOLDER = "downloads"
 os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
 
-# ----------------------------------
-# Client ID عمومی SoundCloud
-# ----------------------------------
-CLIENT_ID = "2t9loNQH90kzJcsFCODdigxfp325aq4z"  # نسخه عمومی که اکثر منابع استفاده می‌کنند
-
-# ----------------------------------
-# تبدیل URL Stream به MP3
-# ----------------------------------
-async def download_soundcloud(url: str, title: str) -> str:
-    mp3_path = os.path.join(DOWNLOAD_FOLDER, f"{title}.mp3")
-    try:
-        r = requests.get(url, stream=True)
-        with open(mp3_path, "wb") as f:
-            for chunk in r.iter_content(1024):
-                f.write(chunk)
-        return mp3_path
-    except Exception as e:
-        print(f"❌ خطا در دانلود: {e}")
+async def convert_to_mp3(video_path: str) -> str:
+    """تبدیل ویدیو/آهنگ به MP3"""
+    mp3_path = video_path.rsplit(".", 1)[0] + ".mp3"
+    if not shutil.which("ffmpeg"):
         return None
+    cmd = [
+        "ffmpeg", "-y", "-i", video_path,
+        "-vn", "-ab", "192k", "-ar", "44100",
+        "-f", "mp3", mp3_path
+    ]
+    subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    return mp3_path
 
-# ----------------------------------
-# جستجوی موزیک در SoundCloud
-# ----------------------------------
-async def music_search_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def soundcloud_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """جستجو و دانلود آهنگ از SoundCloud"""
     if not update.message or not update.message.text:
         return
 
-    query = update.message.text.replace("/موزیک", "").strip()
-    if not query:
-        await update.message.reply_text("لطفاً نام آهنگ یا خواننده را وارد کنید.")
+    text = update.message.text.strip()
+    chat_id = update.effective_chat.id
+
+    if not text.startswith("/موزیک "):
         return
 
-    msg = await update.message.reply_text("🔍 در حال جستجوی موزیک در SoundCloud...")
+    query = text.replace("/موزیک ", "", 1).strip()
+    if not query:
+        await update.message.reply_text("❌ لطفاً نام آهنگ را وارد کنید.")
+        return
 
-    search_url = f"https://api-v2.soundcloud.com/search/tracks?q={query}&client_id={CLIENT_ID}&limit=5"
+    msg = await update.message.reply_text("🔍 در حال جستجو در SoundCloud...")
+
+    # yt-dlp تنظیمات
+    ydl_opts = {
+        "format": "bestaudio/best",
+        "quiet": True,
+        "noplaylist": True,
+        "outtmpl": os.path.join(DOWNLOAD_FOLDER, "%(id)s.%(ext)s"),
+    }
+
     try:
-        res = requests.get(search_url, timeout=10).json()
-        tracks = res.get("collection")
-        if not tracks:
-            await msg.edit_text("❌ موزیکی پیدا نشد.")
-            return
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            # جستجو روی SoundCloud
+            info = ydl.extract_info(f"scsearch:{query}", download=True)
 
-        buttons = []
-        for i, track in enumerate(tracks, start=1):
-            title = track.get("title")
-            track_id = track.get("id")
-            buttons.append([InlineKeyboardButton(f"{i}. {title}", callback_data=f"music_select:{track_id}")])
+            if not info or "entries" not in info or not info["entries"]:
+                await msg.edit_text("❌ آهنگ پیدا نشد.")
+                return
 
-        await msg.edit_text("⬇️ یکی از گزینه‌ها را انتخاب کنید:", reply_markup=InlineKeyboardMarkup(buttons))
+            # اولین نتیجه
+            track = info["entries"][0]
+            filename = ydl.prepare_filename(track)
+
+            # ارسال ویدیو/صوت
+            mp3_path = await convert_to_mp3(filename)
+            if mp3_path and os.path.exists(mp3_path):
+                await context.bot.send_audio(chat_id, mp3_path, caption=f"🎵 {track.get('title','SoundCloud')}")
+                os.remove(mp3_path)
+            else:
+                # اگر تبدیل نشد، فایل اصلی ارسال می‌شود
+                await context.bot.send_document(chat_id, filename, caption=f"🎵 {track.get('title','SoundCloud')}")
+
+            if os.path.exists(filename):
+                os.remove(filename)
+
+        await msg.delete()
 
     except Exception as e:
-        await msg.edit_text(f"❌ خطا در جستجوی موزیک: {e}")
-
-# ----------------------------------
-# هندلر انتخاب موزیک
-# ----------------------------------
-async def music_select_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-    track_id = query.data.split(":")[1]
-
-    # دریافت اطلاعات کامل آهنگ
-    track_url = f"https://api-v2.soundcloud.com/tracks/{track_id}?client_id={CLIENT_ID}"
-    try:
-        track_info = requests.get(track_url, timeout=10).json()
-        title = track_info.get("title")
-        stream_url = f"{track_info.get('media')['transcodings'][0]['url']}?client_id={CLIENT_ID}"
-
-        msg = await query.edit_message_text("⬇️ در حال دانلود موزیک... لطفاً صبر کنید...")
-
-        # دریافت لینک واقعی mp3
-        stream_res = requests.get(stream_url, timeout=10).json()
-        mp3_download_url = stream_res.get("url")
-
-        mp3_path = await download_soundcloud(mp3_download_url, title)
-        if mp3_path and os.path.exists(mp3_path):
-            await context.bot.send_audio(chat_id=query.message.chat.id, audio=open(mp3_path, "rb"), title=title)
-            os.remove(mp3_path)
-            await msg.delete()
-        else:
-            await msg.edit_text("❌ خطا در دانلود موزیک.")
-
-    except Exception as e:
-        await query.edit_message_text(f"❌ خطا در پردازش موزیک: {e}")
+        await msg.edit_text(f"❌ خطا در دانلود موزیک:\n{e}")
