@@ -1099,12 +1099,13 @@ async def leave(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ======================= 🌟 پنل نوری پلاس =======================
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import ContextTypes
-import aiofiles, os, asyncio
+import aiofiles, os
 from datetime import datetime
 from modules.azan_module import get_azan_time  # ✅ اضافه برای اذان
 
 TEXTS_PATH = "texts"
 
+# ======================= 📄 بارگذاری متن از فایل =======================
 async def load_text(file_name, default_text):
     path = os.path.join(TEXTS_PATH, file_name)
     if os.path.exists(path):
@@ -1114,62 +1115,57 @@ async def load_text(file_name, default_text):
 
 
 # ======================= 🎛 پنل اصلی ربات =======================
-from datetime import datetime
-
 async def show_main_panel(update: Update, context: ContextTypes.DEFAULT_TYPE, edit=False):
     user_first_name = update.effective_user.first_name
     now = datetime.now().strftime("%Y/%m/%d - %H:%M:%S")
 
     about = (
         f"🌙 <b>به منوی اصلی ربات خوش آمدی {user_first_name}!</b>\n"
-        f"📅 {now}\n"
-        f"از دکمه‌های زیر یکی رو انتخاب کن 😎"
+        f"📅 {now}\n\n"
+        f"از دکمه‌های زیر یکی را انتخاب کن 😎"
     )
 
     keyboard = [
-    [
-        InlineKeyboardButton("💻 ارتباط با سازنده", url="https://t.me/NOORI_NOOR"),
-        InlineKeyboardButton("💭 گروه پشتیبانی", url="https://t.me/+CuXueaUaWQo1Yzhi")
-    ],
-    [
-        InlineKeyboardButton("➕ افزودن به گروه", url="https://t.me/AFGR63_bot?startgroup=true"),
-        InlineKeyboardButton("🧩 قابلیت‌های ربات", callback_data="panel_features")
-    ],
-    [
-        InlineKeyboardButton("🤖 راهنمای ربات", callback_data="panel_about"),
-        InlineKeyboardButton("🎵 جستجوی موزیک", callback_data="panel_team")
-    ],
-    [
-        InlineKeyboardButton("🎨 فونت‌ساز حرفه‌ای", callback_data="panel_font"),
-        InlineKeyboardButton("💳 آیدی من", callback_data="panel_stats"),
-        InlineKeyboardButton("📥 دانلود از تیک تاک", callback_data="panel_tiktok")
-    ],
-    [
-        InlineKeyboardButton("🧠 گفتگوی ChatGPT", callback_data="panel_chatgpt")
-    ],
-    [
-        InlineKeyboardButton("🌤 آب و هوا", callback_data="panel_weather"),
-        InlineKeyboardButton("🕌 اوقات شرعی / اذان", callback_data="panel_azan")
+        [
+            InlineKeyboardButton("💻 ارتباط با سازنده", url="https://t.me/NOORI_NOOR"),
+            InlineKeyboardButton("💭 گروه پشتیبانی", url="https://t.me/+CuXueaUaWQo1Yzhi")
+        ],
+        [
+            InlineKeyboardButton("➕ افزودن به گروه", url="https://t.me/AFGR63_bot?startgroup=true"),
+            InlineKeyboardButton("🧩 قابلیت‌های ربات", callback_data="panel_features")
+        ],
+        [
+            InlineKeyboardButton("🤖 راهنمای ربات", callback_data="panel_about"),
+            InlineKeyboardButton("🔍آهنگMusicاغنية", callback_data="panel_team")
+        ],
+        [
+            InlineKeyboardButton("🎨 فونت‌ساز حرفه‌ای", callback_data="panel_font"),
+            InlineKeyboardButton("💳 آیدی من", callback_data="panel_stats"),
+            InlineKeyboardButton("📥 دانلود از تیک تاک", callback_data="panel_tiktok")
+        ],
+        [
+            InlineKeyboardButton("🧠 گفتگوی ChatGPT", callback_data="panel_chatgpt")
+        ],
+        [
+            InlineKeyboardButton("🌤 آب و هوا", callback_data="panel_weather"),
+            InlineKeyboardButton("🕌 اوقات شرعی / اذان", callback_data="panel_azan")
+        ]
     ]
-]
-    
+
     markup = InlineKeyboardMarkup(keyboard)
 
     if edit:
-        await update.callback_query.edit_message_text(
-            about, reply_markup=markup, parse_mode="HTML"
-        )
+        await update.callback_query.edit_message_text(about, reply_markup=markup, parse_mode="HTML")
     else:
-        await update.message.reply_text(
-            about, reply_markup=markup, parse_mode="HTML"
-        )
+        await update.message.reply_text(about, reply_markup=markup, parse_mode="HTML")
 
-# ======================= 🎛 بازگشت از منوی فونت یا سایر قابلیت‌ها =======================
+
+# ======================= 🔙 بازگشت از منو =======================
 async def feature_back(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
 
-    # ✅ ساخت یک آبجکت ساده که هم message داره، هم callback_query
+    # ایجاد یک FakeUpdate برای هماهنگی با show_main_panel
     fake_update = type("FakeUpdate", (), {
         "message": query.message,
         "callback_query": query
@@ -1179,7 +1175,6 @@ async def feature_back(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 # ======================= 🎛 کنترل پنل =======================
-
 async def panel_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -1201,16 +1196,12 @@ async def panel_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(back_btn), parse_mode="HTML")
 
     elif query.data == "panel_stats":
-        user = query.from_user
-        now = datetime.now().strftime("%Y/%m/%d - %H:%M:%S")
-
         text = (
             f"📊 <b>اطلاعات کاربر:</b>\n\n"
             f"👤 نام: <b>{user.first_name}</b>\n"
             f"🆔 آیدی: <code>{user.id}</code>\n"
             f"📅 تاریخ و ساعت فعلی: <b>{now}</b>"
         )
-
         try:
             photos = await context.bot.get_user_profile_photos(user.id, limit=1)
             if photos.total_count > 0:
@@ -1225,30 +1216,29 @@ async def panel_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await show_weather(update, context)
 
     elif query.data == "panel_azan":
+        context.user_data["awaiting_azan_city"] = True
         await query.message.reply_text(
-            "🕌 برای دیدن اوقات شرعی بنویس:\n<b>اذان هرات</b> یا <b>اذان تهران</b>یا برای دیدن روز های مذهبی<b>رمضان</b>",
+            "🕌 برای دیدن اوقات شرعی بنویس:\n"
+            "<b>اذان هرات</b> یا <b>اذان تهران</b>\n"
+            "برای مشاهده روزهای مذهبی: <b>رمضان</b>",
             parse_mode="HTML"
         )
 
-    elif query.data == "panel_ramadan":
-        # ✅ نمایش وضعیت رمضان و تاریخ‌های قمری/شمسی/میلادی
-        await get_ramadan_status(update, context)
-        
     elif query.data == "panel_tiktok":
         await query.edit_message_text(
-        "📥 لطفاً لینک ویدیوی TikTok مورد نظر خود را ارسال کنید تا دانلود شود.\n\n"
-        "مثال:https://vm.tiktok.com/ZNR8p9QB2/ ",
+            "📥 لطفاً لینک ویدیوی TikTok مورد نظر خود را ارسال کنید تا دانلود شود.\n\n"
+            "مثال: https://vm.tiktok.com/ZNR8p9QB2/",
             parse_mode="HTML"
-            )
+        )
 
-    
     elif query.data == "panel_font":
-        await query.message.reply_text("🎨 برای ساخت فونت بنویس:\n<b> فونت اسمت </b>", parse_mode="HTML")
+        await query.message.reply_text("🎨 برای ساخت فونت بنویس:\n<b>فونت اسمت</b>", parse_mode="HTML")
 
     elif query.data == "back_main":
         await show_main_panel(update, context, edit=True)
 
-# ======================= ☁️ پاسخ به نام شهر برای اذان =======================
+
+# ======================= ☪️ پاسخ به نام شهر برای اذان =======================
 async def handle_azan_city(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if context.user_data.get("awaiting_azan_city"):
         city = update.message.text.strip()
@@ -1270,7 +1260,6 @@ async def handle_azan_city(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("⚠️ متأسفم، نتوانستم اطلاعات شهر را پیدا کنم!", parse_mode="HTML")
 
         context.user_data["awaiting_azan_city"] = False
-    
 # ======================= 🚀 اجرای نهایی =======================
 if __name__ == "__main__":
     print("🤖 ربات فارسی 8.7 Cloud+ Supreme Pro Stable+  آماده به خدمت استم محمد ...")
