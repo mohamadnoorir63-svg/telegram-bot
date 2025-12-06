@@ -1,3 +1,4 @@
+# modules/media_handler.py
 import os
 import shutil
 import subprocess
@@ -23,7 +24,7 @@ async def convert_to_mp3(video_path: str) -> str:
     return mp3_path
 
 async def media_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """دانلود ویدیو TikTok و Instagram و ارسال صوت، پیام خطا برای عکس"""
+    """دانلود ویدیو TikTok، Instagram و YouTube و ارسال صوت، پیام خطا برای عکس"""
     url = update.message.text.strip()
     chat_id = update.effective_chat.id
     msg = await update.message.reply_text("⬇️ در حال پردازش رسانه ...")
@@ -34,12 +35,12 @@ async def media_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             resp = requests.get(url, allow_redirects=True)
             url = resp.url
         except Exception as e:
-            await msg.edit(f"❌ خطا در ریدایرکت لینک: {e}")
+            await msg.edit_text(f"❌ خطا در ریدایرکت لینک: {e}")
             return
 
     # بررسی عکس‌ها
-    if "/photo/" in url or "instagram.com/p/" in url and "media/?size=l" in url:
-        await msg.edit("❌ عکس‌ها پشتیبانی نمی‌شوند.")
+    if "/photo/" in url or (("instagram.com/p/" in url) and ("media/?size=l" in url)):
+        await msg.edit_text("❌ عکس‌ها پشتیبانی نمی‌شوند.")
         return
 
     # دانلود ویدیو با yt-dlp
@@ -69,4 +70,4 @@ async def media_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await msg.delete()
 
     except Exception as e:
-        await msg.edit(f"❌ خطا در دانلود رسانه: {e}")
+        await msg.edit_text(f"❌ خطا در دانلود رسانه: {e}")
