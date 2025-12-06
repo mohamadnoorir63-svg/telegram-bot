@@ -9,9 +9,9 @@ from telegram.ext import ContextTypes
 DOWNLOAD_FOLDER = "downloads"
 os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
 
-# ذخیره نتایج جستجو (track_id -> info)
 track_store = {}
 
+# تبدیل به MP3
 async def convert_to_mp3(file_path: str) -> str:
     mp3_path = file_path.rsplit(".", 1)[0] + ".mp3"
     if not shutil.which("ffmpeg"):
@@ -24,39 +24,32 @@ async def convert_to_mp3(file_path: str) -> str:
     subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     return mp3_path
 
+
 async def soundcloud_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message or not update.message.text:
         return
 
     text = update.message.text.strip()
     chat_id = update.effective_chat.id
-    text_l = text.lower()
 
-    # -----------------------------
-    # دستورات سه‌زبانه
-    # -----------------------------
-    triggers = [
-        "آهنگ ",
-        "music ",
-        "اغنيه ",
-        "أغنية ",
-    ]
+    # ---- سه زبان ----
+    triggers = ["آهنگ ", "music ", "اغنية ", "أغنية "]
 
-    used_trigger = None
-    for t in triggers:
-        if text_l.startswith(t):
-            used_trigger = t
-            break
-
-    if not used_trigger:
+    # بررسی شروع پیام با یکی از دستورات
+    if not any(text.lower().startswith(t) for t in triggers):
         return
 
-    query = text[len(used_trigger):].strip()
+    # حذف کلمه دستور
+    for t in triggers:
+        if text.lower().startswith(t):
+            query = text[len(t):].strip()
+            break
+
     if not query:
         await update.message.reply_text("❌ لطفاً نام یا متن آهنگ را وارد کنید.")
         return
 
-    msg = await update.message.reply_text(f"🔍 در حال جستجو در SoundCloud ...")
+    msg = await update.message.reply_text("🔍 در حال جستجو در SoundCloud ...")
 
     ydl_opts = {
         "format": "bestaudio/best",
@@ -79,15 +72,22 @@ async def soundcloud_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
             for track in info["entries"]:
                 track_id = track.get("id")
                 title = track.get("title", "SoundCloud Track")
-                keyboard.append([InlineKeyboardButton(title, callback_data=f"music_select:{track_id}")])
+                keyboard.append(
+                    [InlineKeyboardButton(title, callback_data=f"music_select:{track_id}")]
+                )
 
-            reply_markup = InlineKeyboardMarkup(keyboard)
-            await msg.edit_text(f"🎵 {len(info['entries'])} آهنگ پیدا شد. لطفا انتخاب کنید:", reply_markup=reply_markup)
+            await msg.edit_text(
+                f"🎵 {len(info['entries'])} آهنگ پیدا شد. لطفا انتخاب کنید:",
+                reply_markup=InlineKeyboardMarkup(keyboard)
+            )
 
     except Exception as e:
         await msg.edit_text(f"❌ خطا در جستجوی موزیک:\n{e}")
 
 
+# -------------------------------
+# هندلر انتخاب آهنگ
+# -------------------------------
 async def music_select_handler(update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -128,5 +128,6 @@ async def music_select_handler(update, context: ContextTypes.DEFAULT_TYPE):
             os.remove(filename)
 
         await msg.delete()
+
     except Exception as e:
-        await query.edit_message_text(f"❌ خطا در دانلود موزیک:\n{e}")
+        await query.edit_message_text(f"❌ خطا در دانلود آهنگ:\n{e}")
