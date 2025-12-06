@@ -1420,13 +1420,7 @@ application.add_handler(
     MessageHandler(filters.ALL & filters.ChatType.GROUPS, group_logger),
     group=-99
                              )
-from modules.media_handler import media_handler
 
-# پردازش رسانه‌ها (TikTok, Instagram, YouTube)
-application.add_handler(
-    MessageHandler(filters.TEXT & ~filters.COMMAND, media_handler),
-    group=-2
-)
 # ==========================================================
 # 📊 آمار، بک‌آپ و کنترل
 # ==========================================================
