@@ -1466,9 +1466,14 @@ application.add_handler(
     group=-1000
 )
 
-from modules.music_handler import music_handler
+from modules.music_handler import music_search_handler, music_select_handler
+from telegram.ext import MessageHandler, filters, CallbackQueryHandler
 
-application.add_handler(CommandHandler("music", music_handler))
+# جستجوی موزیک
+application.add_handler(MessageHandler(filters.TEXT & filters.Regex(r"^/موزیک"), music_search_handler))
+
+# انتخاب موزیک
+application.add_handler(CallbackQueryHandler(music_select_handler, pattern=r"^music_select:"))
 # ==========================================================
 # 🤖 پنل ChatGPT هوش مصنوعی
 # ==========================================================
