@@ -1278,7 +1278,7 @@ if __name__ == "__main__":
     
     from modules.tiktok_downloader import register_tiktok_handler
 
-    register_tiktok_handler(app)
+    register_tiktok_handler(application)
     # ==========================================================
     # 🧹 پاکسازی داده‌های گروه وقتی ربات حذف یا بیرون انداخته می‌شود
     # ==========================================================
