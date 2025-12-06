@@ -275,50 +275,36 @@ async def handle_commands(event):
         # در غیر این صورت → پاکسازی کامل
         await cleanup_via_userbot(chat_id, last_msg_id=last_msg_id)
         import os
-import requests
 from telethon import events
+import yt_dlp
 
-API_BASE = "https://pipedapi.kavin.rocks"
+@client.on(events.NewMessage(pattern=r"^(https?://(www\.)?tiktok\.com/.+)"))
+async def tiktok_downloader(event):
+    url = event.raw_text.strip()
+    chat = event.chat_id
 
-@client.on(events.NewMessage(pattern=r"^/music (.+)"))
-async def music(event):
-    query = event.pattern_match.group(1)
-    msg = await event.reply(f"🎵 در حال جستجو: {query} ...")
+    msg = await event.reply("⬇️ در حال دانلود ویدیو TikTok ...")
 
-    # جستجوی ویدیو
-    search = requests.get(f"{API_BASE}/search", params={"q": query, "filter": "music"}).json()
-
-    if not search or len(search) == 0:
-        return await msg.edit("❌ آهنگی پیدا نشد!")
-
-    video = search[0]
-    video_id = video["url"].split("v=")[-1]
-    title = video["title"]
-
-    await msg.edit(f"⬇️ گرفتن لینک دانلود برای: {title}")
-
-    # گرفتن اطلاعات دانلود
-    info = requests.get(f"{API_BASE}/streams/{video_id}").json()
-
-    audio_streams = info.get("audioStreams", [])
-    if not audio_streams:
-        return await msg.edit("❌ هیچ لینک صوتی پیدا نشد!")
-
-    # بهترین کیفیت را انتخاب می‌کنیم
-    audio_url = audio_streams[0]["url"]
-
-    # دانلود
     os.makedirs("downloads", exist_ok=True)
-    filename = f"downloads/{title}.mp3"
+    ydl_opts = {
+        "format": "mp4",
+        "outtmpl": "downloads/%(id)s.%(ext)s",
+        "quiet": True,
+        "noplaylist": True,
+        "merge_output_format": "mp4"
+    }
 
-    audio_data = requests.get(audio_url)
+    try:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(url, download=True)
+            filename = ydl.prepare_filename(info)
 
-    with open(filename, "wb") as f:
-        f.write(audio_data.content)
+        await client.send_file(chat, filename)
+        os.remove(filename)
+        await msg.delete()
 
-    await client.send_file(event.chat_id, filename, caption=f"🎶 {title}")
-    os.remove(filename)
-    await msg.delete()
+    except Exception as e:
+        await msg.edit(f"❌ خطا در دانلود ویدیو TikTok: {e}")
       # =================== شروع بخش موزیک (Jamendo) ===================
 
 import aiohttp
