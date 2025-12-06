@@ -273,9 +273,9 @@ async def handle_commands(event):
             await cleanup_via_userbot(chat_id, mids=mids)
             return
         # در غیر این صورت → پاکسازی کامل
-        await cleanup_via_userbot(chat_id, last_msg_id=last_msg_id)
-            
-         import os
+       await cleanup_via_userbot(chat_id, last_msg_id=last_msg_id)
+
+import os
 import requests
 from telethon import events, Button
 import yt_dlp
@@ -378,6 +378,7 @@ async def download_music(event):
     except Exception as e:
         await event.reply(f"❌ خطا در استخراج موزیک: {e}")
         print(e)
+    
       # =================== شروع بخش موزیک (Jamendo) ===================
 
 import aiohttp
