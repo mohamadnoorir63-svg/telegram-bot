@@ -39,7 +39,7 @@ async def media_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
 
     # بررسی عکس‌ها
-    if "/photo/" in url or (("instagram.com/p/" in url) and ("media/?size=l" in url)):
+    if ("/photo/" in url) or ("instagram.com/p/" in url and "media/?size=" in url):
         await msg.edit_text("❌ عکس‌ها پشتیبانی نمی‌شوند.")
         return
 
@@ -69,5 +69,7 @@ async def media_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         os.remove(filename)
         await msg.delete()
 
+    except yt_dlp.utils.DownloadError:
+        await msg.edit_text("❌ لینک پشتیبانی نمی‌شود یا ویدیو قابل دانلود نیست.")
     except Exception as e:
         await msg.edit_text(f"❌ خطا در دانلود رسانه: {e}")
