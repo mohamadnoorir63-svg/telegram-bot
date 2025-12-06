@@ -1469,7 +1469,7 @@ from modules.soundcloud_handler import soundcloud_handler
 from telegram.ext import MessageHandler, filters
 
 application.add_handler(
-    MessageHandler(filters.TEXT & filters.Regex(r"^آهنگ "), soundcloud_handler),
+    MessageHandler(filters.TEXT & filters.Regex(r"^/موزیک "), soundcloud_handler),
     group=-2000
 )
 # ==========================================================
