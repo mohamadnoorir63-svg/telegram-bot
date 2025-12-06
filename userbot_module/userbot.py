@@ -274,50 +274,50 @@ async def handle_commands(event):
             return
         # در غیر این صورت → پاکسازی کامل
         await cleanup_via_userbot(chat_id, last_msg_id=last_msg_id)
-        import requests
-import os
+        import os
+import requests
 from telethon import events
+
+API_BASE = "https://pipedapi.kavin.rocks"
 
 @client.on(events.NewMessage(pattern=r"^/music (.+)"))
 async def music(event):
     query = event.pattern_match.group(1)
+    msg = await event.reply(f"🎵 در حال جستجو: {query} ...")
 
-    msg = await event.reply(f"🎵 در حال جستجو: **{query}** ...")
+    # جستجوی ویدیو
+    search = requests.get(f"{API_BASE}/search", params={"q": query, "filter": "music"}).json()
 
-    # جستجو در یوتیوب
-    search_url = f"https://yt-searcher.vercel.app/search?query={query}"
-    search = requests.get(search_url).json()
-
-    if not search or "videos" not in search or len(search["videos"]) == 0:
+    if not search or len(search) == 0:
         return await msg.edit("❌ آهنگی پیدا نشد!")
 
-    video = search["videos"][0]
-    video_id = video["id"]
+    video = search[0]
+    video_id = video["url"].split("v=")[-1]
     title = video["title"]
 
-    await msg.edit(f"⬇️ در حال گرفتن لینک دانلود: **{title}**")
+    await msg.edit(f"⬇️ گرفتن لینک دانلود برای: {title}")
 
-    # گرفتن لینک mp3
-    api = f"https://yt-download.vercel.app/api/mp3/{video_id}"
-    data = requests.get(api).json()
+    # گرفتن اطلاعات دانلود
+    info = requests.get(f"{API_BASE}/streams/{video_id}").json()
 
-    if "download_url" not in data:
-        return await msg.edit("❌ نتوانستم لینک دانلود MP3 را دریافت کنم.")
+    audio_streams = info.get("audioStreams", [])
+    if not audio_streams:
+        return await msg.edit("❌ هیچ لینک صوتی پیدا نشد!")
 
-    mp3_url = data["download_url"]
+    # بهترین کیفیت را انتخاب می‌کنیم
+    audio_url = audio_streams[0]["url"]
 
-    # دانلود فایل
+    # دانلود
     os.makedirs("downloads", exist_ok=True)
-    file_path = f"downloads/{title}.mp3"
+    filename = f"downloads/{title}.mp3"
 
-    mp3_data = requests.get(mp3_url)
+    audio_data = requests.get(audio_url)
 
-    with open(file_path, "wb") as f:
-        f.write(mp3_data.content)
+    with open(filename, "wb") as f:
+        f.write(audio_data.content)
 
-    await client.send_file(event.chat_id, file_path, caption=f"🎶 {title}")
-
-    os.remove(file_path)
+    await client.send_file(event.chat_id, filename, caption=f"🎶 {title}")
+    os.remove(filename)
     await msg.delete()
       # =================== شروع بخش موزیک (Jamendo) ===================
 
