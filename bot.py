@@ -1133,11 +1133,11 @@ async def show_main_panel(update: Update, context: ContextTypes.DEFAULT_TYPE, ed
     ],
     [
         InlineKeyboardButton("➕ افزودن به گروه", url="https://t.me/AFGR63_bot?startgroup=true"),
-        InlineKeyboardButton("🧩 قابلیت‌های ربات", callback_data="panel_features")
+        InlineKeyboardButton("🧩 قابلیت ربات", callback_data="panel_features")
     ],
     [
         InlineKeyboardButton("🤖 راهنمای ربات", callback_data="panel_about"),
-        InlineKeyboardButton("👨‍💻 درباره تیم ما", callback_data="panel_team")
+        InlineKeyboardButton("📥آهنگ🔍Music🔍اغنية📥", callback_data="panel_team")
     ],
     [
         InlineKeyboardButton("🎨 فونت‌ساز حرفه‌ای", callback_data="panel_font"),
