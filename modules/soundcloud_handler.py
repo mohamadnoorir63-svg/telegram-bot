@@ -1,17 +1,13 @@
-# modules/soundcloud_handler.py
 import os
 import shutil
 import subprocess
 import yt_dlp
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import ContextTypes, CallbackQueryHandler
+from telegram.ext import ContextTypes
 
 DOWNLOAD_FOLDER = "downloads"
 os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
 
-# -------------------------------
-# تبدیل به MP3
-# -------------------------------
 async def convert_to_mp3(file_path: str) -> str:
     mp3_path = file_path.rsplit(".", 1)[0] + ".mp3"
     if not shutil.which("ffmpeg"):
@@ -24,86 +20,86 @@ async def convert_to_mp3(file_path: str) -> str:
     subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     return mp3_path
 
-# -------------------------------
-# هندلر جستجو و ارسال آهنگ
-# -------------------------------
+
 async def soundcloud_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    # اگر پیام آهنگ نبود → هیچ کاری نکن
     if not update.message or not update.message.text:
         return
 
     text = update.message.text.strip()
-    chat_id = update.effective_chat.id
 
-    # استفاده از ۵ کلمه اول متن به عنوان کلیدواژه
-    words = text.split()
-    if not words:
-        await update.message.reply_text("❌ لطفاً نام یا متن آهنگ را وارد کنید.")
+    # فقط وقتی متن با "آهنگ " شروع شود
+    if not text.startswith("آهنگ "):
         return
 
-    search_query = " ".join(words[:5])
+    query_text = text.replace("آهنگ ", "", 1).strip()
 
-    msg = await update.message.reply_text(f"🔍 در حال جستجو در SoundCloud با کلیدواژه:\n`{search_query}`", parse_mode="Markdown")
+    msg = await update.message.reply_text(
+        f"🔍 در حال جستجو برای:\n`{query_text}`",
+        parse_mode="Markdown"
+    )
 
     ydl_opts = {
         "format": "bestaudio/best",
         "quiet": True,
-        "noplaylist": True,
-        "outtmpl": os.path.join(DOWNLOAD_FOLDER, "%(id)s.%(ext)s"),
+        "noplaylist": True
     }
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(f"scsearch5:{search_query}", download=False)
 
-            if not info or "entries" not in info or not info["entries"]:
+            info = ydl.extract_info(f"scsearch5:{query_text}", download=False)
+
+            if not info or not info.get("entries"):
                 await msg.edit_text("❌ آهنگ پیدا نشد.")
                 return
 
-            # ایجاد دکمه‌ها برای انتخاب ۵ نتیجه اول
             buttons = []
-            for i, track in enumerate(info["entries"][:5], start=1):
-                title = track.get("title", "SoundCloud Track")
-                track_id = track.get("id")
-                buttons.append([InlineKeyboardButton(f"{i}. {title}", callback_data=f"music_select:{track_id}")])
+            for entry in info["entries"][:5]:
+                title = entry.get("title", "Track")
+                url = entry.get("url")
+                buttons.append([
+                    InlineKeyboardButton(title, callback_data=f"scdl:{url}")
+                ])
 
             keyboard = InlineKeyboardMarkup(buttons)
-            await msg.edit_text("🎵 چند نتیجه پیدا شد. لطفا یکی را انتخاب کنید:", reply_markup=keyboard)
+            await msg.edit_text("🎵 لطفاً یک آهنگ را انتخاب کنید:", reply_markup=keyboard)
 
     except Exception as e:
-        await msg.edit_text(f"❌ خطا در جستجوی موزیک:\n{e}")
+        await msg.edit_text(f"❌ خطا:\n{e}")
 
 
-# -------------------------------
-# هندلر انتخاب آهنگ
-# -------------------------------
-async def music_select_handler(update, context: ContextTypes.DEFAULT_TYPE):
+async def soundcloud_download_callback(update, context):
     query = update.callback_query
     await query.answer()
-    track_id = query.data.split(":")[1]
+
+    url = query.data.replace("scdl:", "")
 
     msg = await query.edit_message_text("⬇️ در حال دانلود آهنگ... لطفا صبر کنید.")
 
     ydl_opts = {
         "format": "bestaudio/best",
-        "quiet": True,
         "outtmpl": os.path.join(DOWNLOAD_FOLDER, "%(id)s.%(ext)s"),
+        "quiet": True
     }
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(f"https://soundcloud.com/i/tracks/{track_id}", download=True)
+            info = ydl.extract_info(url, download=True)
             filename = ydl.prepare_filename(info)
 
-        mp3_path = await convert_to_mp3(filename)
-        if mp3_path and os.path.exists(mp3_path):
-            await context.bot.send_audio(query.message.chat_id, mp3_path, caption=f"🎵 {info.get('title','SoundCloud')}")
-            os.remove(mp3_path)
+        mp3 = await convert_to_mp3(filename)
+        if mp3 and os.path.exists(mp3):
+            await query.message.reply_audio(mp3, caption=f"🎵 {info['title']}")
+            os.remove(mp3)
         else:
-            await context.bot.send_document(query.message.chat_id, filename, caption=f"🎵 {info.get('title','SoundCloud')}")
+            await query.message.reply_document(filename, caption=f"🎵 {info['title']}")
 
         if os.path.exists(filename):
             os.remove(filename)
 
         await msg.delete()
+
     except Exception as e:
-        await msg.edit_message_text(f"❌ خطا در دانلود آهنگ:\n{e}")
+        await msg.edit_message_text(f"❌ خطا در دانلود:\n{e}")
