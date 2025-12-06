@@ -1,125 +1,156 @@
 # modules/soundcloud_handler.py
-import os, shutil, subprocess, yt_dlp
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+import os, re, shutil, subprocess, yt_dlp
+from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import ContextTypes
+from rapidfuzz import fuzz
 
 DOWNLOAD_FOLDER = "downloads"
 os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
 
-# حافظه موقت برای نتایج جستجو با صفحه‌بندی
-track_store = {}  # {chat_id: {"tracks": [...], "page": 0}}
+def clean_text(t: str):
+    t = t.lower()
+    t = re.sub(r"[^\w\s]", " ", t)
+    t = t.replace("آهنگ", "").replace("موزیک","")
+    t = re.sub(r"\s+", " ", t)
+    return t.strip()
 
-async def convert_to_mp3(file_path: str) -> str:
-    mp3_path = file_path.rsplit(".", 1)[0] + ".mp3"
+async def convert_to_mp3(path: str):
+    mp3 = path.rsplit(".", 1)[0] + ".mp3"
     if not shutil.which("ffmpeg"):
         return None
-    cmd = [
-        "ffmpeg", "-y", "-i", file_path,
-        "-vn", "-ab", "192k", "-ar", "44100",
-        "-f", "mp3", mp3_path
-    ]
-    subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    return mp3_path
+    subprocess.run(["ffmpeg","-y","-i",path,"-vn","-ab","192k","-ar","44100",mp3], 
+                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    return mp3
 
-# نمایش یک صفحه از نتایج
-def build_keyboard(chat_id: int):
-    store = track_store[chat_id]
-    tracks = store["tracks"]
-    page = store["page"]
-    per_page = 5
-    start = page * per_page
-    end = start + per_page
+# حافظه نتایج برای صفحه‌بندی
+track_store = {}
 
-    keyboard = []
-    for i, track in enumerate(tracks[start:end], start=start):
-        title = track.get("title", "SoundCloud Track")
-        keyboard.append([InlineKeyboardButton(f"{i+1}. {title}", callback_data=f"music_select:{i}")])
+def best_match(search_text, tracks):
+    """بهترین تطابق fuzzy از میان نتایج"""
+    search_clean = clean_text(search_text)
+    scored = []
+    for t in tracks:
+        title = clean_text(t.get("title",""))
+        score = fuzz.partial_ratio(search_clean, title)
+        scored.append((score, t))
+    scored.sort(reverse=True, key=lambda x: x[0])
+    return scored[:30]  # حداکثر ۳۰ نتیجه قوی
 
-    nav_buttons = []
-    if page > 0:
-        nav_buttons.append(InlineKeyboardButton("⬅️ Prev", callback_data="music_page:prev"))
-    if end < len(tracks):
-        nav_buttons.append(InlineKeyboardButton("Next ➡️", callback_data="music_page:next"))
-    if nav_buttons:
-        keyboard.append(nav_buttons)
-
-    return InlineKeyboardMarkup(keyboard)
-
-async def soundcloud_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    text = update.message.text.strip()
+async def soundcloud_handler(update:Update, context: ContextTypes.DEFAULT_TYPE):
+    text = update.message.text
     chat_id = update.effective_chat.id
 
-    if not text.lower().startswith("آهنگ "):
+    if not text.startswith("آهنگ "):
         return
 
-    query = text.replace("آهنگ ", "", 1).strip()
-    if not query:
-        await update.message.reply_text("❌ لطفاً نام یا متن آهنگ را وارد کنید.")
-        return
+    query = clean_text(text.replace("آهنگ ", ""))
 
-    msg = await update.message.reply_text("🔍 در حال جستجو در SoundCloud...")
+    msg = await update.message.reply_text("🔍 در حال جستجو در چند منبع ...")
 
-    ydl_opts = {"format": "bestaudio/best", "quiet": True, "noplaylist": True}
+    ydl_opts = {"quiet":True, "noplaylist":True}
+
     try:
+        all_results = []
+
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(f"scsearch50:{query}", download=False)  # تا 50 نتیجه
-            if not info or "entries" not in info or not info["entries"]:
-                await msg.edit_text("❌ آهنگ پیدا نشد.")
-                return
+            sc = ydl.extract_info(f"scsearch50:{query}", download=False)
+            yt = ydl.extract_info(f"ytsearch50:{query}", download=False)
 
-            tracks = info["entries"]
-            track_store[chat_id] = {"tracks": tracks, "page": 0}
+        if sc and "entries" in sc:
+            all_results.extend(sc["entries"])
+        if yt and "entries" in yt:
+            all_results.extend(yt["entries"])
 
-            await msg.edit_text(
-                f"🎵 {len(tracks)} آهنگ پیدا شد، یکی را انتخاب کنید:",
-                reply_markup=build_keyboard(chat_id)
-            )
-
-    except Exception as e:
-        await msg.edit_text(f"❌ خطا در جستجوی موزیک:\n{e}")
-
-# هندلر انتخاب آهنگ
-async def music_select_handler(update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-    chat_id = query.message.chat_id
-
-    if query.data.startswith("music_select:"):
-        idx = int(query.data.split(":")[1])
-        if chat_id not in track_store or idx >= len(track_store[chat_id]["tracks"]):
-            await query.edit_message_text("❌ آهنگ پیدا نشد یا منقضی شده.")
+        if not all_results:
+            await msg.edit_text("❌ آهنگی یافت نشد.")
             return
 
-        track = track_store[chat_id]["tracks"][idx]
-        track_id = track.get("id")
-        title = track.get("title", "SoundCloud Track")
+        # انتخاب نتایج بهتر با fuzzy match
+        best = [t for _, t in best_match(query, all_results)]
+        track_store[chat_id] = {"tracks": best, "page": 0}
 
-        msg = await query.edit_message_text(f"⬇️ در حال دانلود: {title} ... لطفا صبر کنید.")
-        ydl_opts = {"format": "bestaudio/best", "quiet": True, "outtmpl": os.path.join(DOWNLOAD_FOLDER, "%(id)s.%(ext)s")}
+        # دکمه انتخاب
+        def build_page():
+            page = track_store[chat_id]["page"]
+            start = page * 5
+            end = start + 5
+
+            kb = []
+            for i, t in enumerate(best[start:end], start=start):
+                kb.append([InlineKeyboardButton(
+                    f"{i+1}. {t.get('title')[:50]}",
+                    callback_data=f"music_dl:{i}"
+                )])
+
+            nav = []
+            if page > 0: nav.append(InlineKeyboardButton("⬅️", callback_data="page:prev"))
+            if end < len(best): nav.append(InlineKeyboardButton("➡️", callback_data="page:next"))
+            if nav: kb.append(nav)
+
+            return InlineKeyboardMarkup(kb)
+
+        await msg.edit_text("🎶 نتایج یافت‌شده:", reply_markup=build_page())
+
+    except Exception as e:
+        await msg.edit_text(f"❌ خطا:\n{e}")
+
+async def music_select_handler(update, context):
+    q = update.callback_query
+    await q.answer()
+    chat = q.message.chat_id
+    data = q.data
+
+    if data.startswith("page:"):
+        if data=="page:next":
+            track_store[chat]["page"] += 1
+        else:
+            track_store[chat]["page"] -= 1
+
+        page = track_store[chat]["page"]
+        tracks = track_store[chat]["tracks"]
+
+        kb = []
+        start = page*5
+        end = start+5
+        for i, t in enumerate(tracks[start:end], start=start):
+            kb.append([InlineKeyboardButton(
+                f"{i+1}. {t.get('title','')[:50]}",
+                callback_data=f"music_dl:{i}"
+            )])
+
+        nav=[]
+        if page>0: nav.append(InlineKeyboardButton("⬅️", callback_data="page:prev"))
+        if end<len(tracks): nav.append(InlineKeyboardButton("➡️", callback_data="page:next"))
+        if nav: kb.append(nav)
+
+        await q.edit_message_reply_markup(InlineKeyboardMarkup(kb))
+        return
+
+    if data.startswith("music_dl:"):
+        idx = int(data.split(":")[1])
+        track = track_store[chat]["tracks"][idx]
+        title = track.get("title","Track")
+        url = track.get("webpage_url")
+
+        msg = await q.edit_message_text(f"⬇ در حال دانلود {title} ...")
+
+        ydl_opts = {"format":"bestaudio/best","quiet":True,"outtmpl":"downloads/%(id)s.%(ext)s"}
+
         try:
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                info = ydl.extract_info(f"https://soundcloud.com/i/tracks/{track_id}", download=True)
+                info = ydl.extract_info(url, download=True)
                 filename = ydl.prepare_filename(info)
 
-            mp3_path = await convert_to_mp3(filename)
-            if mp3_path and os.path.exists(mp3_path):
-                await context.bot.send_audio(chat_id, mp3_path, caption=f"🎵 {title}")
-                os.remove(mp3_path)
+            mp3 = await convert_to_mp3(filename)
+            if mp3 and os.path.exists(mp3):
+                await context.bot.send_audio(chat, mp3, caption=f"🎵 {title}")
+                os.remove(mp3)
             else:
-                await context.bot.send_document(chat_id, filename, caption=f"🎵 {title}")
+                await context.bot.send_document(chat, filename)
 
             if os.path.exists(filename):
                 os.remove(filename)
 
             await msg.delete()
         except Exception as e:
-            await query.edit_message_text(f"❌ خطا در دانلود آهنگ:\n{e}")
-
-    elif query.data.startswith("music_page:"):
-        direction = query.data.split(":")[1]
-        store = track_store[chat_id]
-        if direction == "next":
-            store["page"] += 1
-        elif direction == "prev":
-            store["page"] -= 1
-        await query.edit_message_reply_markup(reply_markup=build_keyboard(chat_id))
+            await q.edit_message_text(f"❌ خطا در دانلود:\n{e}")
