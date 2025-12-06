@@ -1465,15 +1465,14 @@ application.add_handler(
     MessageHandler(filters.TEXT & ~filters.COMMAND, tiktok_handler),
     group=-1000
 )
-
 from modules.soundcloud_handler import soundcloud_handler
 from telegram.ext import MessageHandler, filters
 
-# هندلر جستجوی موزیک با کلمه آهنگ (بدون /)
 application.add_handler(
-    MessageHandler(filters.TEXT & filters.Regex(r"^آهنگ\s+"), soundcloud_handler),
+    MessageHandler(filters.TEXT & filters.Regex(r"^موزیک "), soundcloud_handler),
     group=-2000
 )
+
 # ==========================================================
 # 🤖 پنل ChatGPT هوش مصنوعی
 # ==========================================================
