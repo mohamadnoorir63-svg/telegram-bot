@@ -30,7 +30,7 @@ async def soundcloud_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
     text = update.message.text.strip()
     chat_id = update.effective_chat.id
 
-    if not text.startswith("آهنگ "):
+    if not text.startswith("/موزیک "):
         return
 
     query = text.replace("/موزیک ", "", 1).strip()
