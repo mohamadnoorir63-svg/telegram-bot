@@ -33,11 +33,12 @@ def convert_to_mp3(video_path):
     return mp3_path if os.path.exists(mp3_path) else None
 
 # هندلر TikTok
+# دانلود عکس یا ویدیو با yt_dlp
 async def tiktok_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     url = update.message.text.strip()
     msg = await update.message.reply_text("⬇️ در حال پردازش رسانه TikTok ...")
 
-    # ریدایرکت لینک کوتاه TikTok
+    # ریدایرکت لینک کوتاه
     if "vm.tiktok.com" in url or "vt.tiktok.com" in url:
         try:
             resp = requests.get(url, allow_redirects=True)
@@ -46,23 +47,8 @@ async def tiktok_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await msg.edit_text(f"❌ خطا در ریدایرکت لینک TikTok: {e}")
             return
 
-    # عکس TikTok
-    if "/photo/" in url:
-        try:
-            filename = f"downloads/{url.split('/')[-1]}.jpg"
-            r = requests.get(url)
-            with open(filename, "wb") as f:
-                f.write(r.content)
-            await context.bot.send_photo(update.effective_chat.id, filename, caption="🖼 عکس TikTok")
-            os.remove(filename)
-            await msg.delete()
-        except Exception as e:
-            await msg.edit_text(f"❌ خطا در دانلود عکس TikTok: {e}")
-        return
-
-    # دانلود ویدیو
     ydl_opts = {
-        "format": "mp4",
+        "format": "best",
         "outtmpl": "downloads/%(id)s.%(ext)s",
         "quiet": True,
         "noplaylist": True,
@@ -71,28 +57,32 @@ async def tiktok_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(url, download=True)
-            filename = ydl.prepare_filename(info)
+            info = ydl.extract_info(url, download=False)
 
-        if not os.path.exists(filename):
-            await msg.edit_text("❌ فایل ویدیو دانلود نشد!")
-            return
+            # بررسی نوع رسانه
+            if info.get("ext") == "jpg" or info.get("is_photo"):
+                # عکس TikTok
+                image_url = info["url"]
+                filename = f"downloads/{info['id']}.jpg"
+                r = requests.get(image_url)
+                with open(filename, "wb") as f:
+                    f.write(r.content)
+                await context.bot.send_photo(update.effective_chat.id, filename, caption="🖼 عکس TikTok")
+                os.remove(filename)
+            else:
+                # ویدیو
+                info = ydl.extract_info(url, download=True)
+                filename = ydl.prepare_filename(info)
+                await context.bot.send_video(update.effective_chat.id, filename, caption=f"🎬 {info.get('title','TikTok Video')}")
+                
+                # تبدیل و ارسال صوت
+                mp3_path = convert_to_mp3(filename)
+                if mp3_path:
+                    await context.bot.send_audio(update.effective_chat.id, mp3_path, caption="🎵 صوت ویدیو")
+                    os.remove(mp3_path)
+                os.remove(filename)
 
-        # ارسال ویدیو
-        await context.bot.send_video(update.effective_chat.id, filename, caption=f"🎬 {info.get('title', 'TikTok Video')}")
-
-        # تبدیل و ارسال صوت
-        mp3_path = convert_to_mp3(filename)
-        if mp3_path:
-            await context.bot.send_audio(update.effective_chat.id, mp3_path, caption="🎵 صوت ویدیو")
-            os.remove(mp3_path)
-
-        os.remove(filename)
         await msg.delete()
     except Exception as e:
-        await msg.edit_text(f"❌ خطا در دانلود ویدیو/صوت: {e}")
+        await msg.edit_text(f"❌ خطا در دانلود رسانه TikTok: {e}")
         print(e)
-
-# تابع برای ثبت هندلر در ربات اصلی
-def register_tiktok_handler(app):
-    app.add_handler(MessageHandler(filters.Regex(r"https?://(www\.)?(tiktok\.com|vm\.tiktok\.com|vt\.tiktok\.com)/.+"), tiktok_handler))
