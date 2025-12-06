@@ -13,9 +13,18 @@ track_store = {}
 
 # پیام‌های سه‌زبانه
 LANG_MESSAGES = {
-    "fa": {"downloading": "⬇️ در حال دانلود آهنگ... لطفا صبر کنید."},
-    "en": {"downloading": "⬇️ Downloading song... Please wait."},
-    "ar": {"downloading": "⬇️ جاري تنزيل الأغنية... يرجى الانتظار."},
+    "fa": {
+        "searching": "🔍 در حال جستجو در SoundCloud ...",
+        "downloading": "⬇️ در حال دانلود آهنگ... لطفا صبر کنید."
+    },
+    "en": {
+        "searching": "🔍 Searching in SoundCloud ...",
+        "downloading": "⬇️ Downloading song... Please wait."
+    },
+    "ar": {
+        "searching": "🔍 جاري البحث في SoundCloud ...",
+        "downloading": "⬇️ جاري تنزيل الأغنية... يرجى الانتظار."
+    },
 }
 
 # تبدیل به MP3
@@ -64,7 +73,9 @@ async def soundcloud_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
     # ذخیره زبان برای callback
     context.user_data["music_lang"] = lang
 
-    msg = await update.message.reply_text("🔍 در حال جستجو در SoundCloud ...")
+    # پیام جستجو بر اساس زبان
+    searching_text = LANG_MESSAGES.get(lang, LANG_MESSAGES["fa"])["searching"]
+    msg = await update.message.reply_text(searching_text)
 
     ydl_opts = {
         "format": "bestaudio/best",
@@ -119,7 +130,7 @@ async def music_select_handler(update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text("❌ خطا: آهنگ پیدا نشد.")
         return
 
-    # استفاده از زبان ذخیره شده
+    # دریافت زبان کاربر یا پیش‌فرض فارسی
     lang = context.user_data.get("music_lang", "fa")
     downloading_text = LANG_MESSAGES.get(lang, LANG_MESSAGES["fa"])["downloading"]
 
