@@ -60,7 +60,7 @@ def save_commands_local(data: Dict[str, Any]):
 
 # ================= API اصلی =================
 
-# ذخیره دستور با جلوگیری از تکرار و حداکثر 200 پاسخ
+# ذخیره دستور به صورت پکیج چندپیامی
 async def save_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     chat = update.effective_chat
@@ -84,40 +84,46 @@ async def save_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "owner_id": user.id
     })
 
-    entry = {}
-    if reply.text or reply.caption:
-        entry = {"type": "text", "data": (reply.text or reply.caption).strip()}
-    elif reply.photo:
-        entry = {"type": "photo", "file_id": reply.photo[-1].file_id, "caption": reply.caption or ""}
-    elif reply.video:
-        entry = {"type": "video", "file_id": reply.video.file_id, "caption": reply.caption or ""}
-    elif reply.document:
-        entry = {"type": "document", "file_id": reply.document.file_id, "caption": reply.caption or ""}
-    elif reply.audio:
-        entry = {"type": "audio", "file_id": reply.audio.file_id, "caption": reply.caption or ""}
-    elif reply.animation:
-        entry = {"type": "animation", "file_id": reply.animation.file_id, "caption": reply.caption or ""}
-    else:
-        return await update.message.reply_text("⚠️ این نوع پیام پشتیبانی نمی‌شود!")
+    # تابع کمکی برای ساخت آبجکت پیام
+    def create_message_obj(msg):
+        if msg.text or msg.caption:
+            return {"type": "text", "data": (msg.text or msg.caption).strip()}
+        elif msg.photo:
+            return {"type": "photo", "file_id": msg.photo[-1].file_id, "caption": msg.caption or ""}
+        elif msg.video:
+            return {"type": "video", "file_id": msg.video.file_id, "caption": msg.caption or ""}
+        elif msg.document:
+            return {"type": "document", "file_id": msg.document.file_id, "caption": msg.caption or ""}
+        elif msg.audio:
+            return {"type": "audio", "file_id": msg.audio.file_id, "caption": msg.caption or ""}
+        elif msg.animation:
+            return {"type": "animation", "file_id": msg.animation.file_id, "caption": msg.caption or ""}
+        return None
 
-    # جلوگیری از ذخیره‌ی تکراری
-    if entry not in doc["responses"]:
-        doc["responses"].append(entry)
-        # حداکثر 200 پاسخ نگه داشته شود
+    # ایجاد پکیج تک‌پیامی از پیام ریپلای شده
+    package = []
+    obj = create_message_obj(reply)
+    if not obj:
+        return await update.message.reply_text("⚠️ این نوع پیام پشتیبانی نمی‌شود!")
+    package.append(obj)
+
+    # جلوگیری از تکراری بودن پکیج
+    if package not in doc["responses"]:
+        doc["responses"].append(package)
         while len(doc["responses"]) > 200:
             doc["responses"].pop(0)
 
         commands[name] = doc
         save_commands_local(commands)
         await update.message.reply_text(
-            f"✅ پاسخ برای دستور <b>{name}</b> ذخیره شد. ({len(doc['responses'])}/200)",
+            f"✅ پکیج پاسخ برای دستور <b>{name}</b> ذخیره شد. ({len(doc['responses'])}/200)",
             parse_mode="HTML"
         )
     else:
-        await update.message.reply_text("⚠️ این پاسخ قبلا ذخیره شده و تکراری نمی‌شود.")
+        await update.message.reply_text("⚠️ این پکیج قبلا ذخیره شده و تکراری نمی‌شود.")
 
 
-# اجرای دستور بدون تکرار تا مصرف تمام پاسخ‌ها
+# اجرای دستور با ارسال کل پکیج
 async def handle_custom_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message or not update.message.text:
         return
@@ -128,13 +134,12 @@ async def handle_custom_command(update: Update, context: ContextTypes.DEFAULT_TY
     commands = load_commands()
 
     if text not in commands:
-        return  # دستور سفارشی نیست → اجازه بدیم ادامه‌ی پردازش بشه
+        return
 
     cmd = commands[text]
 
-    # ================= 🎯 منطق دسترسی =================
+    # بررسی دسترسی
     is_allowed = False
-
     if chat and chat.type in ["group", "supergroup"]:
         if user.id == ADMIN_ID:
             is_allowed = True
@@ -145,48 +150,44 @@ async def handle_custom_command(update: Update, context: ContextTypes.DEFAULT_TY
                     is_allowed = True
             except:
                 pass
-
         if not is_allowed:
             return
-
     else:
-        # در پیوی همه مجاز هستند
         is_allowed = True
 
-    # ================= اجرای پاسخ =================
+    # اجرای پاسخ
     responses = cmd.get("responses", [])
-
     if not responses:
         return await update.message.reply_text("⚠️ هنوز پاسخی برای این دستور ثبت نشده.")
 
     used = cmd.get("last_used", [])
-
     if len(used) >= len(responses):
         used = []
 
     unused = [i for i in range(len(responses)) if i not in used]
     chosen_index = random.choice(unused)
-    chosen = responses[chosen_index]
-
+    chosen_package = responses[chosen_index]
     used.append(chosen_index)
+
     cmd["last_used"] = used
     commands[text] = cmd
     save_commands_local(commands)
 
-    r_type = chosen.get("type")
-
-    if r_type == "text":
-        await update.message.reply_text(chosen.get("data", ""))
-    elif r_type == "photo":
-        await update.message.reply_photo(chosen.get("file_id"), caption=chosen.get("caption", ""))
-    elif r_type == "video":
-        await update.message.reply_video(chosen.get("file_id"), caption=chosen.get("caption", ""))
-    elif r_type == "document":
-        await update.message.reply_document(chosen.get("file_id"), caption=chosen.get("caption", ""))
-    elif r_type == "audio":
-        await update.message.reply_audio(chosen.get("file_id"), caption=chosen.get("caption", ""))
-    elif r_type == "animation":
-        await update.message.reply_animation(chosen.get("file_id"), caption=chosen.get("caption", ""))
+    # ارسال کل پکیج
+    for chosen in chosen_package:
+        r_type = chosen.get("type")
+        if r_type == "text":
+            await update.message.reply_text(chosen.get("data", ""))
+        elif r_type == "photo":
+            await update.message.reply_photo(chosen.get("file_id"), caption=chosen.get("caption", ""))
+        elif r_type == "video":
+            await update.message.reply_video(chosen.get("file_id"), caption=chosen.get("caption", ""))
+        elif r_type == "document":
+            await update.message.reply_document(chosen.get("file_id"), caption=chosen.get("caption", ""))
+        elif r_type == "audio":
+            await update.message.reply_audio(chosen.get("file_id"), caption=chosen.get("caption", ""))
+        elif r_type == "animation":
+            await update.message.reply_animation(chosen.get("file_id"), caption=chosen.get("caption", ""))
 
     context.user_data["custom_handled"] = True
 
@@ -210,6 +211,7 @@ async def list_commands(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(txt[:4000], parse_mode="HTML")
 
 
+# ================= پاکسازی دستورات گروه =================
 def cleanup_group_commands(chat_id: int):
     try:
         commands = load_commands()
