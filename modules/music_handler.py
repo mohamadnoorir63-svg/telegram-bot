@@ -1,80 +1,95 @@
-import os
+# modules/music_handler.py
 import requests
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import ContextTypes
+import os
+import uuid
+from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
+from telegram.ext import ContextTypes, CallbackQueryHandler
 
 DOWNLOAD_FOLDER = "downloads"
 os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
 
-# -----------------------
-# جستجوی موزیک از API جهانی رایگان
-# -----------------------
+# جایگزین با Client ID خودت از Jamendo
+JAMENDO_CLIENT_ID = "YOUR_JAMENDO_CLIENT_ID"
+
+# -----------------------------
+# جستجوی موزیک
+# -----------------------------
 async def music_search_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """جستجوی موزیک با Jamendo API"""
     if not update.message or not update.message.text:
         return
 
-    query = update.message.text.replace("/موزیک", "").replace("موزیک", "").strip()
+    query = update.message.text.replace("/موزیک", "").strip()
     if not query:
-        await update.message.reply_text("❌ لطفاً نام موزیک یا خواننده را وارد کنید.")
+        await update.message.reply_text("❌ لطفاً نام آهنگ یا خواننده را وارد کنید.")
         return
 
     msg = await update.message.reply_text("🔍 در حال جستجو...")
 
+    url = f"https://api.jamendo.com/v3.0/tracks/?client_id={JAMENDO_CLIENT_ID}&format=json&limit=5&search={query}"
     try:
-        # مثال API رایگان (سایت های موسیقی جهانی مثل api.lyrics.ovh یا سایر رایگان ها)
-        # اینجا از یک API نمونه استفاده می‌کنیم که جستجو و لینک mp3 می‌دهد
-        url = f"https://api.lyrics.ovh/suggest/{query}"
         resp = requests.get(url, timeout=10).json()
-        songs = resp.get("data", [])[:5]
+        results = resp.get("results", [])
 
-        if not songs:
-            await msg.edit_text("❌ آهنگی پیدا نشد.")
+        if not results:
+            await msg.edit_text("❌ نتیجه‌ای پیدا نشد.")
             return
 
-        keyboard = []
-        for i, song in enumerate(songs, start=1):
-            title = song.get("title")
-            artist = song.get("artist", {}).get("name", "Unknown")
-            song_id = f"{title}||{artist}"
-            keyboard.append([InlineKeyboardButton(f"{i}. {title} - {artist}", callback_data=f"music_select:{song_id}")])
+        # ساخت دکمه‌های انتخاب آهنگ
+        buttons = []
+        for track in results:
+            track_id = track["id"]
+            title = track["name"]
+            artist = track["artist_name"]
+            buttons.append(
+                [InlineKeyboardButton(f"{title} - {artist}", callback_data=f"music_select:{track_id}")]
+            )
 
-        await msg.edit_text("🎵 لطفاً یک آهنگ را انتخاب کنید:", reply_markup=InlineKeyboardMarkup(keyboard))
+        await msg.edit_text(
+            "🎵 نتایج پیدا شده:",
+            reply_markup=InlineKeyboardMarkup(buttons)
+        )
 
     except Exception as e:
         await msg.edit_text(f"❌ خطا در جستجوی موزیک: {e}")
 
-# -----------------------
-# انتخاب موزیک و دانلود
-# -----------------------
+
+# -----------------------------
+# دانلود و ارسال موزیک انتخابی
+# -----------------------------
 async def music_select_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """دانلود و ارسال آهنگ انتخابی"""
     query = update.callback_query
     await query.answer()
-    song_id = query.data.replace("music_select:", "")
-    title, artist = song_id.split("||")
 
-    msg = await query.edit_message_text(f"⬇ در حال دانلود آهنگ: {title} - {artist}\nلطفاً صبر کنید...")
+    track_id = query.data.split(":")[1]
+    msg = await query.edit_message_text("⬇ در حال دانلود موزیک... لطفاً صبر کنید...")
 
+    url = f"https://api.jamendo.com/v3.0/tracks/?client_id={JAMENDO_CLIENT_ID}&format=json&id={track_id}"
     try:
-        # لینک mp3 نمونه از سایت رایگان
-        # اینجا می‌توانی هر API رایگان موزیک جهانی که لینک مستقیم mp3 می‌دهد قرار دهی
-        # مثال فرضی:
-        mp3_url = f"https://mp3-sample-api.example.com/download?title={title}&artist={artist}"
+        resp = requests.get(url, timeout=10).json()
+        track = resp["results"][0]
+        mp3_url = track["audio"]
+        title = track["name"]
+        artist = track["artist_name"]
 
-        file_path = os.path.join(DOWNLOAD_FOLDER, f"{title}_{artist}.mp3")
-        r = requests.get(mp3_url, stream=True, timeout=20)
-        if r.status_code == 200:
-            with open(file_path, "wb") as f:
-                for chunk in r.iter_content(chunk_size=1024):
-                    if chunk:
-                        f.write(chunk)
-        else:
-            await query.edit_message_text("❌ خطا در دانلود موزیک.")
-            return
+        # دانلود فایل
+        filename = os.path.join(DOWNLOAD_FOLDER, f"{uuid.uuid4().hex}.mp3")
+        with requests.get(mp3_url, stream=True) as r:
+            r.raise_for_status()
+            with open(filename, "wb") as f:
+                for chunk in r.iter_content(chunk_size=8192):
+                    f.write(chunk)
 
-        # ارسال موزیک
-        await context.bot.send_audio(chat_id=query.message.chat.id, audio=open(file_path, "rb"), caption=f"🎵 {title} - {artist}")
-        os.remove(file_path)
-        await query.edit_message_text(f"✅ آهنگ {title} - {artist} دانلود شد.")
+        # ارسال به تلگرام
+        await context.bot.send_audio(
+            chat_id=query.message.chat.id,
+            audio=open(filename, "rb"),
+            caption=f"🎵 {title} - {artist}"
+        )
+
+        os.remove(filename)
+        await msg.delete()
 
     except Exception as e:
-        await query.edit_message_text(f"❌ خطا در دانلود موزیک: {e}")
+        await msg.edit_text(f"❌ خطا در دانلود موزیک: {e}")
