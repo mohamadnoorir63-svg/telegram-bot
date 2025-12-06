@@ -274,43 +274,33 @@ async def handle_commands(event):
             return
         # در غیر این صورت → پاکسازی کامل
         await cleanup_via_userbot(chat_id, last_msg_id=last_msg_id)
-     # ================== شروع بخش TikTok Downloader ==================
+     # ================== TikTok Downloader اصلاح‌شده ==================
 
 import os
 import requests
-import subprocess
 from io import BytesIO
+import subprocess
 from telethon import events
-
 import yt_dlp
 
-# پوشه ذخیره‌سازی ویدیوها
 os.makedirs("downloads", exist_ok=True)
 
-# تبدیل فایل ویدیو به mp3
 def convert_to_mp3(video_path):
     mp3_path = video_path.rsplit(".", 1)[0] + ".mp3"
     command = [
-        "ffmpeg",
-        "-y",  # overwrite if exists
-        "-i", video_path,
-        "-vn",  # بدون ویدیو
-        "-ab", "192k",
-        "-ar", "44100",
-        "-f", "mp3",
-        mp3_path
+        "ffmpeg", "-y", "-i", video_path,
+        "-vn", "-ab", "192k", "-ar", "44100", "-f", "mp3", mp3_path
     ]
     subprocess.run(command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     return mp3_path
 
-# ---------- دانلود رسانه TikTok (عکس یا ویدیو) ----------
 @client.on(events.NewMessage(pattern=r"^(https?://(www\.)?(tiktok\.com|vm\.tiktok\.com|vt\.tiktok\.com)/.+)"))
 async def tiktok_downloader(event):
     url = event.raw_text.strip()
     chat_id = event.chat_id
     msg = await event.reply("⬇️ در حال پردازش رسانه TikTok ...")
 
-    # ریدایرکت لینک کوتاه TikTok
+    # ریدایرکت لینک کوتاه
     if "vm.tiktok.com" in url or "vt.tiktok.com" in url:
         try:
             resp = requests.get(url, allow_redirects=True)
@@ -323,11 +313,17 @@ async def tiktok_downloader(event):
     if "/photo/" in url:
         try:
             resp = requests.get(url)
-            if resp.status_code != 200:
-                return await msg.edit("❌ خطا در دانلود عکس TikTok")
-            file_bytes = BytesIO(resp.content)
-            file_bytes.name = f"{url.split('/')[-1]}.jpg"
+            html = resp.text
+            # استخراج لینک عکس از تگ meta
+            import re
+            match = re.search(r'<meta property="og:image" content="(.+?)"', html)
+            if not match:
+                return await msg.edit("❌ نتوانستم لینک عکس را پیدا کنم.")
+            image_url = match.group(1)
+            img_data = requests.get(image_url).content
 
+            file_bytes = BytesIO(img_data)
+            file_bytes.name = "tiktok_photo.jpg"
             await client.send_file(chat_id, file_bytes, caption="🖼 عکس TikTok")
             await msg.delete()
         except Exception as e:
@@ -355,7 +351,7 @@ async def tiktok_downloader(event):
         mp3_path = convert_to_mp3(filename)
         await client.send_file(chat_id, mp3_path, caption="🎵 صوت ویدیو")
 
-        # حذف فایل‌های دانلود شده
+        # حذف فایل‌ها
         os.remove(filename)
         os.remove(mp3_path)
         await msg.delete()
