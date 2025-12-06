@@ -15,15 +15,18 @@ track_store = {}
 LANG_MESSAGES = {
     "fa": {
         "searching": "🔍 در حال جستجو در SoundCloud ...",
-        "downloading": "⬇️ در حال دانلود آهنگ... لطفا صبر کنید."
+        "downloading": "⬇️ در حال دانلود آهنگ... لطفا صبر کنید.",
+        "select_song": "🎵 {n} آهنگ پیدا شد. لطفا انتخاب کنید:"
     },
     "en": {
         "searching": "🔍 Searching in SoundCloud ...",
-        "downloading": "⬇️ Downloading song... Please wait."
+        "downloading": "⬇️ Downloading song... Please wait.",
+        "select_song": "🎵 {n} songs found. Please select:"
     },
     "ar": {
         "searching": "🔍 جاري البحث في SoundCloud ...",
-        "downloading": "⬇️ جاري تنزيل الأغنية... يرجى الانتظار."
+        "downloading": "⬇️ جاري تنزيل الأغنية... يرجى الانتظار.",
+        "select_song": "🎵 تم العثور على {n} أغنية. الرجاء الاختيار:"
     },
 }
 
@@ -48,14 +51,11 @@ async def soundcloud_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
     text = update.message.text.strip()
     chat_id = update.effective_chat.id
 
-    # ---- سه زبان ----
     triggers = ["آهنگ ", "music ", "اغنية ", "أغنية "]
 
-    # بررسی شروع پیام با یکی از دستورات
     if not any(text.lower().startswith(t) for t in triggers):
         return
 
-    # تعیین زبان و حذف دستور از متن
     lang = "fa"  # پیش‌فرض فارسی
     for t in triggers:
         if text.lower().startswith(t):
@@ -73,7 +73,6 @@ async def soundcloud_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
     # ذخیره زبان برای callback
     context.user_data["music_lang"] = lang
 
-    # پیام جستجو بر اساس زبان
     searching_text = LANG_MESSAGES.get(lang, LANG_MESSAGES["fa"])["searching"]
     msg = await update.message.reply_text(searching_text)
 
@@ -98,14 +97,10 @@ async def soundcloud_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
             for track in info["entries"]:
                 track_id = track.get("id")
                 title = track.get("title", "SoundCloud Track")
-                keyboard.append(
-                    [InlineKeyboardButton(title, callback_data=f"music_select:{track_id}")]
-                )
+                keyboard.append([InlineKeyboardButton(title, callback_data=f"music_select:{track_id}")])
 
-            await msg.edit_text(
-                f"🎵 {len(info['entries'])} آهنگ پیدا شد. لطفا انتخاب کنید:",
-                reply_markup=InlineKeyboardMarkup(keyboard)
-            )
+            select_song_text = LANG_MESSAGES.get(lang, LANG_MESSAGES["fa"])["select_song"].format(n=len(info["entries"]))
+            await msg.edit_text(select_song_text, reply_markup=InlineKeyboardMarkup(keyboard))
 
     except Exception as e:
         await msg.edit_text(f"❌ خطا در جستجوی موزیک:\n{e}")
@@ -130,7 +125,6 @@ async def music_select_handler(update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text("❌ خطا: آهنگ پیدا نشد.")
         return
 
-    # دریافت زبان کاربر یا پیش‌فرض فارسی
     lang = context.user_data.get("music_lang", "fa")
     downloading_text = LANG_MESSAGES.get(lang, LANG_MESSAGES["fa"])["downloading"]
 
