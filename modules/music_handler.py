@@ -1,107 +1,94 @@
-# modules/music_handler.py
+import requests
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import ContextTypes
+from youtube_search import YoutubeSearch
 import os
-import shutil
-import subprocess
-import yt_dlp
-import uuid
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import ContextTypes, CallbackQueryHandler
 
-DOWNLOAD_FOLDER = "downloads"
-os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
 
-async def convert_to_mp3(video_path: str) -> str:
-    mp3_path = video_path.rsplit(".", 1)[0] + ".mp3"
-    if not shutil.which("ffmpeg"):
-        return None
-    cmd = [
-        "ffmpeg", "-y", "-i", video_path,
-        "-vn", "-ab", "192k", "-ar", "44100",
-        "-f", "mp3", mp3_path
-    ]
-    subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    return mp3_path
+# ---------- جستجوی موزیک ----------
+async def music_search_handler(update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.message.text.replace("/موزیک", "").strip()
 
-# ---------------------
-# مرحله 1: جستجوی موزیک
-# ---------------------
-async def music_search_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not update.message or not update.message.text:
+    if not query:
+        await update.message.reply_text("❗ نام آهنگ را بعد از /موزیک بنویس\nمثال:\n/موزیک مهرداد جم شیک")
         return
 
-    query = update.message.text.replace("/موزیک", "").strip()
-    chat_id = update.effective_chat.id
-    msg = await update.message.reply_text(f"🔎 در حال جستجوی '{query}' ...")
+    await update.message.reply_text("🔍 در حال جستجو...")
 
-    ydl_opts = {
-        "format": "bestaudio/best",
-        "noplaylist": True,
-        "quiet": True,
-        "extract_flat": "in_playlist",
-        "skip_download": True,
-        "extractor_args": {
-            "youtube": {
-                "player_client": ["android"]
-            }
-        }
-    }
+    results = YoutubeSearch(query, max_results=5).to_dict()
 
+    if not results:
+        await update.message.reply_text("❌ هیچ موزیکی پیدا نشد!")
+        return
+
+    keyboard = []
+    for item in results:
+        title = item["title"]
+        video_id = item["id"]
+
+        keyboard.append([InlineKeyboardButton(title, callback_data=f"music_select:{video_id}")])
+
+    await update.message.reply_text(
+        "🎵 موزیک مورد نظر را انتخاب کن:",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+
+
+# ---------- گرفتن لینک بدون کوکی ----------
+def get_audio_url(video_id):
     try:
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(f"ytsearch3:{query}", download=False)
+        api = f"https://piped.video/streams/{video_id}"
+        r = requests.get(api).json()
+        audio_streams = r.get("audioStreams", [])
 
-        results = info.get("entries", [])
-        if not results:
-            await msg.edit_text("❌ نتیجه‌ای پیدا نشد.")
-            return
+        if not audio_streams:
+            return None
 
-        # ساخت دکمه‌ها
-        buttons = []
-        for i, entry in enumerate(results, 1):
-            buttons.append([InlineKeyboardButton(
-                f"{i}. {entry.get('title')}",
-                callback_data=f"music_select:{entry['id']}"
-            )])
-        
-        markup = InlineKeyboardMarkup(buttons)
-        await msg.edit_text("🎵 یکی از نتایج زیر را انتخاب کنید:", reply_markup=markup)
+        return audio_streams[0]["url"]
 
-    except Exception as e:
-        await msg.edit_text(f"❌ خطا در جستجوی موزیک:\n{e}")
+    except:
+        return None
 
-# ---------------------
-# مرحله 2: دانلود بعد از انتخاب
-# ---------------------
-async def music_select_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+# ---------- دانلود موزیک ----------
+def download_audio(video_id):
+    audio_url = get_audio_url(video_id)
+    if not audio_url:
+        return None
+
+    filename = f"{video_id}.mp3"
+
+    r = requests.get(audio_url, stream=True)
+    with open(filename, "wb") as f:
+        for chunk in r.iter_content(chunk_size=1024):
+            if chunk:
+                f.write(chunk)
+
+    return filename
+
+
+# ---------- انتخاب موزیک ----------
+async def music_select_handler(update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    video_id = query.data.split(":")[1]
-    chat_id = query.message.chat.id
-    msg = await query.message.edit_text("⬇️ در حال دانلود و تبدیل به MP3 ...")
 
-    outtmpl = os.path.join(DOWNLOAD_FOLDER, f"%(id)s_{uuid.uuid4().hex}.%(ext)s")
-    ydl_opts = {
-        "format": "bestaudio/best",
-        "outtmpl": outtmpl,
-        "quiet": True,
-        "noplaylist": True,
-        "merge_output_format": "mp3",
-        "extractor_args": {
-            "youtube": {"player_client": ["android"]}
-        }
-    }
+    video_id = query.data.split(":")[1]
+
+    await query.edit_message_text("⬇ در حال دانلود موزیک...")
+
+    filepath = download_audio(video_id)
+
+    if not filepath:
+        await query.edit_message_text("❌ خطا در دانلود موزیک!")
+        return
 
     try:
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(f"https://www.youtube.com/watch?v={video_id}", download=True)
-            filename = ydl.prepare_filename(info)
+        await query.message.reply_audio(open(filepath, "rb"))
+    except:
+        await query.edit_message_text("❌ خطا در ارسال فایل!")
 
-        mp3_path = await convert_to_mp3(filename)
-        if mp3_path and os.path.exists(mp3_path):
-            await context.bot.send_audio(chat_id, mp3_path, caption=f"🎵 {info.get('title')}")
-            os.remove(mp3_path)
-        os.remove(filename)
-        await msg.delete()
-
-    except Exception as e:
-        await msg.edit_text(f"❌ خطا در دانلود موزیک:\n{e}")
+    # حذف فایل بعد ارسال
+    try:
+        os.remove(filepath)
+    except:
+        pass
