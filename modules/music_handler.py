@@ -1,148 +1,80 @@
-import requests
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import ContextTypes
-from youtube_search import YoutubeSearch
 import os
-from mutagen.mp3 import MP3
-from mutagen.id3 import ID3, TIT2, TPE1, APIC
+import requests
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import ContextTypes
 
+DOWNLOAD_FOLDER = "downloads"
+os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
 
-# ---------- سرچ موزیک ----------
-async def music_search_handler(update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.message.text.replace("/موزیک", "").strip()
+# -----------------------
+# جستجوی موزیک از API جهانی رایگان
+# -----------------------
+async def music_search_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not update.message or not update.message.text:
+        return
 
+    query = update.message.text.replace("/موزیک", "").replace("موزیک", "").strip()
     if not query:
-        await update.message.reply_text("❗ نام آهنگ را بعد از /موزیک بنویس\nمثال:\n/موزیک مهرداد جم شیک")
+        await update.message.reply_text("❌ لطفاً نام موزیک یا خواننده را وارد کنید.")
         return
 
-    await update.message.reply_text("🔍 در حال جستجو...")
+    msg = await update.message.reply_text("🔍 در حال جستجو...")
 
-    results = YoutubeSearch(query, max_results=5).to_dict()
-
-    if not results:
-        await update.message.reply_text("❌ هیچ موزیکی پیدا نشد!")
-        return
-
-    keyboard = []
-    text = "🎵 موزیک‌های پیدا شده:\n\n"
-
-    for i, item in enumerate(results):
-        title = item["title"]
-        video_id = item["id"]
-        duration = item["duration"]
-        channel = item["channel"]
-
-        text += f"{i+1}. {title} — {channel} ({duration})\n"
-
-        keyboard.append([InlineKeyboardButton(title, callback_data=f"music_select:{video_id}")])
-
-    await update.message.reply_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
-
-
-# ---------- گرفتن لینک صوتی از Piped ----------
-def get_piped_audio(video_id):
     try:
-        api = f"https://piped.video/streams/{video_id}"
-        data = requests.get(api).json()
+        # مثال API رایگان (سایت های موسیقی جهانی مثل api.lyrics.ovh یا سایر رایگان ها)
+        # اینجا از یک API نمونه استفاده می‌کنیم که جستجو و لینک mp3 می‌دهد
+        url = f"https://api.lyrics.ovh/suggest/{query}"
+        resp = requests.get(url, timeout=10).json()
+        songs = resp.get("data", [])[:5]
 
-        audio_streams = data.get("audioStreams", [])
-        if not audio_streams:
-            return None, None
+        if not songs:
+            await msg.edit_text("❌ آهنگی پیدا نشد.")
+            return
 
-        # پیدا کردن کیفیت 320
-        best_audio = None
-        for stream in audio_streams:
-            if "bitrate" in stream and stream["bitrate"] == 320:
-                best_audio = stream
-                break
+        keyboard = []
+        for i, song in enumerate(songs, start=1):
+            title = song.get("title")
+            artist = song.get("artist", {}).get("name", "Unknown")
+            song_id = f"{title}||{artist}"
+            keyboard.append([InlineKeyboardButton(f"{i}. {title} - {artist}", callback_data=f"music_select:{song_id}")])
 
-        # اگر 320 نبود، بهترین کیفیت
-        if not best_audio:
-            best_audio = audio_streams[0]
+        await msg.edit_text("🎵 لطفاً یک آهنگ را انتخاب کنید:", reply_markup=InlineKeyboardMarkup(keyboard))
 
-        return best_audio["url"], data.get("thumbnailUrl")
+    except Exception as e:
+        await msg.edit_text(f"❌ خطا در جستجوی موزیک: {e}")
 
-    except:
-        return None, None
-
-
-# ---------- دانلود موزیک ----------
-def download_audio(video_id):
-    audio_url, cover_url = get_piped_audio(video_id)
-    if not audio_url:
-        return None
-
-    filename = f"{video_id}.mp3"
-
-    r = requests.get(audio_url, stream=True)
-    with open(filename, "wb") as f:
-        for chunk in r.iter_content(chunk_size=2048):
-            if chunk:
-                f.write(chunk)
-
-    return filename, cover_url
-
-
-# ---------- اضافه کردن عنوان، خواننده، کاور ----------
-def tag_mp3(file_path, title, artist, cover_url):
-    try:
-        audio = MP3(file_path, ID3=ID3)
-
-        try:
-            audio.add_tags()
-        except:
-            pass
-
-        audio.tags["TIT2"] = TIT2(encoding=3, text=title)
-        audio.tags["TPE1"] = TPE1(encoding=3, text=artist)
-
-        if cover_url:
-            cover_data = requests.get(cover_url).content
-            audio.tags["APIC"] = APIC(
-                encoding=3,
-                mime="image/jpeg",
-                type=3,
-                desc="Cover",
-                data=cover_data
-            )
-
-        audio.save()
-    except:
-        pass
-
-
-# ---------- انتخاب موزیک ----------
-async def music_select_handler(update, context: ContextTypes.DEFAULT_TYPE):
+# -----------------------
+# انتخاب موزیک و دانلود
+# -----------------------
+async def music_select_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
+    song_id = query.data.replace("music_select:", "")
+    title, artist = song_id.split("||")
 
-    video_id = query.data.split(":")[1]
-    await query.edit_message_text("⬇ در حال دانلود موزیک... لطفاً صبر کنید...")
-
-    filepath, cover_url = download_audio(video_id)
-
-    if not filepath:
-        await query.edit_message_text("❌ خطا در دانلود موزیک!")
-        return
-
-    # استخراج عنوان آهنگ از YouTubeSearch (بهترین روش موجود)
-    search = YoutubeSearch(video_id, max_results=1).to_dict()
-    title = search[0]["title"] if search else "Music"
-    artist = search[0]["channel"] if search else "Unknown Artist"
-
-    # اضافه کردن عنوان و کاور
-    tag_mp3(filepath, title, artist, cover_url)
+    msg = await query.edit_message_text(f"⬇ در حال دانلود آهنگ: {title} - {artist}\nلطفاً صبر کنید...")
 
     try:
-        await query.message.reply_audio(
-            audio=open(filepath, "rb"),
-            title=title,
-            performer=artist,
-        )
-    except:
-        await query.edit_message_text("❌ خطا در ارسال فایل!")
+        # لینک mp3 نمونه از سایت رایگان
+        # اینجا می‌توانی هر API رایگان موزیک جهانی که لینک مستقیم mp3 می‌دهد قرار دهی
+        # مثال فرضی:
+        mp3_url = f"https://mp3-sample-api.example.com/download?title={title}&artist={artist}"
 
-    try:
-        os.remove(filepath)
-    except:
-        pass
+        file_path = os.path.join(DOWNLOAD_FOLDER, f"{title}_{artist}.mp3")
+        r = requests.get(mp3_url, stream=True, timeout=20)
+        if r.status_code == 200:
+            with open(file_path, "wb") as f:
+                for chunk in r.iter_content(chunk_size=1024):
+                    if chunk:
+                        f.write(chunk)
+        else:
+            await query.edit_message_text("❌ خطا در دانلود موزیک.")
+            return
+
+        # ارسال موزیک
+        await context.bot.send_audio(chat_id=query.message.chat.id, audio=open(file_path, "rb"), caption=f"🎵 {title} - {artist}")
+        os.remove(file_path)
+        await query.edit_message_text(f"✅ آهنگ {title} - {artist} دانلود شد.")
+
+    except Exception as e:
+        await query.edit_message_text(f"❌ خطا در دانلود موزیک: {e}")
