@@ -2,17 +2,20 @@
 import os
 import shutil
 import subprocess
+from difflib import SequenceMatcher
 import yt_dlp
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import ContextTypes
+from telegram.ext import ContextTypes, CallbackQueryHandler
 
 DOWNLOAD_FOLDER = "downloads"
 os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
 
-# 🔹 دیکشنری موقت برای نگهداری URLها
-TRACKS_CACHE = {}
+def similar(a, b):
+    """محاسبه شباهت بین دو رشته"""
+    return SequenceMatcher(None, a.lower(), b.lower()).ratio()
 
 async def convert_to_mp3(file_path: str) -> str:
+    """تبدیل ویدیو/آهنگ به MP3"""
     mp3_path = file_path.rsplit(".", 1)[0] + ".mp3"
     if not shutil.which("ffmpeg"):
         return None
@@ -31,6 +34,7 @@ async def soundcloud_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
     text = update.message.text.strip()
     chat_id = update.effective_chat.id
 
+    # فقط وقتی متن با "آهنگ" شروع شد
     if not text.lower().startswith("آهنگ "):
         return
 
@@ -45,25 +49,35 @@ async def soundcloud_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
         "format": "bestaudio/best",
         "quiet": True,
         "noplaylist": True,
-        "default_search": "scsearch1",
         "outtmpl": os.path.join(DOWNLOAD_FOLDER, "%(id)s.%(ext)s"),
     }
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(query, download=False)
+            # جستجوی ۵ نتیجه اول
+            info = ydl.extract_info(f"scsearch5:{query}", download=False)
             if not info or "entries" not in info or not info["entries"]:
                 await msg.edit_text("❌ آهنگ پیدا نشد.")
                 return
 
-            track = info["entries"][0]
-            title = track.get("title", "SoundCloud Track")
-            track_url = track.get("webpage_url")
+            # fuzzy match برای انتخاب بهترین نتیجه
+            best_track = None
+            best_ratio = 0
+            for track in info['entries']:
+                title = track.get("title", "")
+                ratio = similar(query, title)
+                if ratio > best_ratio:
+                    best_ratio = ratio
+                    best_track = track
 
-            # 🔹 ذخیره URL در دیکشنری با شناسه کوتاه
-            track_id = str(track.get("id"))
-            TRACKS_CACHE[track_id] = track_url
+            if not best_track or best_ratio < 0.3:
+                await msg.edit_text("❌ آهنگ پیدا نشد.")
+                return
 
+            track_id = best_track.get("id")
+            title = best_track.get("title", "SoundCloud Track")
+
+            # دکمه دانلود آهنگ
             keyboard = InlineKeyboardMarkup([
                 [InlineKeyboardButton(f"⬇ دانلود: {title}", callback_data=f"music_select:{track_id}")]
             ])
@@ -72,16 +86,13 @@ async def soundcloud_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
     except Exception as e:
         await msg.edit_text(f"❌ خطا در جستجوی موزیک:\n{e}")
 
+# -------------------------------
+# هندلر انتخاب آهنگ
+# -------------------------------
 async def music_select_handler(update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    track_id = query.data.split(":", 1)[1]
-
-    # 🔹 بازیابی URL واقعی از دیکشنری
-    track_url = TRACKS_CACHE.get(track_id)
-    if not track_url:
-        await query.edit_message_text("❌ آهنگ پیدا نشد یا منقضی شده است.")
-        return
+    track_id = query.data.split(":")[1]
 
     msg = await query.edit_message_text("⬇️ در حال دانلود آهنگ... لطفا صبر کنید.")
 
@@ -93,7 +104,7 @@ async def music_select_handler(update, context: ContextTypes.DEFAULT_TYPE):
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(track_url, download=True)
+            info = ydl.extract_info(f"https://soundcloud.com/i/tracks/{track_id}", download=True)
             filename = ydl.prepare_filename(info)
 
         mp3_path = await convert_to_mp3(filename)
