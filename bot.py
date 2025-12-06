@@ -1465,18 +1465,18 @@ application.add_handler(
     MessageHandler(filters.TEXT & ~filters.COMMAND, tiktok_handler),
     group=-1000
 )
-from modules.soundcloud_handler import soundcloud_handler, soundcloud_download_callback
+from modules.soundcloud_handler import soundcloud_handler, music_select_handler
 from telegram.ext import MessageHandler, filters, CallbackQueryHandler
 
-# فقط وقتی پیام شامل "آهنگ ..." باشد
+# جستجو با کلمه آهنگ
 application.add_handler(
     MessageHandler(filters.TEXT & filters.Regex(r"^آهنگ\s+"), soundcloud_handler),
     group=-2000
 )
 
-# دانلود از SoundCloud
+# دکمه انتخاب آهنگ
 application.add_handler(
-    CallbackQueryHandler(soundcloud_download_callback, pattern="^scdl:"),
+    CallbackQueryHandler(music_select_handler, pattern=r"^music_select:"),
     group=-2000
 )
 # ==========================================================
