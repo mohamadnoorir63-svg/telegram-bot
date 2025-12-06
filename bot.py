@@ -1470,7 +1470,7 @@ from modules.music_handler import music_search_handler, music_select_handler
 from telegram.ext import MessageHandler, filters, CallbackQueryHandler
 
 # جستجوی موزیک
-application.add_handler(MessageHandler(filters.TEXT & filters.Regex(r"^/موزیک"), music_search_handler))
+application.add_handler(MessageHandler(filters.TEXT & filters.Regex(r"^موزیک"), music_search_handler))
 
 # انتخاب موزیک
 application.add_handler(CallbackQueryHandler(music_select_handler, pattern=r"^music_select:"))
