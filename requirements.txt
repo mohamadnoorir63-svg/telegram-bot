@@ -48,4 +48,5 @@ nest_asyncio==1.5.8
 # Translator
 deep-translator==1.11.4
 yt-dlp
+ffmpeg   # لینوکس
 
