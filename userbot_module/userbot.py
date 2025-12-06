@@ -274,36 +274,52 @@ async def handle_commands(event):
             return
         # در غیر این صورت → پاکسازی کامل
         await cleanup_via_userbot(chat_id, last_msg_id=last_msg_id)
-      # =================== شروع بخش موزیک ===================
+      # =================== شروع بخش موزیک (Jamendo) ===================
 
-import yt_dlp
+import aiohttp
 
+# ---------- فرمان موزیک ----------
 @client.on(events.NewMessage(pattern=r"^/music (.+)"))
 async def music_command(event):
     query = event.pattern_match.group(1).strip()
     chat_id = event.chat_id
 
-    msg = await client.send_message(chat_id, f"🎵 در حال دانلود موزیک: {query} ...")
-
+    msg = await client.send_message(chat_id, f"🔍 در حال جستجو برای موزیک: {query} ...")
     download_path = f"downloads/{query}.mp3"
     os.makedirs("downloads", exist_ok=True)
 
-    ydl_opts = {
-        'format': 'bestaudio/best',
-        'noplaylist': True,
-        'outtmpl': download_path,
-        'quiet': True,
-        'postprocessors': [{
-            'key': 'FFmpegExtractAudio',
-            'preferredcodec': 'mp3',
-            'preferredquality': '192',
-        }],
-    }
+    # Jamendo client_id باید در Config Vars Heroku ست شده باشد
+    CLIENT_ID = os.environ.get("JAMENDO_CLIENT_ID")
+    if not CLIENT_ID:
+        return await msg.edit("❌ خطا: JAMENDO_CLIENT_ID پیدا نشد!")
 
     try:
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            ydl.download([f"ytsearch1:{query}"])  # جستجوی یوتیوب و دانلود اولین نتیجه
+        # جستجوی آهنگ در Jamendo
+        url = (
+            "https://api.jamendo.com/v3.0/tracks"
+            f"?client_id={CLIENT_ID}"
+            f"&format=json"
+            f"&limit=1"
+            f"&namesearch={aiohttp.helpers.quote(query)}"
+            f"&audiodownload_allowed=true"
+        )
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url) as resp:
+                data = await resp.json()
+                results = data.get("results", [])
+                if not results:
+                    return await msg.edit("⚠️ آهنگی با این نام پیدا نشد یا دانلود آن مجاز نیست.")
+                track = results[0]
+                dl_url = track.get("audiodownload")
 
+            # دانلود موزیک
+            async with session.get(dl_url) as resp:
+                content = await resp.read()
+
+        with open(download_path, "wb") as f:
+            f.write(content)
+
+        # ارسال فایل
         await client.send_file(chat_id, download_path, caption=f"🎶 {query}")
         os.remove(download_path)
         await msg.delete()
@@ -311,7 +327,7 @@ async def music_command(event):
     except Exception as e:
         await msg.edit(f"❌ خطا در دانلود موزیک: {e}")
 
-# =================== پایان بخش موزیک ===================
+# =================== پایان بخش موزیک (Jamendo) ===================
 
 # ---------- لفت ----------
 
