@@ -21,6 +21,9 @@ async def convert_to_mp3(file_path: str) -> str:
     subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     return mp3_path
 
+# -------------------------------
+# جستجوی آهنگ و نمایش دکمه
+# -------------------------------
 async def soundcloud_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message or not update.message.text:
         return
@@ -37,32 +40,32 @@ async def soundcloud_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
         await update.message.reply_text("❌ لطفاً نام یا متن آهنگ را وارد کنید.")
         return
 
-    # پیام جستجو
     msg = await update.message.reply_text(f"🔍 در حال جستجو در SoundCloud ...")
 
     ydl_opts = {
         "format": "bestaudio/best",
         "quiet": True,
         "noplaylist": True,
+        "default_search": "scsearch1",
         "outtmpl": os.path.join(DOWNLOAD_FOLDER, "%(id)s.%(ext)s"),
     }
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(f"scsearch5:{query}", download=False)
+            # جستجو روی SoundCloud
+            info = ydl.extract_info(query, download=False)
 
             if not info or "entries" not in info or not info["entries"]:
                 await msg.edit_text("❌ آهنگ پیدا نشد.")
                 return
 
-            # فقط اولین نتیجه برای جلوگیری از گیج شدن
             track = info["entries"][0]
-            track_id = track.get("id")
             title = track.get("title", "SoundCloud Track")
+            track_url = track.get("webpage_url")
 
             # دکمه دانلود آهنگ
             keyboard = InlineKeyboardMarkup([
-                [InlineKeyboardButton(f"⬇ دانلود: {title}", callback_data=f"music_select:{track_id}")]
+                [InlineKeyboardButton(f"⬇ دانلود: {title}", callback_data=f"music_select:{track_url}")]
             ])
             await msg.edit_text(f"🎵 آهنگ پیدا شد: {title}", reply_markup=keyboard)
 
@@ -70,12 +73,12 @@ async def soundcloud_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
         await msg.edit_text(f"❌ خطا در جستجوی موزیک:\n{e}")
 
 # -------------------------------
-# هندلر انتخاب آهنگ
+# هندلر دانلود آهنگ پس از انتخاب دکمه
 # -------------------------------
 async def music_select_handler(update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    track_id = query.data.split(":")[1]
+    track_url = query.data.split(":", 1)[1]
 
     msg = await query.edit_message_text("⬇️ در حال دانلود آهنگ... لطفا صبر کنید.")
 
@@ -87,7 +90,7 @@ async def music_select_handler(update, context: ContextTypes.DEFAULT_TYPE):
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(f"https://soundcloud.com/i/tracks/{track_id}", download=True)
+            info = ydl.extract_info(track_url, download=True)
             filename = ydl.prepare_filename(info)
 
         mp3_path = await convert_to_mp3(filename)
