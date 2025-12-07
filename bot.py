@@ -1498,6 +1498,8 @@ application.add_handler(
     MessageHandler(filters.TEXT & ~filters.COMMAND, youtube_handler),
     group=-2500
 )
+from modules.youtube_search_downloader import youtube_search_handler
+application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, youtube_search_handler))
 # ==========================================================
 # 🤖 پنل ChatGPT هوش مصنوعی
 # ==========================================================
