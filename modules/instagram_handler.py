@@ -1,44 +1,61 @@
-import requests
+# modules/instagram_downloader.py
+import aiohttp
 from telegram import Update
 from telegram.ext import ContextTypes
-import os
 
-DOWNLOAD_FOLDER = "downloads"
-os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
+API_LIST = [
+    "https://snapinsta.app/action.php?url={}",
+    "https://saveig.app/api/ajax?url={}",
+    "https://igram.io/api/ajax?url={}",
+    "https://instasave.one/action.php?url={}"
+]
 
-async def instagram_downloader(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def fetch_api(session, url):
+    async with session.get(url, timeout=15) as resp:
+        if resp.status == 200:
+            return await resp.text()
+        return None
+
+async def extract_download_link(html: str) -> str:
+    """
+    از HTML لینک دانلود را استخراج می‌کند.
+    """
+    import re
+    # پیدا کردن لینک MP4 یا JPG
+    match = re.search(r'https?://[^"]+\.(mp4|jpg|jpeg|png)', html)
+    return match.group(0) if match else None
+
+async def instagram_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message or not update.message.text:
         return
 
-    url = update.message.text.strip()
+    text = update.message.text.strip()
+    if "instagram.com" not in text:
+        return  # لینک نیست
 
-    if "instagram.com" not in url:
-        return
+    msg = await update.message.reply_text("🔍 در حال پردازش لینک اینستاگرام...")
 
-    msg = await update.message.reply_text("📥 در حال پردازش لینک اینستاگرام...")
+    async with aiohttp.ClientSession() as session:
+        for api in API_LIST:
+            api_url = api.format(text)
+            try:
+                html = await fetch_api(session, api_url)
+                if not html:
+                    continue
 
-    try:
-        api_url = "https://igram.io/api/instagram"
-        response = requests.post(api_url, data={"url": url})
+                download_url = await extract_download_link(html)
+                if download_url:
+                    await msg.edit_text("⬇️ لینک آماده شد، در حال دانلود...")
 
-        data = response.json()
+                    await context.bot.send_video(
+                        update.effective_chat.id,
+                        download_url,
+                        caption="📥 ویدیو با موفقیت دانلود شد."
+                    )
+                    await msg.delete()
+                    return
 
-        if "data" not in data or len(data["data"]) == 0:
-            await msg.edit_text("❌ نتوانستم لینک دانلود را پیدا کنم!")
-            return
+            except Exception:
+                continue
 
-        download_link = data["data"][0]["url"]
-
-        file_content = requests.get(download_link).content
-        file_path = os.path.join(DOWNLOAD_FOLDER, "insta.mp4")
-
-        with open(file_path, "wb") as f:
-            f.write(file_content)
-
-        await update.message.reply_video(video=open(file_path, "rb"), caption="✅ دانلود شد!")
-
-        os.remove(file_path)
-        await msg.delete()
-
-    except Exception as e:
-        await msg.edit_text(f"❌ خطا: {e}")
+    await msg.edit_text("❌ متاسفانه نتوانستم این لینک را دانلود کنم. دوباره امتحان کن!")
