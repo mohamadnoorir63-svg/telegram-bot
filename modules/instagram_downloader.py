@@ -21,12 +21,11 @@ INSTAGRAM_COOKIES = """
 
 COOKIE_FILE = "insta_cookie.txt"
 
-# ذخیره فایل کوکی در زمان اجرا
+# ذخیره کوکی
 with open(COOKIE_FILE, "w") as f:
     f.write(INSTAGRAM_COOKIES.strip())
 
-
-# استخراج URL
+# استخراج لینک از پیام
 URL_RE = re.compile(r"(https?://[^\s]+)")
 
 
@@ -44,35 +43,50 @@ async def instagram_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     msg = await update.message.reply_text("📥 در حال بررسی لینک اینستاگرام...")
 
-    # yt-dlp تنظیمات
     ydl_opts = {
         "quiet": True,
         "cookiefile": COOKIE_FILE,
-        "format": "bestvideo+bestaudio/best",   # ← دریافت ویدیو + صوت
+        "format": "best",
         "outtmpl": "downloads/%(id)s.%(ext)s",
     }
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=True)
-            filename = ydl.prepare_filename(info)
 
-        await msg.edit_text("⬇ در حال ارسال فایل‌ها...")
+        await msg.edit_text("⬇ ارسال فایل‌ها...")
 
-        # ارسال ویدیو (اگر ویدیو بود)
-        if filename.endswith((".mp4", ".mkv", ".webm")):
-            await update.message.reply_video(
-                video=open(filename, "rb"),
-                caption="🎬 ویدیو با موفقیت دانلود شد!"
-            )
+        sent_any = False
 
-        # ارسال صوت جداگانه (اگر ترک صوتی وجود داشت)
-        if "audio" in info.get("formats", [{}])[0].get("format_note", "").lower():
-            audio_path = filename.rsplit(".", 1)[0] + ".mp3"
-            await update.message.reply_audio(
-                audio=open(audio_path, "rb"),
-                caption="🎵 فایل صوتی جداگانه"
-            )
+        # ------------------------------
+        # 📌 ارسال ویدیو (اگر موجود بود)
+        # ------------------------------
+        if "requested_downloads" in info:
+            for file in info["requested_downloads"]:
+                fpath = file.get("filepath")
+                ext = fpath.split(".")[-1].lower()
+
+                if ext in ["mp4", "mkv", "webm"]:
+                    await update.message.reply_video(
+                        video=open(fpath, "rb"),
+                        caption="📥 ویدیو با موفقیت دانلود شد!"
+                    )
+                    sent_any = True
+
+                # ------------------------------
+                # 🎵 ارسال فایل صوتی (اگر موجود بود)
+                # ------------------------------
+                if ext in ["mp3", "m4a", "aac", "ogg", "opus"]:
+                    await update.message.reply_audio(
+                        audio=open(fpath, "rb"),
+                        caption="🎵 فایل صوتی پست"
+                    )
+                    sent_any = True
+
+        if not sent_any:
+            await msg.edit_text("⚠️ هیچ ویدیو یا صوتی در این پست پیدا نشد!")
+        else:
+            await msg.delete()
 
     except Exception as e:
         await msg.edit_text(f"❌ نتوانستم دانلود کنم.\n⚠️ خطا: {e}")
