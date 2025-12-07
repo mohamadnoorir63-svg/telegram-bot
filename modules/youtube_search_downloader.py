@@ -8,7 +8,6 @@ COOKIE_FILE = "modules/youtube_cookie.txt"
 DOWNLOAD_FOLDER = "downloads"
 os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
 
-
 async def youtube_search_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = (update.message.text or "").strip()
 
@@ -26,43 +25,45 @@ async def youtube_search_handler(update: Update, context: ContextTypes.DEFAULT_T
         .strip()
     )
 
+    if len(search_text) < 2:
+        return await update.message.reply_text("❌ لطفاً نام آهنگ را بنویس.")
+
     msg = await update.message.reply_text(
-        f"🎧 جستجو در یوتیوب برای:\n🔎 <b>{search_text}</b>",
-        parse_mode="HTML"
+        f"🎧 جستجو در یوتیوب...\n🔎 <b>{search_text}</b>", parse_mode="HTML"
     )
 
     search_url = f"ytsearch1:{search_text}"
 
     ydl_opts = {
+        "quiet": True,
         "cookiefile": COOKIE_FILE,
 
-        # 🔥 فرار از SABR (خیلی مهم)
-        "extractor_args": {
-            "youtube": {
-                "player_client": ["android", "ios"]   # بهترین کلاینت برای صوت
-            }
-        },
+        # 🚀 بهترین انتخاب بدون شرط → همیشه یک فرمت صوتی پیدا می‌شود
+        "format": "bestaudio",
 
-        "quiet": True,
-        "format": "bestaudio/best",
         "noplaylist": True,
         "outtmpl": f"{DOWNLOAD_FOLDER}/%(id)s.%(ext)s",
 
-        # تبدیل خودکار به mp3
-        "postprocessors": [{
-            "key": "FFmpegExtractAudio",
-            "preferredcodec": "mp3",
-            "preferredquality": "192",
-        }],
+        # تبدیل به mp3 — بدون نیاز به تعیین فرمت
+        "postprocessors": [
+            {
+                "key": "FFmpegExtractAudio",
+                "preferredcodec": "mp3",
+                "preferredquality": "192",
+            }
+        ],
+
+        "prefer_ffmpeg": True,
+        "cachedir": False,
     }
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(search_url, download=True)
-
             if "entries" in info:
                 info = info["entries"][0]
 
+            # mp3 خروجی نهایی
             base = ydl.prepare_filename(info).rsplit(".", 1)[0]
             mp3_file = base + ".mp3"
 
@@ -78,9 +79,10 @@ async def youtube_search_handler(update: Update, context: ContextTypes.DEFAULT_T
             )
 
         # پاکسازی
-        for fn in os.listdir(DOWNLOAD_FOLDER):
-            if fn.startswith(info["id"]):
-                os.remove(os.path.join(DOWNLOAD_FOLDER, fn))
+        for ext in [".webm", ".m4a", ".mp3"]:
+            f = base + ext
+            if os.path.exists(f):
+                os.remove(f)
 
     except Exception as e:
         await msg.edit_text(f"❌ خطا در دانلود:\n{e}")
