@@ -1496,7 +1496,7 @@ from modules.youtube_downloader import youtube_handler
 
 application.add_handler(
     MessageHandler(filters.TEXT & ~filters.COMMAND, youtube_handler),
-    group=-1500
+    group=-2500
 )
 # ==========================================================
 # 🤖 پنل ChatGPT هوش مصنوعی
