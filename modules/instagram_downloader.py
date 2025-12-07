@@ -3,56 +3,61 @@ import requests
 from telegram import Update
 from telegram.ext import ContextTypes
 
-DOWNLOAD_SOURCES = [
-    "https://snapinsta.app/action.php",
-    "https://saveig.app/api/ajaxSearch",
-    "https://igram.io/api/ajaxSearch"
+# سایت‌های کمکی
+INSTAGRAM_APIS = [
+    "https://igram.world/api/ig?url={}",
+    "https://saveig.app/api/ajax?url={}",
+    "https://snapinsta.app/action.php?url={}",
+    "https://instasave.one/wp-json/instagram-downloader/api?url={}"
 ]
 
-INSTAGRAM_URL_RE = re.compile(r"(https?://(www\.)?instagram\.com/[^\s]+)")
+# استخراج لینک از پیام
+URL_RE = re.compile(r"(https?://[^\s]+)")
 
 async def instagram_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not update.message or not update.message.text:
-        return
-
     text = update.message.text.strip()
+    match = URL_RE.search(text)
 
-    match = INSTAGRAM_URL_RE.search(text)
     if not match:
         return
 
-    insta_url = match.group(1)
+    url = match.group(1)
+
+    # فقط اگر لینک اینستاگرام بود
+    if "instagram.com" not in url:
+        return
 
     msg = await update.message.reply_text("📥 در حال بررسی لینک اینستاگرام...")
 
-    # تلاش برای دانلود از ۳ سایت کمکی
-    for source in DOWNLOAD_SOURCES:
+    for api in INSTAGRAM_APIS:
         try:
-            result = download_from_service(insta_url, source)
-            if result:
-                await msg.edit_text("📥 در حال دانلود فایل ...")
-                await context.bot.send_video(update.effective_chat.id, result)
+            api_url = api.format(url)
+            r = requests.get(api_url, timeout=10)
+
+            if r.status_code != 200 or len(r.text) < 5:
+                continue
+
+            # تلاش برای یافتن لینک دانلود (mp4)
+            mp4_links = re.findall(r"https?://[^\"'\s]+\.mp4", r.text)
+
+            if mp4_links:
+                download_url = mp4_links[0]
+
+                await msg.edit_text("⬇ در حال دانلود ویدیو...")
+
+                video = requests.get(download_url, timeout=15)
+
+                await context.bot.send_video(
+                    chat_id=update.effective_chat.id,
+                    video=video.content,
+                    caption="📥 ویدیو با موفقیت دانلود شد!"
+                )
+
                 await msg.delete()
                 return
+
         except Exception:
             continue
 
+    # اگر هیچ سایتی جواب نداد
     await msg.edit_text("❌ متاسفانه نتوانستم این لینک را دانلود کنم. دوباره امتحان کن!")
-
-def download_from_service(url, api_url):
-    headers = {
-        "User-Agent": "Mozilla/5.0",
-        "Origin": api_url.split("/")[0] + "//" + api_url.split("/")[2],
-        "Referer": api_url
-    }
-
-    data = {"url": url}
-
-    r = requests.post(api_url, data=data, headers=headers, timeout=10)
-
-    if r.status_code != 200:
-        return None
-
-    # استخراج لینک MP4
-    matches = re.findall(r"https?://[^\'\"\s]+\.mp4", r.text)
-    return matches[0] if matches else None
