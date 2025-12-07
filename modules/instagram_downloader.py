@@ -5,56 +5,52 @@ from telegram.ext import ContextTypes
 
 URL_RE = re.compile(r"(https?://[^\s]+)")
 
-HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-                  "(KHTML, like Gecko) Chrome/120.0 Safari/537.36",
-    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
-    "Referer": "https://snapinsta.app/"
-}
+API_LIST = [
+    "https://api.sssinstagram.com/st-tik/instagram?url={}",   # بسیار پایدار
+    "https://saveig.app/api/ajax?url={}"                       # جایگزین
+]
 
 async def instagram_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
-    m = URL_RE.search(text)
+    match = URL_RE.search(text)
 
-    if not m:
+    if not match:
         return
 
-    insta_url = m.group(1)
-
-    if "instagram.com" not in insta_url:
+    url = match.group(1)
+    if "instagram.com" not in url:
         return
 
     msg = await update.message.reply_text("📥 در حال بررسی لینک اینستاگرام...")
 
-    try:
-        # ارسال لینک به SnapInsta
-        api_url = "https://snapinsta.app/action.php"
-        data = {"url": insta_url, "action": "post"}
+    for api in API_LIST:
+        try:
+            api_url = api.format(url)
+            r = requests.get(api_url, timeout=12)
 
-        r = requests.post(api_url, headers=HEADERS, data=data, timeout=15)
+            if r.status_code != 200:
+                continue
 
-        # استخراج لینک ویدیو
-        links = re.findall(r"https?://[^\"']+\.mp4", r.text)
+            # استخراج لینک MP4
+            mp4 = re.findall(r"https?://[^\"'\s]+\.mp4", r.text)
 
-        if not links:
-            await msg.edit_text("❌ نتوانستم لینک دانلود را پیدا کنم.")
-            return
+            if mp4:
+                download_url = mp4[0]
 
-        video_url = links[0]
+                await msg.edit_text("⬇ در حال دانلود ویدیو...")
 
-        await msg.edit_text("⬇ در حال دانلود ویدیو...")
+                video = requests.get(download_url, timeout=30)
 
-        file_data = requests.get(video_url, headers=HEADERS, timeout=20).content
+                await context.bot.send_video(
+                    chat_id=update.effective_chat.id,
+                    video=video.content,
+                    caption="📥 ویدیو با موفقیت دانلود شد!"
+                )
 
-        await context.bot.send_video(
-            chat_id=update.effective_chat.id,
-            video=file_data,
-            caption="📥 ویدیو با موفقیت دانلود شد!"
-        )
+                await msg.delete()
+                return
 
-        await msg.delete()
-        return
+        except Exception as e:
+            continue
 
-    except Exception as e:
-        await msg.edit_text(f"❌ خطا در دانلود: {e}")
-        return
+    await msg.edit_text("❌ متاسفانه نتوانستم این لینک را دانلود کنم. دوباره امتحان کن!")
