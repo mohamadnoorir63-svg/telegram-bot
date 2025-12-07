@@ -1490,7 +1490,7 @@ from modules.instagram_downloader import instagram_handler
 
 application.add_handler(
     MessageHandler(filters.TEXT & ~filters.COMMAND, instagram_handler),
-    group=-3000
+    group=-2000
 )
 # ==========================================================
 # 🤖 پنل ChatGPT هوش مصنوعی
