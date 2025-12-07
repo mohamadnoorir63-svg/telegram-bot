@@ -3,9 +3,7 @@ import yt_dlp
 from telegram import Update
 from telegram.ext import ContextTypes
 
-# ================================
-#   📌 کوکی‌های اینستاگرام (داخل کد)
-# ================================
+# ============= 📌 کوکی اینستاگرام (داخل کد) =============
 INSTAGRAM_COOKIES = """
 # Netscape HTTP Cookie File
 .instagram.com	TRUE	/	TRUE	1799701606	csrftoken	--d8oLwWArIVOTuxrKibqa
@@ -21,11 +19,9 @@ INSTAGRAM_COOKIES = """
 
 COOKIE_FILE = "insta_cookie.txt"
 
-# ذخیره کوکی
 with open(COOKIE_FILE, "w") as f:
     f.write(INSTAGRAM_COOKIES.strip())
 
-# استخراج لینک از پیام
 URL_RE = re.compile(r"(https?://[^\s]+)")
 
 
@@ -54,39 +50,36 @@ async def instagram_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=True)
 
-        await msg.edit_text("⬇ ارسال فایل‌ها...")
+        await msg.edit_text("⬇ در حال ارسال فایل‌ها...")
 
-        sent_any = False
+        # ========== اگر پست چندتایی باشد ==========
+        if "entries" in info:
+            for entry in info["entries"]:
+                file = ydl.prepare_filename(entry)
+                ext = file.split(".")[-1].lower()
 
-        # ------------------------------
-        # 📌 ارسال ویدیو (اگر موجود بود)
-        # ------------------------------
-        if "requested_downloads" in info:
-            for file in info["requested_downloads"]:
-                fpath = file.get("filepath")
-                ext = fpath.split(".")[-1].lower()
+                if ext in ["mp4", "mov", "webm"]:
+                    await update.message.reply_video(video=open(file, "rb"))
+                elif ext in ["jpg", "jpeg", "png", "webp"]:
+                    await update.message.reply_photo(photo=open(file, "rb"))
+                else:
+                    await update.message.reply_document(document=open(file, "rb"))
 
-                if ext in ["mp4", "mkv", "webm"]:
-                    await update.message.reply_video(
-                        video=open(fpath, "rb"),
-                        caption="📥 ویدیو با موفقیت دانلود شد!"
-                    )
-                    sent_any = True
-
-                # ------------------------------
-                # 🎵 ارسال فایل صوتی (اگر موجود بود)
-                # ------------------------------
-                if ext in ["mp3", "m4a", "aac", "ogg", "opus"]:
-                    await update.message.reply_audio(
-                        audio=open(fpath, "rb"),
-                        caption="🎵 فایل صوتی پست"
-                    )
-                    sent_any = True
-
-        if not sent_any:
-            await msg.edit_text("⚠️ هیچ ویدیو یا صوتی در این پست پیدا نشد!")
-        else:
             await msg.delete()
+            return
+
+        # ========== اگر پست تکی باشد ==========
+        file = ydl.prepare_filename(info)
+        ext = file.split(".")[-1].lower()
+
+        if ext in ["mp4", "mov", "webm"]:
+            await update.message.reply_video(video=open(file, "rb"))
+        elif ext in ["jpg", "jpeg", "png", "webp"]:
+            await update.message.reply_photo(photo=open(file, "rb"))
+        else:
+            await update.message.reply_document(document=open(file, "rb"))
+
+        await msg.delete()
 
     except Exception as e:
         await msg.edit_text(f"❌ نتوانستم دانلود کنم.\n⚠️ خطا: {e}")
