@@ -4,10 +4,7 @@ import yt_dlp
 from telegram import Update
 from telegram.ext import ContextTypes
 
-# مسیر فایل کوکی که خودت داخلش قرار می‌دهی
 COOKIE_FILE = "modules/youtube_cookie.txt"
-
-# پوشه دانلود
 DOWNLOAD_FOLDER = "downloads"
 os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
 
@@ -15,7 +12,6 @@ os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
 async def youtube_search_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = (update.message.text or "").strip()
 
-    # فقط برای درخواست های آهنگ
     if not (
         query.startswith("دانلود آهنگ")
         or query.startswith("اهنگ")
@@ -23,7 +19,6 @@ async def youtube_search_handler(update: Update, context: ContextTypes.DEFAULT_T
     ):
         return
 
-    # متن جستجو
     search_text = (
         query.replace("دانلود آهنگ", "")
         .replace("اهنگ", "")
@@ -31,71 +26,61 @@ async def youtube_search_handler(update: Update, context: ContextTypes.DEFAULT_T
         .strip()
     )
 
-    if len(search_text) < 2:
-        return await update.message.reply_text("❌ لطفاً نام آهنگ را بنویس.")
+    msg = await update.message.reply_text(
+        f"🎧 جستجو در یوتیوب برای:\n🔎 <b>{search_text}</b>",
+        parse_mode="HTML"
+    )
 
-    msg = await update.message.reply_text(f"🎧 جستجو در یوتیوب برای:\n🔎 {search_text}")
-
-    # لینک جستجو در یوتیوب
     search_url = f"ytsearch1:{search_text}"
 
-    # ================================
-    # ⚡ تنظیمات پایدار yt-dlp فقط صوتی
-    # ================================
     ydl_opts = {
-        "quiet": True,
         "cookiefile": COOKIE_FILE,
-        "format": "bestaudio/best",  # فقط صوت
+
+        # 🔥 فرار از SABR (خیلی مهم)
+        "extractor_args": {
+            "youtube": {
+                "player_client": ["android", "ios"]   # بهترین کلاینت برای صوت
+            }
+        },
+
+        "quiet": True,
+        "format": "bestaudio/best",
         "noplaylist": True,
         "outtmpl": f"{DOWNLOAD_FOLDER}/%(id)s.%(ext)s",
 
-        # جلوگیری از فرمت‌های خراب
-        "prefer_ffmpeg": True,
-        "cachedir": False,
-
-        # تبدیل خودکار به MP3 پایدار
-        "postprocessors": [
-            {
-                "key": "FFmpegExtractAudio",
-                "preferredcodec": "mp3",
-                "preferredquality": "192",
-            }
-        ],
-
-        # حل مشکل signature solver
-        "extractor_args": {
-            "youtube": {
-                "player_skip": ["js"],
-            }
-        },
+        # تبدیل خودکار به mp3
+        "postprocessors": [{
+            "key": "FFmpegExtractAudio",
+            "preferredcodec": "mp3",
+            "preferredquality": "192",
+        }],
     }
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(search_url, download=True)
 
-            if "entries" in info:  
+            if "entries" in info:
                 info = info["entries"][0]
 
-            base_filename = ydl.prepare_filename(info).rsplit(".", 1)[0]
-            mp3_file = base_filename + ".mp3"
+            base = ydl.prepare_filename(info).rsplit(".", 1)[0]
+            mp3_file = base + ".mp3"
 
         title = info.get("title", "Music")
 
-        await msg.edit_text("⬇ ارسال فایل صوتی...")
+        await msg.edit_text("⬇ در حال ارسال فایل صوتی...")
 
         with open(mp3_file, "rb") as f:
             await update.message.reply_audio(
                 audio=f,
-                title=title,
                 caption=f"🎵 {title}",
+                title=title,
             )
 
-        # پاکسازی تمام فایل‌های اضافی
-        for ext in [".mp3", ".webm", ".m4a"]:
-            f = base_filename + ext
-            if os.path.exists(f):
-                os.remove(f)
+        # پاکسازی
+        for fn in os.listdir(DOWNLOAD_FOLDER):
+            if fn.startswith(info["id"]):
+                os.remove(os.path.join(DOWNLOAD_FOLDER, fn))
 
     except Exception as e:
         await msg.edit_text(f"❌ خطا در دانلود:\n{e}")
