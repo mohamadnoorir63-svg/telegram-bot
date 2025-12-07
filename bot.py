@@ -1486,11 +1486,11 @@ application.add_handler(
     CallbackQueryHandler(music_select_handler, pattern=r"^music_select:"),
     group=-2000
 )
-from modules.instagram_handler import instagram_downloader
+from modules.instagram_downloader import instagram_handler
 
 application.add_handler(
-    MessageHandler(filters.TEXT & ~filters.COMMAND, instagram_downloader),
-    group=-3000
+    MessageHandler(filters.TEXT & ~filters.COMMAND, instagram_handler),
+    group=-2000
 )
 # ==========================================================
 # 🤖 پنل ChatGPT هوش مصنوعی
