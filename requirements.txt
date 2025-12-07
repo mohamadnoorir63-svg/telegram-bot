@@ -51,4 +51,4 @@ ffmpeg   # لینوکس
 youtube-search
 mutagen
 rapidfuzz==3.9.1
--U "yt-dlp[default,python-omni]"
+yt-dlp[default,python-omni]
