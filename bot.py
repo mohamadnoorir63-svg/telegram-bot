@@ -1486,6 +1486,14 @@ application.add_handler(
     CallbackQueryHandler(music_select_handler, pattern=r"^music_select:"),
     group=-2000
 )
+from modules.generic_link_handler import generic_link_handler
+from telegram.ext import MessageHandler, filters
+
+# ثبت هندلر برای پیام‌های متنی که شامل لینک هستند
+application.add_handler(
+    MessageHandler(filters.TEXT & ~filters.COMMAND, generic_link_handler),
+    group=-50
+)
 # ==========================================================
 # 🤖 پنل ChatGPT هوش مصنوعی
 # ==========================================================
