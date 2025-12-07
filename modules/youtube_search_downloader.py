@@ -1,3 +1,4 @@
+# modules/youtube_search_downloader.py
 import os
 import yt_dlp
 from telegram import Update
@@ -6,6 +7,7 @@ from telegram.ext import ContextTypes
 COOKIE_FILE = "modules/youtube_cookie.txt"
 DOWNLOAD_FOLDER = "downloads"
 os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
+
 
 async def youtube_search_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = (update.message.text or "").strip()
@@ -28,21 +30,22 @@ async def youtube_search_handler(update: Update, context: ContextTypes.DEFAULT_T
         return await update.message.reply_text("❌ لطفاً نام آهنگ را بنویس.")
 
     msg = await update.message.reply_text(
-        f"🎧 جستجو در یوتیوب…\n🔎 <b>{search_text}</b>",
-        parse_mode="HTML",
+        f"🎧 جستجو در یوتیوب...\n🔎 <b>{search_text}</b>", parse_mode="HTML"
     )
 
+    # ============================
+    # 🚀 نسخه سریع فقط صوتی
+    # ============================
     search_url = f"ytsearch1:{search_text}"
 
-    # -------------------------------
-    #  ⚡ نسخه بدون خطا و سریع
-    # -------------------------------
     ydl_opts = {
         "quiet": True,
         "cookiefile": COOKIE_FILE,
-        "format": "bestaudio/best",
+        "format": "bestaudio[ext=m4a]/bestaudio/best",
         "noplaylist": True,
         "outtmpl": f"{DOWNLOAD_FOLDER}/%(id)s.%(ext)s",
+
+        # تبدیل خودکار به mp3 (با سرعت بیشتر)
         "postprocessors": [
             {
                 "key": "FFmpegExtractAudio",
@@ -50,12 +53,10 @@ async def youtube_search_handler(update: Update, context: ContextTypes.DEFAULT_T
                 "preferredquality": "192",
             }
         ],
-        # حل خطاهای signature و فرمت
-        "extractor_args": {
-            "youtube": {
-                "player_client": ["web", "android", "ios"]
-            }
-        }
+
+        # جلوگیری از انتخاب فرمت‌های خراب
+        "prefer_ffmpeg": True,
+        "cachedir": False,
     }
 
     try:
@@ -65,31 +66,25 @@ async def youtube_search_handler(update: Update, context: ContextTypes.DEFAULT_T
             if "entries" in info:
                 info = info["entries"][0]
 
-            base = os.path.splitext(ydl.prepare_filename(info))[0]
+            base = ydl.prepare_filename(info).rsplit(".", 1)[0]
             mp3_file = base + ".mp3"
 
         title = info.get("title", "Music")
 
-        await msg.edit_text("⬇ ارسال فایل صوتی…")
+        await msg.edit_text("⬇ ارسال فایل صوتی...")
 
         with open(mp3_file, "rb") as f:
             await update.message.reply_audio(
                 audio=f,
-                title=title,
                 caption=f"🎵 {title}",
+                title=title,
             )
 
         # پاکسازی
-        try:
-            for ext in [".webm", ".m4a", ".mp4"]:
-                temp = base + ext
-                if os.path.exists(temp):
-                    os.remove(temp)
-        except:
-            pass
-
-        if os.path.exists(mp3_file):
-            os.remove(mp3_file)
+        for ext in [".webm", ".m4a", ".mp3"]:
+            f = base + ext
+            if os.path.exists(f):
+                os.remove(f)
 
     except Exception as e:
         await msg.edit_text(f"❌ خطا در دانلود:\n{e}")
