@@ -21,9 +21,10 @@ INSTAGRAM_COOKIES = """
 
 COOKIE_FILE = "insta_cookie.txt"
 
-# ذخیره‌سازی کوکی داخل فایل
+# ذخیره فایل کوکی در زمان اجرا
 with open(COOKIE_FILE, "w") as f:
     f.write(INSTAGRAM_COOKIES.strip())
+
 
 # استخراج URL
 URL_RE = re.compile(r"(https?://[^\s]+)")
@@ -35,7 +36,7 @@ async def instagram_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if not m:
         return
-    
+
     url = m.group(1)
 
     if "instagram.com" not in url:
@@ -43,26 +44,35 @@ async def instagram_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     msg = await update.message.reply_text("📥 در حال بررسی لینک اینستاگرام...")
 
-    # yt-dlp config
+    # yt-dlp تنظیمات
     ydl_opts = {
         "quiet": True,
         "cookiefile": COOKIE_FILE,
-        "format": "best",
+        "format": "bestvideo+bestaudio/best",   # ← دریافت ویدیو + صوت
         "outtmpl": "downloads/%(id)s.%(ext)s",
     }
 
     try:
-        # دانلود با کوکی
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=True)
             filename = ydl.prepare_filename(info)
 
-        await msg.edit_text("⬇ ارسال ویدیو...")
+        await msg.edit_text("⬇ در حال ارسال فایل‌ها...")
 
-        await update.message.reply_video(
-            video=open(filename, "rb"),
-            caption="📥 ویدیو با موفقیت دانلود شد!"
-        )
+        # ارسال ویدیو (اگر ویدیو بود)
+        if filename.endswith((".mp4", ".mkv", ".webm")):
+            await update.message.reply_video(
+                video=open(filename, "rb"),
+                caption="🎬 ویدیو با موفقیت دانلود شد!"
+            )
+
+        # ارسال صوت جداگانه (اگر ترک صوتی وجود داشت)
+        if "audio" in info.get("formats", [{}])[0].get("format_note", "").lower():
+            audio_path = filename.rsplit(".", 1)[0] + ".mp3"
+            await update.message.reply_audio(
+                audio=open(audio_path, "rb"),
+                caption="🎵 فایل صوتی جداگانه"
+            )
 
     except Exception as e:
         await msg.edit_text(f"❌ نتوانستم دانلود کنم.\n⚠️ خطا: {e}")
