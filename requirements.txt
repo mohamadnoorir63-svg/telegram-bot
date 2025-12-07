@@ -47,8 +47,9 @@ nest_asyncio==1.5.8
 
 # Translator
 deep-translator==1.11.4
-ffmpeg   # لینوکس
+#ffmpeg   # لینوکس
 youtube-search
 mutagen
 rapidfuzz==3.9.1
 yt-dlp 
+ffmpeg-python
