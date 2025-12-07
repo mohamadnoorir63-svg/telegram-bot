@@ -1487,10 +1487,13 @@ application.add_handler(
     group=-2000
 )
 from modules.instagram_downloader import instagram_handler
-
+# 📥 دانلود از اینستاگرام با لینک
 application.add_handler(
-    MessageHandler(filters.TEXT & ~filters.COMMAND, instagram_handler),
-    group=-2000
+    MessageHandler(
+        filters.TEXT & ~filters.COMMAND,
+        instagram_handler
+    ),
+    group=-1500,   # عدد منفی تا قبل از بقیه هندلرها تست شود
 )
 # ==========================================================
 # 🤖 پنل ChatGPT هوش مصنوعی
