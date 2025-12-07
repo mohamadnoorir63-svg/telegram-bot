@@ -8,7 +8,11 @@ COOKIE_FILE = "modules/youtube_cookie.txt"
 DOWNLOAD_FOLDER = "downloads"
 os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
 
+# ================================
+#  🎵 دانلود فقط صوتی — نسخه ضد خطا
+# ================================
 async def youtube_search_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
     query = (update.message.text or "").strip()
 
     if not (
@@ -34,17 +38,20 @@ async def youtube_search_handler(update: Update, context: ContextTypes.DEFAULT_T
 
     search_url = f"ytsearch1:{search_text}"
 
+    # ============================
+    # 🎼 نسخه ضد خطا
+    # ============================
     ydl_opts = {
         "quiet": True,
         "cookiefile": COOKIE_FILE,
 
-        # 🚀 بهترین انتخاب بدون شرط → همیشه یک فرمت صوتی پیدا می‌شود
-        "format": "bestaudio",
+        # ⛔ هیچ فرمت خاصی انتخاب نکن → خودش هر فرمت صوتی موجود را می‌گیرد
+        "format": "bestaudio/best",
 
         "noplaylist": True,
         "outtmpl": f"{DOWNLOAD_FOLDER}/%(id)s.%(ext)s",
 
-        # تبدیل به mp3 — بدون نیاز به تعیین فرمت
+        # 🔥 تبدیل خودکار به mp3 (بدون توجه به پسوند دانلود شده)
         "postprocessors": [
             {
                 "key": "FFmpegExtractAudio",
@@ -53,23 +60,27 @@ async def youtube_search_handler(update: Update, context: ContextTypes.DEFAULT_T
             }
         ],
 
-        "prefer_ffmpeg": True,
-        "cachedir": False,
+        # مشکل SABR را دور می‌زند
+        "extractor_args": {
+            "youtube": {
+                "player_client": ["android"],
+            }
+        }
     }
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(search_url, download=True)
+
             if "entries" in info:
                 info = info["entries"][0]
 
-            # mp3 خروجی نهایی
-            base = ydl.prepare_filename(info).rsplit(".", 1)[0]
-            mp3_file = base + ".mp3"
+            base_path = ydl.prepare_filename(info).rsplit(".", 1)[0]
+            mp3_file = base_path + ".mp3"
 
         title = info.get("title", "Music")
 
-        await msg.edit_text("⬇ در حال ارسال فایل صوتی...")
+        await msg.edit_text("⬇ ارسال فایل صوتی...")
 
         with open(mp3_file, "rb") as f:
             await update.message.reply_audio(
@@ -80,9 +91,12 @@ async def youtube_search_handler(update: Update, context: ContextTypes.DEFAULT_T
 
         # پاکسازی
         for ext in [".webm", ".m4a", ".mp3"]:
-            f = base + ext
+            f = base_path + ext
             if os.path.exists(f):
-                os.remove(f)
+                try:
+                    os.remove(f)
+                except:
+                    pass
 
     except Exception as e:
         await msg.edit_text(f"❌ خطا در دانلود:\n{e}")
