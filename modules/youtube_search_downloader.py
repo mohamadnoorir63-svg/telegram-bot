@@ -1,53 +1,71 @@
+# modules/youtube_search_downloader.py
+import os
 import yt_dlp
 from telegram import Update
 from telegram.ext import ContextTypes
-import os
 import re
 
 COOKIE_FILE = "modules/youtube_cookie.txt"
+
 DOWNLOAD_FOLDER = "downloads"
 os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
 
-async def youtube_search_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    text = update.message.text.strip()
 
-    # فقط اگر کاربر گفت: دانلود آهنگ ...
-    if not text.startswith("دانلود آهنگ"):
+async def youtube_search_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.message.text.strip()
+
+    # فقط اگر کاربر نوشته "دانلود آهنگ ..."
+    if not (query.startswith("دانلود آهنگ") or query.startswith("اهنگ") or query.startswith("آهنگ")):
         return
 
-    query = text.replace("دانلود آهنگ", "").strip()
+    search_text = query.replace("دانلود آهنگ", "").replace("اهنگ", "").replace("آهنگ", "").strip()
 
-    if len(query) < 2:
-        return await update.message.reply_text("🎵 لطفاً نام آهنگ را بنویس مثال:\nدانلود آهنگ سکوتم را به باران هدیه کردم")
+    if len(search_text) < 2:
+        return await update.message.reply_text("❌ لطفاً نام آهنگ را بنویس!")
 
-    msg = await update.message.reply_text(f"🎧 در حال جستجو برای: {query}")
+    msg = await update.message.reply_text(f"🎧 در حال جستجو در یوتیوب برای:\n🔎 {search_text}")
+
+    # ============================
+    # 1️⃣ جستجو در یوتیوب
+    # ============================
+    search_url = f"ytsearch1:{search_text}"
+
+    ydl_opts = {
+        "quiet": True,
+        "cookiefile": COOKIE_FILE,
+        "format": "bestaudio",
+        "noplaylist": True,
+        "outtmpl": f"{DOWNLOAD_FOLDER}/%(id)s.%(ext)s",
+    }
 
     try:
-        # جستجو در یوتیوب
-        search_url = f"ytsearch:{query}"
-
-        ydl_opts = {
-            "quiet": True,
-            "cookiefile": COOKIE_FILE,
-            "format": "bestaudio/best",
-            "outtmpl": f"{DOWNLOAD_FOLDER}/%(id)s.%(ext)s"
-        }
-
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(search_url, download=True)
-            entry = info["entries"][0]  # اولین نتیجه
-            filename = ydl.prepare_filename(entry)
+            if "entries" in info:
+                info = info["entries"][0]
 
-        title = entry.get("title", "Music")
+            filename = ydl.prepare_filename(info)
 
-        await msg.edit_text("⬇ ارسال فایل صوتی...")
+        title = info.get("title", "Music")
+
+        mp3_file = filename.rsplit(".", 1)[0] + ".mp3"
+
+        # ============================
+        # 2️⃣ تبدیل به MP3
+        # ============================
+        os.system(f'ffmpeg -i "{filename}" -vn -ab 192k "{mp3_file}" -y')
+
+        await msg.edit_text("⬇ در حال ارسال فایل صوتی...")
 
         await update.message.reply_audio(
-            audio=open(filename, "rb"),
+            audio=open(mp3_file, "rb"),
+            title=title,
             caption=f"🎵 {title}"
         )
 
+        # حذف فایل‌ها
         os.remove(filename)
+        os.remove(mp3_file)
 
     except Exception as e:
         await msg.edit_text(f"❌ خطا در دانلود:\n{e}")
