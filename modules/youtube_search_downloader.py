@@ -1,4 +1,4 @@
-# modules/youtube_search_downloader.py
+    # modules/youtube_search_downloader.py
 import os
 import yt_dlp
 from telegram import Update
@@ -27,23 +27,25 @@ async def youtube_search_handler(update: Update, context: ContextTypes.DEFAULT_T
     )
 
     if len(search_text) < 2:
-        return await update.message.reply_text("❌ نام آهنگ لازم است.")
+        return await update.message.reply_text("❌ لطفاً نام آهنگ را بنویس.")
 
-    msg = await update.message.reply_text(f"🎧 جستجو در یوتیوب برای:\n<b>{search_text}</b>", parse_mode="HTML")
+    msg = await update.message.reply_text(
+        f"🎧 جستجو در یوتیوب...\n🔎 <b>{search_text}</b>",
+        parse_mode="HTML"
+    )
 
     search_url = f"ytsearch1:{search_text}"
 
-    ydl_opts = {
+    # ==============
+    # 1️⃣ تلاش برای دانلود فقط صوت (M4A)
+    # ==============
+    ydl_audio_only = {
         "quiet": True,
         "cookiefile": COOKIE_FILE,
-
-        # 🔥 جلوگیری از خطا: هر فرمتی موجود بود می‌گیرد
-        "format": "bestaudio/best",
-
+        "format": "bestaudio[ext=m4a]/bestaudio",
         "noplaylist": True,
         "outtmpl": f"{DOWNLOAD_FOLDER}/%(id)s.%(ext)s",
 
-        # تبدیل به mp3
         "postprocessors": [
             {
                 "key": "FFmpegExtractAudio",
@@ -52,43 +54,72 @@ async def youtube_search_handler(update: Update, context: ContextTypes.DEFAULT_T
             }
         ],
 
-        # جلوگیری از باگ SABR
-        "extractor_args": {
-            "youtube": {
-                "player_skip": ["js", "configs"],   # ❗ از ارور signature جلوگیری می‌کند
-            }
-        },
-
-        "cachedir": False,
         "prefer_ffmpeg": True,
+        "nocheckcertificate": True,
+        "cachedir": False,
     }
 
     try:
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-
+        with yt_dlp.YoutubeDL(ydl_audio_only) as ydl:
             info = ydl.extract_info(search_url, download=True)
 
-            if "entries" in info:
-                info = info["entries"][0]
+        if "entries" in info:
+            info = info["entries"][0]
 
-            base = ydl.prepare_filename(info).rsplit(".", 1)[0]
-            mp3_file = base + ".mp3"
+        base = ydl.prepare_filename(info).rsplit(".", 1)[0]
+        mp3_file = base + ".mp3"
 
-        title = info.get("title", "Music")
+        if os.path.exists(mp3_file):
+            await msg.edit_text("⬇ ارسال فایل صوتی...")
+            with open(mp3_file, "rb") as f:
+                await update.message.reply_audio(
+                    audio=f,
+                    caption=f"🎵 {info.get('title','Music')}",
+                )
+            os.remove(mp3_file)
+            return
 
-        await msg.edit_text("⬇ فایل صوتی آماده ارسال است...")
+        # اگر به اینجا رسید، یعنی فایل صوتی مستقیم قابل دانلود نبود
+    except:
+        pass
+
+    # ==============
+    # 2️⃣ حالت دوم — ویدیو دانلود شود و صوت استخراج شود
+    # ==============
+    ydl_fallback = {
+        "quiet": True,
+        "cookiefile": COOKIE_FILE,
+        "format": "best",
+        "noplaylist": True,
+        "outtmpl": f"{DOWNLOAD_FOLDER}/%(id)s.%(ext)s",
+    }
+
+    try:
+        with yt_dlp.YoutubeDL(ydl_fallback) as ydl:
+            info = ydl.extract_info(search_url, download=True)
+
+        if "entries" in info:
+            info = info["entries"][0]
+
+        video_file = ydl.prepare_filename(info)
+        mp3_file = video_file.rsplit(".", 1)[0] + ".mp3"
+
+        # استخراج صدا
+        os.system(f'ffmpeg -i "{video_file}" -vn -ab 192k "{mp3_file}" -y')
+
+        await msg.edit_text("⬇ ارسال فایل صوتی...")
 
         with open(mp3_file, "rb") as f:
-            await update.message.reply_audio(audio=f, caption=f"🎵 {title}", title=title)
+            await update.message.reply_audio(
+                audio=f,
+                caption=f"🎵 {info.get('title','Music')}",
+            )
 
         # پاکسازی
-        for ext in [".webm", ".m4a", ".mp4", ".mp3"]:
-            f = base + ext
-            if os.path.exists(f):
-                try:
-                    os.remove(f)
-                except:
-                    pass
+        if os.path.exists(video_file):
+            os.remove(video_file)
+        if os.path.exists(mp3_file):
+            os.remove(mp3_file)
 
     except Exception as e:
-        await msg.edit_text(f"❌ خطا در دانلود:\n{e}")
+        await msg.edit_text(f"❌ خطا در دانلود:\n{e}")  
