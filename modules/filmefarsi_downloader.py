@@ -1,60 +1,35 @@
-# modules/filmefarsi_downloader.py
+# =====================================
+#   FilmeFarsi Downloader (Final)
+#   With Cookies + Cloudflare Bypass
+# =====================================
+
 import os
 import re
-import asyncio
-from concurrent.futures import ThreadPoolExecutor
-
 import yt_dlp
 from telegram import Update
 from telegram.ext import ContextTypes
 
-# ============================
-#  تنظیمات اولیه
-# ============================
-
-DOWNLOAD_FOLDER = "downloads"
-os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
-
+# ------------------------
+# مسیر کوکی مخصوص سایت تو
+# ------------------------
 COOKIE_FILE = "modules/filmefarsi_cookie.txt"
 
-# اگر کوکی وجود ندارد → فایل درست کن
+# اگر وجود ندارد → بساز
 os.makedirs("modules", exist_ok=True)
 if not os.path.exists(COOKIE_FILE):
     with open(COOKIE_FILE, "w", encoding="utf-8") as f:
-        f.write("# Paste filmefarsi.com cookies here (Netscape Format)\n")
+        f.write("# Paste FilmeFarsi cookies here (Netscape format)\n")
 
-# فقط لینک‌های سایت خودت
-SITE_RE = re.compile(r"(https?://(?:www\.)?filmefarsi\.com[^\s]+)")
+# پوشه دانلود
+DOWNLOAD_FOLDER = "downloads"
+os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
 
-executor = ThreadPoolExecutor(max_workers=4)
-
-
-# ============================
-# تابع سینک برای دانلود بدون هنگ
-# ============================
-def _download_filmefarsi_sync(url):
-    """
-    دانلود از filmefarsi.com با سرعت بالا و استفاده از کوکی‌ها
-    """
-    ydl_opts = {
-        "cookiefile": COOKIE_FILE,  # ← کوکی سایت خودت
-        "quiet": True,
-        "format": "bestvideo+bestaudio/best",
-        "merge_output_format": "mp4",
-        "outtmpl": f"{DOWNLOAD_FOLDER}/%(title)s.%(ext)s",
-        "noplaylist": True,
-        "concurrent_fragment_downloads": 5,  # سرعت بالا
-    }
-
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        info = ydl.extract_info(url, download=True)
-        file_path = ydl.prepare_filename(info)
-
-    return info, file_path
+# تشخیص لینک‌های فیلم‌فارسی
+FF_RE = re.compile(r"(https?://(?:www\.)?filmefarsi\.com/[^\s]+)")
 
 
 # ============================
-# هندلر اصلی دانلود
+#    دانلود‌کننده فیلم‌فارسی
 # ============================
 async def filmefarsi_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
@@ -62,38 +37,56 @@ async def filmefarsi_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
         return
 
     text = update.message.text.strip()
-    match = SITE_RE.search(text)
 
-    if not match:
-        return  # اگر لینک مربوط به filmefarsi نبود → بی‌خیال
+    m = FF_RE.search(text)
+    if not m:
+        return  # لینک فیلم‌فارسی نبود → کاری نکن
 
-    url = match.group(1)
+    url = m.group(1)
 
-    msg = await update.message.reply_text("📥 در حال دانلود از FilmeFarsi...")
+    msg = await update.message.reply_text("🎬 در حال پردازش لینک FilmeFarsi...")
 
-    loop = asyncio.get_running_loop()
+    # ------------------------------------------
+    # تنظیمات yt-dlp مخصوص Cloudflare + Cookie
+    # ------------------------------------------
+    ydl_opts = {
+        "cookiefile": COOKIE_FILE,
+        "quiet": True,
+        "outtmpl": f"{DOWNLOAD_FOLDER}/%(id)s.%(ext)s",
+
+        # دور زدن Cloudflare (Impersonation)
+        "extractor_args": {
+            "generic": {
+                "impersonate": "chrome"   # ← ضروری
+            }
+        },
+
+        # بهترین کیفیت ممکن
+        "format": "best",
+
+        "concurrent_fragment_downloads": 8,
+        "retries": 10,
+        "http_headers": {
+            "User-Agent": "Mozilla/5.0"
+        }
+    }
 
     try:
-        info, file_path = await loop.run_in_executor(
-            executor,
-            _download_filmefarsi_sync,
-            url
-        )
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(url, download=True)
+
+        filepath = ydl.prepare_filename(info)
+        title = info.get("title", "Video")
+
+        await msg.edit_text("⬇ در حال ارسال فایل...")
+
+        with open(filepath, "rb") as f:
+            await update.message.reply_video(
+                video=f,
+                caption=f"🎬 {title}"
+            )
+
+        os.remove(filepath)
+
     except Exception as e:
-        return await msg.edit_text(f"❌ خطا در دانلود:\n{e}")
-
-    title = info.get("title", "Video")
-
-    await msg.edit_text("⬇ در حال ارسال فایل...")
-
-    # ارسال فایل ویدیو
-    try:
-        await update.message.reply_video(
-            video=open(file_path, "rb"),
-            caption=f"🎬 {title}"
-        )
-    except Exception as e:
-        await msg.edit_text(f"❌ خطا در ارسال فایل:\n{e}")
-    finally:
-        if os.path.exists(file_path):
-            os.remove(file_path)
+        await msg.edit_text(f"❌ خطا در دانلود:\n`{e}`")
