@@ -1472,13 +1472,15 @@ application.add_handler(
 from modules.soundcloud_handler import soundcloud_handler, music_select_handler
 from telegram.ext import MessageHandler, CallbackQueryHandler, filters
 
+# هندلر متن (برای تمام حالت‌های "آهنگ [اسم]" )
 application.add_handler(
-    MessageHandler(filters.TEXT & filters.Regex(r"^(آهنگ)\s+"), soundcloud_handler),
+    MessageHandler(filters.TEXT & ~filters.COMMAND, soundcloud_handler),
     group=-2000
 )
 
+# هندلر انتخاب آهنگ
 application.add_handler(
-    CallbackQueryHandler(music_select_handler, pattern=r"^msc:"),
+    CallbackQueryHandler(music_select_handler, pattern=r"^music_select:"),
     group=-2000
 )
 from modules.instagram_downloader import instagram_handler
