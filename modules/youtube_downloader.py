@@ -47,15 +47,6 @@ async def youtube_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         "outtmpl": f"{DOWNLOAD_FOLDER}/%(id)s.%(ext)s",
         "noplaylist": True,
-
-        # تبدیل خودکار MP3 → با مصرف RAM بسیار کم
-        "postprocessors": [
-            {
-                "key": "FFmpegExtractAudio",
-                "preferredcodec": "mp3",
-                "preferredquality": "192",
-            }
-        ],
     }
 
     try:
@@ -68,14 +59,11 @@ async def youtube_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         video_ext = info.get("ext", "mp4")
 
         video_file = f"{DOWNLOAD_FOLDER}/{video_id}.{video_ext}"
-        mp3_file = f"{DOWNLOAD_FOLDER}/{video_id}.mp3"
 
         # بررسی حجم پیش از ارسال (Heroku محدود است)
-        if os.path.getsize(video_file) > 180 * 1024 * 1024:  # محدودیت 180MB
+        if os.path.getsize(video_file) > 180 * 1024 * 1024:
             await msg.edit_text("⚠ حجم ویدیو خیلی بزرگ است. امکان ارسال وجود ندارد.")
             os.remove(video_file)
-            if os.path.exists(mp3_file):
-                os.remove(mp3_file)
             return
 
         # ارسال ویدیو
@@ -85,17 +73,8 @@ async def youtube_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             caption=f"📥 {title}"
         )
 
-        # ارسال MP3
-        if os.path.exists(mp3_file):
-            await update.message.reply_audio(
-                audio=open(mp3_file, "rb"),
-                caption=f"🎵 {title}"
-            )
-
-        # پاکسازی فایل‌ها
+        # پاکسازی فایل
         os.remove(video_file)
-        if os.path.exists(mp3_file):
-            os.remove(mp3_file)
 
     except Exception as e:
         await msg.edit_text(f"❌ خطا در دانلود:\n{e}")
