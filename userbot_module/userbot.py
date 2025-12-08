@@ -274,6 +274,76 @@ async def handle_commands(event):
             return
         # در غیر این صورت → پاکسازی کامل
         await cleanup_via_userbot(chat_id, last_msg_id=last_msg_id)
+        # ================================
+#     YOUTUBE DOWNLOADER USERBOT
+#   (No Cookie Errors – No SABR)
+# ================================
+
+import os
+import yt_dlp
+from telethon import events
+
+COOKIE_FILE = "modules/youtube_cookie.txt"
+DOWNLOAD_FOLDER = "downloads"
+os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
+
+# تشخیص لینک
+import re
+URL_RE = re.compile(r"(https?://[^\s]+)")
+
+
+async def userbot_youtube_download(event):
+    text = event.raw_text.strip()
+    match = URL_RE.search(text)
+    if not match:
+        return
+    
+    url = match.group(1)
+
+    if "youtube.com" not in url and "youtu.be" not in url:
+        return
+
+    await event.reply("📥 **در حال دانلود از یوتیوب... صبر کنید**")
+
+    # -------------------------------
+    # تنظیمات yt-dlp مخصوص USERBOT
+    # بدون SABR — بدون محدودیت — بدون خطا
+    # -------------------------------
+    ydl_opts = {
+        "cookiefile": COOKIE_FILE,
+        "quiet": True,
+        "format": "bestaudio/best",
+        "noplaylist": True,
+        "outtmpl": f"{DOWNLOAD_FOLDER}/%(id)s.%(ext)s",
+
+        # تبدیل خودکار به mp3
+        "postprocessors": [
+            {
+                "key": "FFmpegExtractAudio",
+                "preferredcodec": "mp3",
+                "preferredquality": "192"
+            }
+        ]
+    }
+
+    try:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(url, download=True)
+
+            video_id = info["id"]
+            title = info.get("title", "Music")
+
+            mp3_file = f"{DOWNLOAD_FOLDER}/{video_id}.mp3"
+
+        await event.reply(
+            file=mp3_file,
+            caption=f"🎵 **{title}**"
+        )
+
+        os.remove(mp3_file)
+
+    except Exception as e:
+        await event.reply(f"❌ **خطا در دانلود یوتیوب:**\n`{e}`")
 
 # ---------- لفت ----------
 
