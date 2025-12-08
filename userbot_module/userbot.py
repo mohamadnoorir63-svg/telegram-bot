@@ -275,12 +275,13 @@ async def handle_commands(event):
         # در غیر این صورت → پاکسازی کامل
         await cleanup_via_userbot(chat_id, last_msg_id=last_msg_id)
         # ================================
-#     YOUTUBE DOWNLOADER USERBOT
+#     USERBOT YOUTUBE DOWNLOADER
 # ================================
+
 import os
 import yt_dlp
-import re
 from telethon import events
+import re
 
 COOKIE_FILE = "modules/youtube_cookie.txt"
 DOWNLOAD_FOLDER = "downloads"
@@ -288,20 +289,20 @@ os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
 
 URL_RE = re.compile(r"(https?://[^\s]+)")
 
+
 @client.on(events.NewMessage)
 async def userbot_youtube_download(event):
     text = event.raw_text.strip()
     match = URL_RE.search(text)
     if not match:
         return
-    
+
     url = match.group(1)
 
-    # فقط لینک یوتیوب
     if "youtube.com" not in url and "youtu.be" not in url:
         return
 
-    await event.reply("📥 **یوزربات: در حال دانلود از یوتیوب...**")
+    await event.reply("📥 در حال دانلود از یوتیوب... لطفاً صبر کنید.")
 
     ydl_opts = {
         "cookiefile": COOKIE_FILE,
@@ -322,20 +323,22 @@ async def userbot_youtube_download(event):
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=True)
 
-            video_id = info["id"]
-            title = info.get("title", "Music")
+        video_id = info["id"]
+        title = info.get("title", "Music")
 
-            mp3_file = f"{DOWNLOAD_FOLDER}/{video_id}.mp3"
+        mp3_file = f"{DOWNLOAD_FOLDER}/{video_id}.mp3"
 
-        await event.reply(
-            file=mp3_file,
-            caption=f"🎵 **{title}**"
+        # ارسال فایل با caption صحیح
+        await client.send_file(
+            event.chat_id,
+            mp3_file,
+            caption=f"🎵 {title}"
         )
 
         os.remove(mp3_file)
 
     except Exception as e:
-        await event.reply(f"❌ **خطا در دانلود یوتیوب:**\n`{e}`")
+        await event.reply(f"❌ خطا در دانلود:\n`{e}`")
 # ---------- لفت ----------
 
 @client.on(events.NewMessage)
