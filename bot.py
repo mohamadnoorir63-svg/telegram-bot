@@ -1492,19 +1492,19 @@ application.add_handler(
     MessageHandler(filters.TEXT & ~filters.COMMAND, instagram_handler),
     group=-1500
 )
+from modules.youtube_search_downloader import youtube_search_handler, youtube_quality_handler
 
-from modules.youtube_search_downloader import youtube_search_handler, youtube_choice_handler
-
-# دریافت لینک و نمایش پنل
+# دریافت لینک و نمایش پنل اولیه (Audio / Video)
 application.add_handler(
     MessageHandler(filters.TEXT & ~filters.COMMAND, youtube_search_handler),
     group=-3000
 )
 
-# واکنش به دکمه‌های شیشه‌ای
+# هندلر دکمه‌ها (Audio / Video / کیفیت‌ها)
 application.add_handler(
-    CallbackQueryHandler(youtube_choice_handler, pattern="^(yt_audio|yt_video)$")
+    CallbackQueryHandler(youtube_quality_handler, pattern="^(yt_audio|yt_video|v_.*)$")
 )
+
 # ==========================================================
 # 🤖 پنل ChatGPT هوش مصنوعی
 # ==========================================================
