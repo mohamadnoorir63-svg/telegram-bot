@@ -1,6 +1,6 @@
 # modules/soundcloud_handler.py
+
 import os
-import shutil
 import subprocess
 import yt_dlp
 import asyncio
@@ -10,13 +10,19 @@ from telegram.ext import ContextTypes
 
 
 # ================================
+# سودوها
+# ================================
+SUDO_USERS = [8588347189]   # ← آیدی شما
+
+
+# ================================
 # تنظیمات پایه
 # ================================
 DOWNLOAD_FOLDER = "downloads"
 os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
 
-COOKIE_FILE = "modules/youtube_cookie.txt"   # ← کوکی یوتیوب
-executor = ThreadPoolExecutor(max_workers=8)  # سرعت بسیار بالا
+COOKIE_FILE = "modules/youtube_cookie.txt"
+executor = ThreadPoolExecutor(max_workers=8)
 track_store = {}
 
 # پیام‌ها سه زبانه
@@ -43,7 +49,31 @@ LANG_MESSAGES = {
 
 
 # ================================
-# تبدیل MP3 (Thread)
+# تابع چک مدیر بودن
+# ================================
+async def is_admin(update, context):
+    chat = update.effective_chat
+    user = update.effective_user
+
+    # پیوی → همه مجاز
+    if chat.type == "private":
+        return True
+
+    # سودو → همیشه مجاز
+    if user.id in SUDO_USERS:
+        return True
+
+    try:
+        admins = await context.bot.get_chat_administrators(chat.id)
+        admin_ids = [a.user.id for a in admins]
+    except:
+        return False
+
+    return user.id in admin_ids
+
+
+# ================================
+# تبدیل MP3
 # ================================
 def _mp3_convert_sync(filepath):
     mp3 = filepath.rsplit(".", 1)[0] + ".mp3"
@@ -55,7 +85,7 @@ def _mp3_convert_sync(filepath):
 
 
 # ================================
-# دانلود از SoundCloud (Thread)
+# دانلود از SoundCloud
 # ================================
 def _sc_download_sync(url):
     opts = {
@@ -70,7 +100,7 @@ def _sc_download_sync(url):
 
 
 # ================================
-# دانلود سریع از YouTube (Thread)
+# fallback یوتیوب
 # ================================
 def _youtube_fallback_sync(query):
     opts = {
@@ -78,7 +108,7 @@ def _youtube_fallback_sync(query):
         "quiet": True,
         "format": "bestaudio/best",
         "outtmpl": f"{DOWNLOAD_FOLDER}/%(id)s.%(ext)s",
-        "concurrent_fragment_downloads": 5,    # سرعت بالا
+        "concurrent_fragment_downloads": 5,
         "postprocessors": [{
             "key": "FFmpegExtractAudio",
             "preferredcodec": "mp3",
@@ -95,7 +125,7 @@ def _youtube_fallback_sync(query):
 
 
 # ================================
-# جستجو → SoundCloud → (fallback) YouTube
+# جستجو و لیست آهنگ‌ها
 # ================================
 async def soundcloud_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
@@ -103,12 +133,18 @@ async def soundcloud_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
         return
 
     text = update.message.text.strip()
-
     triggers = ["آهنگ ", "music ", "اغنية ", "أغنية "]
+
     if not any(text.lower().startswith(t) for t in triggers):
         return
 
-    # زبان
+    # محدودیت دسترسی در گروه (سکوت برای کاربران عادی)
+    if update.effective_chat.type != "private":
+        allowed = await is_admin(update, context)
+        if not allowed:
+            return  # سکوت کامل
+
+    # تعیین زبان
     lang = "fa"
     query = ""
     for t in triggers:
@@ -119,7 +155,7 @@ async def soundcloud_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
     msg = await update.message.reply_text(LANG_MESSAGES[lang]["searching"])
 
-    # جستجو ساوندکلاود (thread)
+    # جستجو در soundcloud
     def search_sc():
         with yt_dlp.YoutubeDL({"quiet": True}) as y:
             return y.extract_info(f"scsearch10:{query}", download=False)
@@ -130,22 +166,26 @@ async def soundcloud_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
     except:
         sc_info = None
 
-    # اگر هیچ نتیجه‌ای نبود → YouTube
+    # اگر نتیجه نبود → یوتیوب
     if not sc_info or "entries" not in sc_info or len(sc_info["entries"]) == 0:
         await msg.edit_text(LANG_MESSAGES[lang]["notfound"])
 
         try:
-            yt_info, mp3_path = await loop.run_in_executor(executor, _youtube_fallback_sync, query)
+            yt_info, mp3_path = await loop.run_in_executor(
+                executor, _youtube_fallback_sync, query
+            )
         except Exception as e:
             return await msg.edit_text(f"❌ خطا:\n{e}")
 
         with open(mp3_path, "rb") as f:
-            await update.message.reply_audio(audio=f, caption=f"🎵 {yt_info.get('title','Music')}")
+            await update.message.reply_audio(
+                audio=f, caption=f"🎵 {yt_info.get('title','Music')}"
+            )
 
         os.remove(mp3_path)
         return
 
-    # نمایش لیست آهنگ‌ها
+    # ساخت لیست انتخاب
     track_store[update.effective_chat.id] = sc_info["entries"]
     keyboard = [
         [InlineKeyboardButton(t["title"], callback_data=f"music_select:{t['id']}")]
@@ -159,11 +199,17 @@ async def soundcloud_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
 
 # ================================
-# انتخاب آهنگ → دانلود MP3
+# انتخاب آهنگ و دانلود
 # ================================
 async def music_select_handler(update, context: ContextTypes.DEFAULT_TYPE):
 
     cq = update.callback_query
+
+    # محدودیت در گروه (بدون پیام)
+    allowed = await is_admin(update, context)
+    if update.effective_chat.type != "private" and not allowed:
+        return  # سکوت کامل
+
     await cq.answer()
 
     track_id = cq.data.split(":")[1]
@@ -178,12 +224,10 @@ async def music_select_handler(update, context: ContextTypes.DEFAULT_TYPE):
 
     loop = asyncio.get_running_loop()
 
-    # دانلود فایل
     info, file = await loop.run_in_executor(
         executor, _sc_download_sync, track["webpage_url"]
     )
 
-    # تبدیل به mp3
     mp3 = await loop.run_in_executor(executor, _mp3_convert_sync, file)
 
     with open(mp3, "rb") as f:
