@@ -1489,7 +1489,8 @@ application.add_handler(
     MessageHandler(filters.TEXT & ~filters.COMMAND, instagram_handler),
     group=-1500
 )
-
+from modules.youtube_search_downloader import youtube_search_handler, youtube_quality_handler
+from telegram.ext import MessageHandler, CallbackQueryHandler, filters
 # مرحله ۱ — دریافت لینک YouTube
 application.add_handler(
     MessageHandler(
