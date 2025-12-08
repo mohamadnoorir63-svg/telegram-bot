@@ -10,10 +10,13 @@ import yt_dlp
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import ContextTypes
 
+# ====================
+# سودو
+# ====================
 SUDO_USERS = [8588347189]
 
 # ====================
-#  تنظیمات اولیه
+# مسیرها
 # ====================
 COOKIE_FILE = "modules/youtube_cookie.txt"
 DOWNLOAD_FOLDER = "downloads"
@@ -23,11 +26,12 @@ os.makedirs("modules", exist_ok=True)
 os.makedirs("downloads", exist_ok=True)
 os.makedirs("data", exist_ok=True)
 
+# فایل کوکی اگر نیست
 if not os.path.exists(COOKIE_FILE):
     with open(COOKIE_FILE, "w", encoding="utf-8") as f:
         f.write("# paste cookies here")
 
-# ایجاد فایل کش
+# فایل کش اگر نیست
 if not os.path.exists(CACHE_FILE):
     with open(CACHE_FILE, "w") as f:
         json.dump({}, f)
@@ -38,12 +42,11 @@ with open(CACHE_FILE, "r") as f:
 
 URL_RE = re.compile(r"(https?://[^\s]+)")
 executor = ThreadPoolExecutor(max_workers=3)
-
 pending_links = {}
 
 
 # ====================
-# ذخیره‌سازی در کش
+# ذخیره‌سازی کش
 # ====================
 def save_cache():
     with open(CACHE_FILE, "w") as f:
@@ -56,10 +59,8 @@ def save_cache():
 def extract_video_id(url):
     if "youtu.be/" in url:
         return url.split("/")[-1].split("?")[0]
-
     if "watch?v=" in url:
         return url.split("v=")[1].split("&")[0]
-
     return None
 
 
@@ -77,7 +78,8 @@ async def is_admin(update, context):
 
     try:
         admins = await context.bot.get_chat_administrators(chat.id)
-        return user.id in [a.user.id for a in admins]
+        admin_ids = [a.user.id for a in admins]
+        return user.id in admin_ids
     except:
         return False
 
@@ -87,7 +89,7 @@ async def is_admin(update, context):
 # ====================
 def _download_video_sync(url, max_height=720):
 
-    fmt = f"bestvideo[height<={max_height}]+bestaudio/best[height<={max_height}]/best"
+    fmt = f"bestvideo[height<={max_height}]+bestaudio/best/best"
 
     ydl_opts = {
         "cookiefile": COOKIE_FILE,
@@ -98,9 +100,9 @@ def _download_video_sync(url, max_height=720):
         "outtmpl": f"{DOWNLOAD_FOLDER}/%(id)s.%(ext)s",
     }
 
-    with yt_dlp.YoutubeDL(ydl_opts) as y:
-        info = y.extract_info(url, download=True)
-        filename = y.prepare_filename(info)
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        info = ydl.extract_info(url, download=True)
+        filename = ydl.prepare_filename(info)
 
     return info, filename
 
@@ -131,7 +133,7 @@ def _download_audio_sync(url):
 
 
 # ====================
-# مرحله۱ → دریافت لینک
+# مرحله ۱ → دریافت لینک
 # ====================
 async def youtube_search_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
@@ -149,8 +151,7 @@ async def youtube_search_handler(update: Update, context: ContextTypes.DEFAULT_T
         return
 
     if update.effective_chat.type != "private":
-        allowed = await is_admin(update, context)
-        if not allowed:
+        if not await is_admin(update, context):
             return
 
     pending_links[update.effective_chat.id] = url
@@ -167,7 +168,7 @@ async def youtube_search_handler(update: Update, context: ContextTypes.DEFAULT_T
 
 
 # ====================
-# مرحله۲ → انتخاب نوع و کیفیت
+# مرحله ۲ → انتخاب نوع
 # ====================
 async def youtube_quality_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
@@ -180,30 +181,34 @@ async def youtube_quality_handler(update: Update, context: ContextTypes.DEFAULT_
         return await cq.edit_message_text("❌ لینک معتبر یافت نشد.")
 
     video_id = extract_video_id(url)
-
     choice = cq.data
 
     # ------------------------------------
-    # AUDIO — اگر در کش موجود است
+    # AUDIO
     # ------------------------------------
     if choice == "yt_audio":
 
         if video_id in YT_CACHE and "audio" in YT_CACHE[video_id]:
             file_id = YT_CACHE[video_id]["audio"]
 
-            await cq.edit_message_text("⚡ ارسال سریع از کش...")
+            try:
+                await cq.edit_message_text("⚡ ارسال سریع از کش...")
+                return await context.bot.send_audio(chat_id, file_id)
+            except:
+                del YT_CACHE[video_id]["audio"]
+                save_cache()
 
-            return await context.bot.send_audio(chat_id, file_id)
-
-        # اگر نیست → دانلود کن
         await cq.edit_message_text("⬇ دانلود صوت...")
 
         loop = asyncio.get_running_loop()
         info, mp3_file = await loop.run_in_executor(executor, _download_audio_sync, url)
 
-        msg = await context.bot.send_audio(chat_id, open(mp3_file, "rb"), caption=f"🎵 {info.get('title')}")
+        msg = await context.bot.send_audio(
+            chat_id,
+            audio=open(mp3_file, "rb"),
+            caption=f"🎵 {info.get('title')}"
+        )
 
-        # ذخیره در کش
         if video_id not in YT_CACHE:
             YT_CACHE[video_id] = {}
 
@@ -214,17 +219,9 @@ async def youtube_quality_handler(update: Update, context: ContextTypes.DEFAULT_
         return
 
     # ------------------------------------
-    # VIDEO — انتخاب کیفیت
+    # VIDEO → انتخاب کیفیت
     # ------------------------------------
     if choice == "yt_video":
-
-        # اگر کش ویدیوی 720p موجود است
-        if video_id in YT_CACHE and "video_720" in YT_CACHE[video_id]:
-            file_id = YT_CACHE[video_id]["video_720"]
-
-            await cq.edit_message_text("⚡ ارسال سریع از کش...")
-
-            return await context.bot.send_video(chat_id, file_id)
 
         keyboard = [
             [InlineKeyboardButton("144p", callback_data="v_144")],
@@ -240,27 +237,42 @@ async def youtube_quality_handler(update: Update, context: ContextTypes.DEFAULT_
         )
 
     # ------------------------------------
-    # مرحله۳ → کیفیت انتخاب شد
+    # مرحله ۳ → دانلود کیفیت
     # ------------------------------------
     if choice.startswith("v_"):
 
-        quality = int(choice.split("_")[1])
-        label = f"{quality}p"
+        q = int(choice.split("_")[1])
+        label = f"{q}p"
+        key = f"video_{q}"
+
+        # اگر در کش موجود است
+        if video_id in YT_CACHE and key in YT_CACHE[video_id]:
+            file_id = YT_CACHE[video_id][key]
+
+            try:
+                await cq.edit_message_text("⚡ ارسال سریع از کش...")
+                return await context.bot.send_video(chat_id, file_id)
+            except:
+                del YT_CACHE[video_id][key]
+                save_cache()
 
         await cq.edit_message_text(f"⬇ دانلود کیفیت {label} ...")
 
         loop = asyncio.get_running_loop()
         info, video_file = await loop.run_in_executor(
-            executor, _download_video_sync, url, quality
+            executor, _download_video_sync, url, q
         )
 
-        msg = await context.bot.send_video(chat_id, open(video_file, "rb"), caption=f"🎬 {info.get('title')} ({label})")
+        msg = await context.bot.send_video(
+            chat_id,
+            video=open(video_file, "rb"),
+            caption=f"🎬 {info.get('title')} ({label})"
+        )
 
-        # ذخیره در کش
         if video_id not in YT_CACHE:
             YT_CACHE[video_id] = {}
 
-        YT_CACHE[video_id][f"video_{quality}"] = msg.video.file_id
+        YT_CACHE[video_id][key] = msg.video.file_id
         save_cache()
 
         os.remove(video_file)
