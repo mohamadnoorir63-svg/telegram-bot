@@ -1469,10 +1469,17 @@ application.add_handler(
     MessageHandler(filters.TEXT & ~filters.COMMAND, tiktok_handler),
     group=-1000
 )
-from modules.soundcloud_handler import soundcloud_handler, music_select_handler
 from telegram.ext import MessageHandler, filters, CallbackQueryHandler
+from modules.soundcloud_handler import soundcloud_handler, music_select_handler
 
-# جستجو با فرمان سه‌زبانه آهنگ / music / اغنية
+# ================================
+#   SOUNDLOUD SEARCH + YOUTUBE FALLBACK
+# ================================
+
+# فرمان سه زبانه:
+# فارسی → "آهنگ ..."
+# انگلیسی → "music ..."
+# عربی → "اغنية ..." یا "أغنية ..."
 application.add_handler(
     MessageHandler(
         filters.TEXT & filters.Regex(r"^(آهنگ|music|اغنية|أغنية)\s+"),
@@ -1481,7 +1488,7 @@ application.add_handler(
     group=-2000
 )
 
-# دکمه انتخاب آهنگ
+# دکمه انتخاب آهنگ (Callback)
 application.add_handler(
     CallbackQueryHandler(music_select_handler, pattern=r"^music_select:"),
     group=-2000
