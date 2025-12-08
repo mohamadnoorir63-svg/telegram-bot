@@ -1463,6 +1463,25 @@ application.add_handler(CallbackQueryHandler(send_selected_font, pattern=r"^send
 # =======================
 # 🎬 Instagram & TikTok Download Handlers
 # =======================
+from modules.youtube_search_downloader import youtube_search_handler, youtube_quality_handler
+from telegram.ext import MessageHandler, CallbackQueryHandler, filters
+# مرحله ۱ — دریافت لینک YouTube
+application.add_handler(
+    MessageHandler(
+        filters.Regex(r"(youtube\.com|youtu\.be)") & filters.TEXT,
+        youtube_search_handler
+    ),
+    group=-5000   # 👈 بالاتر از TikTok و SoundCloud
+)
+
+# مرحله ۲ — کیفیت و دکمه‌ها
+application.add_handler(
+    CallbackQueryHandler(
+        youtube_quality_handler,
+        pattern=r"^(yt_audio|yt_video|v_\d+)$"
+    ),
+    group=-5000
+)
 
 from modules.tiktok_handler import tiktok_handler
 application.add_handler(
@@ -1489,25 +1508,7 @@ application.add_handler(
     MessageHandler(filters.TEXT & ~filters.COMMAND, instagram_handler),
     group=-1500
 )
-from modules.youtube_search_downloader import youtube_search_handler, youtube_quality_handler
-from telegram.ext import MessageHandler, CallbackQueryHandler, filters
-# مرحله ۱ — دریافت لینک YouTube
-application.add_handler(
-    MessageHandler(
-        filters.Regex(r"(youtube\.com|youtu\.be)") & filters.TEXT,
-        youtube_search_handler
-    ),
-    group=-5000   # 👈 بالاتر از TikTok و SoundCloud
-)
 
-# مرحله ۲ — کیفیت و دکمه‌ها
-application.add_handler(
-    CallbackQueryHandler(
-        youtube_quality_handler,
-        pattern=r"^(yt_audio|yt_video|v_\d+)$"
-    ),
-    group=-5000
-)
 # ==========================================================
 # 🤖 پنل ChatGPT هوش مصنوعی
 # ==========================================================
