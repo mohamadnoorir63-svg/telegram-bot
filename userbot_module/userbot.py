@@ -276,22 +276,19 @@ async def handle_commands(event):
         await cleanup_via_userbot(chat_id, last_msg_id=last_msg_id)
         # ================================
 #     YOUTUBE DOWNLOADER USERBOT
-#   (No Cookie Errors – No SABR)
 # ================================
-
 import os
 import yt_dlp
+import re
 from telethon import events
 
 COOKIE_FILE = "modules/youtube_cookie.txt"
 DOWNLOAD_FOLDER = "downloads"
 os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
 
-# تشخیص لینک
-import re
 URL_RE = re.compile(r"(https?://[^\s]+)")
 
-
+@client.on(events.NewMessage)
 async def userbot_youtube_download(event):
     text = event.raw_text.strip()
     match = URL_RE.search(text)
@@ -300,23 +297,18 @@ async def userbot_youtube_download(event):
     
     url = match.group(1)
 
+    # فقط لینک یوتیوب
     if "youtube.com" not in url and "youtu.be" not in url:
         return
 
-    await event.reply("📥 **در حال دانلود از یوتیوب... صبر کنید**")
+    await event.reply("📥 **یوزربات: در حال دانلود از یوتیوب...**")
 
-    # -------------------------------
-    # تنظیمات yt-dlp مخصوص USERBOT
-    # بدون SABR — بدون محدودیت — بدون خطا
-    # -------------------------------
     ydl_opts = {
         "cookiefile": COOKIE_FILE,
         "quiet": True,
         "format": "bestaudio/best",
         "noplaylist": True,
         "outtmpl": f"{DOWNLOAD_FOLDER}/%(id)s.%(ext)s",
-
-        # تبدیل خودکار به mp3
         "postprocessors": [
             {
                 "key": "FFmpegExtractAudio",
@@ -344,7 +336,6 @@ async def userbot_youtube_download(event):
 
     except Exception as e:
         await event.reply(f"❌ **خطا در دانلود یوتیوب:**\n`{e}`")
-
 # ---------- لفت ----------
 
 @client.on(events.NewMessage)
