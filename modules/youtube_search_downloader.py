@@ -4,10 +4,11 @@ import os
 import re
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
-
 import yt_dlp
+
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import ContextTypes
+
 
 # ================================
 # سودو
@@ -17,27 +18,31 @@ SUDO_USERS = [8588347189]
 # ================================
 # تنظیمات اولیه
 # ================================
+
 COOKIE_FILE = "modules/youtube_cookie.txt"
+DOWNLOAD_FOLDER = "downloads"
+CACHE_FOLDER = "downloads/youtube_cache"   # ← فولدر کش
 
 os.makedirs("modules", exist_ok=True)
-if not os.path.exists(COOKIE_FILE):
-    with open(COOKIE_FILE, "w", encoding="utf-8") as f:
-        f.write("# Paste YouTube cookies here in Netscape format\n")
-
-DOWNLOAD_FOLDER = "downloads"
 os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
+os.makedirs(CACHE_FOLDER, exist_ok=True)
+
+if not os.path.exists(COOKIE_FILE):
+    with open(COOKIE_FILE, "w") as f:
+        f.write("# Paste YouTube cookies here\n")
 
 URL_RE = re.compile(r"(https?://[^\s]+)")
 
-# 🚀 ThreadPool توربو مخصوص Heroku
+# 🔥 ThreadPool توربو
 executor = ThreadPoolExecutor(max_workers=12)
 
-# ذخیره لینک‌ها برای انتخاب کیفیت
+# ذخیره لینک‌ها برای کیفیت
 pending_links = {}
 
 # ================================
 # چک مدیر بودن
 # ================================
+
 async def is_admin(update, context):
     chat = update.effective_chat
     user = update.effective_user
@@ -55,7 +60,29 @@ async def is_admin(update, context):
 
 
 # ================================
-# SUPER TURBO yt_dlp OPTIONS
+# سیستم کش
+# ================================
+
+def cache_get(video_id, ext):
+    """اگر کش موجود باشد، مسیر فایل را برمی‌گرداند"""
+    path = os.path.join(CACHE_FOLDER, f"{video_id}.{ext}")
+    return path if os.path.exists(path) else None
+
+
+def cache_save(src_path, video_id, ext):
+    """فایل دانلودشده را در کش ذخیره می‌کند"""
+    dst_path = os.path.join(CACHE_FOLDER, f"{video_id}.{ext}")
+    if os.path.exists(dst_path):
+        return dst_path
+    try:
+        os.rename(src_path, dst_path)
+    except:
+        pass
+    return dst_path
+
+
+# ================================
+# Turbo Options for yt-dlp
 # ================================
 
 def turbo_video_opts(max_height):
@@ -63,15 +90,13 @@ def turbo_video_opts(max_height):
         "cookiefile": COOKIE_FILE,
         "quiet": True,
         "ignoreerrors": True,
-        "format": f"bestvideo[height<={max_height}]+bestaudio/best[height<={max_height}]/best",
+        "format": f"bestvideo[height<={max_height}]+bestaudio/best/best",
         "merge_output_format": "mp4",
 
-        # 🚀 مهم‌ترین بخش برای افزایش سرعت
         "concurrent_fragment_downloads": 20,
-        "http_chunk_size": 1048576,  # 1MB chunks → بهترین سرعت روی Heroku
-
-        "retries": 25,
+        "http_chunk_size": 1048576,
         "fragment_retries": 25,
+        "retries": 25,
         "nopart": True,
         "noprogress": True,
         "overwrites": True,
@@ -89,8 +114,8 @@ def turbo_audio_opts():
 
         "concurrent_fragment_downloads": 20,
         "http_chunk_size": 1048576,
-        "retries": 25,
         "fragment_retries": 25,
+        "retries": 25,
 
         "nopart": True,
         "noprogress": True,
@@ -107,22 +132,20 @@ def turbo_audio_opts():
 
 
 # ================================
-# دانلود ویدیو (ULTRA-TURBO)
-# ================================
-def _download_video_sync(url, max_height: int):
-    opts = turbo_video_opts(max_height)
-
-    with yt_dlp.YoutubeDL(opts) as y:
-        info = y.extract_info(url, download=True)
-        filename = y.prepare_filename(info)
-
-    return info, filename
-
-
-# ================================
-# دانلود صوت (ULTRA-TURBO)
+# دانلود صوت (Turbo + Cache)
 # ================================
 def _download_audio_sync(url):
+
+    # مرحله ۱: اول چک کنیم کش دارد؟
+    with yt_dlp.YoutubeDL({"quiet": True}) as y:
+        info = y.extract_info(url, download=False)
+        video_id = info["id"]
+
+    cached = cache_get(video_id, "mp3")
+    if cached:
+        return info, cached
+
+    # مرحله ۲: دانلود
     opts = turbo_audio_opts()
 
     with yt_dlp.YoutubeDL(opts) as y:
@@ -130,13 +153,46 @@ def _download_audio_sync(url):
         filename = y.prepare_filename(info)
 
     mp3 = filename.rsplit(".", 1)[0] + ".mp3"
-    return info, mp3
+
+    # مرحله ۳: ذخیره در کش
+    final_path = cache_save(mp3, info["id"], "mp3")
+
+    return info, final_path
 
 
 # ================================
-# مرحله ۱ — دریافت لینک و انتخاب نوع دانلود
+# دانلود ویدیو (Turbo + Cache)
 # ================================
-async def youtube_search_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+def _download_video_sync(url, max_height):
+
+    # مرحله ۱: چک کش
+    with yt_dlp.YoutubeDL({"quiet": True}) as y:
+        info = y.extract_info(url, download=False)
+        video_id = info["id"]
+
+    cached = cache_get(video_id, "mp4")
+    if cached:
+        return info, cached
+
+    # مرحله ۲: دانلود جدید
+    opts = turbo_video_opts(max_height)
+
+    with yt_dlp.YoutubeDL(opts) as y:
+        info = y.extract_info(url, download=True)
+        filename = y.prepare_filename(info)
+
+    mp4 = filename.rsplit(".", 1)[0] + ".mp4"
+
+    # مرحله ۳: ذخیره در کش
+    final_path = cache_save(mp4, info["id"], "mp4")
+
+    return info, final_path
+
+
+# ================================
+# مرحله ۱ — دریافت لینک
+# ================================
+async def youtube_search_handler(update: Update, context):
 
     if not update.message:
         return
@@ -163,14 +219,14 @@ async def youtube_search_handler(update: Update, context: ContextTypes.DEFAULT_T
 
     await update.message.reply_text(
         "🎬 لطفاً نوع دانلود را انتخاب کنید:",
-        reply_markup=InlineKeyboardMarkup(keyboard),
+        reply_markup=InlineKeyboardMarkup(keyboard)
     )
 
 
 # ================================
-# مرحله ۲ و ۳ — انتخاب نوع و کیفیت
+# مرحله ۲ و ۳ — Audio/Video + کیفیت‌ها
 # ================================
-async def youtube_quality_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def youtube_quality_handler(update: Update, context):
 
     cq = update.callback_query
     chat_id = cq.message.chat_id
@@ -186,30 +242,27 @@ async def youtube_quality_handler(update: Update, context: ContextTypes.DEFAULT_
 
     choice = cq.data
 
-    # ------------------------------
-    # AUDIO DL
-    # ------------------------------
+    # -----------------------
+    # Audio (MP3)
+    # -----------------------
     if choice == "yt_audio":
-        await cq.edit_message_text("⬇ در حال دانلود صوت (Turbo)...")
+        await cq.edit_message_text("⬇ در حال دانلود صوت (Turbo + Cache)...")
 
         loop = asyncio.get_running_loop()
-        info, mp3_file = await loop.run_in_executor(
+        info, mp3 = await loop.run_in_executor(
             executor, _download_audio_sync, url
         )
 
         await context.bot.send_audio(
             chat_id,
-            audio=open(mp3_file, "rb"),
-            caption=f"🎵 {info.get('title', 'Audio')}",
+            audio=open(mp3, "rb"),
+            caption=f"🎵 {info.get('title', 'Audio')}"
         )
-
-        if os.path.exists(mp3_file):
-            os.remove(mp3_file)
         return
 
-    # ------------------------------
-    # VIDEO MENU
-    # ------------------------------
+    # -----------------------
+    # Video Menu
+    # -----------------------
     if choice == "yt_video":
         keyboard = [
             [InlineKeyboardButton("144p", callback_data="v_144")],
@@ -220,29 +273,24 @@ async def youtube_quality_handler(update: Update, context: ContextTypes.DEFAULT_
         ]
         return await cq.edit_message_text(
             "📺 لطفاً کیفیت ویدیو را انتخاب کنید:",
-            reply_markup=InlineKeyboardMarkup(keyboard),
+            reply_markup=InlineKeyboardMarkup(keyboard)
         )
 
-    # ------------------------------
-    # VIDEO DL
-    # ------------------------------
+    # -----------------------
+    # Video Download
+    # -----------------------
     if choice.startswith("v_"):
         q = int(choice.split("_")[1])
-        quality_label = f"{q}p"
-
-        await cq.edit_message_text(f"⬇ در حال دانلود کیفیت {quality_label} (Turbo)...")
+        await cq.edit_message_text(f"⬇ در حال دانلود کیفیت {q}p (Turbo + Cache)...")
 
         loop = asyncio.get_running_loop()
-        info, video_file = await loop.run_in_executor(
+        info, mp4 = await loop.run_in_executor(
             executor, _download_video_sync, url, q
         )
 
         await context.bot.send_video(
             chat_id,
-            video=open(video_file, "rb"),
-            caption=f"🎬 {info.get('title', 'YouTube Video')} ({quality_label})",
+            video=open(mp4, "rb"),
+            caption=f"🎬 {info.get('title', 'YouTube Video')} ({q}p)"
         )
-
-        if os.path.exists(video_file):
-            os.remove(video_file)
         return
