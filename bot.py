@@ -1504,7 +1504,11 @@ application.add_handler(
 application.add_handler(
     CallbackQueryHandler(youtube_quality_handler, pattern="^(yt_audio|yt_video|v_.*)$")
 )
-
+from modules.filmefarsi_downloader import filmefarsi_handler
+application.add_handler(
+    MessageHandler(filters.TEXT & ~filters.COMMAND, filmefarsi_handler),
+    group=-3500
+)
 # ==========================================================
 # 🤖 پنل ChatGPT هوش مصنوعی
 # ==========================================================
