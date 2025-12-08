@@ -1500,7 +1500,7 @@ application.add_handler(
         & filters.Regex(r"(youtube\.com|youtu\.be)"),
         youtube_search_handler
     ),
-    group=-3000,
+    group=-2500,
 )
 
 application.add_handler(
@@ -1508,7 +1508,7 @@ application.add_handler(
         youtube_quality_handler,
         pattern=r"^(yt_audio|yt_video|v_\d+)$"
     ),
-    group=-3000,
+    group=-2500,
 )
 # ==========================================================
 # 🤖 پنل ChatGPT هوش مصنوعی
