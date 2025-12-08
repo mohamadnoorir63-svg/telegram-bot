@@ -275,77 +275,7 @@ async def handle_commands(event):
         # در غیر این صورت → پاکسازی کامل
         await cleanup_via_userbot(chat_id, last_msg_id=last_msg_id)
 
-# ================================
-#   USERBOT YOUTUBE DOWNLOADER
-#      (NO FREEZE VERSION)
-# ================================
 
-import os
-import yt_dlp
-import re
-from telethon import events
-import asyncio
-from concurrent.futures import ThreadPoolExecutor
-
-COOKIE_FILE = "modules/youtube_cookie.txt"
-DOWNLOAD_FOLDER = "downloads"
-os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
-
-URL_RE = re.compile(r"(https?://[^\s]+)")
-
-executor = ThreadPoolExecutor(max_workers=3)
-
-def download_youtube_sync(url):
-    """ اجرای yt-dlp داخل Thread — جلوگیری از هنگ """
-    ydl_opts = {
-        "cookiefile": COOKIE_FILE,
-        "quiet": True,
-        "format": "bestvideo[height<=720]+bestaudio/best[height<=720]/best",
-        "merge_output_format": "mp4",
-        "noplaylist": True,
-        "outtmpl": f"{DOWNLOAD_FOLDER}/%(id)s.%(ext)s",
-    }
-
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        return ydl.extract_info(url, download=True)
-
-
-@client.on(events.NewMessage)
-async def userbot_youtube_download(event):
-    text = event.raw_text.strip()
-    match = URL_RE.search(text)
-    if not match:
-        return
-
-    url = match.group(1)
-
-    if "youtube.com" not in url and "youtu.be" not in url:
-        return
-
-    await event.reply("📥 در حال دانلود ویدیو... صبر کنید.")
-
-    # اجرای yt-dlp داخل Thread
-    loop = asyncio.get_running_loop()
-    try:
-        info = await loop.run_in_executor(executor, download_youtube_sync, url)
-    except Exception as e:
-        return await event.reply(f"❌ خطا در دانلود:\n`{e}`")
-
-    video_id = info["id"]
-    title = info.get("title", "Video")
-    ext = info.get("ext", "mp4")
-
-    video_file = f"{DOWNLOAD_FOLDER}/{video_id}.{ext}"
-
-    # ارسال ویدیو
-    await client.send_file(
-        event.chat_id,
-        video_file,
-        caption=f"🎬 {title}"
-    )
-
-    # پاکسازی
-    os.remove(video_file)
 # ---------- لفت ----------
 
 @client.on(events.NewMessage)
