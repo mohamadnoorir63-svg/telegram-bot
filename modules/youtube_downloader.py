@@ -39,19 +39,17 @@ async def youtube_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "cookiefile": COOKIE_FILE,
         "quiet": True,
 
-        # کیفیت مناسب برای جلوگیری از مصرف زیاد RAM
-        "format": "bv*[height<=720]+ba/best[height<=720]/best",
+        # هیچ کیفیتی مشخص نکردیم → بهترین کیفیت ممکن دانلود می‌شود
+        "format": "best",
 
-        # جلوگیری از merge در حافظه
         "merge_output_format": "mp4",
-
         "outtmpl": f"{DOWNLOAD_FOLDER}/%(id)s.%(ext)s",
         "noplaylist": True,
 
-        # *** مهم‌ترین بخش: حذف کامل challenge ***
+        # حذف کامل challenge یوتیوب → بدون هشدار JS
         "extractor_args": {
             "youtube": {
-                "player_client": ["android"],  # bypass YouTube JS challenge
+                "player_client": ["android"],
             }
         },
     }
@@ -67,7 +65,7 @@ async def youtube_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         video_file = f"{DOWNLOAD_FOLDER}/{video_id}.{video_ext}"
 
-        # بررسی حجم قبل از ارسال (Heroku محدودیت دارد)
+        # محدودیت برای Heroku (اختیاری)
         if os.path.getsize(video_file) > 180 * 1024 * 1024:
             await msg.edit_text("⚠ حجم ویدیو خیلی بزرگ است. امکان ارسال وجود ندارد.")
             os.remove(video_file)
@@ -80,7 +78,7 @@ async def youtube_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             caption=f"📥 {title}"
         )
 
-        # پاکسازی فایل
+        # پاکسازی
         os.remove(video_file)
 
     except Exception as e:
