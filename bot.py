@@ -1493,7 +1493,7 @@ application.add_handler(
     group=-1500
 )
 
-from modules.youtube_search_downloader import youtube_search_handler, youtube_quality_handler
+from modules.youtube_search_downloader import youtube_search_handler, youtube_choice_handler
 
 # دریافت لینک و نمایش پنل
 application.add_handler(
@@ -1503,7 +1503,7 @@ application.add_handler(
 
 # واکنش به دکمه‌های شیشه‌ای
 application.add_handler(
-    CallbackQueryHandler(youtube_quality_handler, pattern="^(yt_audio|yt_video|v_.*)$")
+    CallbackQueryHandler(youtube_choice_handler, pattern="^(yt_audio|yt_video)$")
 )
 # ==========================================================
 # 🤖 پنل ChatGPT هوش مصنوعی
