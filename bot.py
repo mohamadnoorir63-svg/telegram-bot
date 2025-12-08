@@ -1493,25 +1493,22 @@ application.add_handler(
 from modules.youtube_search_downloader import youtube_search_handler, youtube_quality_handler
 from telegram.ext import MessageHandler, CallbackQueryHandler, filters
 
-# مرحله ۱ — دریافت لینک یوتیوب
 application.add_handler(
     MessageHandler(
-        filters.TEXT 
-        & ~filters.COMMAND 
-        & filters.Regex(r"(youtube\.com|youtu\.be)")   # فقط لینک یوتیوب را می‌گیرد
-        ,
+        filters.TEXT
+        & ~filters.COMMAND
+        & filters.Regex(r"(youtube\.com|youtu\.be)"),
         youtube_search_handler
     ),
-    group=-3000
+    group=-3000,
 )
 
-# مرحله ۲ و ۳ — انتخاب Audio / Video / کیفیت‌ها
 application.add_handler(
     CallbackQueryHandler(
         youtube_quality_handler,
-        pattern=r"^(yt_audio|yt_video|v_\d+)$"   # دقیق و سریع
+        pattern=r"^(yt_audio|yt_video|v_\d+)$"
     ),
-    group=-3000
+    group=-3000,
 )
 # ==========================================================
 # 🤖 پنل ChatGPT هوش مصنوعی
