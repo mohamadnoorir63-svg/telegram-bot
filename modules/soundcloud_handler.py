@@ -3,15 +3,17 @@ import os
 import shutil
 import subprocess
 import yt_dlp
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
+from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import ContextTypes
 
 DOWNLOAD_FOLDER = "downloads"
 os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
 
+executor = ThreadPoolExecutor(max_workers=5)
 track_store = {}
 
-# پیام‌های سه‌زبانه
 LANG_MESSAGES = {
     "fa": {
         "searching": "🔍 در حال جستجو در SoundCloud ...",
@@ -30,17 +32,29 @@ LANG_MESSAGES = {
     },
 }
 
-# تبدیل به MP3
-async def convert_to_mp3(file_path: str) -> str:
-    mp3_path = file_path.rsplit(".", 1)[0] + ".mp3"
+def _download_track_sync(url):
+    """ اجرای yt-dlp داخل Thread — بدون هنگ """
+    ydl_opts = {
+        "format": "bestaudio/best",
+        "quiet": True,
+        "outtmpl": os.path.join(DOWNLOAD_FOLDER, "%(id)s.%(ext)s"),
+    }
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        info = ydl.extract_info(url, download=True)
+        filename = ydl.prepare_filename(info)
+    return info, filename
+
+
+def _convert_to_mp3_sync(filepath):
+    """ ffmpeg داخل Thread — بدون هنگ """
+    mp3_path = filepath.rsplit(".", 1)[0] + ".mp3"
     if not shutil.which("ffmpeg"):
         return None
-    cmd = [
-        "ffmpeg", "-y", "-i", file_path,
+    subprocess.run([
+        "ffmpeg", "-y", "-i", filepath,
         "-vn", "-ab", "192k", "-ar", "44100",
-        "-f", "mp3", mp3_path
-    ]
-    subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        mp3_path
+    ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     return mp3_path
 
 
@@ -49,109 +63,72 @@ async def soundcloud_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
         return
 
     text = update.message.text.strip()
-    chat_id = update.effective_chat.id
 
     triggers = ["آهنگ ", "music ", "اغنية ", "أغنية "]
-
     if not any(text.lower().startswith(t) for t in triggers):
         return
 
-    lang = "fa"  # پیش‌فرض فارسی
+    lang = "fa"
     for t in triggers:
         if text.lower().startswith(t):
             query = text[len(t):].strip()
-            if t.startswith("music"):
-                lang = "en"
-            elif t.startswith(("اغنية", "أغنية")):
-                lang = "ar"
+            lang = "en" if t.startswith("music") else ("ar" if t.startswith(("اغنية","أغنية")) else "fa")
             break
 
-    if not query:
-        await update.message.reply_text("❌ لطفاً نام یا متن آهنگ را وارد کنید.")
-        return
+    msg = await update.message.reply_text(LANG_MESSAGES[lang]["searching"])
 
-    # ذخیره زبان برای callback
-    context.user_data["music_lang"] = lang
-
-    searching_text = LANG_MESSAGES.get(lang, LANG_MESSAGES["fa"])["searching"]
-    msg = await update.message.reply_text(searching_text)
-
-    ydl_opts = {
-        "format": "bestaudio/best",
-        "quiet": True,
-        "noplaylist": True,
-        "outtmpl": os.path.join(DOWNLOAD_FOLDER, "%(id)s.%(ext)s"),
-    }
+    # جستجو در Thread (ممنوع داخل async)
+    def search_soundcloud():
+        with yt_dlp.YoutubeDL({"quiet": True}) as ydl:
+            return ydl.extract_info(f"scsearch10:{query}", download=False)
 
     try:
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(f"scsearch10:{query}", download=False)
+        loop = asyncio.get_running_loop()
+        info = await loop.run_in_executor(executor, search_soundcloud)
+    except:
+        return await msg.edit_text("❌ خطا در جستجو.")
 
-            if not info or "entries" not in info or not info["entries"]:
-                await msg.edit_text("❌ آهنگ پیدا نشد.")
-                return
+    if not info or "entries" not in info:
+        return await msg.edit_text("❌ هیچ آهنگی پیدا نشد.")
 
-            track_store[chat_id] = info["entries"]
+    track_store[update.effective_chat.id] = info["entries"]
 
-            keyboard = []
-            for track in info["entries"]:
-                track_id = track.get("id")
-                title = track.get("title", "SoundCloud Track")
-                keyboard.append([InlineKeyboardButton(title, callback_data=f"music_select:{track_id}")])
+    keyboard = [
+        [InlineKeyboardButton(t["title"], callback_data=f"music_select:{t['id']}")]
+        for t in info["entries"]
+    ]
 
-            select_song_text = LANG_MESSAGES.get(lang, LANG_MESSAGES["fa"])["select_song"].format(n=len(info["entries"]))
-            await msg.edit_text(select_song_text, reply_markup=InlineKeyboardMarkup(keyboard))
-
-    except Exception as e:
-        await msg.edit_text(f"❌ خطا در جستجوی موزیک:\n{e}")
+    await msg.edit_text(
+        LANG_MESSAGES[lang]["select_song"].format(n=len(info["entries"])),
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
 
 
-# -------------------------------
-# هندلر انتخاب آهنگ
-# -------------------------------
 async def music_select_handler(update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
+
     track_id = query.data.split(":")[1]
     chat_id = query.message.chat_id
-
-    track_info = None
-    for track in track_store.get(chat_id, []):
-        if str(track.get("id")) == str(track_id):
-            track_info = track
-            break
-
-    if not track_info:
-        await query.edit_message_text("❌ خطا: آهنگ پیدا نشد.")
-        return
-
     lang = context.user_data.get("music_lang", "fa")
-    downloading_text = LANG_MESSAGES.get(lang, LANG_MESSAGES["fa"])["downloading"]
 
-    msg = await query.edit_message_text(downloading_text)
+    track = next((t for t in track_store.get(chat_id, []) if str(t["id"]) == track_id), None)
+    if not track:
+        return await query.edit_message_text("❌ آهنگ پیدا نشد.")
 
-    ydl_opts = {
-        "format": "bestaudio/best",
-        "quiet": True,
-        "outtmpl": os.path.join(DOWNLOAD_FOLDER, "%(id)s.%(ext)s"),
-    }
+    msg = await query.edit_message_text(LANG_MESSAGES[lang]["downloading"])
 
-    try:
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(track_info["webpage_url"], download=True)
-            filename = ydl.prepare_filename(info)
+    loop = asyncio.get_running_loop()
 
-        mp3_path = await convert_to_mp3(filename)
-        if mp3_path and os.path.exists(mp3_path):
-            await context.bot.send_audio(chat_id, mp3_path, caption=f"🎵 {info.get('title','SoundCloud')}")
-            os.remove(mp3_path)
-        else:
-            await context.bot.send_document(chat_id, filename, caption=f"🎵 {info.get('title','SoundCloud')}")
+    # دانلود آهنگ داخل Thread
+    info, filename = await loop.run_in_executor(executor, _download_track_sync, track["webpage_url"])
 
-        if os.path.exists(filename):
-            os.remove(filename)
+    # تبدیل به MP3 داخل Thread
+    mp3_path = await loop.run_in_executor(executor, _convert_to_mp3_sync, filename)
 
-        await msg.delete()
+    if mp3_path and os.path.exists(mp3_path):
+        await context.bot.send_audio(chat_id, mp3_path, caption=f"🎵 {info.get('title')}")
+        os.remove(mp3_path)
 
-    except Exception as e:
-        await query.edit_message_text(f"❌ خطا در دانلود آهنگ:\n{e}")
+    os.remove(filename)
+    await msg.delete()
