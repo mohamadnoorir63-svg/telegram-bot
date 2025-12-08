@@ -1,139 +1,147 @@
 # modules/soundcloud_handler.py
 import os
-import yt_dlp
 import asyncio
-from concurrent.futures import ThreadPoolExecutor
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+import yt_dlp
+from concurrent.futures import ProcessPoolExecutor
+from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import ContextTypes
 
+# ================================
+# سودوها
+# ================================
+SUDO_USERS = [8588347189]   # ← آیدی شما
+
+# ================================
+# تنظیمات پایه
+# ================================
 DOWNLOAD_FOLDER = "downloads"
 os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
 
-COOKIE_FILE = "modules/youtube_cookie.txt"   # اگر کوکی داری اینجا بزار
+COOKIE_FILE = "modules/youtube_cookie.txt"
 
-executor = ThreadPoolExecutor(max_workers=12)
+# استفاده از ProcessPoolExecutor برای سرعت وحشی روی تمام هسته‌های CPU
+executor = ProcessPoolExecutor(max_workers=os.cpu_count() or 4)
+
+# ذخیره‌ی نتایج جستجو برای هر چت
 track_store = {}
 
+# ================================
+# پیام‌ها سه زبانه
+# ================================
+LANG_MESSAGES = {
+    "fa": {
+        "searching": "🔍 در حال جستجو ... لطفاً صبر کنید",
+        "downloading": "⬇️ در حال دانلود آهنگ...",
+        "select_song": "🎵 {n} آهنگ پیدا شد — لطفاً انتخاب کنید:",
+        "notfound": "❌ در SoundCloud چیزی پیدا نشد. در حال جستجو در یوتیوب...",
+        "notfound_sc": "❌ در SoundCloud نتیجه‌ای یافت نشد.",
+        "download_error": "❌ در دانلود آهنگ خطایی رخ داد.",
+        "track_not_found": "❌ آهنگ پیدا نشد.",
+    },
+    "en": {
+        "searching": "🔍 Searching... please wait",
+        "downloading": "⬇️ Downloading...",
+        "select_song": "🎵 {n} songs found — choose one:",
+        "notfound": "❌ No results in SoundCloud. Searching YouTube...",
+        "notfound_sc": "❌ No SoundCloud results.",
+        "download_error": "❌ Error while downloading the track.",
+        "track_not_found": "❌ Track not found.",
+    },
+    "ar": {
+        "searching": "🔍 جاري البحث ... يرجى الانتظار",
+        "downloading": "⬇️ جاري تنزيل الأغنية...",
+        "select_song": "🎵 تم العثور على {n} أغنية — يرجى الاختيار:",
+        "notfound": "❌ لا توجد نتائج في ساوند كلاود. يتم البحث في يوتيوب...",
+        "notfound_sc": "❌ لا توجد نتائج في ساوند كلاود.",
+        "download_error": "❌ حدث خطأ أثناء تنزيل الأغنية.",
+        "track_not_found": "❌ لم يتم العثور على الأغنية.",
+    },
+}
 
 # ================================
-#  جستجو SoundCloud
+# تابع چک مدیر بودن
 # ================================
-def sc_search_sync(q):
-    with yt_dlp.YoutubeDL({"quiet": True}) as y:
-        return y.extract_info(f"scsearch10:{q}", download=False)
+async def is_admin(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
+    chat = update.effective_chat
+    user = update.effective_user
 
+    # پیوی → همه مجاز
+    if chat.type == "private":
+        return True
 
-# ================================
-#  دانلود سریع SoundCloud (بدون تبدیل)
-# ================================
-def sc_download_fast(url):
-    opts = {
-        "quiet": True,
-        "format": "bestaudio/best",
-        "concurrent_fragment_downloads": 10,
-        "fragment_retries": 20,
-        "retries": 20,
-        "outtmpl": f"{DOWNLOAD_FOLDER}/%(id)s.%(ext)s",
-    }
-    with yt_dlp.YoutubeDL(opts) as y:
-        info = y.extract_info(url, download=True)
-        filename = y.prepare_filename(info)
-    return info, filename
+    # سودو → همیشه مجاز
+    if user and user.id in SUDO_USERS:
+        return True
 
-
-# ================================
-#  fallback یوتیوب — ultra fast
-# ================================
-def yt_fast_sync(q):
-    opts = {
-        "quiet": True,
-        "cookiefile": COOKIE_FILE,
-        "format": "bestaudio/best",
-        "concurrent_fragment_downloads": 10,
-        "fragment_retries": 20,
-        "retries": 20,
-        "outtmpl": f"{DOWNLOAD_FOLDER}/%(id)s.%(ext)s",
-    }
-    with yt_dlp.YoutubeDL(opts) as y:
-        info = y.extract_info(f"ytsearch1:{q}", download=True)
-        if "entries" in info:
-            info = info["entries"][0]
-        filename = y.prepare_filename(info)
-    return info, filename
-
-
-# ================================
-#   Handler — جستجو
-# ================================
-async def soundcloud_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
-    text = update.message.text.strip()
-    if not text.startswith("آهنگ "):
-        return
-
-    query = text.replace("آهنگ ", "").strip()
-    msg = await update.message.reply_text("🔍 در حال جستجو در SoundCloud ...")
-
-    loop = asyncio.get_running_loop()
-
-    # جستجو SC
     try:
-        sc = await loop.run_in_executor(executor, sc_search_sync, query)
-    except:
-        sc = None
+        admins = await context.bot.get_chat_administrators(chat.id)
+        admin_ids = [a.user.id for a in admins]
+    except Exception:
+        return False
 
-    # اگر SC هیچی نبود → یوتیوب
-    if not sc or "entries" not in sc or len(sc["entries"]) == 0:
-        await msg.edit_text("❌ پیدا نشد — جستجو در یوتیوب...")
-
-        info, file = await loop.run_in_executor(executor, yt_fast_sync, query)
-
-        await msg.edit_text("⬇ ارسال...")
-        await update.message.reply_audio(audio=open(file, "rb"), caption=f"🎵 {info['title']}")
-        os.remove(file)
-        return
-
-    # اگر پیدا شد → لیست نشان بده
-    entries = sc["entries"]
-    track_store[update.effective_chat.id] = entries
-
-    keyboard = [
-        [InlineKeyboardButton(t["title"], callback_data=f"sc:{t['id']}")]
-        for t in entries
-    ]
-
-    await msg.edit_text(
-        f"🎵 {len(entries)} آهنگ پیدا شد — انتخاب کنید:",
-        reply_markup=InlineKeyboardMarkup(keyboard)
-    )
+    return user.id in admin_ids if user else False
 
 
 # ================================
-#   Handler — انتخاب آهنگ
+# تنظیمات مشترک yt_dlp (سریع و موازی)
 # ================================
-async def music_select_handler(update, context: ContextTypes.DEFAULT_TYPE):
+BASE_YTDLP_OPTS = {
+    "quiet": True,
+    "format": "bestaudio/best",
+    "outtmpl": os.path.join(DOWNLOAD_FOLDER, "%(id)s.%(ext)s"),
+    "noprogress": True,
+    "nopart": True,
+    "retries": 20,
+    "fragment_retries": 20,
+    "concurrent_fragment_downloads": 20,  # دانلود موازی قطعه‌ها → سرعت ماکس
+    "overwrites": True,
+    "postprocessors": [
+        {
+            "key": "FFmpegExtractAudio",
+            "preferredcodec": "mp3",
+            "preferredquality": "192",
+        }
+    ],
+}
 
-    cq = update.callback_query
-    await cq.answer()
 
-    chat_id = cq.message.chat_id
-    track_id = cq.data.split(":")[1]
+# ================================
+# کمک‌کننده: پیدا کردن مسیر mp3 از روی id
+# ================================
+def _find_mp3_by_id(track_id: str) -> str | None:
+    """
+    به صورت سریع در پوشه downloads دنبال فایلی می‌گردد که با id شروع شده و mp3 باشد.
+    """
+    expected = os.path.join(DOWNLOAD_FOLDER, f"{track_id}.mp3")
+    if os.path.exists(expected):
+        return expected
 
-    tracks = track_store.get(chat_id, [])
-    track = next((t for t in tracks if str(t["id"]) == track_id), None)
+    # در صورتی که نام کمی متفاوت باشد اما id در ابتدای نام باشد
+    for fname in os.listdir(DOWNLOAD_FOLDER):
+        if fname.startswith(track_id) and fname.endswith(".mp3"):
+            return os.path.join(DOWNLOAD_FOLDER, fname)
 
-    if not track:
-        return await cq.edit_message_text("❌ پیدا نشد.")
+    return None
 
-    await cq.edit_message_text("⬇ دانلود سریع...")
 
-    loop = asyncio.get_running_loop()
+# ================================
+# جستجو در SoundCloud (فوق‌سریع)
+# ================================
+def _sc_search_sync(query: str):
+    # تعداد نتایج را کم کردیم برای سرعت بیشتر (۳ به‌جای ۱۰)
+    opts = {"quiet": True}
+    with yt_dlp.YoutubeDL(opts) as ydl:
+        return ydl.extract_info(f"scsearch3:{query}", download=False)
 
-    info, file = await loop.run_in_executor(
-        executor, sc_download_fast, track["webpage_url"]
-    )
 
-    await context.bot.send_audio(chat_id, open(file, "rb"), caption=f"🎵 {info['title']}")
-
-    os.remove(file)
-    await cq.message.delete()
+# ================================
+# دانلود از SoundCloud (بدون تبدیل جداگانه)
+# ================================
+def _sc_download_sync(webpage_url: str):
+    opts = BASE_YTDLP_OPTS.copy()
+    with yt_dlp.YoutubeDL(opts) as ydl:
+        info = ydl.extract_info(webpage_url, download=True)
+        track_id = info.get("id")
+        mp3_path = _find_mp3_by_id(track_id) if track_id else None
+        if not mp3_path:
+            # fallback: اگر چیزی پیدا نشد، از prepare_filename
