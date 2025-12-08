@@ -1,3 +1,4 @@
+# modules/soundcloud_handler.py
 import yt_dlp
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
@@ -16,11 +17,10 @@ MSG = {
     }
 }
 
-
-# ================================
-# 1) گرفتن لینک مستقیم (بدون دانلود)
-# ================================
-def get_direct_link_sc(url):
+# ---------------------------
+# لینک مستقیم SoundCloud
+# ---------------------------
+def sc_direct_link(url):
     opts = {
         "quiet": True,
         "skip_download": True,
@@ -30,30 +30,30 @@ def get_direct_link_sc(url):
         info = y.extract_info(url, download=False)
         return info, info["url"]
 
-
-def get_direct_link_youtube(query):
+# ---------------------------
+# لینک مستقیم یوتیوب
+# ---------------------------
+def yt_direct_link(query):
     opts = {
         "quiet": True,
-        "format": "bestaudio/best",
         "skip_download": True,
+        "format": "bestaudio/best",
     }
     with yt_dlp.YoutubeDL(opts) as y:
         info = y.extract_info(f"ytsearch1:{query}", download=False)
         info = info["entries"][0]
         return info, info["url"]
 
-
-# ================================
-# 2) جستجو در SoundCloud
-# ================================
-def search_sc_sync(q):
+# ---------------------------
+# سرچ SoundCloud
+# ---------------------------
+def sc_search(q):
     with yt_dlp.YoutubeDL({"quiet": True}) as y:
         return y.extract_info(f"scsearch10:{q}", download=False)
 
-
-# ================================
-# 3) هندلر جستجو آهنگ
-# ================================
+# ---------------------------
+# هندلر اصلی جستجو
+# ---------------------------
 async def soundcloud_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if not update.message:
@@ -68,19 +68,15 @@ async def soundcloud_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
     loop = asyncio.get_running_loop()
 
-    # --- search soundcloud
     try:
-        sc = await loop.run_in_executor(executor, search_sc_sync, query)
+        sc = await loop.run_in_executor(executor, sc_search, query)
     except:
         sc = None
 
-    # --- fallback youtube
     if not sc or "entries" not in sc or len(sc["entries"]) == 0:
         await msg.edit_text(MSG["fa"]["yt_fallback"])
 
-        info, link = await loop.run_in_executor(
-            executor, get_direct_link_youtube, query
-        )
+        info, link = await loop.run_in_executor(executor, yt_direct_link, query)
 
         await update.message.reply_audio(
             audio=link,
@@ -88,7 +84,6 @@ async def soundcloud_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
         )
         return
 
-    # ساخت دکمه‌ها
     entries = sc["entries"]
     track_store[update.effective_chat.id] = entries
 
@@ -102,11 +97,10 @@ async def soundcloud_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
 
-
-# ================================
-# 4) انتخاب آهنگ و ارسال سریع
-# ================================
-async def music_select_handler(update, context: ContextTypes.DEFAULT_TYPE):
+# ---------------------------
+# انتخاب موزیک
+# ---------------------------
+async def music_select_handler(update, context):
 
     cq = update.callback_query
     await cq.answer()
@@ -124,14 +118,11 @@ async def music_select_handler(update, context: ContextTypes.DEFAULT_TYPE):
 
     loop = asyncio.get_running_loop()
 
-    # گرفتن لینک مستقیم
-    info, direct_link = await loop.run_in_executor(
-        executor, get_direct_link_sc, track["webpage_url"]
-    )
+    info, direct = await loop.run_in_executor(executor, sc_direct_link, track["webpage_url"])
 
     await context.bot.send_audio(
         chat,
-        direct_link,
+        direct,
         caption=f"🎵 {info['title']}"
     )
 
