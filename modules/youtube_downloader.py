@@ -39,14 +39,14 @@ async def youtube_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "cookiefile": COOKIE_FILE,
         "quiet": True,
 
-        # ✨ مهم‌ترین بخش:
-        # دانلود همان فایل اصلی یوتیوب (Video + Audio ترکیب‌شده)
-        "format": "best[acodec!=none][vcodec!=none]",
+        # بهترین کیفیت واقعی (DASH + ترکیب با ffmpeg)
+        "format": "bestvideo+bestaudio/best",
+        "merge_output_format": "mp4",
 
         "outtmpl": f"{DOWNLOAD_FOLDER}/%(id)s.%(ext)s",
         "noplaylist": True,
 
-        # حذف challenge یوتیوب (بدون نیاز به Nodejs)
+        # حذف challenge یوتیوب
         "extractor_args": {
             "youtube": {
                 "player_client": ["android"],
@@ -65,14 +65,14 @@ async def youtube_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         video_file = f"{DOWNLOAD_FOLDER}/{video_id}.{video_ext}"
 
-        # بررسی حجم قبل از ارسال (Heroku محدود است)
+        # بررسی حجم قبل از ارسال (Heroku محدودیت دارد)
         if os.path.getsize(video_file) > 180 * 1024 * 1024:
             await msg.edit_text("⚠ حجم ویدیو خیلی بزرگ است. امکان ارسال وجود ندارد.")
             os.remove(video_file)
             return
 
         # ارسال ویدیو
-        await msg.edit_text("⬇ در حال ارسال فایل...")
+        await msg.edit_text("⬇ در حال ارسال ویدیو...")
         await update.message.reply_video(
             video=open(video_file, "rb"),
             caption=f"📥 {title}"
