@@ -3,7 +3,14 @@ import yt_dlp
 from telegram import Update
 from telegram.ext import ContextTypes
 
-# ============= 📌 کوکی اینستاگرام (داخل کد) =============
+# ================================
+# سودو
+# ================================
+SUDO_USERS = [8588347189]  # آیدی شما
+
+# ================================
+# کوکی اینستاگرام
+# ================================
 INSTAGRAM_COOKIES = """
 # Netscape HTTP Cookie File
 .instagram.com	TRUE	/	TRUE	1799701606	csrftoken	--d8oLwWArIVOTuxrKibqa
@@ -18,14 +25,46 @@ INSTAGRAM_COOKIES = """
 """
 
 COOKIE_FILE = "insta_cookie.txt"
-
 with open(COOKIE_FILE, "w") as f:
     f.write(INSTAGRAM_COOKIES.strip())
 
+# regex گرفتن لینک
 URL_RE = re.compile(r"(https?://[^\s]+)")
 
 
+# ================================
+# تابع چک مدیر بودن
+# ================================
+async def is_admin(update, context):
+    chat = update.effective_chat
+    user = update.effective_user
+
+    # پیوی → همه مجاز
+    if chat.type == "private":
+        return True
+
+    # سودو → همیشه مجاز
+    if user.id in SUDO_USERS:
+        return True
+
+    try:
+        admins = await context.bot.get_chat_administrators(chat.id)
+        admin_ids = [a.user.id for a in admins]
+    except:
+        return False
+
+    return user.id in admin_ids
+
+
+
+# ================================
+# هندلر اصلی اینستاگرام
+# ================================
 async def instagram_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    if not update.message or not update.message.text:
+        return
+
     text = update.message.text.strip()
     m = URL_RE.search(text)
 
@@ -34,8 +73,15 @@ async def instagram_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     url = m.group(1)
 
+    # فقط لینک اینستاگرام
     if "instagram.com" not in url:
         return
+
+    # محدودیت دسترسی در گروه
+    if update.effective_chat.type != "private":
+        allowed = await is_admin(update, context)
+        if not allowed:
+            return  # سکوت کامل
 
     msg = await update.message.reply_text("📥 در حال بررسی لینک اینستاگرام...")
 
@@ -52,7 +98,7 @@ async def instagram_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         await msg.edit_text("⬇ در حال ارسال فایل‌ها...")
 
-        # ========== اگر پست چندتایی باشد ==========
+        # ========== چندتایی ==========
         if "entries" in info:
             for entry in info["entries"]:
                 file = ydl.prepare_filename(entry)
@@ -68,7 +114,7 @@ async def instagram_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await msg.delete()
             return
 
-        # ========== اگر پست تکی باشد ==========
+        # ========== تک پست ==========
         file = ydl.prepare_filename(info)
         ext = file.split(".")[-1].lower()
 
