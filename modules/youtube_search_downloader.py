@@ -1,4 +1,5 @@
 # modules/youtube_search_downloader.py
+
 import os
 import re
 import asyncio
@@ -7,6 +8,11 @@ from concurrent.futures import ThreadPoolExecutor
 import yt_dlp
 from telegram import Update
 from telegram.ext import ContextTypes
+
+# ================================
+# سودو
+# ================================
+SUDO_USERS = [8588347189]  # آیدی شما
 
 # ================================
 # تنظیمات اولیه
@@ -22,19 +28,41 @@ DOWNLOAD_FOLDER = "downloads"
 os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
 
 URL_RE = re.compile(r"(https?://[^\s]+)")
-
 executor = ThreadPoolExecutor(max_workers=3)
 
 
 # ================================
-# دانلود ویدیو داخل Thread
+# چک مدیر بودن
+# ================================
+async def is_admin(update, context):
+    chat = update.effective_chat
+    user = update.effective_user
+
+    # پیوی → آزاد
+    if chat.type == "private":
+        return True
+
+    # سودو → مجاز
+    if user.id in SUDO_USERS:
+        return True
+
+    try:
+        admins = await context.bot.get_chat_administrators(chat.id)
+        admin_ids = [a.user.id for a in admins]
+        return user.id in admin_ids
+    except:
+        return False
+
+
+# ================================
+# دانلود ویدیو
 # ================================
 def _download_video_sync(url):
     ydl_opts = {
         "cookiefile": COOKIE_FILE,
         "quiet": True,
 
-        # ویدیو بدون SABR و مشکل EJS
+        # کیفیت استاندارد و بدون مشکل EJS
         "format": "bestvideo[height<=720]+bestaudio/best[height<=720]/best",
 
         "merge_output_format": "mp4",
@@ -50,7 +78,7 @@ def _download_video_sync(url):
 
 
 # ================================
-# هندلر اصلی — فقط لینک یوتیوب
+# هندلر اصلی — دانلود یوتیوب
 # ================================
 async def youtube_search_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
@@ -59,7 +87,7 @@ async def youtube_search_handler(update: Update, context: ContextTypes.DEFAULT_T
 
     text = update.message.text.strip()
 
-    # تشخیص لینک
+    # استخراج لینک
     match = URL_RE.search(text)
     if not match:
         return
@@ -67,6 +95,12 @@ async def youtube_search_handler(update: Update, context: ContextTypes.DEFAULT_T
     url = match.group(1)
     if "youtube.com" not in url and "youtu.be" not in url:
         return
+
+    # محدودیت دسترسی در گروه
+    if update.effective_chat.type != "private":
+        allowed = await is_admin(update, context)
+        if not allowed:
+            return  # سکوت کامل
 
     msg = await update.message.reply_text("📥 در حال دانلود ویدیو... لطفاً صبر کنید.")
 
