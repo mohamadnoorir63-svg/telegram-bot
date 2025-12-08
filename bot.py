@@ -1490,18 +1490,13 @@ application.add_handler(
     group=-1500
 )
 
-from modules.youtube_search_downloader import youtube_search_handler, youtube_quality_handler
-from telegram.ext import MessageHandler, CallbackQueryHandler, filters
-
-# مرحله ۱ — دریافت لینک
+# مرحله ۱ — دریافت لینک YouTube
 application.add_handler(
     MessageHandler(
-        filters.TEXT 
-        & ~filters.COMMAND 
-        & filters.Regex(r"(youtube\.com|youtu\.be)"),
+        filters.Regex(r"(youtube\.com|youtu\.be)") & filters.TEXT,
         youtube_search_handler
     ),
-    group=-3000
+    group=-5000   # 👈 بالاتر از TikTok و SoundCloud
 )
 
 # مرحله ۲ — کیفیت و دکمه‌ها
@@ -1510,7 +1505,7 @@ application.add_handler(
         youtube_quality_handler,
         pattern=r"^(yt_audio|yt_video|v_\d+)$"
     ),
-    group=-3000
+    group=-5000
 )
 # ==========================================================
 # 🤖 پنل ChatGPT هوش مصنوعی
