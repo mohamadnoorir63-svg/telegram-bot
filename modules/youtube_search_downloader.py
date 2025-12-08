@@ -12,7 +12,7 @@ from telegram.ext import ContextTypes
 # ================================
 # سودو
 # ================================
-SUDO_USERS = [8588347189]
+SUDO_USERS = [8588347189]  # آیدی شما
 
 # ================================
 # تنظیمات اولیه
@@ -30,8 +30,9 @@ os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
 URL_RE = re.compile(r"(https?://[^\s]+)")
 executor = ThreadPoolExecutor(max_workers=3)
 
-# ذخیره لینک برای انتخاب نوع دانلود
+# لینک‌های ذخیره شده برای انتخاب صوت/تصویر
 pending_links = {}
+
 
 # ================================
 # چک مدیر بودن
@@ -42,6 +43,7 @@ async def is_admin(update, context):
 
     if chat.type == "private":
         return True
+
     if user.id in SUDO_USERS:
         return True
 
@@ -54,13 +56,13 @@ async def is_admin(update, context):
 
 
 # ================================
-# دانلود با کیفیت 720p
+# دانلود ویدیو (کد **دقیقاً همان** کد خودت)
 # ================================
 def _download_video_sync(url):
     ydl_opts = {
         "cookiefile": COOKIE_FILE,
         "quiet": True,
-        "format": "bestvideo[height<=720]+bestaudio/best",
+        "format": "bestvideo[height<=720]+bestaudio/best[height<=720]/best",
         "merge_output_format": "mp4",
         "noplaylist": True,
         "outtmpl": f"{DOWNLOAD_FOLDER}/%(id)s.%(ext)s",
@@ -74,7 +76,7 @@ def _download_video_sync(url):
 
 
 # ================================
-# دانلود صوتی (MP3)
+# دانلود صوت
 # ================================
 def _download_audio_sync(url):
     ydl_opts = {
@@ -100,7 +102,7 @@ def _download_audio_sync(url):
 
 
 # ================================
-# مرحله اول → دریافت لینک و نمایش پنل
+# مرحله 1 → دریافت لینک فقط پنل بده
 # ================================
 async def youtube_search_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
@@ -121,9 +123,9 @@ async def youtube_search_handler(update: Update, context: ContextTypes.DEFAULT_T
     if update.effective_chat.type != "private":
         allowed = await is_admin(update, context)
         if not allowed:
-            return
+            return  # سکوت کامل
 
-    # لینک ذخیره شود
+    # ذخیره لینک
     pending_links[update.effective_chat.id] = url
 
     keyboard = [
@@ -138,12 +140,13 @@ async def youtube_search_handler(update: Update, context: ContextTypes.DEFAULT_T
 
 
 # ================================
-# مرحله دوم → انتخاب صوتی/تصویری
+# مرحله 2 → انتخاب صوتی یا تصویری
 # ================================
 async def youtube_choice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     cq = update.callback_query
     await cq.answer()
+
     chat_id = cq.message.chat_id
 
     # محدودیت گروه
@@ -151,37 +154,40 @@ async def youtube_choice_handler(update: Update, context: ContextTypes.DEFAULT_T
     if update.effective_chat.type != "private" and not allowed:
         return
 
-    # دریافت لینک
+    # گرفتن لینک
     url = pending_links.get(chat_id)
     if not url:
         return await cq.edit_message_text("❌ لینک معتبر یافت نشد.")
 
     choice = cq.data
 
-    # -----------------------------
-    # دانلود صوتی
-    # -----------------------------
+    # ------------------------
+    # صوتی (MP3)
+    # ------------------------
     if choice == "yt_audio":
-
-        await cq.edit_message_text("⬇ در حال دانلود صوت...")
+        await cq.edit_message_text("⬇ در حال دانلود صوت ...")
 
         loop = asyncio.get_running_loop()
-        info, file = await loop.run_in_executor(executor, _download_audio_sync, url)
+        info, mp3_file = await loop.run_in_executor(executor, _download_audio_sync, url)
 
-        await context.bot.send_audio(chat_id, open(file, "rb"), caption=f"🎵 {info.get('title')}")
-        os.remove(file)
+        await context.bot.send_audio(chat_id, open(mp3_file, "rb"), caption=f"🎵 {info.get('title')}")
+        os.remove(mp3_file)
         return
 
-    # -----------------------------
-    # دانلود تصویری 720p
-    # -----------------------------
+    # ------------------------
+    # تصویری (همان کیفیت خودت)
+    # ------------------------
     if choice == "yt_video":
-
-        await cq.edit_message_text("⬇ در حال دانلود ویدیوی 720p ...")
+        await cq.edit_message_text("⬇ در حال دانلود ویدیو (720p)...")
 
         loop = asyncio.get_running_loop()
-        info, file = await loop.run_in_executor(executor, _download_video_sync, url)
+        info, video_file = await loop.run_in_executor(executor, _download_video_sync, url)
 
-        await context.bot.send_video(chat_id, open(file, "rb"), caption=f"🎬 {info.get('title')} (720p)")
-        os.remove(file)
+        await context.bot.send_video(
+            chat_id,
+            open(video_file, "rb"),
+            caption=f"🎬 {info.get('title')} (720p)"
+        )
+
+        os.remove(video_file)
         return
