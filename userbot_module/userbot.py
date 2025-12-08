@@ -274,7 +274,7 @@ async def handle_commands(event):
             return
         # در غیر این صورت → پاکسازی کامل
         await cleanup_via_userbot(chat_id, last_msg_id=last_msg_id)
-        # ================================
+# ================================
 #     USERBOT YOUTUBE DOWNLOADER
 # ================================
 
@@ -292,53 +292,53 @@ URL_RE = re.compile(r"(https?://[^\s]+)")
 
 @client.on(events.NewMessage)
 async def userbot_youtube_download(event):
-    text = event.raw_text.strip()
+    text = (event.raw_text or "").strip()
     match = URL_RE.search(text)
     if not match:
         return
 
     url = match.group(1)
 
+    # فقط برای لینک‌های یوتیوب
     if "youtube.com" not in url and "youtu.be" not in url:
         return
 
-    await event.reply("📥 در حال دانلود از یوتیوب... لطفاً صبر کنید.")
+    msg = await event.reply("📥 در حال دانلود ویدیو از یوتیوب...")
 
+    # ✅ فقط ویدیو (تا 720p) + صدا
     ydl_opts = {
         "cookiefile": COOKIE_FILE,
         "quiet": True,
-        "format": "bestaudio/best",
+        "format": "bv*[height<=720]+ba/best[height<=720]/best",
         "noplaylist": True,
         "outtmpl": f"{DOWNLOAD_FOLDER}/%(id)s.%(ext)s",
-        "postprocessors": [
-            {
-                "key": "FFmpegExtractAudio",
-                "preferredcodec": "mp3",
-                "preferredquality": "192"
-            }
-        ]
+        "merge_output_format": "mp4",  # خروجی نهایی mp4
     }
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=True)
+            filename = ydl.prepare_filename(info)  # مسیر فایل دانلود شده
 
-        video_id = info["id"]
-        title = info.get("title", "Music")
+        title = info.get("title", "YouTube Video")
 
-        mp3_file = f"{DOWNLOAD_FOLDER}/{video_id}.mp3"
+        await msg.edit("⬇ در حال ارسال ویدیو...")
 
-        # ارسال فایل با caption صحیح
+        # ارسال ویدیو با یوزربات
         await client.send_file(
             event.chat_id,
-            mp3_file,
-            caption=f"🎵 {title}"
+            filename,
+            caption=f"📹 {title}",
         )
 
-        os.remove(mp3_file)
+        # پاک‌کردن فایل بعد از ارسال
+        try:
+            os.remove(filename)
+        except:
+            pass
 
     except Exception as e:
-        await event.reply(f"❌ خطا در دانلود:\n`{e}`")
+        await msg.edit(f"❌ خطا در دانلود:\n`{e}`")
 # ---------- لفت ----------
 
 @client.on(events.NewMessage)
