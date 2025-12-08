@@ -13,7 +13,6 @@ from telegram.ext import ContextTypes
 # ================================
 COOKIE_FILE = "modules/youtube_cookie.txt"
 
-# مطمئن شو پوشه و فایل کوکی وجود دارد
 os.makedirs("modules", exist_ok=True)
 if not os.path.exists(COOKIE_FILE):
     with open(COOKIE_FILE, "w", encoding="utf-8") as f:
@@ -22,28 +21,20 @@ if not os.path.exists(COOKIE_FILE):
 DOWNLOAD_FOLDER = "downloads"
 os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
 
-# تشخیص لینک
 URL_RE = re.compile(r"(https?://[^\s]+)")
 
-# ThreadPool برای اجرای yt-dlp بدون هنگ
-executor = ThreadPoolExecutor(max_workers=3)
+executor = ThreadPoolExecutor(max_workers=5)   # سرعت ↑↑↑
 
 
 # ================================
-#  تابع سینک دانلود صوت (داخل Thread)
+# دانلود صوت (Thread)
 # ================================
 def _download_audio_sync(query: str, is_search: bool):
-    """
-    اگر is_search = True باشد:
-        query = متن آهنگ → ytsearch1:...
-    اگر is_search = False باشد:
-        query = لینک مستقیم یوتیوب
-    خروجی: (info_dict, mp3_path)
-    """
+
     ydl_opts = {
         "cookiefile": COOKIE_FILE,
         "quiet": True,
-        "format": "bestaudio/best",          # فقط صوت
+        "format": "bestaudio/best",
         "noplaylist": True,
         "outtmpl": f"{DOWNLOAD_FOLDER}/%(id)s.%(ext)s",
         "postprocessors": [
@@ -55,46 +46,42 @@ def _download_audio_sync(query: str, is_search: bool):
         ],
         "prefer_ffmpeg": True,
         "cachedir": False,
+        "concurrent_fragment_downloads": 5,  # سرعت ↑↑↑
     }
 
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         if is_search:
-            search_url = f"ytsearch1:{query}"
-            info = ydl.extract_info(search_url, download=True)
-            if "entries" in info:
-                info = info["entries"][0]
-        else:
-            info = ydl.extract_info(query, download=True)
+            query = f"ytsearch1:{query}"
+        info = ydl.extract_info(query, download=True)
+        if "entries" in info:
+            info = info["entries"][0]
 
-        original_filename = ydl.prepare_filename(info)
+        file_original = ydl.prepare_filename(info)
 
-    base, _ = os.path.splitext(original_filename)
-    mp3_file = base + ".mp3"
+    base, _ = os.path.splitext(file_original)
+    mp3_path = base + ".mp3"
 
-    if not os.path.exists(mp3_file):
-        raise RuntimeError("فایل MP3 بعد از دانلود پیدا نشد.")
+    if not os.path.exists(mp3_path):
+        raise RuntimeError("MP3 پیدا نشد (تبدیل شکست خورده).")
 
-    return info, mp3_file
+    return info, mp3_path
 
 
 # ================================
-#  تابع سینک دانلود ویدیو (داخل Thread)
+# دانلود ویدیو (Thread)
 # ================================
 def _download_video_sync(url: str):
-    """
-    دانلود ویدیو با کیفیت حداکثر 720p و خروجی MP4
-    خروجی: (info_dict, video_path)
-    """
+
     ydl_opts = {
         "cookiefile": COOKIE_FILE,
         "quiet": True,
-        # ویدیو تا 720p + صدای بهترین کیفیت
-        "format": "bv*[height<=720]+ba/best[height<=720]/best",
+        "format": "bv*[height<=720]+ba/best",  # ویدیو + صدا
         "merge_output_format": "mp4",
         "noplaylist": True,
         "outtmpl": f"{DOWNLOAD_FOLDER}/%(id)s.%(ext)s",
         "prefer_ffmpeg": True,
         "cachedir": False,
+        "concurrent_fragment_downloads": 5,  # سرعت بالاتر
     }
 
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -102,90 +89,91 @@ def _download_video_sync(url: str):
         filename = ydl.prepare_filename(info)
 
     if not os.path.exists(filename):
-        raise RuntimeError("فایل ویدیو بعد از دانلود پیدا نشد.")
+        raise RuntimeError("فایل ویدیو پیدا نشد.")
 
     return info, filename
 
 
 # ================================
-# هندلر اصلی برای ربات
-#  - جستجو: "دانلود آهنگ / اهنگ / آهنگ ..."
-#  - لینک: هر پیام حاوی لینک youtube / youtu.be  → ویدیو
+# هندلر اصلی
 # ================================
 async def youtube_search_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
     if not update.message or not update.message.text:
         return
 
     text = update.message.text.strip()
 
-    # -----------------------------
-    # 1) حالت جستجو "دانلود آهنگ ..."
-    # -----------------------------
-    is_music_search = (
-        text.startswith("دانلود آهنگ")
-        or text.startswith("اهنگ")
-        or text.startswith("آهنگ")
-    )
+    # ================================
+    #  تشخیص دستورات سه‌زبانه جستجوی آهنگ
+    #  فارسی + عربی + انگلیسی
+    # ================================
+    search_commands = ["دانلود آهنگ", "اهنگ", "آهنگ",
+                       "تحميل اغنية", "اغنية", "أغنية",
+                       "download song", "music", "song"]
 
+    is_music_search = any(text.lower().startswith(cmd) for cmd in search_commands)
+
+    # -----------------------------
+    # حالت جستجو آهنگ
+    # -----------------------------
     if is_music_search:
-        # حذف کلمات شروع
-        search_text = (
-            text.replace("دانلود آهنگ", "")
-            .replace("اهنگ", "")
-            .replace("آهنگ", "")
-            .strip()
-        )
 
-        if len(search_text) < 2:
-            await update.message.reply_text("❌ لطفاً نام آهنگ یا خواننده را بنویس.")
+        # پاکسازی فرمان از متن
+        clean_text = text.lower()
+        for cmd in search_commands:
+            clean_text = clean_text.replace(cmd, "")
+        clean_text = clean_text.strip()
+
+        if len(clean_text) < 2:
+            await update.message.reply_text("❌ لطفاً نام آهنگ را بنویس.")
             return
 
         msg = await update.message.reply_text(
-            f"🎧 در حال جستجو در یوتیوب برای:\n🔎 <b>{search_text}</b>",
+            f"🎧 در حال جستجو و دانلود آهنگ…\n🔎 <b>{clean_text}</b>",
             parse_mode="HTML",
         )
 
         loop = asyncio.get_running_loop()
         try:
             info, mp3_path = await loop.run_in_executor(
-                executor, _download_audio_sync, search_text, True
+                executor, _download_audio_sync, clean_text, True
             )
         except Exception as e:
             await msg.edit_text(f"❌ خطا در دانلود:\n{e}")
             return
 
-        title = info.get("title", "Music")
+        title = info.get("title", clean_text)
 
         await msg.edit_text("⬇ در حال ارسال فایل صوتی...")
 
+        # ارسال فایل
         try:
             with open(mp3_path, "rb") as f:
                 await update.message.reply_audio(
                     audio=f,
-                    title=title,
                     caption=f"🎵 {title}",
+                    title=title,
                 )
         finally:
             if os.path.exists(mp3_path):
-                try:
-                    os.remove(mp3_path)
-                except:
-                    pass
+                os.remove(mp3_path)
 
-        return  # این پیام برای جستجوی آهنگ بود، پس دیگه ادامه نمی‌دیم
+        return
 
     # -----------------------------
-    # 2) حالت لینک مستقیم یوتیوب → ویدیو
+    # حالت لینک مستقیم یوتیوب → ویدیو
     # -----------------------------
     m = URL_RE.search(text)
     if not m:
-        return  # نه جستجوی آهنگ بود، نه لینک → هیچی
+        return
 
     url = m.group(1)
+
     if "youtube.com" not in url and "youtu.be" not in url:
         return
 
-    msg = await update.message.reply_text("📥 در حال دانلود ویدیو از یوتیوب...")
+    msg = await update.message.reply_text("📥 در حال دانلود ویدیو...")
 
     loop = asyncio.get_running_loop()
     try:
@@ -208,7 +196,4 @@ async def youtube_search_handler(update: Update, context: ContextTypes.DEFAULT_T
             )
     finally:
         if os.path.exists(video_path):
-            try:
-                os.remove(video_path)
-            except:
-                pass
+            os.remove(video_path)
