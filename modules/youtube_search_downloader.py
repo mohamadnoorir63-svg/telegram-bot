@@ -18,15 +18,20 @@ SUDO_USERS = [8588347189]
 # تنظیمات اولیه
 # ================================
 COOKIE_FILE = "modules/youtube_cookie.txt"
+
+os.makedirs("modules", exist_ok=True)
+if not os.path.exists(COOKIE_FILE):
+    with open(COOKIE_FILE, "w", encoding="utf-8") as f:
+        f.write("# Paste YouTube cookies here in Netscape format\n")
+
 DOWNLOAD_FOLDER = "downloads"
 os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
 
 URL_RE = re.compile(r"(https?://[^\s]+)")
 executor = ThreadPoolExecutor(max_workers=3)
 
-# ذخیره لینک‌ها
+# ذخیره لینک برای انتخاب نوع دانلود
 pending_links = {}
-
 
 # ================================
 # چک مدیر بودن
@@ -49,15 +54,40 @@ async def is_admin(update, context):
 
 
 # ================================
-# دانلود با فرمت سفارشی
+# دانلود با کیفیت 720p
 # ================================
-def _download_custom(url, fmt):
+def _download_video_sync(url):
     ydl_opts = {
         "cookiefile": COOKIE_FILE,
         "quiet": True,
-        "format": fmt,
+        "format": "bestvideo[height<=720]+bestaudio/best",
         "merge_output_format": "mp4",
         "noplaylist": True,
+        "outtmpl": f"{DOWNLOAD_FOLDER}/%(id)s.%(ext)s",
+    }
+
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        info = ydl.extract_info(url, download=True)
+        filename = ydl.prepare_filename(info)
+
+    return info, filename
+
+
+# ================================
+# دانلود صوتی (MP3)
+# ================================
+def _download_audio_sync(url):
+    ydl_opts = {
+        "quiet": True,
+        "cookiefile": COOKIE_FILE,
+
+        "format": "bestaudio/best",
+        "postprocessors": [{
+            "key": "FFmpegExtractAudio",
+            "preferredcodec": "mp3",
+            "preferredquality": "192"
+        }],
+
         "outtmpl": f"{DOWNLOAD_FOLDER}/%(id)s.%(ext)s",
     }
 
@@ -65,11 +95,12 @@ def _download_custom(url, fmt):
         info = y.extract_info(url, download=True)
         filename = y.prepare_filename(info)
 
-    return info, filename
+    mp3 = filename.rsplit(".", 1)[0] + ".mp3"
+    return info, mp3
 
 
 # ================================
-# مرحله 1 — دریافت لینک و نمایش پنل
+# مرحله اول → دریافت لینک و نمایش پنل
 # ================================
 async def youtube_search_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
@@ -82,6 +113,7 @@ async def youtube_search_handler(update: Update, context: ContextTypes.DEFAULT_T
         return
 
     url = match.group(1)
+
     if "youtube.com" not in url and "youtu.be" not in url:
         return
 
@@ -89,14 +121,14 @@ async def youtube_search_handler(update: Update, context: ContextTypes.DEFAULT_T
     if update.effective_chat.type != "private":
         allowed = await is_admin(update, context)
         if not allowed:
-            return  # سکوت کامل
+            return
 
-    # ذخیره لینک
+    # لینک ذخیره شود
     pending_links[update.effective_chat.id] = url
 
     keyboard = [
-        [InlineKeyboardButton("🎵 Audio (MP3)", callback_data="yt_audio")],
-        [InlineKeyboardButton("🎬 Video (MP4)", callback_data="yt_video")],
+        [InlineKeyboardButton("🎵 دانلود صوتی (MP3)", callback_data="yt_audio")],
+        [InlineKeyboardButton("🎬 دانلود تصویری (720p)", callback_data="yt_video")],
     ]
 
     await update.message.reply_text(
@@ -106,22 +138,20 @@ async def youtube_search_handler(update: Update, context: ContextTypes.DEFAULT_T
 
 
 # ================================
-# مرحله 2 — هندلر دکمه‌ها
+# مرحله دوم → انتخاب صوتی/تصویری
 # ================================
-async def youtube_quality_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def youtube_choice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     cq = update.callback_query
+    await cq.answer()
     chat_id = cq.message.chat_id
 
-    await cq.answer()
-
     # محدودیت گروه
-    if update.effective_chat.type != "private":
-        allowed = await is_admin(update, context)
-        if not allowed:
-            return  # سکوت کامل
+    allowed = await is_admin(update, context)
+    if update.effective_chat.type != "private" and not allowed:
+        return
 
-    # گرفتن لینک
+    # دریافت لینک
     url = pending_links.get(chat_id)
     if not url:
         return await cq.edit_message_text("❌ لینک معتبر یافت نشد.")
@@ -129,79 +159,29 @@ async def youtube_quality_handler(update: Update, context: ContextTypes.DEFAULT_
     choice = cq.data
 
     # -----------------------------
-    # AUDIO (MP3)
+    # دانلود صوتی
     # -----------------------------
     if choice == "yt_audio":
 
         await cq.edit_message_text("⬇ در حال دانلود صوت...")
 
-        def audio_download():
-            ydl_opts = {
-                "quiet": True,
-                "cookiefile": COOKIE_FILE,
-                "format": "bestaudio/best",
-                "postprocessors": [{
-                    "key": "FFmpegExtractAudio",
-                    "preferredcodec": "mp3",
-                    "preferredquality": "192"
-                }],
-                "outtmpl": f"{DOWNLOAD_FOLDER}/%(id)s.%(ext)s",
-            }
-            with yt_dlp.YoutubeDL(ydl_opts) as y:
-                info = y.extract_info(url, download=True)
-                filename = y.prepare_filename(info)
-            mp3 = filename.rsplit(".", 1)[0] + ".mp3"
-            return info, mp3
-
         loop = asyncio.get_running_loop()
-        info, file = await loop.run_in_executor(executor, audio_download)
+        info, file = await loop.run_in_executor(executor, _download_audio_sync, url)
 
         await context.bot.send_audio(chat_id, open(file, "rb"), caption=f"🎵 {info.get('title')}")
         os.remove(file)
         return
 
     # -----------------------------
-    # VIDEO — نمایش کیفیت‌ها
+    # دانلود تصویری 720p
     # -----------------------------
     if choice == "yt_video":
 
-        keyboard = [
-            [InlineKeyboardButton("144p", callback_data="v_144")],
-            [InlineKeyboardButton("240p", callback_data="v_240")],
-            [InlineKeyboardButton("360p", callback_data="v_360")],
-            [InlineKeyboardButton("480p", callback_data="v_480")],
-            [InlineKeyboardButton("720p", callback_data="v_720")],
-        ]
-
-        return await cq.edit_message_text(
-            "📺 لطفاً کیفیت ویدیو را انتخاب کنید:",
-            reply_markup=InlineKeyboardMarkup(keyboard)
-        )
-
-    # -----------------------------
-    # مرحله 3 — دانلود با کیفیت انتخابی
-    # -----------------------------
-    if choice.startswith("v_"):
-
-        q = choice.split("_")[1]        # مثل 720
-        quality = f"{q}p"               # مثل 720p
-        height = q                      # مثل "720"
-
-        # فرمت درست yt-dlp
-        format_code = f"bestvideo[height<={height}]+bestaudio/best"
-
-        await cq.edit_message_text(f"⬇ در حال دانلود کیفیت {quality} ...")
+        await cq.edit_message_text("⬇ در حال دانلود ویدیوی 720p ...")
 
         loop = asyncio.get_running_loop()
-        info, filename = await loop.run_in_executor(
-            executor, _download_custom, url, format_code
-        )
+        info, file = await loop.run_in_executor(executor, _download_video_sync, url)
 
-        await context.bot.send_video(
-            chat_id,
-            open(filename, "rb"),
-            caption=f"🎬 {info.get('title')} ({quality})"
-        )
-
-        os.remove(filename)
+        await context.bot.send_video(chat_id, open(file, "rb"), caption=f"🎬 {info.get('title')} (720p)")
+        os.remove(file)
         return
