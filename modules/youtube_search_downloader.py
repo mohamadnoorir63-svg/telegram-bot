@@ -1,5 +1,3 @@
-# modules/youtube_search_downloader.py
-
 import os
 import re
 import asyncio
@@ -10,45 +8,38 @@ from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import ContextTypes
 
 
-# ================================
+# ============================
 # سودو
-# ================================
+# ============================
 SUDO_USERS = [8588347189]
 
-# ================================
-# تنظیمات اولیه
-# ================================
-
-COOKIE_FILE = "modules/youtube_cookie.txt"
+# ============================
+# پوشه‌ها
+# ============================
 DOWNLOAD_FOLDER = "downloads"
-CACHE_FOLDER = "downloads/youtube_cache"   # ← فولدر کش
+CACHE_FOLDER = "downloads/youtube_cache"
 
-os.makedirs("modules", exist_ok=True)
 os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
 os.makedirs(CACHE_FOLDER, exist_ok=True)
 
-if not os.path.exists(COOKIE_FILE):
-    with open(COOKIE_FILE, "w") as f:
-        f.write("# Paste YouTube cookies here\n")
+# کش فایل‌های تلگرام
+telegram_cache = {}   # {video_id: {"mp3": file_id, "720": file_id, ...}}
 
 URL_RE = re.compile(r"(https?://[^\s]+)")
 
-# 🔥 ThreadPool توربو
 executor = ThreadPoolExecutor(max_workers=12)
 
-# ذخیره لینک‌ها برای کیفیت
-pending_links = {}
 
-# ================================
-# چک مدیر بودن
-# ================================
-
+# ============================
+# چک ادمین
+# ============================
 async def is_admin(update, context):
     chat = update.effective_chat
     user = update.effective_user
 
     if chat.type == "private":
         return True
+
     if user.id in SUDO_USERS:
         return True
 
@@ -59,151 +50,97 @@ async def is_admin(update, context):
         return False
 
 
-# ================================
-# سیستم کش
-# ================================
-
-def cache_get(video_id, ext):
-    """اگر کش موجود باشد، مسیر فایل را برمی‌گرداند"""
-    path = os.path.join(CACHE_FOLDER, f"{video_id}.{ext}")
-    return path if os.path.exists(path) else None
+# ============================
+# گرفتن video_id بدون دانلود
+# ============================
+def get_video_info(url):
+    with yt_dlp.YoutubeDL({"quiet": True}) as y:
+        return y.extract_info(url, download=False)
 
 
-def cache_save(src_path, video_id, ext):
-    """فایل دانلودشده را در کش ذخیره می‌کند"""
-    dst_path = os.path.join(CACHE_FOLDER, f"{video_id}.{ext}")
-    if os.path.exists(dst_path):
-        return dst_path
-    try:
-        os.rename(src_path, dst_path)
-    except:
-        pass
-    return dst_path
+# ============================
+# پیدا کردن نزدیک‌ترین کیفیت
+# ============================
+def pick_best_height(info, max_height):
+    formats = info.get("formats", [])
+    heights = sorted({f.get("height") for f in formats if f.get("height")}, reverse=True)
+
+    for h in heights:
+        if h <= max_height:
+            return h
+    return heights[-1]  # پایین‌ترین کیفیت موجود
 
 
-# ================================
-# Turbo Options for yt-dlp
-# ================================
+# ============================
+# دانلود MP3 (Turbo)
+# ============================
+def download_audio(url, video_id):
 
-def turbo_video_opts(max_height):
-    return {
-        "cookiefile": COOKIE_FILE,
+    opts = {
         "quiet": True,
-        "ignoreerrors": True,
-        "format": f"bestvideo[height<={max_height}]+bestaudio/best/best",
-        "merge_output_format": "mp4",
-
-        "concurrent_fragment_downloads": 20,
-        "http_chunk_size": 1048576,
-        "fragment_retries": 25,
-        "retries": 25,
-        "nopart": True,
-        "noprogress": True,
-        "overwrites": True,
-
-        "outtmpl": f"{DOWNLOAD_FOLDER}/%(id)s.%(ext)s",
-    }
-
-
-def turbo_audio_opts():
-    return {
-        "cookiefile": COOKIE_FILE,
-        "quiet": True,
-        "ignoreerrors": True,
         "format": "bestaudio/best",
-
-        "concurrent_fragment_downloads": 20,
-        "http_chunk_size": 1048576,
-        "fragment_retries": 25,
-        "retries": 25,
-
-        "nopart": True,
-        "noprogress": True,
-        "overwrites": True,
-
         "postprocessors": [{
             "key": "FFmpegExtractAudio",
             "preferredcodec": "mp3",
             "preferredquality": "192"
         }],
-
+        "concurrent_fragment_downloads": 20,
+        "http_chunk_size": 1048576,
+        "noprogress": True,
         "outtmpl": f"{DOWNLOAD_FOLDER}/%(id)s.%(ext)s",
     }
 
-
-# ================================
-# دانلود صوت (Turbo + Cache)
-# ================================
-def _download_audio_sync(url):
-
-    # مرحله ۱: اول چک کنیم کش دارد؟
-    with yt_dlp.YoutubeDL({"quiet": True}) as y:
-        info = y.extract_info(url, download=False)
-        video_id = info["id"]
-
-    cached = cache_get(video_id, "mp3")
-    if cached:
-        return info, cached
-
-    # مرحله ۲: دانلود
-    opts = turbo_audio_opts()
-
     with yt_dlp.YoutubeDL(opts) as y:
         info = y.extract_info(url, download=True)
         filename = y.prepare_filename(info)
 
-    mp3 = filename.rsplit(".", 1)[0] + ".mp3"
-
-    # مرحله ۳: ذخیره در کش
-    final_path = cache_save(mp3, info["id"], "mp3")
-
-    return info, final_path
+    return info, filename.rsplit(".", 1)[0] + ".mp3"
 
 
-# ================================
-# دانلود ویدیو (Turbo + Cache)
-# ================================
-def _download_video_sync(url, max_height):
+# ============================
+# دانلود ویدیو (Turbo)
+# ============================
+def download_video(url, info, max_height):
 
-    # مرحله ۱: چک کش
-    with yt_dlp.YoutubeDL({"quiet": True}) as y:
-        info = y.extract_info(url, download=False)
-        video_id = info["id"]
+    real_height = pick_best_height(info, max_height)
 
-    cached = cache_get(video_id, "mp4")
-    if cached:
-        return info, cached
+    fmt = f"bestvideo[height={real_height}]+bestaudio/best"
 
-    # مرحله ۲: دانلود جدید
-    opts = turbo_video_opts(max_height)
+    opts = {
+        "quiet": True,
+        "format": fmt,
+        "merge_output_format": "mp4",
+        "concurrent_fragment_downloads": 20,
+        "http_chunk_size": 1048576,
+        "noprogress": True,
+        "outtmpl": f"{DOWNLOAD_FOLDER}/%(id)s.%(ext)s",
+    }
 
     with yt_dlp.YoutubeDL(opts) as y:
-        info = y.extract_info(url, download=True)
-        filename = y.prepare_filename(info)
+        new_info = y.extract_info(url, download=True)
+        filename = y.prepare_filename(new_info)
 
-    mp4 = filename.rsplit(".", 1)[0] + ".mp4"
-
-    # مرحله ۳: ذخیره در کش
-    final_path = cache_save(mp4, info["id"], "mp4")
-
-    return info, final_path
+    return new_info, filename.rsplit(".", 1)[0] + ".mp4", real_height
 
 
-# ================================
-# مرحله ۱ — دریافت لینک
-# ================================
+# ============================
+# مرحله ۱ — گرفتن لینک
+# ============================
+pending_links = {}
+
 async def youtube_search_handler(update: Update, context):
 
     if not update.message:
         return
 
-    text = update.message.text.strip()
+    text = update.message.text
     match = URL_RE.search(text)
     if not match:
         return
 
     url = match.group(1)
-    if "youtube.com" not in url and "youtu.be" not in url:
+
+    if "youtube" not in url:
         return
 
     if update.effective_chat.type != "private":
@@ -223,9 +160,9 @@ async def youtube_search_handler(update: Update, context):
     )
 
 
-# ================================
-# مرحله ۲ و ۳ — Audio/Video + کیفیت‌ها
-# ================================
+# ============================
+# مرحله ۲ — Audio / Video انتخاب
+# ============================
 async def youtube_quality_handler(update: Update, context):
 
     cq = update.callback_query
@@ -238,31 +175,45 @@ async def youtube_quality_handler(update: Update, context):
 
     url = pending_links.get(chat_id)
     if not url:
-        return await cq.edit_message_text("❌ لینک معتبر یافت نشد.")
+        return await cq.edit_message_text("❌ لینک پیدا نشد.")
 
     choice = cq.data
 
-    # -----------------------
-    # Audio (MP3)
-    # -----------------------
+    # =======================
+    # صوت (MP3)
+    # =======================
     if choice == "yt_audio":
-        await cq.edit_message_text("⬇ در حال دانلود صوت (Turbo + Cache)...")
+        info = get_video_info(url)
+        vid = info["id"]
+
+        # 🔥 کش تلگرام
+        if vid in telegram_cache and "mp3" in telegram_cache[vid]:
+            file_id = telegram_cache[vid]["mp3"]
+            return await context.bot.send_audio(
+                chat_id,
+                audio=file_id,
+                caption=f"🎵 {info.get('title')}"
+            )
+
+        await cq.edit_message_text("⬇ در حال دانلود صوت...")
 
         loop = asyncio.get_running_loop()
-        info, mp3 = await loop.run_in_executor(
-            executor, _download_audio_sync, url
-        )
+        info, mp3 = await loop.run_in_executor(executor, download_audio, url, vid)
 
-        await context.bot.send_audio(
+        msg = await context.bot.send_audio(
             chat_id,
             audio=open(mp3, "rb"),
-            caption=f"🎵 {info.get('title', 'Audio')}"
+            caption=f"🎵 {info.get('title')}"
         )
+
+        # ذخیره file_id
+        telegram_cache.setdefault(vid, {})["mp3"] = msg.audio.file_id
+
         return
 
-    # -----------------------
-    # Video Menu
-    # -----------------------
+    # =======================
+    # نمایش کیفیت ویدیو
+    # =======================
     if choice == "yt_video":
         keyboard = [
             [InlineKeyboardButton("144p", callback_data="v_144")],
@@ -276,21 +227,38 @@ async def youtube_quality_handler(update: Update, context):
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
 
-    # -----------------------
-    # Video Download
-    # -----------------------
+    # =======================
+    # دانلود ویدیو + کش تلگرام
+    # =======================
     if choice.startswith("v_"):
+
         q = int(choice.split("_")[1])
-        await cq.edit_message_text(f"⬇ در حال دانلود کیفیت {q}p (Turbo + Cache)...")
+        info = get_video_info(url)
+        vid = info["id"]
+
+        # 🔥 اگر همین کیفیت قبلاً ارسال شده → فوری بفرست
+        if vid in telegram_cache and str(q) in telegram_cache[vid]:
+            file_id = telegram_cache[vid][str(q)]
+            return await context.bot.send_video(
+                chat_id,
+                video=file_id,
+                caption=f"🎬 {info.get('title')} ({q}p)"
+            )
+
+        await cq.edit_message_text(f"⬇ دانلود کیفیت {q}p ...")
 
         loop = asyncio.get_running_loop()
-        info, mp4 = await loop.run_in_executor(
-            executor, _download_video_sync, url, q
+        info, mp4, real_height = await loop.run_in_executor(
+            executor, download_video, url, info, q
         )
 
-        await context.bot.send_video(
+        msg = await context.bot.send_video(
             chat_id,
             video=open(mp4, "rb"),
-            caption=f"🎬 {info.get('title', 'YouTube Video')} ({q}p)"
+            caption=f"🎬 {info.get('title')} ({real_height}p)"
         )
+
+        # ذخیره file_id
+        telegram_cache.setdefault(vid, {})[str(q)] = msg.video.file_id
+
         return
