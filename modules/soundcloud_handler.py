@@ -274,9 +274,8 @@ async def soundcloud_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
 # ================================
 # دانلود انتخاب‌شده
 # ================================
-
 # ================================
-# دانلود انتخاب‌شده
+# دانلود انتخاب‌شده با دکمه نمایش متن
 # ================================
 
 async def music_select_handler(update, context: ContextTypes.DEFAULT_TYPE):
@@ -292,29 +291,16 @@ async def music_select_handler(update, context: ContextTypes.DEFAULT_TYPE):
 
     track_id = cq.data.split(":")[1]
 
-    # 🔥 بررسی کش تلگرام
     cache_key = f"sc_{track_id}"
     if cache_key in SC_CACHE:
         try:
             await cq.edit_message_text("⚡ در حال ارسال از کش تلگرام...")
         except Exception:
             pass
-        # ارسال همراه با دکمه نمایش متن (اگر متن داشته باشد)
-        tracks = track_store.get(chat, [])
-        track = next((t for t in tracks if str(t["id"]) == track_id), None)
-        lyrics = track.get("lyrics", "متن آهنگ موجود نیست.") if track else "متن آهنگ موجود نیست."
-        return await context.bot.send_audio(
-            chat,
-            SC_CACHE[cache_key],
-            caption=f"🎵 {track.get('title', 'Music') if track else 'Music'}",
-            reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("🎵 نمایش متن", callback_data=f"show_lyrics:{track_id}")]
-            ])
-        )
+        return await context.bot.send_audio(chat, SC_CACHE[cache_key])
 
     tracks = track_store.get(chat, [])
     track = next((t for t in tracks if str(t["id"]) == track_id), None)
-
     if not track:
         return await cq.edit_message_text("❌ آهنگ پیدا نشد.")
 
@@ -328,17 +314,19 @@ async def music_select_handler(update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         return await msg.edit_text(f"❌ خطا در دانلود:\n{e}")
 
-    # ارسال و ذخیره file_id همراه با دکمه نمایش متن
-    lyrics = track.get("lyrics", "متن آهنگ موجود نیست.")
+    # ذخیره توضیحات/متن آهنگ
+    track["lyrics"] = info.get("description", "متن این آهنگ موجود نیست")
+
+    # ارسال فایل با دکمه نمایش متن
     try:
         with open(mp3, "rb") as f:
             sent = await context.bot.send_audio(
                 chat,
                 f,
                 caption=f"🎵 {info.get('title', 'Music')}",
-                reply_markup=InlineKeyboardMarkup([
-                    [InlineKeyboardButton("🎵 نمایش متن", callback_data=f"show_lyrics:{track_id}")]
-                ])
+                reply_markup=InlineKeyboardMarkup(
+                    [[InlineKeyboardButton("🎵 نمایش متن", callback_data=f"show_lyrics:{track_id}")]]
+                ),
             )
     except Exception as e:
         return await msg.edit_text(f"❌ خطا در ارسال فایل:\n{e}")
@@ -350,31 +338,26 @@ async def music_select_handler(update, context: ContextTypes.DEFAULT_TYPE):
     SC_CACHE[cache_key] = sent.audio.file_id
     save_cache()
 
-    # پاک کردن پیام "⬇️ در حال دانلود..."
+    # پاک کردن پیام "در حال دانلود"
     try:
         await msg.delete()
     except Exception:
         pass
 
-
 # ================================
-# هندلر دکمه نمایش متن
+# نمایش متن آهنگ
 # ================================
 
-async def show_lyrics_handler(update, context: ContextTypes.DEFAULT_TYPE):
+async def lyrics_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     cq = update.callback_query
     await cq.answer()
-
     track_id = cq.data.split(":")[1]
     chat = cq.message.chat_id
+
     tracks = track_store.get(chat, [])
     track = next((t for t in tracks if str(t["id"]) == track_id), None)
+    if not track:
+        return await cq.edit_message_text("❌ آهنگ پیدا نشد.")
 
-    lyrics = "متن آهنگ موجود نیست."
-    if track and track.get("lyrics"):
-        lyrics = track["lyrics"]
-
-    try:
-        await cq.edit_message_caption(caption=lyrics)
-    except Exception:
-        await cq.message.reply_text(lyrics)
+    lyrics = track.get("lyrics", "متن این آهنگ موجود نیست")
+    await cq.edit_message_text(f"📝 متن آهنگ:\n\n{lyrics}")
