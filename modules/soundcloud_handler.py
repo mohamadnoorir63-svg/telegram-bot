@@ -1,18 +1,16 @@
-# modules/soundcloud_handler.py
+# modules/soundcloud_inline.py
 
 import os
 import asyncio
 import yt_dlp
 from concurrent.futures import ThreadPoolExecutor
 import json
-from typing import Optional
 
 from telegram import (
     Update,
+    InlineQueryResultCachedAudio,
     InlineKeyboardMarkup,
-    InlineKeyboardButton,
-    InlineQueryResultArticle,
-    InputTextMessageContent,
+    InlineKeyboardButton
 )
 from telegram.ext import ContextTypes
 
@@ -28,17 +26,11 @@ DOWNLOAD_FOLDER = "downloads"
 os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
 
 COOKIE_FILE = "modules/youtube_cookie.txt"
-
 executor = ThreadPoolExecutor(max_workers=3)
 
-track_store = {}
-
-# ================================
-# کش تلگرام
-# ================================
-CACHE_FILE = "data/sc_cache.json"
+# کش فایل‌ها
+CACHE_FILE = "data/sc_inline_cache.json"
 os.makedirs("data", exist_ok=True)
-
 if not os.path.exists(CACHE_FILE):
     with open(CACHE_FILE, "w", encoding="utf-8") as f:
         json.dump({}, f)
@@ -52,18 +44,6 @@ with open(CACHE_FILE, "r", encoding="utf-8") as f:
 def save_cache():
     with open(CACHE_FILE, "w", encoding="utf-8") as f:
         json.dump(SC_CACHE, f, ensure_ascii=False, indent=2)
-
-# ================================
-# پیام‌ها
-# ================================
-LANG_MESSAGES = {
-    "fa": {
-        "searching": "🔍 در حال جستجو ... لطفاً صبر کنید",
-        "downloading": "⬇️ در حال دانلود آهنگ...",
-        "select_song": "🎵 {n} آهنگ پیدا شد — لطفاً انتخاب کنید:",
-        "notfound": "❌ در SoundCloud چیزی پیدا نشد. در حال جستجو در یوتیوب...",
-    }
-}
 
 # ================================
 # yt_dlp تنظیمات
@@ -84,26 +64,9 @@ BASE_OPTS = {
 }
 
 # ================================
-# بررسی مدیر بودن
+# کش محلی mp3
 # ================================
-async def is_admin(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
-    chat = update.effective_chat
-    user = update.effective_user
-    if chat.type == "private":
-        return True
-    if user and user.id in SUDO_USERS:
-        return True
-    try:
-        admins = await context.bot.get_chat_administrators(chat.id)
-        ids = [a.user.id for a in admins]
-        return user.id in ids
-    except Exception:
-        return False
-
-# ================================
-# چک کش mp3 لوکال
-# ================================
-def cache_check(id_: str) -> Optional[str]:
+def cache_check(id_: str):
     for file in os.listdir(DOWNLOAD_FOLDER):
         if file.startswith(id_) and file.endswith(".mp3"):
             return os.path.join(DOWNLOAD_FOLDER, file)
@@ -144,150 +107,82 @@ def _youtube_fallback_sync(query: str):
         return info, mp3
 
 # ================================
-# هندلر پیام
+# هندلر Inline
 # ================================
-async def soundcloud_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not update.message or not update.message.text:
+async def inline_sc_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.inline_query.query.strip()
+    if not query:
         return
 
-    text = update.message.text.strip()
-    triggers = ["آهنگ ", "music ", "اغنية ", "أغنية ", "موزیک ", "داستان ", "Music ", "Musik ", "اهنگ "]
-    if not any(text.lower().startswith(t) for t in triggers):
-        return
+    loop = asyncio.get_running_loop()
 
-    if update.effective_chat.type != "private":
-        if not await is_admin(update, context):
-            return
-
-    query = next((text[len(t):].strip() for t in triggers if text.lower().startswith(t)), "")
-    msg = await update.message.reply_text(LANG_MESSAGES["fa"]["searching"])
-
-    def _search():
+    def _search_sc():
         with yt_dlp.YoutubeDL({"quiet": True}) as y:
             return y.extract_info(f"scsearch5:{query}", download=False)
 
-    loop = asyncio.get_running_loop()
     try:
-        sc_info = await loop.run_in_executor(executor, _search)
-    except Exception as e:
-        await msg.edit_text(f"❌ خطا در جستجو:\n{e}")
-        return
+        sc_info = await loop.run_in_executor(executor, _search_sc)
+    except Exception:
+        sc_info = None
 
-    if not sc_info or not sc_info.get("entries"):
-        await msg.edit_text(LANG_MESSAGES["fa"]["notfound"])
+    results = []
+
+    if sc_info and sc_info.get("entries"):
+        tracks = sc_info["entries"]
+    else:
         try:
             info, mp3 = await loop.run_in_executor(executor, _youtube_fallback_sync, query)
-        except Exception as e:
-            return await msg.edit_text(f"❌ خطا در fallback:\n{e}")
+            tracks = [info]
+        except Exception:
+            tracks = []
 
-        yt_id = f"yt_{info.get('id')}"
-        if yt_id in SC_CACHE:
-            try: await msg.delete()
-            except: pass
-            return await update.message.reply_audio(SC_CACHE[yt_id],
-                caption=f"🎵 {info.get('title','Music')}\n\n📥 <a href='https://t.me/AFGR63_bot'>دانلود موزیک</a>",
-                parse_mode="HTML")
-
-        try:
-            with open(mp3, "rb") as f:
-                keyboard = [[InlineKeyboardButton("➕ افزودن به گروه", url="https://t.me/AFGR63_bot?startgroup=true")]] if update.effective_chat.type=="private" else None
-                sent = await update.message.reply_audio(f,
-                    caption=f"🎵 {info.get('title','Music')}\n\n📥 <a href='https://t.me/AFGR63_bot'>دانلود موزیک</a>",
-                    parse_mode="HTML",
-                    reply_markup=InlineKeyboardMarkup(keyboard) if keyboard else None)
-        finally:
-            if os.path.exists(mp3): os.remove(mp3)
-        SC_CACHE[yt_id] = sent.audio.file_id
-        save_cache()
-        try: await msg.delete()
-        except: pass
-        return
-
-    entries = sc_info["entries"]
-    track_store[update.effective_chat.id] = entries
-
-    keyboard = [[InlineKeyboardButton(t["title"], callback_data=f"music_select:{t['id']}")] for t in entries]
-    await msg.edit_text(LANG_MESSAGES["fa"]["select_song"].format(n=len(entries)),
-                        reply_markup=InlineKeyboardMarkup(keyboard))
-
-# ================================
-# دانلود انتخاب‌شده
-# ================================
-async def music_select_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    cq = update.callback_query
-    await cq.answer()
-    chat = cq.message.chat_id
-
-    if update.effective_chat.type != "private":
-        if not await is_admin(update, context):
-            return
-
-    track_id = cq.data.split(":")[1]
-    cache_key = f"sc_{track_id}"
-
-    if cache_key in SC_CACHE:
-        try: await cq.edit_message_text("⚡ در حال ارسال از کش تلگرام...")
-        except: pass
-        return await context.bot.send_audio(chat, SC_CACHE[cache_key])
-
-    tracks = track_store.get(chat, [])
-    track = next((t for t in tracks if str(t["id"]) == track_id), None)
-    if not track:
-        return await cq.edit_message_text("❌ آهنگ پیدا نشد.")
-
-    msg = await cq.edit_message_text(LANG_MESSAGES["fa"]["downloading"])
-    loop = asyncio.get_running_loop()
-
-    try:
-        info, mp3 = await loop.run_in_executor(executor, _sc_download_sync, track["webpage_url"])
-    except Exception as e:
-        return await msg.edit_text(f"❌ خطا در دانلود:\n{e}")
-
-    try:
-        with open(mp3, "rb") as f:
-            keyboard = [[InlineKeyboardButton("➕ افزودن به گروه", url="https://t.me/AFGR63_bot?startgroup=true")]] if update.effective_chat.type=="private" else None
-            sent = await context.bot.send_audio(chat, f,
-                    caption=f"🎵 {info.get('title','Music')}\n\n📥 <a href='https://t.me/AFGR63_bot'>دانلود موزیک</a>",
-                    parse_mode="HTML",
-                    reply_markup=InlineKeyboardMarkup(keyboard) if keyboard else None)
-    finally:
-        if os.path.exists(mp3): os.remove(mp3)
-
-    SC_CACHE[cache_key] = sent.audio.file_id
-    save_cache()
-    try: await msg.delete()
-    except: pass
-
-# ================================
-# INLINE MODE مستقیم
-# ================================
-async def inline_sc(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    q = update.inline_query.query.strip()
-    if not q or len(q)<2:
-        return
-
-    def _search():
-        with yt_dlp.YoutubeDL({"quiet": True}) as y:
-            return y.extract_info(f"scsearch5:{q}", download=False)
-
-    loop = asyncio.get_running_loop()
-    try:
-        sc_info = await loop.run_in_executor(executor, _search)
-    except Exception:
-        sc_info=None
-
-    results=[]
-    if sc_info and sc_info.get("entries"):
-        for t in sc_info["entries"]:
-            title=t.get("title") or "Unknown"
-            webpage=t.get("webpage_url") or ""
-            input_text=f"آهنگ {webpage}"
+    for t in tracks:
+        track_id = str(t.get("id"))
+        cache_key = f"sc_{track_id}"
+        if cache_key in SC_CACHE:
+            file_id = SC_CACHE[cache_key]
             results.append(
-                InlineQueryResultArticle(
-                    id=str(t.get("id")) or title,
-                    title=title,
-                    input_message_content=InputTextMessageContent(input_text),
-                    description=(t.get("uploader") or "")[:50]
+                InlineQueryResultCachedAudio(
+                    id=track_id,
+                    audio_file_id=file_id,
+                    title=t.get("title") or "Music",
+                    performer=t.get("uploader") or ""
                 )
             )
+            continue
+
+        # دانلود mp3 قبل از ارسال
+        try:
+            info, mp3 = await loop.run_in_executor(executor, _sc_download_sync, t.get("webpage_url"))
+        except Exception:
+            continue
+
+        # ارسال Inline Audio
+        keyboard = InlineKeyboardMarkup([[InlineKeyboardButton(
+            "➕ افزودن به گروه",
+            url="https://t.me/AFGR63_bot?startgroup=true"
+        )]]) if update.effective_user else None
+
+        with open(mp3, "rb") as f:
+            sent = await context.bot.send_audio(
+                update.effective_user.id,
+                f,
+                caption=f"🎵 {info.get('title')}\n\n📥 <a href='https://t.me/AFGR63_bot'>دانلود موزیک</a>",
+                parse_mode="HTML",
+                reply_markup=keyboard if keyboard else None
+            )
+        SC_CACHE[cache_key] = sent.audio.file_id
+        save_cache()
+        if os.path.exists(mp3):
+            os.remove(mp3)
+
+        results.append(
+            InlineQueryResultCachedAudio(
+                id=track_id,
+                audio_file_id=sent.audio.file_id,
+                title=info.get("title") or "Music",
+                performer=info.get("uploader") or ""
+            )
+        )
+
     await update.inline_query.answer(results, cache_time=1)
