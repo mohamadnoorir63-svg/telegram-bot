@@ -1541,31 +1541,25 @@ from modules.soundcloud_handler import (
     music_inline_handler
 )
 
-from telegram.ext import (
-    MessageHandler,
-    CallbackQueryHandler,
-    InlineQueryHandler,   # ← مشکل همین بود
-    filters
-)
-# پیام متنی
+# پیام‌های متنی
 application.add_handler(
     MessageHandler(filters.TEXT & ~filters.COMMAND, soundcloud_handler),
     group=-2000
 )
 
-# دکمه انتخاب موزیک عادی
+# انتخاب آهنگ عادی
 application.add_handler(
     CallbackQueryHandler(music_select_handler, pattern=r"^music_select:"),
     group=-2000
 )
 
-# جستجو inline
+# جستجوی inline
 application.add_handler(
     InlineQueryHandler(inline_sc),
     group=-3000
 )
 
-# دکمه دانلود inline
+# دانلود آهنگ از دکمه inline
 application.add_handler(
     CallbackQueryHandler(music_inline_handler, pattern=r"^music_inline:"),
     group=-2000
