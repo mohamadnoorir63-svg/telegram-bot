@@ -246,18 +246,88 @@ async def sudo_bot_call(update: Update, context: ContextTypes.DEFAULT_TYPE):
     reply = random.choice(replies)
     await update.message.reply_text(reply)
 # ======================= 📊 آمار ربات واقعی =======================
-import json
+    import json
 import os
 from datetime import datetime
+from telegram import Update
+from telegram.ext import ContextTypes
+
 
 # مسیر فایل‌ها
 GROUP_FILE = "data/groups.json"
 USER_FILE = "data/users.json"
 
 
-# ======================= 📊 دستور /stats (آمار کلی) =======================
+# =====================================================================
+#  🔥 حذف خودکار گروه و کاربر وقتی ربات کیک/حذف/بلاک می‌شود
+# =====================================================================
+async def bot_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    مراقب تغییر وضعیت ربات است.
+    - اگر از گروه حذف شد → حذف از groups.json
+    - اگر کاربر ربات را بلاک کرد → حذف از users.json
+    """
+    data = update.my_chat_member
+    chat = data.chat
+    new = data.new_chat_member
+
+    # اگر ربات از چت حذف شد
+    if new.status in ("left", "kicked"):
+
+        # ==============================================================
+        # 🏠 اگر گروه باشد → حذف گروه
+        # ==============================================================
+        if chat.type in ("group", "supergroup"):
+
+            if os.path.exists(GROUP_FILE):
+                try:
+                    with open(GROUP_FILE, "r", encoding="utf-8") as f:
+                        groups = json.load(f)
+
+                    gid = str(chat.id)
+
+                    if gid in groups:
+                        del groups[gid]
+
+                        with open(GROUP_FILE, "w", encoding="utf-8") as f:
+                            json.dump(groups, f, indent=4, ensure_ascii=False)
+
+                except:
+                    pass
+
+            return
+
+        # ==============================================================
+        # 👤 اگر PV باشد → کاربر ربات را بلاک کرده → حذف
+        # ==============================================================
+        if chat.type == "private":
+
+            if os.path.exists(USER_FILE):
+                try:
+                    with open(USER_FILE, "r", encoding="utf-8") as f:
+                        users = json.load(f)
+
+                    uid = str(chat.id)
+
+                    if uid in users:
+                        del users[uid]
+
+                        with open(USER_FILE, "w", encoding="utf-8") as f:
+                            json.dump(users, f, indent=4, ensure_ascii=False)
+
+                except:
+                    pass
+
+            return
+
+
+
+# =====================================================================
+# 📊 دستور /stats — آمار کلی
+# =====================================================================
 async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # بارگذاری کاربران
+
+    # --- کاربران ---
     if os.path.exists(USER_FILE):
         try:
             with open(USER_FILE, "r", encoding="utf-8") as f:
@@ -268,7 +338,7 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         total_users = 0
 
-    # بارگذاری گروه‌ها
+    # --- گروه‌ها ---
     if os.path.exists(GROUP_FILE):
         try:
             with open(GROUP_FILE, "r", encoding="utf-8") as f:
@@ -294,20 +364,22 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 
-# ======================= 🏠 دستور /fullstats (آمار کامل گروه‌ها) =======================
+# =====================================================================
+# 🏠 دستور /fullstats — آمار کامل گروه‌ها
+# =====================================================================
 async def fullstats(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
-    # دسترسی فقط برای ADMIN یا SUDO
-    ADMIN_ID = int(os.getenv("ADMIN_ID", "123"))  
+    ADMIN_ID = int(os.getenv("ADMIN_ID", "123"))
     SUDO_IDS = [ADMIN_ID]
 
     if update.effective_user.id not in SUDO_IDS:
         return await update.message.reply_text("⛔ فقط مدیر اصلی اجازه دارد.")
 
-    # بارگذاری گروه‌ها
+    # وجود فایل
     if not os.path.exists(GROUP_FILE):
         return await update.message.reply_text("ℹ️ هیچ گروهی ثبت نشده است.")
 
+    # خواندن فایل
     try:
         with open(GROUP_FILE, "r", encoding="utf-8") as f:
             groups = json.load(f)
@@ -332,6 +404,7 @@ async def fullstats(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"━━━━━━━━━━━━━━\n"
         )
 
+    # جلوگیری از ارور 400
     if len(text) > 4000:
         text = text[:3990] + "..."
 
