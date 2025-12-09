@@ -38,22 +38,44 @@ track_store = {}
 # ================================
 # کش تلگرام (file_id)
 # ================================
-CACHE_FILE = "data/sc_cache.json"
-os.makedirs("data", exist_ok=True)
-
-if not os.path.exists(CACHE_FILE):
-    with open(CACHE_FILE, "w", encoding="utf-8") as f:
-        json.dump({}, f)
-
-with open(CACHE_FILE, "r", encoding="utf-8") as f:
+# ================================
+# ارسال موزیک از حافظه‌ی کش (همانند دانلود مستقیم)
+# ================================
+async def send_from_cache(chat_id, track_id, bot, context):
     try:
-        SC_CACHE = json.load(f)
-    except json.JSONDecodeError:
-        SC_CACHE = {}
+        cache_entry = SC_CACHE.get(track_id)
+        if not cache_entry:
+            return False
 
-def save_cache():
-    with open(CACHE_FILE, "w", encoding="utf-8") as f:
-        json.dump(SC_CACHE, f, ensure_ascii=False, indent=2)
+        file_path = cache_entry["file"]
+
+        if not os.path.exists(file_path):
+            # فایل پاک شده → کش را ریست می‌کنیم
+            del SC_CACHE[track_id]
+            save_cache()
+            return False
+
+        keyboard = [[InlineKeyboardButton(
+            "➕ افزودن به گروه",
+            url="https://t.me/AFGR63_bot?startgroup=true"
+        )]]
+
+        caption = f"🎵 {cache_entry.get('title', 'Music')}\n\n📥 <a href='https://t.me/AFGR63_bot'>دانلود موزیک</a>"
+
+        with open(file_path, "rb") as f:
+            await bot.send_audio(
+                chat_id,
+                f,
+                caption=caption,
+                parse_mode="HTML",
+                reply_markup=InlineKeyboardMarkup(keyboard)
+            )
+
+        return True
+
+    except Exception as e:
+        print("Cache send error:", e)
+        return False
 
 # ================================
 # پیام‌ها
@@ -332,91 +354,6 @@ async def music_select_handler(update: Update, context: ContextTypes.DEFAULT_TYP
     except Exception:
         pass
 
-# ================================
-from telegram import InlineQueryResultArticle, InputTextMessageContent, InlineKeyboardButton, InlineKeyboardMarkup
-from urllib.parse import quote, unquote
-import asyncio
-
-# INLINE MODE — جستجوی درون‌خطی مستقیم
-async def inline_sc(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    q = update.inline_query.query.strip()
-    if not q or len(q) < 2:
-        return
-
-    def _search():
-        with yt_dlp.YoutubeDL({"quiet": True}) as y:
-            return y.extract_info(f"scsearch5:{q}", download=False)
-
-    loop = asyncio.get_running_loop()
-    try:
-        sc_info = await loop.run_in_executor(executor, _search)
-    except Exception:
-        sc_info = None
-
-    results = []
-    if sc_info and sc_info.get("entries"):
-        for t in sc_info["entries"]:
-            title = t.get("title") or "Unknown"
-            webpage = t.get("webpage_url") or ""
-            track_id = str(t.get("id"))
-
-            # callback_data امن با quote کردن URL و جداکننده |
-            callback_data = f"music_inline:{track_id}|{quote(webpage)}"
-
-            results.append(
-                InlineQueryResultArticle(
-                    id=track_id,
-                    title=title,
-                    input_message_content=InputTextMessageContent("در حال دانلود..."),
-                    description=(t.get("uploader") or "")[:50],
-                    reply_markup=InlineKeyboardMarkup([[
-                        InlineKeyboardButton(
-                            "➕ دریافت موزیک",
-                            callback_data=callback_data
-                        )
-                    ]])
-                )
-            )
-
-    await update.inline_query.answer(results, cache_time=1)
-
-
-# Callback برای inline → دانلود مستقیم
-async def inline_select_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    cq = update.callback_query
-    await cq.answer()
-
-    # جدا کردن track_id و URL
-    try:
-        data = cq.data.split("|")
-        track_id = data[0].split(":")[1]  # music_inline:123 → 123
-        webpage = unquote(data[1])
-    except Exception:
-        return await cq.edit_message_text("❌ خطا در خواندن اطلاعات آهنگ.")
-
-    chat = cq.message.chat_id
-    msg = await cq.edit_message_text("⬇️ در حال دانلود...")
-
-    loop = asyncio.get_running_loop()
-    try:
-        info, mp3 = await loop.run_in_executor(executor, _sc_download_sync, webpage)
-    except Exception as e:
-        return await msg.edit_text(f"❌ خطا در دانلود:\n{e}")
-
-    try:
-        with open(mp3, "rb") as f:
-            keyboard = [[InlineKeyboardButton(
-                "➕ افزودن به گروه",
-                url="https://t.me/AFGR63_bot?startgroup=true"
-            )]]
-            sent = await context.bot.send_audio(
-                chat,
-                f,
-                caption=f"🎵 {info.get('title', 'Music')}",
-                parse_mode="HTML",
-                reply_markup=InlineKeyboardMarkup(keyboard)
-            )
-    except Exception as e:
         return await msg.edit_text(f"❌ خطا در ارسال فایل:\n{e}")
     finally:
         if os.path.exists(mp3):
