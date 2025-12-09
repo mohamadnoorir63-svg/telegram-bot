@@ -7,7 +7,10 @@ import json
 from concurrent.futures import ThreadPoolExecutor
 from typing import Optional
 
-from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
+from telegram import (
+    Update, InlineKeyboardMarkup, InlineKeyboardButton,
+    InlineQueryResultArticle, InputTextMessageContent
+)
 from telegram.ext import ContextTypes
 
 # ================================
@@ -108,7 +111,7 @@ async def soundcloud_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
     query = next((text[len(t):].strip() for t in triggers if text.lower().startswith(t)), "")
     msg = await update.message.reply_text(TXT["searching"])
 
-    # جستجو ultra-fast
+    # جستجوی ultra-fast
     def _search():
         with yt_dlp.YoutubeDL({"quiet": True}) as y:
             return y.extract_info(f"scsearch5:{query}", download=False)
@@ -167,3 +170,55 @@ async def music_select_handler(update: Update, context: ContextTypes.DEFAULT_TYP
         await cq.message.delete()
     except:
         pass
+
+# ================================
+# هندلر inline ultra-fast
+# ================================
+async def inline_sc(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.inline_query.query.strip()
+    if not query:
+        return
+
+    def _search():
+        with yt_dlp.YoutubeDL({"quiet": True}) as y:
+            return y.extract_info(f"scsearch5:{query}", download=False)
+
+    loop = asyncio.get_running_loop()
+    result = await loop.run_in_executor(executor, _search)
+
+    results = []
+    for t in result.get("entries", [])[:6]:
+        tid = str(t["id"])
+        track_store[f"inline_{tid}"] = t
+        results.append(
+            InlineQueryResultArticle(
+                id=tid,
+                title=t["title"],
+                input_message_content=InputTextMessageContent(f"دانلود {t['title']}"),
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("دانلود", callback_data=f"music_inline:{tid}")]])
+            )
+        )
+    await update.inline_query.answer(results, cache_time=5)
+
+# ================================
+# دکمه دانلود inline ultra-fast
+# ================================
+async def music_inline_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    cq = update.callback_query
+    await cq.answer()
+
+    tid = cq.data.replace("music_inline:", "")
+    track = track_store.get(f"inline_{tid}")
+    if not track:
+        return await cq.edit_message_text("❌ آهنگ پیدا نشد.")
+
+    await cq.edit_message_text(TXT["down"])
+    url = track["webpage_url"]
+
+    loop = asyncio.get_running_loop()
+    info, mp3 = await loop.run_in_executor(executor, _sc_download_sync, url)
+
+    with open(mp3, "rb") as f:
+        sent = await context.bot.send_audio(cq.message.chat.id, f, caption=info.get("title", ""))
+
+    os.remove(mp3)
