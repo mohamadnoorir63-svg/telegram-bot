@@ -7,7 +7,13 @@ from concurrent.futures import ThreadPoolExecutor
 import json
 from typing import Optional
 
-from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton, InlineQueryResultArticle, InputTextMessageContent
+from telegram import (
+    Update,
+    InlineKeyboardMarkup,
+    InlineKeyboardButton,
+    InlineQueryResultArticle,
+    InputTextMessageContent,
+)
 from telegram.ext import ContextTypes
 
 # ================================
@@ -26,6 +32,7 @@ os.makedirs("data", exist_ok=True)
 if not os.path.exists(CACHE_FILE):
     with open(CACHE_FILE, "w", encoding="utf-8") as f:
         json.dump({}, f)
+
 with open(CACHE_FILE, "r", encoding="utf-8") as f:
     try:
         SC_CACHE = json.load(f)
@@ -39,7 +46,7 @@ def save_cache():
 # ================================
 # ThreadPool ultra-fast
 # ================================
-executor = ThreadPoolExecutor(max_workers=12)
+executor = ThreadPoolExecutor(max_workers=16)
 
 # ================================
 # جملات
@@ -94,7 +101,7 @@ def _download_sync(url: str):
         return info, fname
 
 # ================================
-# fallback یوتیوب (ابتدا extract info)
+# fallback یوتیوب
 # ================================
 def _youtube_fallback(query: str):
     opts = BASE_OPTS.copy()
@@ -133,8 +140,8 @@ async def soundcloud_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
     except:
         result = None
 
+    # ====== fallback یوتیوب اگر SoundCloud خالی بود ======
     if not result or not result.get("entries") or len(result["entries"]) == 0:
-        # fallback یوتیوب
         try:
             info, _ = await loop.run_in_executor(executor, _youtube_fallback, query)
             await msg.edit_text(TXT["down"])
@@ -147,7 +154,7 @@ async def soundcloud_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
         except:
             return await msg.edit_text(TXT["notfound"])
 
-    # SoundCloud نتیجه داشت
+    # ====== SoundCloud نتیجه داشت ======
     entries = {str(t["id"]): t for t in result["entries"]}
     track_store[update.message.message_id] = entries
     keyboard = [
@@ -192,7 +199,6 @@ async def music_select_handler(update: Update, context: ContextTypes.DEFAULT_TYP
     os.remove(mp3)
     SC_CACHE[cache_key] = sent.audio.file_id
     save_cache()
-# modules/soundcloud_handler.py (ادامه با inline)
 
 # ================================
 # هندلر inline ultra-fast
@@ -266,11 +272,9 @@ async def music_inline_handler(update: Update, context: ContextTypes.DEFAULT_TYP
     loop = asyncio.get_running_loop()
 
     url = track.get("webpage_url") if track.get("webpage_url") else track.get("url", "")
-    # اگر SoundCloud است _download_sync، اگر یوتیوب است _youtube_fallback
     if "soundcloud" in url:
         info, mp3 = await loop.run_in_executor(executor, _download_sync, url)
     else:
-        # برای یوتیوب ابتدا extract info، سپس دانلود
         info_tmp, _ = await loop.run_in_executor(executor, _youtube_fallback, track.get("title"))
         info, mp3 = await loop.run_in_executor(executor, _download_sync, info_tmp['webpage_url'])
 
