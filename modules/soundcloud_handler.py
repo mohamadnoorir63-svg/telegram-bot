@@ -8,12 +8,8 @@ import requests
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import ContextTypes
 import os
-
-AUDD_API_KEY = os.getenv("AUDD_API_KEY", "")
-print("AUDD_API_KEY =", AUDD_API_KEY)  # فقط برای تست در لاگ
-
-if not AUDD_API_KEY:
-    raise ValueError("❌ ENV VAR AUDD_API_KEY ست نشده است!")
+# --- Audd.io API Key ---
+AUDD_API_KEY = "1e24769c4b1e81d488e54e02e610de3d"
 
 # ================================
 # سودوها
