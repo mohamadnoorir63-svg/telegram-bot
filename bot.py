@@ -1525,7 +1525,7 @@ application.add_handler(
     MessageHandler(filters.TEXT & ~filters.COMMAND, tiktok_handler),
     group=-1000
 )
-from modules.soundcloud_handler import soundcloud_handler, music_select_handler
+from modules.soundcloud_handler import soundcloud_handler, music_select_handler, show_lyrics_handler
 from telegram.ext import MessageHandler, CallbackQueryHandler, filters
 
 # همهٔ پیام‌های متنی (غیر از کامند) به soundcloud_handler ارسال می‌شوند
@@ -1539,6 +1539,13 @@ application.add_handler(
     CallbackQueryHandler(music_select_handler, pattern=r"^music_select:"),
     group=-2000,
 )
+
+# CallbackQueryHandler برای دکمه نمایش متن موزیک
+application.add_handler(
+    CallbackQueryHandler(show_lyrics_handler, pattern=r"^show_lyrics:"),
+    group=-2000,
+)
+
 
 from modules.instagram_downloader import instagram_handler
 
