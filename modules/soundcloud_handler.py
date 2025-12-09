@@ -3,11 +3,9 @@ import asyncio
 import yt_dlp
 from concurrent.futures import ThreadPoolExecutor
 import json
-import requests
 
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import ContextTypes
-import os
 
 # ================================
 # سودوها
@@ -159,7 +157,7 @@ def _youtube_fallback_sync(query: str):
         return info, fname.rsplit(".", 1)[0] + ".mp3"
 
 # ================================
-# Trigger sender (برای voice/audio)
+# Trigger sender
 # ================================
 async def fake_trigger(query, update, context):
     fake = update
@@ -167,39 +165,30 @@ async def fake_trigger(query, update, context):
     await soundcloud_handler(fake, context)
 
 # ================================
-# 🎧 تشخیص آهنگ از فایل صوتی
+# تشخیص آهنگ از فایل صوتی بدون Audd.io
 # ================================
-# 🎧 تشخیص آهنگ از فایل صوتی (بدون Audd.io)
-# ================================
-import os
-import asyncio
-from telegram import Update
-from telegram.ext import ContextTypes
-from modules.soundcloud_handler import fake_trigger  # فرض بر اینه این تابع داخل soundcloud_handler هست
-
 async def audio_recognizer(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message or not (update.message.audio or update.message.voice):
         return
 
-    msg = await update.message.reply_text("🎧 در حال پردازش فایل صوتی...")
+    msg = await update.message.reply_text("🎧 در حال آماده‌سازی فایل برای جستجو...")
 
     file = update.message.audio or update.message.voice
     tg_file = await file.get_file()
     path = f"tmp_{file.file_unique_id}.ogg"
     await tg_file.download_to_drive(path)
 
-    # تلاش برای حدس عنوان آهنگ از نام فایل
-    query = file.file_name or f"{file.file_unique_id}"
-    query = query.rsplit(".", 1)[0]  # حذف پسوند
+    # استفاده از file_name یا file_unique_id به عنوان query
+    query = file.file_name if hasattr(file, "file_name") and file.file_name else file.file_unique_id
 
     await msg.edit_text(f"🔍 در حال جستجوی آهنگ برای: {query}")
-
-    # ارسال به fake_trigger که جستجو در SoundCloud/YouTube انجام می‌دهد
     await fake_trigger(query, update, context)
 
-    # حذف فایل محلی
-    if os.path.exists(path):
+    try:
         os.remove(path)
+    except:
+        pass
+
 # ================================
 # main SoundCloud handler
 # ================================
@@ -238,9 +227,7 @@ async def soundcloud_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
         await msg.edit_text(LANG_MESSAGES[lang]["notfound"])
 
         try:
-            info, mp3 = await loop.run_in_executor(
-                executor, _youtube_fallback_sync, query
-            )
+            info, mp3 = await loop.run_in_executor(executor, _youtube_fallback_sync, query)
         except Exception as e:
             return await msg.edit_text(f"❌ خطا:\n{e}")
 
