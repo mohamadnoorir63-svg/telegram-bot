@@ -22,6 +22,7 @@ from welcome_module import (
     welcome_input_handler,
     welcome
 )
+from telegram.ext import InlineQueryHandler
 
 from selective_backup import selective_backup_menu, selective_backup_buttons
 from auto_brain import auto_backup
