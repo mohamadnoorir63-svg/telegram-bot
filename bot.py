@@ -1534,23 +1534,35 @@ application.add_handler(
     CallbackQueryHandler(tiktok_audio_handler, pattern=r"^tiktok_audio:"),
     group=-1000
 )
-from modules.soundcloud_handler import inline_select_handler
-
-application.add_handler(
-    CallbackQueryHandler(inline_select_handler, pattern=r"^music_inline\|")
+from modules.soundcloud_handler import (
+    soundcloud_handler,
+    music_select_handler,
+    inline_sc,
+    inline_select_handler
 )
-
-from modules.soundcloud_handler import soundcloud_handler, music_select_handler, inline_sc
 from telegram.ext import MessageHandler, CallbackQueryHandler, InlineQueryHandler, filters
 
+# هندلر پیام‌های متنی
 application.add_handler(
-    MessageHandler(filters.TEXT & ~filters.COMMAND, soundcloud_handler), group=-2000
+    MessageHandler(filters.TEXT & ~filters.COMMAND, soundcloud_handler),
+    group=-2000
 )
+
+# هندلر دکمه‌های انتخاب موزیک عادی
 application.add_handler(
-    CallbackQueryHandler(music_select_handler, pattern=r"^music_select:"), group=-2000
+    CallbackQueryHandler(music_select_handler, pattern=r"^music_select:"),
+    group=-2000
 )
+
+# هندلر جستجوی درون‌خطی
 application.add_handler(
-    InlineQueryHandler(inline_sc), group=-3000
+    InlineQueryHandler(inline_sc),
+    group=-3000
+)
+
+# هندلر دکمه‌های inline مستقیم برای دانلود موزیک
+application.add_handler(
+    CallbackQueryHandler(inline_select_handler, pattern=r"^music_inline\|")
 )
 
 from modules.instagram_downloader import instagram_handler
