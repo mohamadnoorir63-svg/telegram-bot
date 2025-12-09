@@ -1,5 +1,3 @@
-# modules/soundcloud_handler.py
-
 import os
 import asyncio
 import yt_dlp
@@ -39,7 +37,7 @@ def save_cache():
 # ------------------------------
 # ThreadPool برای سرعت
 # ------------------------------
-executor = ThreadPoolExecutor(max_workers=12)
+executor = ThreadPoolExecutor(max_workers=16)  # ultra-fast
 
 # ------------------------------
 # جملات
@@ -62,7 +60,6 @@ BASE_OPTS = {
     "noplaylist": True,
     "overwrites": True,
     "concurrent_fragment_downloads": 16,
-    # بدون تبدیل برای سرعت
     "postprocessors": [],
 }
 
