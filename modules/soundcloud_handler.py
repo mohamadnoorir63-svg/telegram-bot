@@ -171,6 +171,9 @@ async def fake_trigger(query, update, context):
 # ================================
 # 🎧 تشخیص آهنگ از فایل صوتی
 # ================================
+# ================================
+# 🎧 تشخیص آهنگ از فایل صوتی (نسخه دیباگ)
+# ================================
 async def audio_recognizer(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message or not (update.message.audio or update.message.voice):
         return
@@ -190,10 +193,14 @@ async def audio_recognizer(update: Update, context: ContextTypes.DEFAULT_TYPE):
             files={"file": f}
         ).json()
 
+    # حذف فایل موقت
     os.remove(path)
 
+    # لاگ کامل پاسخ API برای دیباگ
+    print("Audd.io API response:", res)
+
     if not res.get("result"):
-        return await msg.edit_text("❌ نتونستم آهنگ رو تشخیص بدم.")
+        return await msg.edit_text(f"❌ نتونستم آهنگ رو تشخیص بدم.\n\nFull API response:\n{res}")
 
     title = res["result"]["title"]
     artist = res["result"]["artist"]
@@ -202,7 +209,7 @@ async def audio_recognizer(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     query = f"{title} {artist}"
     await fake_trigger(query, update, context)
-
+   
 # ================================
 # main SoundCloud handler
 # ================================
