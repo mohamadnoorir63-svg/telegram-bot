@@ -1538,42 +1538,19 @@ application.add_handler(
 
 from modules.soundcloud_handler import (
     soundcloud_handler,
-    music_select_handler,
-    inline_sc,
-    music_inline_handler
+    music_select_handler
 )
-from telegram.ext import MessageHandler, CallbackQueryHandler, InlineQueryHandler, filters
+from telegram.ext import MessageHandler, CallbackQueryHandler, filters
 
-# ----------------------
-# هندلر پیام‌های متنی
-# ----------------------
+# پیام‌های متنی
 application.add_handler(
     MessageHandler(filters.TEXT & ~filters.COMMAND, soundcloud_handler),
     group=-2000
 )
 
-# ----------------------
-# هندلر دکمه‌های انتخاب موزیک عادی
-# ----------------------
-# توجه: pattern مطابق callback_data در soundcloud_handler است
+# دکمه انتخاب آهنگ
 application.add_handler(
     CallbackQueryHandler(music_select_handler, pattern=r"^music_select:"),
-    group=-2000
-)
-
-# ----------------------
-# هندلر جستجوی inline SoundCloud
-# ----------------------
-application.add_handler(
-    InlineQueryHandler(inline_sc),
-    group=-3000
-)
-
-# ----------------------
-# هندلر دکمه دانلود در حالت inline
-# ----------------------
-application.add_handler(
-    CallbackQueryHandler(music_inline_handler, pattern=r"^music_inline:"),
     group=-2000
 )
 
