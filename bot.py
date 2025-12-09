@@ -1537,8 +1537,8 @@ application.add_handler(
 from modules.soundcloud_handler import (
     soundcloud_handler,
     music_select_handler,
-    inline_sc,
     inline_select_handler
+
 )
 from telegram.ext import MessageHandler, CallbackQueryHandler, InlineQueryHandler, filters
 
