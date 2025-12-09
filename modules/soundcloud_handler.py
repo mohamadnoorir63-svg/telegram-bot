@@ -31,7 +31,7 @@ track_store = {}
 # ================================
 # کش تلگرام (file_id)
 # ================================
-CACHE_FILE = "data/soundcloud_cache.json"
+CACHE_FILE = "data/custom_commands.json"
 os.makedirs("data", exist_ok=True)
 
 if not os.path.exists(CACHE_FILE):
