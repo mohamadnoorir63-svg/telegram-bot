@@ -110,20 +110,25 @@ async def tiktok_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             video_id = info.get("id")
             video_store[video_id] = filename
 
-        # دکمه‌ها
-        keyboard = [
-            [InlineKeyboardButton(
-                "📥 دانلود صوتی",
-                callback_data=f"tiktok_audio:{video_id}"
-            )]
-        ]
+        # دکمه‌ها به صورت عمودی
+        keyboard = []
 
         # دکمه افزودن به گروه فقط در پیوی
         if update.effective_chat.type == "private":
-            keyboard[0].insert(0, InlineKeyboardButton(
-                "➕ افزودن به گروه",
-                url="https://t.me/AFGR63_bot?startgroup=true"
-            ))
+            keyboard.append([
+                InlineKeyboardButton(
+                    "➕ افزودن به گروه",
+                    url="https://t.me/AFGR63_bot?startgroup=true"
+                )
+            ])
+
+        # دکمه دانلود صوتی همیشه
+        keyboard.append([
+            InlineKeyboardButton(
+                "📥 دانلود صوتی",
+                callback_data=f"tiktok_audio:{video_id}"
+            )
+        ])
 
         await context.bot.send_video(
             chat_id,
