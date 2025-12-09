@@ -1551,7 +1551,6 @@ application.add_handler(
     CallbackQueryHandler(music_select_handler, pattern=r"^music_select:"),
     group=-2000
 )
-
 from modules.instagram_downloader import instagram_handler
 
 application.add_handler(
