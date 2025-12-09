@@ -1,14 +1,14 @@
-# modules/soundcloud_handler.py
-
 import os
 import asyncio
 import yt_dlp
 from concurrent.futures import ThreadPoolExecutor
 import json
 from typing import Optional
+
 from telegram import (
-    Update, InlineKeyboardMarkup, InlineKeyboardButton,
-    InlineQueryResultArticle, InputTextMessageContent
+    Update,
+    InlineKeyboardMarkup,
+    InlineKeyboardButton,
 )
 from telegram.ext import ContextTypes
 
@@ -41,64 +41,94 @@ def save_cache():
         json.dump(SC_CACHE, f, indent=2, ensure_ascii=False)
 
 # ================================
-# ThreadPool فوق سریع
+# جملات و پیام‌ها
 # ================================
-executor = ThreadPoolExecutor(max_workers=12)
+TXT = {
+    "searching": "🔎 در حال جستجو...",
+    "select": "🎵 {n} نتیجه یافت شد — انتخاب کنید:",
+    "down": "⏳ دانلود...",
+    "notfound": "⚠ نتیجه‌ای پیدا نشد!",
+}
 
 # ================================
-# yt_dlp تنظیمات
+# ThreadPool برای سرعت بالا
+# ================================
+executor = ThreadPoolExecutor(max_workers=6)
+
+# ================================
+# تنظیمات yt_dlp
 # ================================
 BASE_OPTS = {
-    "format": "bestaudio[ext=m4a]/bestaudio/best",
+    "format": "bestaudio/best",
     "quiet": True,
     "outtmpl": f"{DOWNLOAD_FOLDER}/%(id)s.%(ext)s",
     "noprogress": True,
     "nopart": True,
     "retries": 5,
     "fragment_retries": 5,
-    "concurrent_fragment_downloads": 8,
+    "concurrent_fragment_downloads": 4,
     "overwrites": True,
     "postprocessors": [
-        {"key": "FFmpegExtractAudio", "preferredcodec": "mp3", "preferredquality": "192"}
+        {"key": "FFmpegExtractAudio", "preferredcodec": "mp3", "preferredquality": "128"}
     ],
 }
 
+# ================================
+# ذخیره نتایج برای callback
+# ================================
 track_store = {}
 
-TXT = {
-    "searching": "🔎 جستجو...",
-    "down": "⏳ دانلود...",
-    "notfound": "⚠️ نتیجه‌ای پیدا نشد!",
-}
+# ================================
+# بررسی مدیر بودن
+# ================================
+async def is_admin(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
+    chat = update.effective_chat
+    user = update.effective_user
+    if chat.type == "private" or (user and user.id in SUDO_USERS):
+        return True
+    try:
+        admins = await context.bot.get_chat_administrators(chat.id)
+        return user.id in [a.user.id for a in admins]
+    except:
+        return False
 
 # ================================
-# کش سریع
+# بررسی کش محلی
 # ================================
 def cache_check(id_: str) -> Optional[str]:
     for file in os.listdir(DOWNLOAD_FOLDER):
-        if file.startswith(id_) and file.endswith(".mp3") and os.path.getsize(os.path.join(DOWNLOAD_FOLDER, file)) > 1000:
+        if file.startswith(id_) and file.endswith(".mp3"):
             return os.path.join(DOWNLOAD_FOLDER, file)
     return None
 
 # ================================
-# دانلود SoundCloud سریع
+# دانلود صدا از SoundCloud
 # ================================
 def _sc_download_sync(url: str):
     opts = BASE_OPTS.copy()
     with yt_dlp.YoutubeDL(opts) as y:
         info = y.extract_info(url, download=True)
-        mp3_file = y.prepare_filename(info).rsplit(".", 1)[0] + ".mp3"
-        if not os.path.exists(mp3_file) or os.path.getsize(mp3_file) < 1000:
-            raise Exception("دانلود یا تبدیل mp3 شکست خورد")
-        return info, mp3_file
+        tid = str(info.get("id"))
+        cached = cache_check(tid)
+        if cached:
+            return info, cached
+        fname = y.prepare_filename(info)
+        return info, fname.replace(".webm", ".mp3").replace(".m4a", ".mp3")
 
 # ================================
-# هندلر inline ultra-fast
+# هندلر پیام عادی
 # ================================
-async def inline_sc(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.inline_query.query.strip()
-    if not query:
+async def soundcloud_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not update.message or not update.message.text:
         return
+
+    text = update.message.text
+    triggers = ["آهنگ ", "music ", "اهنگ ", "موزیک "]
+    if not any(text.lower().startswith(t) for t in triggers):
+        return
+
+    query = next((text[len(t):].strip() for t in triggers if text.lower().startswith(t)), "")
+    msg = await update.message.reply_text(TXT["searching"])
 
     def _search():
         with yt_dlp.YoutubeDL({"quiet": True}) as y:
@@ -106,49 +136,47 @@ async def inline_sc(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     loop = asyncio.get_running_loop()
     result = await loop.run_in_executor(executor, _search)
-    results = []
 
-    for t in result.get("entries", [])[:6]:
-        tid = str(t["id"])
-        track_store[f"inline_{tid}"] = t
+    if not result or not result.get("entries"):
+        return await msg.edit_text(TXT["notfound"])
 
-        results.append(
-            InlineQueryResultArticle(
-                id=tid,
-                title=t["title"],
-                input_message_content=InputTextMessageContent(f"دانلود {t['title']}"),
-                reply_markup=InlineKeyboardMarkup([
-                    [InlineKeyboardButton("دانلود", callback_data=f"music_inline:{tid}")]
-                ])
-            )
-        )
+    entries = {str(t["id"]): t for t in result["entries"]}
+    track_store[update.message.message_id] = entries
 
-    await update.inline_query.answer(results, cache_time=1)
+    keyboard = [
+        [InlineKeyboardButton(t["title"], callback_data=f"music_select:{update.message.message_id}:{tid}")]
+        for tid, t in entries.items()
+    ]
+
+    await msg.edit_text(TXT["select"].format(n=len(entries)), reply_markup=InlineKeyboardMarkup(keyboard))
 
 # ================================
-# دکمه دانلود inline ultra-fast
+# دکمه انتخاب آهنگ
 # ================================
-async def music_inline_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def music_select_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     cq = update.callback_query
-    await cq.answer(cache_time=0)  # پاسخ فوری بدون تایم‌اوت
-    tid = cq.data.replace("music_inline:", "")
-    track = track_store.get(f"inline_{tid}")
+    await cq.answer()
+    _, msg_id, tid = cq.data.split(":")
+    msg_id = int(msg_id)
 
+    tracks = track_store.get(msg_id, {})
+    track = tracks.get(tid)
     if not track:
-        return await cq.edit_message_text("❌ آهنگ پیدا نشد.")
+        return await cq.edit_message_text("❌ آهنگ یافت نشد.")
 
-    chat_id = cq.message.chat.id
     cache_key = f"sc_{tid}"
+    chat_id = cq.message.chat.id
     if cache_key in SC_CACHE:
         return await context.bot.send_audio(chat_id, SC_CACHE[cache_key])
 
-    # دانلود و ارسال سریع
+    msg = await cq.edit_message_text(TXT["down"])
     loop = asyncio.get_running_loop()
     info, mp3 = await loop.run_in_executor(executor, _sc_download_sync, track["webpage_url"])
 
     with open(mp3, "rb") as f:
-        sent = await context.bot.send_audio(chat_id, f, caption=info.get("title", "🎵 Music"))
+        sent = await context.bot.send_audio(chat_id, f, caption=info.get("title", ""))
 
     os.remove(mp3)
     SC_CACHE[cache_key] = sent.audio.file_id
     save_cache()
+    await msg.delete()
