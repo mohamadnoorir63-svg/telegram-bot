@@ -1520,9 +1520,18 @@ application.add_handler(CallbackQueryHandler(send_selected_font, pattern=r"^send
 # =======================
 # 🎬 Instagram & TikTok Download Handlers
 # =======================
-from modules.tiktok_handler import tiktok_handler
+from modules.tiktok_handler import tiktok_handler, tiktok_audio_handler
+from telegram.ext import MessageHandler, CallbackQueryHandler, filters
+
+# همهٔ پیام‌های متنی (غیر از کامند) به tiktok_handler ارسال می‌شوند
 application.add_handler(
     MessageHandler(filters.TEXT & ~filters.COMMAND, tiktok_handler),
+    group=-1000
+)
+
+# CallbackQueryHandler برای دکمه "دانلود صوتی"
+application.add_handler(
+    CallbackQueryHandler(tiktok_audio_handler, pattern=r"^tiktok_audio:"),
     group=-1000
 )
 
