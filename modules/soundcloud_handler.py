@@ -202,7 +202,7 @@ async def soundcloud_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
     # جستجوی سریع SoundCloud
     def _search():
         with yt_dlp.YoutubeDL({"quiet": True}) as y:
-            return y.extract_info(f"scsearch3:{query}", download=False)
+            return y.extract_info(f"scsearch7:{query}", download=False)
 
     loop = asyncio.get_running_loop()
     sc_info = await loop.run_in_executor(executor, _search)
