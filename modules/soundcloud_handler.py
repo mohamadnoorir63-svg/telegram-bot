@@ -287,7 +287,7 @@ async def music_select_handler(update: Update, context: ContextTypes.DEFAULT_TYP
     cq = update.callback_query
     await cq.answer()
 
-    chat = cq.message.chat_id
+    chat_id = cq.message.chat.id  # ← مطمئن شوید همیشه chat_id درست است
 
     # گروه → فقط مدیر
     if update.effective_chat.type != "private":
@@ -297,15 +297,16 @@ async def music_select_handler(update: Update, context: ContextTypes.DEFAULT_TYP
     track_id = cq.data.split(":")[1]
     cache_key = f"sc_{track_id}"
 
-    # اگر از قبل کش شده در تلگرام باشه سریع ارسال کن
+    # اگر از قبل کش شده در تلگرام باشد
     if cache_key in SC_CACHE:
         try:
             await cq.edit_message_text("⚡ در حال ارسال از کش تلگرام...")
         except Exception:
             pass
-        return await context.bot.send_audio(chat, SC_CACHE[cache_key])
+        return await context.bot.send_audio(chat_id, SC_CACHE[cache_key])
 
-    tracks = track_store.get(chat, [])
+    # استفاده از chat_id درست
+    tracks = track_store.get(chat_id, [])
     track = next((t for t in tracks if str(t["id"]) == track_id), None)
 
     if not track:
@@ -329,7 +330,7 @@ async def music_select_handler(update: Update, context: ContextTypes.DEFAULT_TYP
                 )]]
 
             sent = await context.bot.send_audio(
-                chat,
+                chat_id,
                 f,
                 caption=f"🎵 {info.get('title', 'Music')}\n\n📥 <a href='https://t.me/AFGR63_bot'>دانلود موزیک</a>",
                 parse_mode="HTML",
@@ -338,14 +339,12 @@ async def music_select_handler(update: Update, context: ContextTypes.DEFAULT_TYP
     except Exception as e:
         return await msg.edit_text(f"❌ خطا در ارسال فایل:\n{e}")
     finally:
-        # حذف فایل محلی بعد از ارسال (اگر فایل محوق نشده با کش)
         if os.path.exists(mp3):
             try:
                 os.remove(mp3)
             except Exception:
                 pass
 
-    # ذخیره در کش تلگرام
     SC_CACHE[cache_key] = sent.audio.file_id
     save_cache()
 
@@ -353,11 +352,3 @@ async def music_select_handler(update: Update, context: ContextTypes.DEFAULT_TYP
         await msg.delete()
     except Exception:
         pass
-
-        return await msg.edit_text(f"❌ خطا در ارسال فایل:\n{e}")
-    finally:
-        if os.path.exists(mp3):
-            try:
-                os.remove(mp3)
-            except Exception:
-                pass
