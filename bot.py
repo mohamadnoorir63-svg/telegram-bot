@@ -1525,28 +1525,16 @@ application.add_handler(
     MessageHandler(filters.TEXT & ~filters.COMMAND, tiktok_handler),
     group=-1000
 )
-from modules.soundcloud_handler import soundcloud_handler, music_select_handler, audio_recognizer
+from modules.soundcloud_handler import soundcloud_handler, music_select_handler
 from telegram.ext import MessageHandler, CallbackQueryHandler, filters
 
-# ================================
-# تشخیص آهنگ از فایل صوتی (voice/audio)
-# ================================
-application.add_handler(
-    MessageHandler(filters.VOICE | filters.AUDIO, audio_recognizer),
-    group=-2001,
-)
-
-# ================================
-# جستجو از متن → SoundCloud / YouTube
-# ================================
+# همهٔ پیام‌های متنی (غیر از کامند) به soundcloud_handler ارسال می‌شوند
 application.add_handler(
     MessageHandler(filters.TEXT & ~filters.COMMAND, soundcloud_handler),
     group=-2000,
 )
 
-# ================================
-# دکمه انتخاب آهنگ
-# ================================
+# CallbackQueryHandler برای انتخاب موزیک، با pattern هماهنگ "music_select:"
 application.add_handler(
     CallbackQueryHandler(music_select_handler, pattern=r"^music_select:"),
     group=-2000,
