@@ -7,10 +7,7 @@ from concurrent.futures import ThreadPoolExecutor
 import json
 from typing import Optional
 
-from telegram import (
-    Update, InlineKeyboardMarkup, InlineKeyboardButton,
-    InlineQueryResultArticle, InputTextMessageContent
-)
+from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton, InlineQueryResultArticle, InputTextMessageContent
 from telegram.ext import ContextTypes
 
 # ================================
@@ -97,22 +94,19 @@ def _download_sync(url: str):
         return info, fname
 
 # ================================
-# fallback یوتیوب
+# fallback یوتیوب (ابتدا extract info)
 # ================================
 def _youtube_fallback(query: str):
     opts = BASE_OPTS.copy()
     if os.path.exists(YOUTUBE_COOKIE_FILE):
         opts["cookiefile"] = YOUTUBE_COOKIE_FILE
     with yt_dlp.YoutubeDL(opts) as y:
-        info = y.extract_info(f"ytsearch1:{query}", download=True)
-        if "entries" in info:
+        info = y.extract_info(f"ytsearch1:{query}", download=False)
+        if "entries" in info and len(info["entries"]) > 0:
             info = info["entries"][0]
-        vid = str(info.get("id"))
-        cached = cache_check(vid)
-        if cached:
-            return info, cached
-        fname = y.prepare_filename(info)
-        return info, fname
+        else:
+            raise Exception("یوتیوب چیزی پیدا نکرد")
+        return info, None  # فایل هنوز دانلود نشده
 
 # ================================
 # هندلر پیام عادی
@@ -128,7 +122,6 @@ async def soundcloud_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
     query = next((text[len(t):].strip() for t in triggers if text.lower().startswith(t)), "")
     msg = await update.message.reply_text(TXT["searching"])
-
     loop = asyncio.get_running_loop()
 
     def _search_sc():
@@ -140,11 +133,12 @@ async def soundcloud_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
     except:
         result = None
 
-    # ====== اگر SoundCloud نتیجه نداشت ======
     if not result or not result.get("entries") or len(result["entries"]) == 0:
+        # fallback یوتیوب
         try:
-            info, mp3 = await loop.run_in_executor(executor, _youtube_fallback, query)
+            info, _ = await loop.run_in_executor(executor, _youtube_fallback, query)
             await msg.edit_text(TXT["down"])
+            info2, mp3 = await loop.run_in_executor(executor, _download_sync, info['webpage_url'])
             with open(mp3, "rb") as f:
                 sent = await context.bot.send_audio(update.message.chat.id, f, caption=info.get("title", ""))
             os.remove(mp3)
@@ -153,10 +147,9 @@ async def soundcloud_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
         except:
             return await msg.edit_text(TXT["notfound"])
 
-    # ====== اگر SoundCloud نتیجه داشت ======
+    # SoundCloud نتیجه داشت
     entries = {str(t["id"]): t for t in result["entries"]}
     track_store[update.message.message_id] = entries
-
     keyboard = [
         [InlineKeyboardButton(t["title"], callback_data=f"music_select:{update.message.message_id}:{tid}")]
         for tid, t in entries.items()
