@@ -1554,6 +1554,7 @@ application.add_handler(
 )
 
 
+
 from modules.instagram_downloader import instagram_handler
 
 application.add_handler(
