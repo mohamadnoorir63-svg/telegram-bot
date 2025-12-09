@@ -1,14 +1,13 @@
-# modules/tiktok_handler.py
-
 import os
 import shutil
 import subprocess
 import requests
 import yt_dlp
+import asyncio
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import ContextTypes
 
-SUDO_USERS = [8588347189]  # ← آیدی شما
+SUDO_USERS = [8588347189]
 DOWNLOAD_FOLDER = "downloads"
 os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
 
@@ -18,8 +17,8 @@ USER_AGENT = (
     "Chrome/120.0 Safari/537.36"
 )
 
-# کش برای نگهداری مسیر فایل‌ها برای callback
 video_store = {}
+executor = asyncio.get_running_loop().run_in_executor  # استفاده از ThreadPool
 
 # ================================
 # چک مدیر بودن
@@ -41,7 +40,7 @@ async def is_admin(update, context):
 # ================================
 # تبدیل به mp3
 # ================================
-async def convert_to_mp3(video_path: str) -> str:
+def _convert_to_mp3_blocking(video_path: str) -> str:
     mp3_path = video_path.rsplit(".", 1)[0] + ".mp3"
     if not shutil.which("ffmpeg"):
         return None
@@ -51,6 +50,35 @@ async def convert_to_mp3(video_path: str) -> str:
         stderr=subprocess.DEVNULL
     )
     return mp3_path
+
+async def convert_to_mp3(video_path: str) -> str:
+    loop = asyncio.get_running_loop()
+    return await loop.run_in_executor(None, _convert_to_mp3_blocking, video_path)
+
+# ================================
+# دانلود و پردازش ویدیو
+# ================================
+def _download_tiktok_blocking(url: str) -> dict:
+    ydl_opts = {
+        "quiet": True,
+        "merge_output_format": "mp4",
+        "noplaylist": True,
+        "outtmpl": os.path.join(DOWNLOAD_FOLDER, "%(id)s.%(ext)s"),
+        "format": "mp4",
+        "fragment_retries": 3,
+        "retries": 3,
+        "concurrent_fragment_downloads": 8,
+        "http_headers": {
+            "User-Agent": USER_AGENT,
+            "Referer": "https://www.tiktok.com/"
+        }
+    }
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        info = ydl.extract_info(url, download=True)
+        if not info:
+            return None
+        info['filename'] = ydl.prepare_filename(info)
+        return info
 
 # ================================
 # هندلر اصلی TikTok
@@ -74,7 +102,6 @@ async def tiktok_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = await update.message.reply_text("⬇️ در حال پردازش TikTok ...")
     chat_id = update.effective_chat.id
 
-    # رفع ریدایرکت لینک کوتاه
     if "vm.tiktok.com" in url or "vt.tiktok.com" in url:
         try:
             resp = requests.get(url, allow_redirects=True, headers={"User-Agent": USER_AGENT})
@@ -87,33 +114,19 @@ async def tiktok_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await msg.edit_text("❌ عکس‌های TikTok پشتیبانی نمی‌شوند.")
         return
 
-    ydl_opts = {
-        "quiet": True,
-        "merge_output_format": "mp4",
-        "noplaylist": True,
-        "outtmpl": os.path.join(DOWNLOAD_FOLDER, "%(id)s.%(ext)s"),
-        "format": "mp4",
-        "http_headers": {
-            "User-Agent": USER_AGENT,
-            "Referer": "https://www.tiktok.com/"
-        }
-    }
-
+    loop = asyncio.get_running_loop()
     try:
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(url, download=True)
-            if not info:
-                await msg.edit_text("❌ ویدیو یافت نشد یا دانلود ممکن نیست.")
-                return
+        info = await loop.run_in_executor(None, _download_tiktok_blocking, url)
+        if not info:
+            await msg.edit_text("❌ ویدیو یافت نشد یا دانلود ممکن نیست.")
+            return
 
-            filename = ydl.prepare_filename(info)
-            video_id = info.get("id")
-            video_store[video_id] = filename
+        filename = info['filename']
+        video_id = info.get("id")
+        video_store[video_id] = filename
 
-        # دکمه‌ها به صورت عمودی
+        # دکمه‌ها عمودی
         keyboard = []
-
-        # دکمه افزودن به گروه فقط در پیوی
         if update.effective_chat.type == "private":
             keyboard.append([
                 InlineKeyboardButton(
@@ -121,8 +134,6 @@ async def tiktok_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     url="https://t.me/AFGR63_bot?startgroup=true"
                 )
             ])
-
-        # دکمه دانلود صوتی همیشه
         keyboard.append([
             InlineKeyboardButton(
                 "📥 دانلود صوتی",
@@ -141,7 +152,6 @@ async def tiktok_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     except Exception as e:
         await msg.edit_text(f"❌ خطا در دانلود: {e}")
-
 
 # ================================
 # هندلر دانلود صوتی
