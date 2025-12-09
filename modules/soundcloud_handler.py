@@ -12,20 +12,18 @@ from telegram.ext import ContextTypes
 # ================================
 # سودوها
 # ================================
-
 SUDO_USERS = [8588347189]   # ← آیدی شما
 
 # ================================
 # تنظیمات
 # ================================
-
 DOWNLOAD_FOLDER = "downloads"
 os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
 
 COOKIE_FILE = "modules/youtube_cookie.txt"
 
 # ThreadPoolExecutor (Heroku-safe)
-executor = ThreadPoolExecutor(max_workers=8)
+executor = ThreadPoolExecutor(max_workers=4)  # کمتر از قبل برای stability
 
 # کش ترک‌ها در حافظه (نتایج جستجو برای انتخاب دکمه)
 track_store = {}
@@ -33,7 +31,6 @@ track_store = {}
 # ================================
 # کش تلگرام (file_id)
 # ================================
-
 CACHE_FILE = "data/custom_commands.json"
 os.makedirs("data", exist_ok=True)
 
@@ -54,7 +51,6 @@ def save_cache():
 # ================================
 # پیام‌ها
 # ================================
-
 LANG_MESSAGES = {
     "fa": {
         "searching": "🔍 در حال جستجو ... لطفاً صبر کنید",
@@ -77,24 +73,23 @@ LANG_MESSAGES = {
 }
 
 # ================================
-# تنظیمات سوپر توربو yt_dlp
+# تنظیمات yt_dlp بهینه
 # ================================
-
 BASE_OPTS = {
-    "format": "bestaudio/best",
+    "format": "bestaudio[ext=m4a]/bestaudio/best",  # سریع‌تر
     "quiet": True,
     "outtmpl": f"{DOWNLOAD_FOLDER}/%(id)s.%(ext)s",
     "noprogress": True,
     "nopart": True,
-    "retries": 20,
-    "fragment_retries": 20,
-    "concurrent_fragment_downloads": 20,  # دانلود چندتردی سریع
+    "retries": 3,  # کمتر برای سرعت
+    "fragment_retries": 3,
+    "concurrent_fragment_downloads": 4,
     "overwrites": True,
     "postprocessors": [
         {
             "key": "FFmpegExtractAudio",
             "preferredcodec": "mp3",
-            "preferredquality": "192",
+            "preferredquality": "128",  # کیفیت کمتر → سریع‌تر
         }
     ],
 }
@@ -102,7 +97,6 @@ BASE_OPTS = {
 # ================================
 # بررسی مدیر بودن
 # ================================
-
 async def is_admin(update, context):
     chat = update.effective_chat
     user = update.effective_user
@@ -118,9 +112,8 @@ async def is_admin(update, context):
         return False
 
 # ================================
-# چک کش mp3 لوکال (مثل قبل)
+# چک کش mp3 لوکال
 # ================================
-
 def cache_check(id_: str):
     """اگر mp3 با این id قبلاً دانلود شده باشد، مسیرش را برمی‌گرداند."""
     for file in os.listdir(DOWNLOAD_FOLDER):
@@ -129,34 +122,31 @@ def cache_check(id_: str):
     return None
 
 # ================================
-# دانلود SoundCloud (Turbo + Cache فایل)
+# دانلود SoundCloud
 # ================================
-
 def _sc_download_sync(url: str):
     opts = BASE_OPTS.copy()
     with yt_dlp.YoutubeDL(opts) as y:
         info = y.extract_info(url, download=True)
         track_id = str(info.get("id"))
 
-        # اگر قبلاً در کش لوکال داریم → همان را بده
         cached = cache_check(track_id)
         if cached:
             return info, cached
 
-        # مسیر خروجی
-        fname = y.prepare_filename(info)
-        mp3 = fname.rsplit(".", 1)[0] + ".mp3"
-        return info, mp3
+        # فایل mp3 توسط postprocessor ساخته می‌شود
+        ext = info.get("ext", "m4a")
+        mp3_file = os.path.join(DOWNLOAD_FOLDER, f"{track_id}.mp3")
+        return info, mp3_file
 
 # ================================
-# دانلود fallback یوتیوب (Turbo + Cache فایل)
+# دانلود fallback یوتیوب
 # ================================
-
 def _youtube_fallback_sync(query: str):
     opts = BASE_OPTS.copy()
-    opts["concurrent_fragment_downloads"] = 20
     if os.path.exists(COOKIE_FILE):
         opts["cookiefile"] = COOKIE_FILE
+    opts["format"] = "bestaudio[ext=m4a]/bestaudio/best"
     with yt_dlp.YoutubeDL(opts) as y:
         info = y.extract_info(f"ytsearch1:{query}", download=True)
         if "entries" in info:
@@ -165,14 +155,12 @@ def _youtube_fallback_sync(query: str):
         cached = cache_check(vid)
         if cached:
             return info, cached
-        fname = y.prepare_filename(info)
-        mp3 = fname.rsplit(".", 1)[0] + ".mp3"
-        return info, mp3
+        mp3_file = os.path.join(DOWNLOAD_FOLDER, f"{vid}.mp3")
+        return info, mp3_file
 
 # ================================
 # جستجو و ساخت لیست انتخاب
 # ================================
-
 async def soundcloud_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message or not update.message.text:
         return
@@ -210,51 +198,37 @@ async def soundcloud_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
     # اگر ساندکلاد نتیجه نداد → یوتیوب
     if not sc_info or not sc_info.get("entries"):
         await msg.edit_text(LANG_MESSAGES[lang]["notfound"])
-
         try:
-            info, mp3 = await loop.run_in_executor(
-                executor, _youtube_fallback_sync, query
-            )
+            info, mp3 = await loop.run_in_executor(executor, _youtube_fallback_sync, query)
         except Exception as e:
             return await msg.edit_text(f"❌ خطا در جستجوی یوتیوب:\n{e}")
 
-        # اگر این آهنگ از یوتیوب قبلاً در کش تلگرامی داریم:
         yt_id = str(info.get("id"))
         cache_key = f"yt_{yt_id}"
 
         if cache_key in SC_CACHE:
-            # پاک کردن پیام خطا/اطلاع
             try:
                 await msg.delete()
             except Exception:
                 pass
-            return await update.message.reply_audio(
-                SC_CACHE[cache_key],
-                caption=f"🎵 {info.get('title', 'Music')}",
-            )
+            return await update.message.reply_audio(SC_CACHE[cache_key], caption=f"🎵 {info.get('title', 'Music')}")
 
-        # ارسال و ذخیره file_id
         try:
             with open(mp3, "rb") as f:
-                sent = await update.message.reply_audio(
-                    f, caption=f"🎵 {info.get('title', 'Music')}"
-                )
+                sent = await update.message.reply_audio(f, caption=f"🎵 {info.get('title', 'Music')}")
         except Exception as e:
             return await msg.edit_text(f"❌ خطا در ارسال فایل:\n{e}")
         finally:
             if os.path.exists(mp3):
                 os.remove(mp3)
 
-        # ذخیره در کش تلگرام
         SC_CACHE[cache_key] = sent.audio.file_id
         save_cache()
 
-        # پاک کردن پیام "در SoundCloud چیزی پیدا نشد..."
         try:
             await msg.delete()
         except Exception:
             pass
-
         return
 
     # ساخت انتخاب‌ها
@@ -274,7 +248,6 @@ async def soundcloud_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
 # ================================
 # دانلود انتخاب‌شده
 # ================================
-
 async def music_select_handler(update, context: ContextTypes.DEFAULT_TYPE):
     cq = update.callback_query
     await cq.answer()
@@ -288,7 +261,6 @@ async def music_select_handler(update, context: ContextTypes.DEFAULT_TYPE):
 
     track_id = cq.data.split(":")[1]
 
-    # 🔥 اول проверим: اگر در کش تلگرام داریم → سریع بفرست
     cache_key = f"sc_{track_id}"
     if cache_key in SC_CACHE:
         try:
@@ -307,26 +279,19 @@ async def music_select_handler(update, context: ContextTypes.DEFAULT_TYPE):
     loop = asyncio.get_running_loop()
 
     try:
-        info, mp3 = await loop.run_in_executor(
-            executor, _sc_download_sync, track["webpage_url"]
-        )
+        info, mp3 = await loop.run_in_executor(executor, _sc_download_sync, track["webpage_url"])
     except Exception as e:
         return await msg.edit_text(f"❌ خطا در دانلود:\n{e}")
 
-    # ارسال و ذخیره file_id
     try:
         with open(mp3, "rb") as f:
-            sent = await context.bot.send_audio(
-                chat, f, caption=f"🎵 " + info.get("title", "Music")
-            )
+            sent = await context.bot.send_audio(chat, f, caption=f"🎵 " + info.get("title", "Music"))
     except Exception as e:
         return await msg.edit_text(f"❌ خطا در ارسال فایل:\n{e}")
 
-    # ذخیره در کش تلگرام
     SC_CACHE[cache_key] = sent.audio.file_id
     save_cache()
 
-    # پاک کردن پیام "⬇️ در حال دانلود..."
     try:
         await msg.delete()
     except Exception:
