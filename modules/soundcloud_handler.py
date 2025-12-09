@@ -217,26 +217,23 @@ async def soundcloud_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
                 pass
             return await update.message.reply_audio(
                 SC_CACHE[cache_key],
-                caption=f"🎵 {info.get('title', 'Music')}\n\n📥 دانلود موزیک",
+                caption=f"🎵 {info.get('title', 'Music')}\n\n📥 <a href='https://t.me/AFGR63_bot'>دانلود موزیک</a>",
+                parse_mode="HTML"
             )
 
         try:
             with open(mp3, "rb") as f:
-                uploader_id = info.get('uploader_id')
-                uploader_name = info.get('uploader')
-
-                keyboard = []
-                if uploader_id and uploader_name:
-                    keyboard = [
-                        [InlineKeyboardButton(
-                            text=f"🎧 آهنگ‌های بعدی از {uploader_name}",
-                            callback_data=f"next_from:{uploader_id}:{uploader_name}"
-                        )]
-                    ]
+                keyboard = None
+                if update.effective_chat.type == "private":
+                    keyboard = [[InlineKeyboardButton(
+                        "➕ افزودن به گروه",
+                        url="https://t.me/AFGR63_bot?startgroup=true"
+                    )]]
 
                 sent = await update.message.reply_audio(
                     f,
-                    caption=f"🎵 {info.get('title', 'Music')}\n\n📥 دانلود موزیک",
+                    caption=f"🎵 {info.get('title', 'Music')}\n\n📥 <a href='https://t.me/AFGR63_bot'>دانلود موزیک</a>",
+                    parse_mode="HTML",
                     reply_markup=InlineKeyboardMarkup(keyboard) if keyboard else None
                 )
         except Exception as e:
@@ -284,6 +281,7 @@ async def music_select_handler(update, context: ContextTypes.DEFAULT_TYPE):
 
     track_id = cq.data.split(":")[1]
     cache_key = f"sc_{track_id}"
+
     if cache_key in SC_CACHE:
         try:
             await cq.edit_message_text("⚡ در حال ارسال از کش تلگرام...")
@@ -307,22 +305,18 @@ async def music_select_handler(update, context: ContextTypes.DEFAULT_TYPE):
 
     try:
         with open(mp3, "rb") as f:
-            uploader_id = info.get('uploader_id')
-            uploader_name = info.get('uploader')
-
-            keyboard = []
-            if uploader_id and uploader_name:
-                keyboard = [
-                    [InlineKeyboardButton(
-                        text=f"🎧 آهنگ‌های بعدی از {uploader_name}",
-                        callback_data=f"next_from:{uploader_id}:{uploader_name}"
-                    )]
-                ]
+            keyboard = None
+            if update.effective_chat.type == "private":
+                keyboard = [[InlineKeyboardButton(
+                    "➕ افزودن به گروه",
+                    url="https://t.me/AFGR63_bot?startgroup=true"
+                )]]
 
             sent = await context.bot.send_audio(
                 chat,
                 f,
-                caption=f"🎵 {info.get('title', 'Music')}\n\n📥 دانلود موزیک",
+                caption=f"🎵 {info.get('title', 'Music')}\n\n📥 <a href='https://t.me/AFGR63_bot'>دانلود موزیک</a>",
+                parse_mode="HTML",
                 reply_markup=InlineKeyboardMarkup(keyboard) if keyboard else None
             )
     except Exception as e:
@@ -335,49 +329,3 @@ async def music_select_handler(update, context: ContextTypes.DEFAULT_TYPE):
         await msg.delete()
     except Exception:
         pass
-
-# ================================
-# هاندلر دکمه "آهنگ‌های بعدی از این خواننده"
-# ================================
-
-async def next_from_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    cq = update.callback_query
-    await cq.answer()
-
-    chat = cq.message.chat_id
-    data = cq.data.split(":")
-    uploader_id = data[1]
-    uploader_name = data[2]
-
-    msg = await cq.edit_message_text(f"🔍 جستجوی آهنگ‌های {uploader_name} ... لطفاً صبر کنید")
-    loop = asyncio.get_running_loop()
-
-    def _search_uploader():
-        with yt_dlp.YoutubeDL({"quiet": True}) as y:
-            return y.extract_info(f"https://soundcloud.com/{uploader_id}/tracks", download=False)
-
-    try:
-        info = await loop.run_in_executor(executor, _search_uploader)
-    except Exception as e:
-        return await msg.edit_text(f"❌ خطا در جستجو:\n{e}")
-
-    if not info or not info.get("entries"):
-        return await msg.edit_text(f"❌ آهنگی از {uploader_name} پیدا نشد.")
-
-    # فقط آهنگ‌های واقعی همان uploader
-    entries = [t for t in info['entries'] if t.get('uploader') == uploader_name]
-
-    if not entries:
-        return await msg.edit_text(f"❌ آهنگی از {uploader_name} پیدا نشد.")
-
-    track_store[chat] = entries
-
-    keyboard = [
-        [InlineKeyboardButton(t["title"], callback_data=f"music_select:{t['id']}")]
-        for t in entries
-    ]
-
-    await msg.edit_text(
-        f"🎵 {len(entries)} آهنگ پیدا شد از {uploader_name} — لطفاً انتخاب کنید:",
-        reply_markup=InlineKeyboardMarkup(keyboard),
-    )
