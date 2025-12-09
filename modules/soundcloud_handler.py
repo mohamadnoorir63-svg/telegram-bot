@@ -8,8 +8,10 @@ import requests
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import ContextTypes
 
-# --- Import API Key ---
-from config import AUDD_API_KEY
+# --- Import API Key from Environment Variable ---
+import os
+
+AUDD_API_KEY = os.getenv("AUDD_API_KEY", "")  # اگر مقدار نداشت، رشته خالی می‌گیرد
 
 # ================================
 # سودوها
