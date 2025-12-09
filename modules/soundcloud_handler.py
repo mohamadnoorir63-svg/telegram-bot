@@ -159,6 +159,7 @@ async def soundcloud_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
         for tid, t in entries.items()
     ]
     await msg.edit_text(TXT["select"].format(n=len(entries)), reply_markup=InlineKeyboardMarkup(keyboard))
+
 # ================================
 # دکمه انتخاب آهنگ
 # ================================
