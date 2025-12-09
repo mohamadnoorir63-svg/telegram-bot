@@ -126,15 +126,19 @@ async def soundcloud_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
     query = next((text[len(t):].strip() for t in triggers if text.lower().startswith(t)), "")
     msg = await update.message.reply_text(TXT["searching"])
 
-    def _search():
+    loop = asyncio.get_running_loop()
+
+    def _search_sc():
         with yt_dlp.YoutubeDL({"quiet": True}) as y:
             return y.extract_info(f"scsearch10:{query}", download=False)
 
-    loop = asyncio.get_running_loop()
-    result = await loop.run_in_executor(executor, _search)
+    try:
+        result = await loop.run_in_executor(executor, _search_sc)
+    except:
+        result = None
 
-    if not result or not result.get("entries"):
-        # اگر چیزی پیدا نکرد، fallback به یوتیوب
+    # ====== اگر SoundCloud نتیجه نداشت ======
+    if not result or not result.get("entries") or len(result["entries"]) == 0:
         try:
             info, mp3 = await loop.run_in_executor(executor, _youtube_fallback, query)
             await msg.edit_text(TXT["down"])
@@ -146,6 +150,7 @@ async def soundcloud_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
         except:
             return await msg.edit_text(TXT["notfound"])
 
+    # ====== اگر SoundCloud نتیجه داشت ======
     entries = {str(t["id"]): t for t in result["entries"]}
     track_store[update.message.message_id] = entries
 
@@ -153,9 +158,7 @@ async def soundcloud_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
         [InlineKeyboardButton(t["title"], callback_data=f"music_select:{update.message.message_id}:{tid}")]
         for tid, t in entries.items()
     ]
-
     await msg.edit_text(TXT["select"].format(n=len(entries)), reply_markup=InlineKeyboardMarkup(keyboard))
-
 # ================================
 # دکمه انتخاب آهنگ
 # ================================
