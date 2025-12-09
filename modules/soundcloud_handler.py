@@ -1,89 +1,105 @@
+# modules/soundcloud_handler.py
+
 import os
 import asyncio
 import yt_dlp
-import aiohttp
 from concurrent.futures import ThreadPoolExecutor
 import json
+from typing import Optional
+
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import ContextTypes
 
 # ================================
-# سودو + پوشه‌ها
+# سودو
 # ================================
 SUDO_USERS = [8588347189]
 
+# ================================
+# پوشه‌ها و کش
+# ================================
 DOWNLOAD_FOLDER = "downloads"
 os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
 
 CACHE_FILE = "data/sc_cache.json"
 os.makedirs("data", exist_ok=True)
+
 if not os.path.exists(CACHE_FILE):
-    with open(CACHE_FILE, "w") as f:
+    with open(CACHE_FILE, "w", encoding="utf-8") as f:
         json.dump({}, f)
-with open(CACHE_FILE, "r") as f:
-    try: SC_CACHE = json.load(f)
-    except: SC_CACHE = {}
+
+with open(CACHE_FILE, "r", encoding="utf-8") as f:
+    try:
+        SC_CACHE = json.load(f)
+    except:
+        SC_CACHE = {}
 
 def save_cache():
-    with open(CACHE_FILE, "w") as f:
+    with open(CACHE_FILE, "w", encoding="utf-8") as f:
         json.dump(SC_CACHE, f, indent=2, ensure_ascii=False)
 
-executor = ThreadPoolExecutor(max_workers=40)
-track_store = {}
-
-TXT = {
-    "searching": "🔎 جستجو با سرعت نور...",
-    "select": "🎵 {n} نتیجه پیدا شد — انتخاب کن:",
-    "down": "⚡ دانلود موشکی...",
-    "notfound": "⚠️ نتیجه‌ای پیدا نشد!"
-}
+# ================================
+# ThreadPool برای سرعت
+# ================================
+executor = ThreadPoolExecutor(max_workers=6)
 
 # ================================
-# yt-dlp سریع بدون تبدیل
+# تنظیمات yt_dlp
 # ================================
 BASE_OPTS = {
     "format": "bestaudio/best",
     "quiet": True,
-    "noprogress": True,
     "outtmpl": f"{DOWNLOAD_FOLDER}/%(id)s.%(ext)s",
-    "retries": 20,
-    "fragment_retries": 20,
-    "concurrent_fragment_downloads": 50,
+    "noprogress": True,
     "nopart": True,
+    "retries": 5,
+    "fragment_retries": 5,
+    "concurrent_fragment_downloads": 4,
     "overwrites": True,
-    "postprocessors": []  # بدون FFmpeg = سرعت ×3
+    "postprocessors": [
+        {"key": "FFmpegExtractAudio", "preferredcodec": "mp3", "preferredquality": "128"}
+    ],
+}
+
+track_store = {}  # ذخیره نتایج جستجو برای callback
+
+# ================================
+# پیام‌ها
+# ================================
+TXT = {
+    "searching": "🔎 در حال جستجو...",
+    "select": "🎵 {n} نتیجه یافت شد — انتخاب کنید:",
+    "down": "⏳ در حال دانلود...",
+    "notfound": "⚠️ نتیجه‌ای پیدا نشد!",
 }
 
 # ================================
-# کش محلی
+# بررسی مدیر بودن
 # ================================
-def cache_check(id_):
-    for f in os.listdir(DOWNLOAD_FOLDER):
-        if f.startswith(id_):
-            return os.path.join(DOWNLOAD_FOLDER, f)
-    return None
+async def is_admin(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
+    chat = update.effective_chat
+    user = update.effective_user
+    if chat.type == "private":
+        return True
+    if user and user.id in SUDO_USERS:
+        return True
+    try:
+        admins = await context.bot.get_chat_administrators(chat.id)
+        return user.id in [a.user.id for a in admins]
+    except:
+        return False
 
 # ================================
-# دانلود مستقیم chunk به chunk با aiohttp
+# دانلود سریع و مطمئن SoundCloud
 # ================================
-async def download_aio(url, filename):
-    async with aiohttp.ClientSession() as session:
-        async with session.get(url) as resp:
-            with open(filename, "wb") as f:
-                async for chunk in resp.content.iter_chunked(1024*32):
-                    f.write(chunk)
-    return filename
-
-# ================================
-# yt-dlp info + URL سریع
-# ================================
-def get_info_sync(url):
-    with yt_dlp.YoutubeDL(BASE_OPTS) as y:
-        info = y.extract_info(url, download=False)
-        # مستقیم به URL stream
-        url_audio = info['url']
-        tid = str(info.get("id"))
-        return info, url_audio, tid
+def _sc_download_sync(url: str):
+    opts = BASE_OPTS.copy()
+    with yt_dlp.YoutubeDL(opts) as y:
+        info = y.extract_info(url, download=True)
+        mp3_file = y.prepare_filename(info).rsplit(".", 1)[0] + ".mp3"
+        if not os.path.exists(mp3_file) or os.path.getsize(mp3_file) == 0:
+            raise Exception("دانلود یا تبدیل mp3 شکست خورد.")
+        return info, mp3_file
 
 # ================================
 # هندلر پیام عادی
@@ -91,16 +107,19 @@ def get_info_sync(url):
 async def soundcloud_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message or not update.message.text:
         return
-    text = update.message.text.lower()
-    triggers = ["آهنگ ", "اهنگ ", "موزیک ", "music "]
-    if not any(text.startswith(t) for t in triggers):
+
+    text = update.message.text
+    triggers = ["آهنگ ", "music ", "اهنگ ", "موزیک "]
+    if not any(text.lower().startswith(t) for t in triggers):
         return
-    query = next(text[len(t):].strip() for t in triggers if text.startswith(t))
+
+    query = next((text[len(t):].strip() for t in triggers if text.lower().startswith(t)), "")
     msg = await update.message.reply_text(TXT["searching"])
 
     def _search(): 
         with yt_dlp.YoutubeDL({"quiet": True}) as y:
             return y.extract_info(f"scsearch10:{query}", download=False)
+
     loop = asyncio.get_running_loop()
     result = await loop.run_in_executor(executor, _search)
 
@@ -109,15 +128,15 @@ async def soundcloud_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
     entries = {str(t["id"]): t for t in result["entries"]}
     track_store[update.message.message_id] = entries
+
     keyboard = [
-        [InlineKeyboardButton(t["title"][:40], callback_data=f"sel:{update.message.message_id}:{tid}")]
+        [InlineKeyboardButton(t["title"], callback_data=f"music_select:{update.message.message_id}:{tid}")]
         for tid, t in entries.items()
     ]
-    await msg.edit_text(TXT["select"].format(n=len(entries)),
-                        reply_markup=InlineKeyboardMarkup(keyboard))
+    await msg.edit_text(TXT["select"].format(n=len(entries)), reply_markup=InlineKeyboardMarkup(keyboard))
 
 # ================================
-# دکمه انتخاب + دانلود موازی
+# دکمه انتخاب آهنگ
 # ================================
 async def music_select_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     cq = update.callback_query
@@ -127,7 +146,7 @@ async def music_select_handler(update: Update, context: ContextTypes.DEFAULT_TYP
     tracks = track_store.get(msg_id, {})
     track = tracks.get(tid)
     if not track:
-        return await cq.edit_message_text("❌ آهنگ پیدا نشد.")
+        return await cq.edit_message_text("❌ آهنگ یافت نشد.")
 
     chat_id = cq.message.chat.id
     cache_key = f"sc_{tid}"
@@ -136,16 +155,12 @@ async def music_select_handler(update: Update, context: ContextTypes.DEFAULT_TYP
 
     msg = await cq.edit_message_text(TXT["down"])
     loop = asyncio.get_running_loop()
-    info, url, tid = await loop.run_in_executor(executor, get_info_sync, track["webpage_url"])
-    file_path = os.path.join(DOWNLOAD_FOLDER, f"{tid}.tmp")
+    info, mp3 = await loop.run_in_executor(executor, _sc_download_sync, track["webpage_url"])
 
-    # دانلود مستقیم با aiohttp
-    await download_aio(url, file_path)
+    with open(mp3, "rb") as f:
+        sent = await context.bot.send_audio(chat_id, f, caption=info.get("title", ""))
 
-    with open(file_path, "rb") as f:
-        sent = await context.bot.send_audio(chat_id, f, caption=info.get("title",""))
-
-    os.remove(file_path)
+    os.remove(mp3)
     SC_CACHE[cache_key] = sent.audio.file_id
     save_cache()
     await msg.delete()
