@@ -8,8 +8,6 @@ import requests
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import ContextTypes
 import os
-# --- Audd.io API Key ---
-AUDD_API_KEY = "1e24769c4b1e81d488e54e02e610de3d"
 
 # ================================
 # سودوها
@@ -171,45 +169,37 @@ async def fake_trigger(query, update, context):
 # ================================
 # 🎧 تشخیص آهنگ از فایل صوتی
 # ================================
+# 🎧 تشخیص آهنگ از فایل صوتی (بدون Audd.io)
 # ================================
-# 🎧 تشخیص آهنگ از فایل صوتی (نسخه دیباگ)
-# ================================
+import os
+import asyncio
+from telegram import Update
+from telegram.ext import ContextTypes
+from modules.soundcloud_handler import fake_trigger  # فرض بر اینه این تابع داخل soundcloud_handler هست
+
 async def audio_recognizer(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message or not (update.message.audio or update.message.voice):
         return
 
-    msg = await update.message.reply_text("🎧 در حال تشخیص آهنگ...")
+    msg = await update.message.reply_text("🎧 در حال پردازش فایل صوتی...")
 
     file = update.message.audio or update.message.voice
     tg_file = await file.get_file()
     path = f"tmp_{file.file_unique_id}.ogg"
     await tg_file.download_to_drive(path)
 
-    # ارسال به Audd.io
-    with open(path, "rb") as f:
-        res = requests.post(
-            "https://api.audd.io/",
-            data={"api_token": AUDD_API_KEY, "return": "timecode"},
-            files={"file": f}
-        ).json()
+    # تلاش برای حدس عنوان آهنگ از نام فایل
+    query = file.file_name or f"{file.file_unique_id}"
+    query = query.rsplit(".", 1)[0]  # حذف پسوند
 
-    # حذف فایل موقت
-    os.remove(path)
+    await msg.edit_text(f"🔍 در حال جستجوی آهنگ برای: {query}")
 
-    # لاگ کامل پاسخ API برای دیباگ
-    print("Audd.io API response:", res)
-
-    if not res.get("result"):
-        return await msg.edit_text(f"❌ نتونستم آهنگ رو تشخیص بدم.\n\nFull API response:\n{res}")
-
-    title = res["result"]["title"]
-    artist = res["result"]["artist"]
-
-    await msg.edit_text(f"🎵 آهنگ شناسایی شد:\n{title} - {artist}\n\nدر حال جستجو...")
-
-    query = f"{title} {artist}"
+    # ارسال به fake_trigger که جستجو در SoundCloud/YouTube انجام می‌دهد
     await fake_trigger(query, update, context)
-   
+
+    # حذف فایل محلی
+    if os.path.exists(path):
+        os.remove(path)
 # ================================
 # main SoundCloud handler
 # ================================
