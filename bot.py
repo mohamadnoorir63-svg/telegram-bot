@@ -1536,9 +1536,11 @@ application.add_handler(
 )
 from modules.soundcloud_handler import (
     soundcloud_handler,
-    music_select_handler
+    music_select_handler,
+    inline_sc,
+    inline_select_handler
 )
-from telegram.ext import MessageHandler, CallbackQueryHandler, filters
+from telegram.ext import MessageHandler, CallbackQueryHandler, InlineQueryHandler, filters
 
 # هندلر پیام‌های متنی
 application.add_handler(
@@ -1551,6 +1553,8 @@ application.add_handler(
     CallbackQueryHandler(music_select_handler, pattern=r"^music_select:"),
     group=-2000
 )
+
+
 from modules.instagram_downloader import instagram_handler
 
 application.add_handler(
