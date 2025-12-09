@@ -60,10 +60,10 @@ def save_cache():
 # ================================
 LANG_MESSAGES = {
     "fa": {
-        "searching": "🔍 در حال جستجو ... لطفاً صبر کنید",
-        "downloading": "⬇️ در حال دانلود آهنگ...",
+        "searching": "🔍",
+        "downloading": "⌛",
         "select_song": "🎵 {n} آهنگ پیدا شد — لطفاً انتخاب کنید:",
-        "notfound": "❌ در SoundCloud چیزی پیدا نشد. در حال جستجو در یوتیوب...",
+        "notfound": "⌛",
     }
 }
 
@@ -333,12 +333,12 @@ async def music_select_handler(update: Update, context: ContextTypes.DEFAULT_TYP
         pass
 
 # ================================
-# INLINE MODE — جستجوی درون‌خطی
-# توضیح مهم:
-#  وقتی کاربر یک InlineResult انتخاب می‌کند، ما یک پیام
-#  با قالب "آهنگ <soundcloud_page_url>" در چت ارسال می‌کنیم.
-#  همان پیام توسط soundcloud_handler پردازش و دانلود می‌شود.
 # ================================
+# INLINE MODE — جستجوی درون‌خطی مستقیم
+# وقتی کاربر انتخاب می‌کند، موزیک مستقیم ارسال می‌شود
+# ================================
+from telegram import InlineQueryResultArticle, InputTextMessageContent
+
 async def inline_sc(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.inline_query.query.strip()
     if not q or len(q) < 2:
@@ -359,15 +359,61 @@ async def inline_sc(update: Update, context: ContextTypes.DEFAULT_TYPE):
         for t in sc_info["entries"]:
             title = t.get("title") or "Unknown"
             webpage = t.get("webpage_url") or ""
-            # وقتی کاربر این InlineResult را انتخاب کند، این متن در چت ارسال می‌شود:
-            input_text = f"آهنگ {webpage}"
+            track_id = str(t.get("id"))
+
+            # وقتی کاربر انتخاب کند → این callback اجرا می‌شود
             results.append(
                 InlineQueryResultArticle(
-                    id=str(t.get("id")) or title,
+                    id=track_id,
                     title=title,
-                    input_message_content=InputTextMessageContent(input_text),
-                    description=(t.get("uploader") or "")[:50]
+                    input_message_content=InputTextMessageContent("در حال دانلود..."),
+                    description=(t.get("uploader") or "")[:50],
+                    reply_markup=InlineKeyboardMarkup([[
+                        InlineKeyboardButton(
+                            "➕ دریافت موزیک",
+                            callback_data=f"music_inline:{track_id}:{webpage}"
+                        )
+                    ]])
                 )
             )
 
     await update.inline_query.answer(results, cache_time=1)
+    # ================================
+# Callback برای inline → دانلود مستقیم
+# ================================
+async def inline_select_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    cq = update.callback_query
+    await cq.answer()
+    data = cq.data.split(":")
+    track_id, webpage = data[1], data[2]
+
+    chat = cq.message.chat_id
+    msg = await cq.edit_message_text("⬇️ در حال دانلود...")
+
+    loop = asyncio.get_running_loop()
+    try:
+        info, mp3 = await loop.run_in_executor(executor, _sc_download_sync, webpage)
+    except Exception as e:
+        return await msg.edit_text(f"❌ خطا در دانلود:\n{e}")
+
+    try:
+        with open(mp3, "rb") as f:
+            keyboard = [[InlineKeyboardButton(
+                "➕ افزودن به گروه",
+                url="https://t.me/AFGR63_bot?startgroup=true"
+            )]]
+            sent = await context.bot.send_audio(
+                chat,
+                f,
+                caption=f"🎵 {info.get('title', 'Music')}",
+                parse_mode="HTML",
+                reply_markup=InlineKeyboardMarkup(keyboard)
+            )
+    except Exception as e:
+        return await msg.edit_text(f"❌ خطا در ارسال فایل:\n{e}")
+    finally:
+        if os.path.exists(mp3):
+            try:
+                os.remove(mp3)
+            except Exception:
+                pass
