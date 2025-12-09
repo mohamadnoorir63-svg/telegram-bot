@@ -8,9 +8,14 @@ from typing import Optional
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import ContextTypes
 
-# ---------------------------
-# پوشه‌ها و کش
-# ---------------------------
+# ================================
+# سودو
+# ================================
+SUDO_USERS = [8588347189]
+
+# ================================
+# پوشه‌ها + کش
+# ================================
 DOWNLOAD_FOLDER = "downloads"
 os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
 
@@ -27,16 +32,16 @@ with open(CACHE_FILE, "r", encoding="utf-8") as f:
 
 def save_cache():
     with open(CACHE_FILE, "w", encoding="utf-8") as f:
-        json.dump(SC_CACHE, f, ensure_ascii=False, indent=2)
+        json.dump(SC_CACHE, f, indent=2, ensure_ascii=False)
 
-# ---------------------------
+# ================================
 # ThreadPool ultra-fast
-# ---------------------------
+# ================================
 executor = ThreadPoolExecutor(max_workers=12)
 
-# ---------------------------
+# ================================
 # جملات
-# ---------------------------
+# ================================
 TXT = {
     "searching": "🔎 در حال جستجو...",
     "select": "🎵 {n} نتیجه یافت شد — انتخاب کنید:",
@@ -44,9 +49,9 @@ TXT = {
     "notfound": "⚠ نتیجه‌ای پیدا نشد!",
 }
 
-# ---------------------------
+# ================================
 # تنظیمات yt_dlp ultra-fast
-# ---------------------------
+# ================================
 BASE_OPTS = {
     "format": "bestaudio/best",
     "quiet": True,
@@ -64,18 +69,18 @@ YOUTUBE_COOKIE_FILE = "modules/youtube_cookie.txt"
 # ذخیره موقت Track ها
 track_store = {}
 
-# ---------------------------
+# ================================
 # چک کش محلی
-# ---------------------------
+# ================================
 def cache_check(id_: str) -> Optional[str]:
     for file in os.listdir(DOWNLOAD_FOLDER):
         if file.startswith(id_) and file.endswith(".mp3"):
             return os.path.join(DOWNLOAD_FOLDER, file)
     return None
 
-# ---------------------------
+# ================================
 # دانلود ultra-fast
-# ---------------------------
+# ================================
 def _download_sync(url: str):
     opts = BASE_OPTS.copy()
     with yt_dlp.YoutubeDL(opts) as y:
@@ -88,9 +93,9 @@ def _download_sync(url: str):
         mp3 = fname.rsplit(".", 1)[0] + ".mp3"
         return info, mp3
 
-# ---------------------------
+# ================================
 # دانلود fallback یوتیوب
-# ---------------------------
+# ================================
 def _youtube_fallback_sync(query: str):
     opts = BASE_OPTS.copy()
     if os.path.exists(YOUTUBE_COOKIE_FILE):
@@ -107,16 +112,18 @@ def _youtube_fallback_sync(query: str):
         mp3 = fname.rsplit(".", 1)[0] + ".mp3"
         return info, mp3
 
-# ---------------------------
+# ================================
 # هندلر پیام عادی
-# ---------------------------
+# ================================
 async def soundcloud_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message or not update.message.text:
         return
-    text = update.message.text.strip()
+
+    text = update.message.text
     triggers = ["آهنگ ", "music ", "اهنگ ", "موزیک "]
     if not any(text.lower().startswith(t) for t in triggers):
         return
+
     query = next((text[len(t):].strip() for t in triggers if text.lower().startswith(t)), "")
     msg = await update.message.reply_text(TXT["searching"])
 
@@ -154,9 +161,9 @@ async def soundcloud_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
     await msg.edit_text(TXT["select"].format(n=len(track_store)), reply_markup=InlineKeyboardMarkup(keyboard))
 
-# ---------------------------
+# ================================
 # دکمه انتخاب آهنگ
-# ---------------------------
+# ================================
 async def music_select_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     cq = update.callback_query
     await cq.answer()
