@@ -110,27 +110,26 @@ async def tiktok_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             video_id = info.get("id")
             video_store[video_id] = filename
 
-        # دکمه‌ها فقط در پیوی
-        keyboard = None
+        # دکمه‌ها
+        keyboard = [
+            [InlineKeyboardButton(
+                "📥 دانلود صوتی",
+                callback_data=f"tiktok_audio:{video_id}"
+            )]
+        ]
+
+        # دکمه افزودن به گروه فقط در پیوی
         if update.effective_chat.type == "private":
-            keyboard = [
-                [
-                    InlineKeyboardButton(
-                        "➕ افزودن به گروه",
-                        url="https://t.me/AFGR63_bot?startgroup=true"
-                    ),
-                    InlineKeyboardButton(
-                        "📥 دانلود صوتی",
-                        callback_data=f"tiktok_audio:{video_id}"
-                    )
-                ]
-            ]
+            keyboard[0].insert(0, InlineKeyboardButton(
+                "➕ افزودن به گروه",
+                url="https://t.me/AFGR63_bot?startgroup=true"
+            ))
 
         await context.bot.send_video(
             chat_id,
             filename,
             caption=f"🎬 {info.get('title', 'TikTok Video')}",
-            reply_markup=InlineKeyboardMarkup(keyboard) if keyboard else None
+            reply_markup=InlineKeyboardMarkup(keyboard)
         )
 
         await msg.delete()
