@@ -1534,6 +1534,11 @@ application.add_handler(
     CallbackQueryHandler(tiktok_audio_handler, pattern=r"^tiktok_audio:"),
     group=-1000
 )
+from modules.soundcloud_handler import inline_select_handler
+
+application.add_handler(
+    CallbackQueryHandler(inline_select_handler, pattern=r"^music_inline\|")
+)
 
 from modules.soundcloud_handler import soundcloud_handler, music_select_handler, inline_sc
 from telegram.ext import MessageHandler, CallbackQueryHandler, InlineQueryHandler, filters
