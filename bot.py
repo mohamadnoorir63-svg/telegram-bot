@@ -1535,28 +1535,17 @@ application.add_handler(
     group=-1000
 )
 
-from modules.soundcloud_handler import (
-    soundcloud_handler,
-    music_select_handler,
-    inline_sc
-)
+from modules.soundcloud_handler import soundcloud_handler, music_select_handler, inline_sc
 from telegram.ext import MessageHandler, CallbackQueryHandler, InlineQueryHandler, filters
 
-# همهٔ پیام‌های متنی (غیر از کامند) → جستجوی آهنگ
 application.add_handler(
-    MessageHandler(filters.TEXT & ~filters.COMMAND, soundcloud_handler),
-    group=-2000,
+    MessageHandler(filters.TEXT & ~filters.COMMAND, soundcloud_handler), group=-2000
 )
-
-# انتخاب آهنگ‌ها
 application.add_handler(
-    CallbackQueryHandler(music_select_handler, pattern=r"^music_select:"),
-    group=-2000,
+    CallbackQueryHandler(music_select_handler, pattern=r"^music_select:"), group=-2000
 )
-
-# 🔥 فعال‌سازی درون‌خطی (inline query)
 application.add_handler(
-    InlineQueryHandler(inline_sc),
+    InlineQueryHandler(inline_sc), group=-3000
 )
 
 from modules.instagram_downloader import instagram_handler
