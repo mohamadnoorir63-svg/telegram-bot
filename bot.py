@@ -1525,10 +1525,10 @@ application.add_handler(
     MessageHandler(filters.TEXT & ~filters.COMMAND, tiktok_handler),
     group=-1000
 )
+
 from modules.soundcloud_handler import (
     soundcloud_handler,
-    music_select_handler,
-    next_from_handler  # ← اضافه شد
+    music_select_handler
 )
 from telegram.ext import MessageHandler, CallbackQueryHandler, filters
 
@@ -1543,13 +1543,6 @@ application.add_handler(
     CallbackQueryHandler(music_select_handler, pattern=r"^music_select:"),
     group=-2000,
 )
-
-# CallbackQueryHandler برای دکمه "آهنگ‌های بعدی از این خواننده"
-application.add_handler(
-    CallbackQueryHandler(next_from_handler, pattern=r"^next_from:"),
-    group=-2000,
-)
-
 
 from modules.instagram_downloader import instagram_handler
 
