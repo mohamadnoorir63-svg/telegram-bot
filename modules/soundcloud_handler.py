@@ -7,11 +7,13 @@ import requests
 
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import ContextTypes
-
-# --- Import API Key from Environment Variable ---
 import os
 
-AUDD_API_KEY = os.getenv("AUDD_API_KEY", "")  # اگر مقدار نداشت، رشته خالی می‌گیرد
+AUDD_API_KEY = os.getenv("AUDD_API_KEY", "")
+print("AUDD_API_KEY =", AUDD_API_KEY)  # فقط برای تست در لاگ
+
+if not AUDD_API_KEY:
+    raise ValueError("❌ ENV VAR AUDD_API_KEY ست نشده است!")
 
 # ================================
 # سودوها
