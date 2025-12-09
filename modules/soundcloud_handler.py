@@ -333,12 +333,11 @@ async def music_select_handler(update: Update, context: ContextTypes.DEFAULT_TYP
         pass
 
 # ================================
-# ================================
-# INLINE MODE — جستجوی درون‌خطی مستقیم
-# وقتی کاربر انتخاب می‌کند، موزیک مستقیم ارسال می‌شود
-# ================================
-from telegram import InlineQueryResultArticle, InputTextMessageContent
+from telegram import InlineQueryResultArticle, InputTextMessageContent, InlineKeyboardButton, InlineKeyboardMarkup
+from urllib.parse import quote, unquote
+import asyncio
 
+# INLINE MODE — جستجوی درون‌خطی مستقیم
 async def inline_sc(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.inline_query.query.strip()
     if not q or len(q) < 2:
@@ -361,7 +360,9 @@ async def inline_sc(update: Update, context: ContextTypes.DEFAULT_TYPE):
             webpage = t.get("webpage_url") or ""
             track_id = str(t.get("id"))
 
-            # وقتی کاربر انتخاب کند → این callback اجرا می‌شود
+            # callback_data امن با quote کردن URL و جداکننده |
+            callback_data = f"music_inline:{track_id}|{quote(webpage)}"
+
             results.append(
                 InlineQueryResultArticle(
                     id=track_id,
@@ -371,21 +372,27 @@ async def inline_sc(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     reply_markup=InlineKeyboardMarkup([[
                         InlineKeyboardButton(
                             "➕ دریافت موزیک",
-                            callback_data=f"music_inline:{track_id}:{webpage}"
+                            callback_data=callback_data
                         )
                     ]])
                 )
             )
 
     await update.inline_query.answer(results, cache_time=1)
-    # ================================
+
+
 # Callback برای inline → دانلود مستقیم
-# ================================
 async def inline_select_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     cq = update.callback_query
     await cq.answer()
-    data = cq.data.split(":")
-    track_id, webpage = data[1], data[2]
+
+    # جدا کردن track_id و URL
+    try:
+        data = cq.data.split("|")
+        track_id = data[0].split(":")[1]  # music_inline:123 → 123
+        webpage = unquote(data[1])
+    except Exception:
+        return await cq.edit_message_text("❌ خطا در خواندن اطلاعات آهنگ.")
 
     chat = cq.message.chat_id
     msg = await cq.edit_message_text("⬇️ در حال دانلود...")
