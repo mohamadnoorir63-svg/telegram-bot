@@ -7,13 +7,7 @@ from concurrent.futures import ThreadPoolExecutor
 import json
 from typing import Optional
 
-from telegram import (
-    Update,
-    InlineKeyboardMarkup,
-    InlineKeyboardButton,
-    InlineQueryResultArticle,
-    InputTextMessageContent,
-)
+from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton, InlineQueryResultArticle, InputTextMessageContent
 from telegram.ext import ContextTypes
 
 # ================================
@@ -32,7 +26,6 @@ os.makedirs("data", exist_ok=True)
 if not os.path.exists(CACHE_FILE):
     with open(CACHE_FILE, "w", encoding="utf-8") as f:
         json.dump({}, f)
-
 with open(CACHE_FILE, "r", encoding="utf-8") as f:
     try:
         SC_CACHE = json.load(f)
@@ -46,7 +39,7 @@ def save_cache():
 # ================================
 # ThreadPool ultra-fast
 # ================================
-executor = ThreadPoolExecutor(max_workers=16)
+executor = ThreadPoolExecutor(max_workers=12)
 
 # ================================
 # جملات
@@ -86,7 +79,7 @@ def cache_check(id_: str) -> Optional[str]:
     return None
 
 # ================================
-# دانلود ultra-fast
+# دانلود SoundCloud / یوتیوب
 # ================================
 def _download_sync(url: str):
     opts = BASE_OPTS.copy()
@@ -101,19 +94,22 @@ def _download_sync(url: str):
         return info, fname
 
 # ================================
-# fallback یوتیوب
+# دانلود مستقیم از یوتیوب
 # ================================
-def _youtube_fallback(query: str):
+def _youtube_download(query: str):
     opts = BASE_OPTS.copy()
     if os.path.exists(YOUTUBE_COOKIE_FILE):
         opts["cookiefile"] = YOUTUBE_COOKIE_FILE
     with yt_dlp.YoutubeDL(opts) as y:
-        info = y.extract_info(f"ytsearch1:{query}", download=False)
+        info = y.extract_info(f"ytsearch1:{query}", download=True)
         if "entries" in info and len(info["entries"]) > 0:
             info = info["entries"][0]
-        else:
-            raise Exception("یوتیوب چیزی پیدا نکرد")
-        return info, None  # فایل هنوز دانلود نشده
+        vid = str(info.get("id"))
+        cached = cache_check(vid)
+        if cached:
+            return info, cached
+        fname = y.prepare_filename(info)
+        return info, fname
 
 # ================================
 # هندلر پیام عادی
@@ -140,18 +136,18 @@ async def soundcloud_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
     except:
         result = None
 
-    # ====== fallback یوتیوب اگر SoundCloud خالی بود ======
+    # ====== اگر SoundCloud چیزی پیدا نکرد ======
     if not result or not result.get("entries") or len(result["entries"]) == 0:
         try:
-            info, _ = await loop.run_in_executor(executor, _youtube_fallback, query)
+            info, mp3 = await loop.run_in_executor(executor, _youtube_download, query)
             await msg.edit_text(TXT["down"])
-            info2, mp3 = await loop.run_in_executor(executor, _download_sync, info['webpage_url'])
             with open(mp3, "rb") as f:
                 sent = await context.bot.send_audio(update.message.chat.id, f, caption=info.get("title", ""))
             os.remove(mp3)
             await msg.delete()
             return
-        except:
+        except Exception as e:
+            print("YouTube fallback error:", e)
             return await msg.edit_text(TXT["notfound"])
 
     # ====== SoundCloud نتیجه داشت ======
@@ -239,7 +235,7 @@ async def inline_sc(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # ====== fallback یوتیوب اگر SoundCloud خالی بود ======
     if len(results) == 0:
         try:
-            info, _ = await loop.run_in_executor(executor, _youtube_fallback, query)
+            info, mp3 = await loop.run_in_executor(executor, _youtube_download, query)
             tid = str(info.get("id"))
             track_store[f"inline_{tid}"] = info
             results.append(
@@ -252,8 +248,8 @@ async def inline_sc(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     ])
                 )
             )
-        except:
-            pass
+        except Exception as e:
+            print("Inline YouTube fallback error:", e)
 
     await update.inline_query.answer(results, cache_time=5)
 
@@ -272,11 +268,11 @@ async def music_inline_handler(update: Update, context: ContextTypes.DEFAULT_TYP
     loop = asyncio.get_running_loop()
 
     url = track.get("webpage_url") if track.get("webpage_url") else track.get("url", "")
+    # اگر SoundCloud است _download_sync، اگر یوتیوب است _youtube_download
     if "soundcloud" in url:
         info, mp3 = await loop.run_in_executor(executor, _download_sync, url)
     else:
-        info_tmp, _ = await loop.run_in_executor(executor, _youtube_fallback, track.get("title"))
-        info, mp3 = await loop.run_in_executor(executor, _download_sync, info_tmp['webpage_url'])
+        info, mp3 = await loop.run_in_executor(executor, _youtube_download, track.get("title"))
 
     await msg.delete()
     with open(mp3, "rb") as f:
