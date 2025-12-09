@@ -2,17 +2,18 @@
 
 import os
 import asyncio
-from concurrent.futures import ThreadPoolExecutor
 import yt_dlp
+from concurrent.futures import ThreadPoolExecutor
 import json
+from uuid import uuid4
 
-from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
+from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton, InlineQueryResultAudio
 from telegram.ext import ContextTypes
 
 # ================================
 # سودوها
 # ================================
-SUDO_USERS = [8588347189]
+SUDO_USERS = [8588347189]   # ← آیدی شما
 
 # ================================
 # تنظیمات
@@ -20,7 +21,6 @@ SUDO_USERS = [8588347189]
 DOWNLOAD_FOLDER = "downloads"
 os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
 COOKIE_FILE = "modules/youtube_cookie.txt"
-
 executor = ThreadPoolExecutor(max_workers=8)
 track_store = {}
 
@@ -79,7 +79,11 @@ BASE_OPTS = {
     "concurrent_fragment_downloads": 20,
     "overwrites": True,
     "postprocessors": [
-        {"key": "FFmpegExtractAudio", "preferredcodec": "mp3", "preferredquality": "192"}
+        {
+            "key": "FFmpegExtractAudio",
+            "preferredcodec": "mp3",
+            "preferredquality": "192",
+        }
     ],
 }
 
@@ -95,8 +99,9 @@ async def is_admin(update, context):
         return True
     try:
         admins = await context.bot.get_chat_administrators(chat.id)
-        return user.id in [a.user.id for a in admins]
-    except:
+        ids = [a.user.id for a in admins]
+        return user.id in ids
+    except Exception:
         return False
 
 # ================================
@@ -128,7 +133,6 @@ def _sc_download_sync(url: str):
 # ================================
 def _youtube_fallback_sync(query: str):
     opts = BASE_OPTS.copy()
-    opts["concurrent_fragment_downloads"] = 20
     if os.path.exists(COOKIE_FILE):
         opts["cookiefile"] = COOKIE_FILE
     with yt_dlp.YoutubeDL(opts) as y:
@@ -144,18 +148,15 @@ def _youtube_fallback_sync(query: str):
         return info, mp3
 
 # ================================
-# Inline & متن جستجو
+# هندلر پیام متنی
 # ================================
 async def soundcloud_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message or not update.message.text:
         return
 
     text = update.message.text.strip()
-    triggers = [
-        "آهنگ ", "music ", "اغنية ", "أغنية ", "موزیک ", "داستان ", "Music ", "Musik ", "اهنگ "
-    ]
-
-    if not any(text.lower().startswith(t.lower()) for t in triggers):
+    triggers = ["آهنگ ", "music ", "اغنية ", "أغنية ", "موزیک ", "داستان ", "Music ", "Musik ", "اهنگ "]
+    if not any(text.lower().startswith(t) for t in triggers):
         return
 
     if update.effective_chat.type != "private":
@@ -165,18 +166,18 @@ async def soundcloud_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
     lang = "fa"
     query = ""
     for t in triggers:
-        if text.lower().startswith(t.lower()):
+        if text.lower().startswith(t):
             query = text[len(t):].strip()
             lang = "en" if t.lower().startswith("music") else ("ar" if "غ" in t else "fa")
             break
 
     msg = await update.message.reply_text(LANG_MESSAGES[lang]["searching"])
+    loop = asyncio.get_running_loop()
 
     def _search():
         with yt_dlp.YoutubeDL({"quiet": True}) as y:
-            return y.extract_info(f"scsearch8:{query}", download=False)
+            return y.extract_info(f"scsearch5:{query}", download=False)
 
-    loop = asyncio.get_running_loop()
     sc_info = await loop.run_in_executor(executor, _search)
 
     if not sc_info or not sc_info.get("entries"):
@@ -186,13 +187,15 @@ async def soundcloud_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
         except Exception as e:
             return await msg.edit_text(f"❌ خطا در جستجوی یوتیوب:\n{e}")
 
-        cache_key = f"yt_{info.get('id')}"
+        yt_id = str(info.get("id"))
+        cache_key = f"yt_{yt_id}"
+
         if cache_key in SC_CACHE:
             try: await msg.delete()
-            except: pass
+            except Exception: pass
             return await update.message.reply_audio(
                 SC_CACHE[cache_key],
-                caption=f"🎵 {info.get('title', 'Music')}\n\n📥 <a href='https://t.me/AFGR63_bot'>افزودن به گروه</a>",
+                caption=f"🎵 {info.get('title', 'Music')}\n\n📥 <a href='https://t.me/AFGR63_bot'>دانلود موزیک</a>",
                 parse_mode="HTML"
             )
 
@@ -203,7 +206,7 @@ async def soundcloud_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
                     keyboard = [[InlineKeyboardButton("➕ افزودن به گروه", url="https://t.me/AFGR63_bot?startgroup=true")]]
                 sent = await update.message.reply_audio(
                     f,
-                    caption=f"🎵 {info.get('title', 'Music')}\n\n📥 <a href='https://t.me/AFGR63_bot'>افزودن به گروه</a>",
+                    caption=f"🎵 {info.get('title', 'Music')}\n\n📥 <a href='https://t.me/AFGR63_bot'>دانلود موزیک</a>",
                     parse_mode="HTML",
                     reply_markup=InlineKeyboardMarkup(keyboard) if keyboard else None
                 )
@@ -214,7 +217,7 @@ async def soundcloud_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
         SC_CACHE[cache_key] = sent.audio.file_id
         save_cache()
         try: await msg.delete()
-        except: pass
+        except Exception: pass
         return
 
     entries = sc_info["entries"]
@@ -227,7 +230,7 @@ async def soundcloud_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
     )
 
 # ================================
-# دانلود انتخاب‌شده
+# هندلر انتخاب موزیک
 # ================================
 async def music_select_handler(update, context: ContextTypes.DEFAULT_TYPE):
     cq = update.callback_query
@@ -243,7 +246,7 @@ async def music_select_handler(update, context: ContextTypes.DEFAULT_TYPE):
 
     if cache_key in SC_CACHE:
         try: await cq.edit_message_text("⚡ در حال ارسال از کش تلگرام...")
-        except: pass
+        except Exception: pass
         return await context.bot.send_audio(chat, SC_CACHE[cache_key])
 
     tracks = track_store.get(chat, [])
@@ -253,6 +256,7 @@ async def music_select_handler(update, context: ContextTypes.DEFAULT_TYPE):
 
     msg = await cq.edit_message_text("⬇️ در حال دانلود...")
     loop = asyncio.get_running_loop()
+
     try:
         info, mp3 = await loop.run_in_executor(executor, _sc_download_sync, track["webpage_url"])
     except Exception as e:
@@ -264,8 +268,9 @@ async def music_select_handler(update, context: ContextTypes.DEFAULT_TYPE):
             if update.effective_chat.type == "private":
                 keyboard = [[InlineKeyboardButton("➕ افزودن به گروه", url="https://t.me/AFGR63_bot?startgroup=true")]]
             sent = await context.bot.send_audio(
-                chat, f,
-                caption=f"🎵 {info.get('title', 'Music')}\n\n📥 <a href='https://t.me/AFGR63_bot'>افزودن به گروه</a>",
+                chat,
+                f,
+                caption=f"🎵 {info.get('title', 'Music')}\n\n📥 <a href='https://t.me/AFGR63_bot'>دانلود موزیک</a>",
                 parse_mode="HTML",
                 reply_markup=InlineKeyboardMarkup(keyboard) if keyboard else None
             )
@@ -276,4 +281,33 @@ async def music_select_handler(update, context: ContextTypes.DEFAULT_TYPE):
     SC_CACHE[cache_key] = sent.audio.file_id
     save_cache()
     try: await msg.delete()
-    except: pass
+    except Exception: pass
+
+# ================================
+# هندلر درون‌خطی (inline query)
+# ================================
+async def inline_sc(update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.inline_query.query.strip()
+    if not query:
+        return
+    loop = asyncio.get_running_loop()
+
+    def _search():
+        with yt_dlp.YoutubeDL({"quiet": True}) as y:
+            return y.extract_info(f"scsearch5:{query}", download=False)
+
+    results = await loop.run_in_executor(executor, _search)
+    if not results or not results.get("entries"):
+        return
+
+    audio_results = []
+    for track in results["entries"]:
+        audio_results.append(
+            InlineQueryResultAudio(
+                id=str(uuid4()),
+                audio_url=track.get("url"),
+                title=track.get("title", "Unknown"),
+            )
+        )
+
+    await update.inline_query.answer(audio_results, cache_time=0)
