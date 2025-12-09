@@ -173,7 +173,17 @@ async def soundcloud_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
         return
 
     text = update.message.text.strip()
-    triggers = ["آهنگ ", "music ", "اغنية ", "أغنية "]
+    triggers = [
+    "آهنگ ",
+    "music ",
+    "اغنية ",
+    "أغنية ",
+    "موزیک ",
+    "داستان ",
+    "Music ",
+    "Musik ",
+    "اهنگ "
+    ]
 
     if not any(text.lower().startswith(t) for t in triggers):
         return
