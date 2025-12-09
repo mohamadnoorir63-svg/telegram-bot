@@ -19,7 +19,7 @@ from telegram.ext import ContextTypes
 # ================================
 # سودوها
 # ================================
-SUDO_USERS = [8588347189]
+SUDO_USERS = [8588347189]  # آیدی خودتان
 
 # ================================
 # تنظیمات
@@ -27,8 +27,10 @@ SUDO_USERS = [8588347189]
 DOWNLOAD_FOLDER = "downloads"
 os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
 COOKIE_FILE = "modules/youtube_cookie.txt"
-executor = ThreadPoolExecutor(max_workers=6)  # برای سرعت بهتر
-track_store = {}
+
+executor = ThreadPoolExecutor(max_workers=6)  # سرعت بالاتر
+
+track_store = {}  # کش نتایج
 
 # ================================
 # کش تلگرام
@@ -230,7 +232,7 @@ async def music_select_handler(update: Update, context: ContextTypes.DEFAULT_TYP
     except: pass
 
 # ================================
-# هندلر جستجوی inline
+# هندلر inline
 # ================================
 async def inline_sc(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.inline_query.query.strip()
@@ -260,3 +262,49 @@ async def inline_sc(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
         )
     await update.inline_query.answer(results, cache_time=10)
+
+# ================================
+# callback inline
+# ================================
+async def music_inline_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    cq = update.callback_query
+    await cq.answer()
+    chat_id = cq.message.chat.id
+
+    try:
+        _, track_id = cq.data.split(":")
+    except:
+        return await cq.edit_message_text("❌ خطا در callback.")
+
+    track = track_store.get(f"inline_{track_id}")
+    if not track:
+        return await cq.edit_message_text("❌ آهنگ پیدا نشد.")
+
+    cache_key = f"sc_{track_id}"
+    if cache_key in SC_CACHE:
+        try: await cq.edit_message_text("⚡ ارسال از کش...")
+        except: pass
+        return await context.bot.send_audio(chat_id, SC_CACHE[cache_key])
+
+    msg = await cq.edit_message_text("⌛ در حال دانلود...")
+    loop = asyncio.get_running_loop()
+    try:
+        info, mp3 = await loop.run_in_executor(executor, _sc_download_sync, track["webpage_url"])
+    except Exception as e:
+        return await msg.edit_text(f"❌ خطا در دانلود:\n{e}")
+
+    try:
+        with open(mp3,"rb") as f:
+            keyboard = [[InlineKeyboardButton("➕ افزودن به گروه", url="https://t.me/AFGR63_bot?startgroup=true")]] if update.effective_chat.type=="private" else None
+            sent = await context.bot.send_audio(chat_id,f,
+                caption=f"🎵 {info.get('title','Music')}\n\n📥 <a href='https://t.me/AFGR63_bot'>دانلود موزیک</a>",
+                parse_mode="HTML",
+                reply_markup=InlineKeyboardMarkup(keyboard) if keyboard else None
+            )
+    finally:
+        if os.path.exists(mp3): os.remove(mp3)
+
+    SC_CACHE[cache_key] = sent.audio.file_id
+    save_cache()
+    try: await msg.delete()
+    except: pass
