@@ -43,10 +43,10 @@ executor = ThreadPoolExecutor(max_workers=12)
 # جملات
 # ================================
 TXT = {
-    "searching": "🔎 در حال جستجو...",
-    "select": "🎵 {n} نتیجه یافت شد — انتخاب کنید:",
+    "searching": "🔎",
+    "select": "🎵:",
     "down": "⏳ دانلود...",
-    "notfound": "⚠ نتیجه‌ای پیدا نشد!",
+    "notfound": "⌛",
 }
 
 # ================================
@@ -165,58 +165,7 @@ async def soundcloud_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
     ]
     await msg.edit_text(TXT["select"].format(n=len(entries)), reply_markup=InlineKeyboardMarkup(keyboard))
     
-# ================================
-# هندلر پیام اصلی
-# ================================
-async def soundcloud_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not update.message or not update.message.text:
-        return
 
-    text = update.message.text
-    triggers = ["آهنگ ", "music ", "اهنگ ", "موزیک "]
-    if not any(text.lower().startswith(t) for t in triggers):
-        return
-
-    query = next((text[len(t):].strip() for t in triggers if text.lower().startswith(t)), "")
-    msg = await update.message.reply_text(TXT["searching"])
-
-    # جستجوی SoundCloud
-    loop = asyncio.get_running_loop()
-    def _search_sc():
-        with yt_dlp.YoutubeDL({"quiet": True}) as y:
-            return y.extract_info(f"scsearch10:{query}", download=False)
-    try:
-        result = await loop.run_in_executor(executor, _search_sc)
-    except:
-        result = None
-
-    # fallback اگر نتیجه نبود
-    if not result or not result.get("entries"):
-        await msg.edit_text("⌛ نتیجه‌ای پیدا نشد! در حال fallback به Tidal…")
-        info, mp3 = await _tidal_fallback(query)
-        if not info:
-            await msg.edit_text("در حال fallback به YouTube…")
-            info, mp3 = await _youtube_fallback(query)
-        if info and mp3:
-            cache_key = f"fallback_{info.get('id')}"
-            with open(mp3, "rb") as f:
-                sent = await update.message.reply_audio(f, caption=info.get("title", "Music"))
-            if os.path.exists(mp3):
-                os.remove(mp3)
-            SC_CACHE[cache_key] = sent.audio.file_id
-            save_cache()
-            await msg.delete()
-            return
-
-    # SoundCloud → دکمه انتخاب
-    entries = {str(t["id"]): t for t in result["entries"]}
-    track_store[update.message.message_id] = entries
-    keyboard = [
-        [InlineKeyboardButton(t["title"], callback_data=f"music_select:{update.message.message_id}:{tid}")]
-        for tid, t in entries.items()
-    ]
-    await msg.edit_text(TXT["select"].format(n=len(entries)), reply_markup=InlineKeyboardMarkup(keyboard))
-# ================================
 # دکمه انتخاب آهنگ
 # ================================
 async def music_select_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
