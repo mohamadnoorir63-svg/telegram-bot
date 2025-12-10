@@ -1,4 +1,5 @@
 import re
+import os
 import yt_dlp
 from telegram import Update
 from telegram.ext import ContextTypes
@@ -9,24 +10,17 @@ from telegram.ext import ContextTypes
 SUDO_USERS = [8588347189]  # آیدی شما
 
 # ================================
-# کوکی اینستاگرام
+# کوکی اینستاگرام (فرمت Netscape)
 # ================================
-INSTAGRAM_COOKIES = """
-Netscape HTTP Cookie File
-.instagram.com    TRUE    /    TRUE    1799701606    csrftoken    --d8oLwWArIVOTuxrKibqa
-.instagram.com    TRUE    /    TRUE    1799687399    datr    47Q1aZceuWl7nLkf_Uzh_kVW
-.instagram.com    TRUE    /    TRUE    1796663399    ig_did    615B02DC-3964-40ED-864D-5EDD6E7C4EA3
-.instagram.com    TRUE    /    TRUE    1799687399    mid    aTW04wABAAHoKpxsaAJbAfLsgVU3
-.instagram.com    TRUE    /    TRUE    1765732343    dpr    2
-.instagram.com    TRUE    /    TRUE    1772917606    ds_user_id    79160628834
-.instagram.com    TRUE    /    TRUE    1796663585    sessionid    79160628834%3AtMYF1zDBj9tXx3%3A7%3AAYhX_MD6k4rrVPUaIBvVhJLqxdAzNqJ0SkLDHb-ymQ
-.instagram.com    TRUE    /    TRUE    1765746400    wd    360x683
-.instagram.com    TRUE    /    TRUE    0    rur    "FRC\05479160628834\0541796677606:01feeadcb720f15c682519c2475d06626b55e5e1646ce3648355ab004152c377c46ba081"
+COOKIE_FILE = "insta_cookie.txt"
+INSTAGRAM_COOKIES = """# Netscape HTTP Cookie File
+.instagram.com	TRUE	/	FALSE	1893456000	csrftoken	YOUR_CSRFTOKEN
+.instagram.com	TRUE	/	FALSE	1893456000	sessionid	YOUR_SESSIONID
+.instagram.com	TRUE	/	FALSE	1893456000	datr	YOUR_DATR
 """
 
-COOKIE_FILE = "insta_cookie.txt"
 with open(COOKIE_FILE, "w") as f:
-    f.write(INSTAGRAM_COOKIES.strip())
+    f.write(INSTAGRAM_COOKIES)
 
 # ================================
 # regex گرفتن لینک
@@ -40,11 +34,8 @@ async def is_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat = update.effective_chat
     user = update.effective_user
 
-    # پیوی → همه مجاز
     if chat.type == "private":
         return True
-
-    # سودو → همیشه مجاز
     if user.id in SUDO_USERS:
         return True
 
@@ -69,16 +60,13 @@ async def instagram_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     url = m.group(1)
-
-    # فقط لینک اینستاگرام
     if "instagram.com" not in url:
         return
 
-    # محدودیت دسترسی در گروه
     if update.effective_chat.type != "private":
         allowed = await is_admin(update, context)
         if not allowed:
-            return  # سکوت کامل
+            return
 
     msg = await update.message.reply_text("📥 در حال بررسی لینک اینستاگرام...")
 
@@ -90,37 +78,27 @@ async def instagram_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     }
 
     try:
+        os.makedirs("downloads", exist_ok=True)
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=True)
-
             await msg.edit_text("⬇ در حال ارسال فایل‌ها...")
 
-            # ========== چندتایی ==========
-            if "entries" in info:
-                for entry in info["entries"]:
-                    file = ydl.prepare_filename(entry)
-                    ext = file.split(".")[-1].lower()
+            files_to_send = []
 
-                    if ext in ["mp4", "mov", "webm"]:
-                        await update.message.reply_video(video=open(file, "rb"))
-                    elif ext in ["jpg", "jpeg", "png", "webp"]:
-                        await update.message.reply_photo(photo=open(file, "rb"))
-                    else:
-                        await update.message.reply_document(document=open(file, "rb"))
+            if "entries" in info:  # چندتایی
+                files_to_send = [ydl.prepare_filename(entry) for entry in info["entries"]]
+            else:  # تک پست
+                files_to_send = [ydl.prepare_filename(info)]
 
-                await msg.delete()
-                return
-
-            # ========== تک پست ==========
-            file = ydl.prepare_filename(info)
-            ext = file.split(".")[-1].lower()
-
-            if ext in ["mp4", "mov", "webm"]:
-                await update.message.reply_video(video=open(file, "rb"))
-            elif ext in ["jpg", "jpeg", "png", "webp"]:
-                await update.message.reply_photo(photo=open(file, "rb"))
-            else:
-                await update.message.reply_document(document=open(file, "rb"))
+            for file in files_to_send:
+                ext = file.split(".")[-1].lower()
+                if ext in ["mp4", "mov", "webm"]:
+                    await update.message.reply_video(video=open(file, "rb"))
+                elif ext in ["jpg", "jpeg", "png", "webp"]:
+                    await update.message.reply_photo(photo=open(file, "rb"))
+                else:
+                    await update.message.reply_document(document=open(file, "rb"))
+                os.remove(file)  # حذف فایل بعد از ارسال
 
             await msg.delete()
 
