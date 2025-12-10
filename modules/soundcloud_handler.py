@@ -96,8 +96,11 @@ def _sc_download_sync(url: str):
 # دانلود fallback یوتیوب سریع
 # ================================
 def _youtube_fallback_fast(query: str):
+    """
+    دانلود fallback یوتیوب سریع با mp3 واقعی
+    """
     opts = BASE_OPTS.copy()
-    opts["format"] = "bestaudio"
+    opts["format"] = "bestaudio/best"  # اصلاح شد
     opts["noplaylist"] = True
     opts["outtmpl"] = f"{DOWNLOAD_FOLDER}/%(id)s.%(ext)s"
     cookie_file = "modules/youtube_cookie.txt"
@@ -123,6 +126,11 @@ def _youtube_fallback_fast(query: str):
 
         fname = y.prepare_filename(info)
         mp3 = fname.rsplit(".", 1)[0] + ".mp3"
+
+        # اگر هنوز فایل وجود ندارد، خطا بده
+        if not os.path.exists(mp3):
+            raise FileNotFoundError(f"فایل mp3 برای {vid} پیدا نشد.")
+
         return info, mp3
 
 # ================================
