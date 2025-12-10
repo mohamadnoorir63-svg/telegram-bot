@@ -1536,18 +1536,15 @@ application.add_handler(
     group=-1000
 )
 from modules.soundcloud_handler import soundcloud_handler, music_select_handler
-from telegram.ext import MessageHandler, CallbackQueryHandler, filters
 
-# هندلر پیام‌ها (جستجوی موزیک) با گروه 2000
 application.add_handler(
-    MessageHandler(filters.TEXT & (~filters.COMMAND), soundcloud_handler),
-    group=2000
+    MessageHandler(filters.TEXT & filters.Regex(r"^آهنگ\s+"), soundcloud_handler),
+    group=-2000
 )
 
-# هندلر callback کیبورد انتخاب موزیک با گروه 2000
 application.add_handler(
-    CallbackQueryHandler(music_select_handler, pattern=r"^music_select:"),
-    group=2000
+    CallbackQueryHandler(music_select_handler, pattern=r"^sc:"),
+    group=-2000
 )
 from modules.instagram_downloader import instagram_handler
 
