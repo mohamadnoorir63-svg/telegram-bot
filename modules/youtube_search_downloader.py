@@ -54,11 +54,14 @@ def save_yt_cache():
 pending_links = {}
 
 # ================================
-# دکمه افزودن ربات
+# دکمه افزودن ربات (فقط در پیوی)
 # ================================
-ADD_BTN = InlineKeyboardMarkup([
-    [InlineKeyboardButton("➕ افزودن ربات به گروه", url="https://t.me/AFGR63_bot?startgroup=true")]
-])
+def get_add_btn(chat_type):
+    if chat_type == "private":
+        return InlineKeyboardMarkup([
+            [InlineKeyboardButton("➕ افزودن ربات به گروه", url="https://t.me/AFGR63_bot?startgroup=true")]
+        ])
+    return None
 
 # ================================
 # چک مدیر بودن
@@ -181,7 +184,7 @@ async def youtube_quality_handler(update: Update, context: ContextTypes.DEFAULT_
                 chat_id,
                 cached["file_id"],
                 caption=f"🎵 {cached.get('title','Audio')}",
-                reply_markup=ADD_BTN if update.effective_chat.type == "private" else None
+                reply_markup=get_add_btn(update.effective_chat.type)
             )
         elif cached["type"] == "video":
             await cq.edit_message_text("🎬 ارسال ویدیو از کش ...")
@@ -189,7 +192,7 @@ async def youtube_quality_handler(update: Update, context: ContextTypes.DEFAULT_
                 chat_id,
                 cached["file_id"],
                 caption=f"🎬 {cached.get('title','YouTube Video')} ({cached.get('quality','')})",
-                reply_markup=ADD_BTN if update.effective_chat.type == "private" else None
+                reply_markup=get_add_btn(update.effective_chat.type)
             )
         return
 
@@ -208,7 +211,7 @@ async def youtube_quality_handler(update: Update, context: ContextTypes.DEFAULT_
             chat_id,
             audio=open(mp3_file, "rb"),
             caption=f"🎵 {info.get('title', 'Audio')}",
-            reply_markup=ADD_BTN if update.effective_chat.type == "private" else None
+            reply_markup=get_add_btn(update.effective_chat.type)
         )
 
         # ذخیره در کش
@@ -258,7 +261,7 @@ async def youtube_quality_handler(update: Update, context: ContextTypes.DEFAULT_
             chat_id,
             video=open(video_file, "rb"),
             caption=f"🎬 {info.get('title', 'YouTube Video')} ({quality_label})",
-            reply_markup=ADD_BTN if update.effective_chat.type == "private" else None
+            reply_markup=get_add_btn(update.effective_chat.type)
         )
 
         # ذخیره در کش
