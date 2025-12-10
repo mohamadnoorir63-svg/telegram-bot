@@ -23,6 +23,7 @@ os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
 COOKIE_FILE = "modules/youtube_cookie.txt"
 executor = ThreadPoolExecutor(max_workers=4)  # Heroku-safe
 
+# کش نتایج جستجو و فایل‌ها
 track_store = {}
 SC_CACHE = {}
 
@@ -112,7 +113,7 @@ def cache_check(id_: str):
     return None
 
 # ================================
-# دانلود ترک SoundCloud یا یوتیوب
+# دانلود پیش‌دانلود (Sync)
 # ================================
 def _download_track(url: str):
     opts = BASE_OPTS.copy()
@@ -120,6 +121,9 @@ def _download_track(url: str):
         info = y.extract_info(url, download=True)
         track_id = str(info.get("id"))
         mp3_file = os.path.join(DOWNLOAD_FOLDER, f"{track_id}.mp3")
+        if not os.path.exists(mp3_file):
+            ext = info.get("ext", "m4a")
+            mp3_file = os.path.join(DOWNLOAD_FOLDER, f"{track_id}.mp3")
         return info, mp3_file
 
 def _youtube_fallback_sync(query: str):
@@ -163,37 +167,35 @@ async def soundcloud_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
     loop = asyncio.get_running_loop()
 
     # جستجوی SoundCloud
-    def _search_sc():
+    def _search():
         with yt_dlp.YoutubeDL({"quiet": True}) as y:
             return y.extract_info(f"scsearch3:{query}", download=False)
 
-    sc_info = await loop.run_in_executor(executor, _search_sc)
+    sc_info = await loop.run_in_executor(executor, _search)
 
     # اگر SoundCloud نتیجه نداد، fallback یوتیوب
     if not sc_info or not sc_info.get("entries"):
         await msg.edit_text(LANG_MESSAGES[lang]["notfound"])
+        try:
+            info, mp3 = await loop.run_in_executor(executor, _youtube_fallback_sync, query)
+        except Exception as e:
+            return await msg.edit_text(f"❌ خطا در جستجوی یوتیوب:\n{e}")
 
-        # پیش‌دانلود یوتیوب fallback
-        async def prefetch_youtube():
-            try:
-                info, mp3 = await loop.run_in_executor(executor, _youtube_fallback_sync, query)
-            except: return
-
-        asyncio.create_task(prefetch_youtube())
-
-        # دانلود یوتیوب همزمان هنگام انتخاب
-        info, mp3 = await loop.run_in_executor(executor, _youtube_fallback_sync, query)
         yt_id = str(info.get("id"))
         cache_key = f"yt_{yt_id}"
+
         if cache_key in SC_CACHE:
             try: await msg.delete()
             except: pass
             return await update.message.reply_audio(SC_CACHE[cache_key], caption=f"🎵 {info.get('title','Music')}")
+
+        # ارسال فایل آماده
         try:
             with open(mp3, "rb") as f:
                 sent = await update.message.reply_audio(f, caption=f"🎵 {info.get('title','Music')}")
         except Exception as e:
             return await msg.edit_text(f"❌ خطا در ارسال فایل:\n{e}")
+
         SC_CACHE[cache_key] = sent.audio.file_id
         save_cache()
         try: await msg.delete()
@@ -204,27 +206,23 @@ async def soundcloud_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
     entries = sc_info["entries"]
     track_store[update.effective_chat.id] = entries
 
-    # پیش‌دانلود SoundCloud و fallback یوتیوب
-    async def prefetch_all():
+    # پیش‌دانلود همه آهنگ‌ها به صورت async background
+    async def prefetch_tracks():
         for t in entries:
             track_id = str(t["id"])
-            if cache_check(track_id): continue
+            if cache_check(track_id):  # اگر قبلاً دانلود شده
+                continue
             try:
                 await loop.run_in_executor(executor, _download_track, t["webpage_url"])
             except: pass
-            # fallback یوتیوب
-            if not cache_check(f"yt_{track_id}"):
-                try:
-                    await loop.run_in_executor(executor, _youtube_fallback_sync, t["title"])
-                except: pass
 
-    asyncio.create_task(prefetch_all())
+    asyncio.create_task(prefetch_tracks())
 
     keyboard = [[InlineKeyboardButton(t["title"], callback_data=f"music_select:{t['id']}")] for t in entries]
     await msg.edit_text(LANG_MESSAGES[lang]["select_song"].format(n=len(entries)), reply_markup=InlineKeyboardMarkup(keyboard))
 
 # ================================
-# دانلود انتخاب‌شده Ultra-Fast
+# دانلود انتخاب‌شده (Ultra-Fast)
 # ================================
 async def music_select_handler(update, context: ContextTypes.DEFAULT_TYPE):
     cq = update.callback_query
@@ -249,10 +247,9 @@ async def music_select_handler(update, context: ContextTypes.DEFAULT_TYPE):
     if not track:
         return await cq.edit_message_text("❌ آهنگ پیدا نشد.")
 
-    # بررسی کش محلی
     mp3_file = cache_check(track_id)
     if not mp3_file:
-        # اگر هنوز آماده نیست، sync دانلود
+        # اگر پیش‌دانلود هنوز تمام نشده، دانلود sync
         loop = asyncio.get_running_loop()
         try:
             info, mp3_file = await loop.run_in_executor(executor, _download_track, track["webpage_url"])
