@@ -10,38 +10,27 @@ from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import ContextTypes
 
 # ================================
-
 # سودوها
-
 # ================================
-
 SUDO_USERS = [8588347189]   # ← آیدی شما
 
 # ================================
-
 # تنظیمات
-
 # ================================
-
 DOWNLOAD_FOLDER = "downloads"
 os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
 
 COOKIE_FILE = "modules/youtube_cookie.txt"
 
 # ThreadPoolExecutor (Heroku-safe)
-
 executor = ThreadPoolExecutor(max_workers=8)
 
 # کش ترک‌ها در حافظه (نتایج جستجو برای انتخاب دکمه)
-
 track_store = {}
 
 # ================================
-
 # کش تلگرام (file_id)
-
 # ================================
-
 CACHE_FILE = "data/custom_commands.json"
 os.makedirs("data", exist_ok=True)
 
@@ -60,11 +49,8 @@ def save_cache():
         json.dump(SC_CACHE, f, ensure_ascii=False, indent=2)
 
 # ================================
-
 # پیام‌ها
-
 # ================================
-
 LANG_MESSAGES = {
     "fa": {
         "searching": "🔍 در حال جستجو ... لطفاً صبر کنید",
@@ -87,11 +73,8 @@ LANG_MESSAGES = {
 }
 
 # ================================
-
-# تنظیمات سوپر توربو yt_dlp
-
+# تنظیمات yt_dlp
 # ================================
-
 BASE_OPTS = {
     "format": "bestaudio/best",
     "quiet": True,
@@ -100,7 +83,7 @@ BASE_OPTS = {
     "nopart": True,
     "retries": 20,
     "fragment_retries": 20,
-    "concurrent_fragment_downloads": 20,  # دانلود چندتردی سریع
+    "concurrent_fragment_downloads": 20,
     "overwrites": True,
     "postprocessors": [
         {
@@ -112,11 +95,8 @@ BASE_OPTS = {
 }
 
 # ================================
-
 # بررسی مدیر بودن
-
 # ================================
-
 async def is_admin(update, context):
     chat = update.effective_chat
     user = update.effective_user
@@ -132,46 +112,32 @@ async def is_admin(update, context):
         return False
 
 # ================================
-
-# چک کش mp3 لوکال (مثل قبل)
-
+# چک کش mp3 لوکال
 # ================================
-
 def cache_check(id_: str):
-    """اگر mp3 با این id قبلاً دانلود شده باشد، مسیرش را برمی‌گرداند."""
     for file in os.listdir(DOWNLOAD_FOLDER):
         if file.startswith(id_) and file.endswith(".mp3"):
             return os.path.join(DOWNLOAD_FOLDER, file)
     return None
 
 # ================================
-
-# دانلود SoundCloud (Turbo + Cache فایل)
-
+# دانلود SoundCloud
 # ================================
-
 def _sc_download_sync(url: str):
     opts = BASE_OPTS.copy()
     with yt_dlp.YoutubeDL(opts) as y:
         info = y.extract_info(url, download=True)
         track_id = str(info.get("id"))
-
-        # اگر قبلاً در کش لوکال داریم → همان را بده
         cached = cache_check(track_id)
         if cached:
             return info, cached
-
-        # مسیر خروجی
         fname = y.prepare_filename(info)
         mp3 = fname.rsplit(".", 1)[0] + ".mp3"
         return info, mp3
 
 # ================================
-
-# دانلود fallback یوتیوب (Turbo + Cache فایل)
-
+# دانلود fallback یوتیوب
 # ================================
-
 def _youtube_fallback_sync(query: str):
     opts = BASE_OPTS.copy()
     opts["concurrent_fragment_downloads"] = 20
@@ -179,7 +145,6 @@ def _youtube_fallback_sync(query: str):
         opts["cookiefile"] = COOKIE_FILE
     with yt_dlp.YoutubeDL(opts) as y:
         info = y.extract_info(f"ytsearch1:{query}", download=True)
-
         if "entries" in info:
             info = info["entries"][0]
         vid = str(info.get("id"))
@@ -191,25 +156,21 @@ def _youtube_fallback_sync(query: str):
         return info, mp3
 
 # ================================
-
 # جستجو و ساخت لیست انتخاب
-
 # ================================
-
 async def soundcloud_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message or not update.message.text:
         return
+
     text = update.message.text.strip()
     triggers = ["آهنگ ", "music ", "اغنية ", "أغنية "]
     if not any(text.lower().startswith(t) for t in triggers):
         return
 
-    # گروه → فقط مدیر
     if update.effective_chat.type != "private":
         if not await is_admin(update, context):
             return
 
-    # تعیین زبان + query
     lang = "fa"
     query = ""
     for t in triggers:
@@ -220,67 +181,56 @@ async def soundcloud_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
     msg = await update.message.reply_text(LANG_MESSAGES[lang]["searching"])
 
-    # جستجوی سریع SoundCloud
     def _search():
         with yt_dlp.YoutubeDL({"quiet": True}) as y:
             return y.extract_info(f"scsearch3:{query}", download=False)
 
     loop = asyncio.get_running_loop()
-    sc_info = await loop.run_in_executor(executor, _search)
+    try:
+        sc_info = await asyncio.wait_for(loop.run_in_executor(executor, _search), timeout=10)
+    except asyncio.TimeoutError:
+        await msg.edit_text("❌ SoundCloud دیر پاسخ داد. در حال جستجوی YouTube...")
+        sc_info = None
+    except Exception as e:
+        await msg.edit_text(f"❌ خطا در جستجوی SoundCloud:\n{e}")
+        sc_info = None
 
-    # اگر ساندکلاد نتیجه نداد → یوتیوب
+    # fallback به یوتیوب
     if not sc_info or not sc_info.get("entries"):
-        await msg.edit_text(LANG_MESSAGES[lang]["notfound"])
-
         try:
-            info, mp3 = await loop.run_in_executor(
-                executor, _youtube_fallback_sync, query
-            )
+            info, mp3 = await loop.run_in_executor(executor, _youtube_fallback_sync, query)
         except Exception as e:
-            return await msg.edit_text(f"❌ خطا در جستجوی یوتیوب:\n{e}")
+            return await msg.edit_text(f"❌ خطا در جستجوی YouTube:\n{e}")
 
-        # اگر این آهنگ از یوتیوب قبلاً در کش تلگرامی داریم:
         yt_id = str(info.get("id"))
         cache_key = f"yt_{yt_id}"
-
         if cache_key in SC_CACHE:
-            # پاک کردن پیام خطا/اطلاع
             try:
                 await msg.delete()
             except Exception:
                 pass
+            return await update.message.reply_audio(SC_CACHE[cache_key],
+                                                    caption=f"🎵 {info.get('title', 'Music')}")
 
-            return await update.message.reply_audio(
-                SC_CACHE[cache_key],
-                caption=f"🎵 {info.get('title', 'Music')}",
-            )
-
-        # ارسال و ذخیره file_id
         try:
             with open(mp3, "rb") as f:
-                sent = await update.message.reply_audio(
-                    f, caption=f"🎵 {info.get('title', 'Music')}"
-                )
+                sent = await update.message.reply_audio(f, caption=f"🎵 {info.get('title', 'Music')}")
         except Exception as e:
             return await msg.edit_text(f"❌ خطا در ارسال فایل:\n{e}")
         finally:
-            # حذف فایل لوکال در صورت نیاز
             if os.path.exists(mp3):
                 os.remove(mp3)
 
-        # ذخیره در کش تلگرام
         SC_CACHE[cache_key] = sent.audio.file_id
         save_cache()
 
-        # پاک کردن پیام "در SoundCloud چیزی پیدا نشد..."
         try:
             await msg.delete()
         except Exception:
             pass
-
         return
 
-    # ساخت انتخاب‌ها
+    # SoundCloud نتیجه داد → ساخت انتخاب
     entries = sc_info["entries"]
     track_store[update.effective_chat.id] = entries
 
@@ -295,36 +245,28 @@ async def soundcloud_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
     )
 
 # ================================
-
 # دانلود انتخاب‌شده
-
 # ================================
-
 async def music_select_handler(update, context: ContextTypes.DEFAULT_TYPE):
     cq = update.callback_query
     await cq.answer()
     chat = cq.message.chat_id
 
-    # گروه → فقط مدیر
     if update.effective_chat.type != "private":
         if not await is_admin(update, context):
             return
 
     track_id = cq.data.split(":")[1]
-
-    # 🔥 اول проверим: اگر در کش تلگرام داریم → سریع بفرست
     cache_key = f"sc_{track_id}"
     if cache_key in SC_CACHE:
         try:
             await cq.edit_message_text("⚡ در حال ارسال از کش تلگرام...")
         except Exception:
             pass
-
         return await context.bot.send_audio(chat, SC_CACHE[cache_key])
 
     tracks = track_store.get(chat, [])
     track = next((t for t in tracks if str(t["id"]) == track_id), None)
-
     if not track:
         return await cq.edit_message_text("❌ آهنگ پیدا نشد.")
 
@@ -332,26 +274,19 @@ async def music_select_handler(update, context: ContextTypes.DEFAULT_TYPE):
     loop = asyncio.get_running_loop()
 
     try:
-        info, mp3 = await loop.run_in_executor(
-            executor, _sc_download_sync, track["webpage_url"]
-        )
+        info, mp3 = await loop.run_in_executor(executor, _sc_download_sync, track["webpage_url"])
     except Exception as e:
         return await msg.edit_text(f"❌ خطا در دانلود:\n{e}")
 
-    # ارسال و ذخیره file_id
     try:
         with open(mp3, "rb") as f:
-            sent = await context.bot.send_audio(
-                chat, f, caption=f"🎵 " + info.get("title", "Music")
-            )
+            sent = await context.bot.send_audio(chat, f, caption=f"🎵 " + info.get("title", "Music"))
     except Exception as e:
         return await msg.edit_text(f"❌ خطا در ارسال فایل:\n{e}")
 
-    # ذخیره در کش تلگرام
     SC_CACHE[cache_key] = sent.audio.file_id
     save_cache()
 
-    # پاک کردن پیام "⬇️ در حال دانلود..."
     try:
         await msg.delete()
     except Exception:
