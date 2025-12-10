@@ -59,7 +59,13 @@ TXT = {
 # ================================================
 # CAPTION ثابت موزیک
 # ================================================
-MUSIC_CAPTION = "[دانلود موزیک با ربات](https://t.me/AFGR63_bot)"
+caption = "[دانلود موزیک با ربات](https://t.me/AFGR63_bot)"
+sent = await context.bot.send_audio(
+    chat_id,
+    audio_io,
+    caption=caption,
+    parse_mode="MarkdownV2"
+)
 
 # ================================================
 # دکمه افزودن به گروه (فقط در پیوی)
@@ -172,8 +178,7 @@ async def soundcloud_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
         return
 
     text = update.message.text
-    triggers = ["آهنگ ", "music ", "اهنگ ", "موزیک "]
-
+    triggers = ["آهنگ ", "music ", "اهنگ " , "Musik", "Music", "موزیک", "اغنية" ,"أغنية"]
     if not any(text.lower().startswith(t) for t in triggers):
         return
 
