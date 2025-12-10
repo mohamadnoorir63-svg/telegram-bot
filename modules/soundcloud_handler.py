@@ -59,13 +59,15 @@ TXT = {
 # ================================================
 # CAPTION ثابت موزیک
 # ================================================
-caption = "[دانلود موزیک با ربات](https://t.me/AFGR63_bot)"
-sent = await context.bot.send_audio(
-    chat_id,
-    audio_io,
-    caption=caption,
-    parse_mode="MarkdownV2"
-)
+async def send_music(chat_id, audio_io, context):
+    caption = "[دانلود موزیک با ربات](https://t.me/AFGR63_bot)"
+    sent = await context.bot.send_audio(
+        chat_id,
+        audio_io,
+        caption=caption,
+        parse_mode="MarkdownV2"
+    )
+    return sent
 
 # ================================================
 # دکمه افزودن به گروه (فقط در پیوی)
