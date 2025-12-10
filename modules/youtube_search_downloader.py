@@ -4,6 +4,7 @@ import os
 import re
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
+import json
 
 import yt_dlp
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
@@ -18,21 +19,46 @@ SUDO_USERS = [8588347189]  # آیدی شما
 # تنظیمات اولیه
 # ================================
 COOKIE_FILE = "modules/youtube_cookie.txt"
-
+DOWNLOAD_FOLDER = "downloads"
 os.makedirs("modules", exist_ok=True)
+os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
+
 if not os.path.exists(COOKIE_FILE):
     with open(COOKIE_FILE, "w", encoding="utf-8") as f:
         f.write("# Paste YouTube cookies here in Netscape format\n")
 
-DOWNLOAD_FOLDER = "downloads"
-os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
-
 URL_RE = re.compile(r"(https?://[^\s]+)")
 executor = ThreadPoolExecutor(max_workers=3)
 
+# ================================
+# کش YouTube
+# ================================
+YT_CACHE_FILE = os.path.join("modules", "yt_cache.json")
+if not os.path.exists(YT_CACHE_FILE):
+    with open(YT_CACHE_FILE, "w", encoding="utf-8") as f:
+        json.dump({}, f)
+
+with open(YT_CACHE_FILE, "r", encoding="utf-8") as f:
+    try:
+        YT_CACHE = json.load(f)
+    except:
+        YT_CACHE = {}
+
+def save_yt_cache():
+    with open(YT_CACHE_FILE, "w", encoding="utf-8") as f:
+        json.dump(YT_CACHE, f, indent=2, ensure_ascii=False)
+
+# ================================
 # ذخیره لینک‌ها برای انتخاب نوع و کیفیت
+# ================================
 pending_links = {}
 
+# ================================
+# دکمه افزودن ربات
+# ================================
+ADD_BTN = InlineKeyboardMarkup([
+    [InlineKeyboardButton("➕ افزودن ربات به گروه", url="https://t.me/AFGR63_bot?startgroup=true")]
+])
 
 # ================================
 # چک مدیر بودن
@@ -41,44 +67,34 @@ async def is_admin(update, context):
     chat = update.effective_chat
     user = update.effective_user
 
-    # پیوی → آزاد
     if chat.type == "private":
         return True
-
-    # سودو → مجاز
     if user.id in SUDO_USERS:
         return True
 
     try:
         admins = await context.bot.get_chat_administrators(chat.id)
-        admin_ids = [a.user.id for a in admins]
-        return user.id in admin_ids
+        return user.id in [a.user.id for a in admins]
     except:
         return False
 
-
 # ================================
 # دانلود ویدیو با حداکثر ارتفاع سفارشی
-# (فرمت بر اساس کد خودت، فقط height داینامیک شده)
 # ================================
 def _download_video_sync(url, max_height: int = 720):
     fmt = f"bestvideo[height<={max_height}]+bestaudio/best[height<={max_height}]/best"
-
     ydl_opts = {
         "cookiefile": COOKIE_FILE,
         "quiet": True,
-        "format": fmt,  # <- دقیقا با الگوی خودت، فقط height تغییر می‌کند
+        "format": fmt,
         "merge_output_format": "mp4",
         "noplaylist": True,
         "outtmpl": f"{DOWNLOAD_FOLDER}/%(id)s.%(ext)s",
     }
-
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(url, download=True)
         filename = ydl.prepare_filename(info)
-
     return info, filename
-
 
 # ================================
 # دانلود صوت (MP3)
@@ -95,30 +111,23 @@ def _download_audio_sync(url):
         }],
         "outtmpl": f"{DOWNLOAD_FOLDER}/%(id)s.%(ext)s",
     }
-
     with yt_dlp.YoutubeDL(ydl_opts) as y:
         info = y.extract_info(url, download=True)
         filename = y.prepare_filename(info)
-
     mp3 = filename.rsplit(".", 1)[0] + ".mp3"
     return info, mp3
-
 
 # ================================
 # مرحله ۱ — دریافت لینک و نمایش پنل نوع دانلود
 # ================================
 async def youtube_search_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
     if not update.message or not update.message.text:
         return
 
     text = update.message.text.strip()
-
-    # استخراج لینک
     match = URL_RE.search(text)
     if not match:
         return
-
     url = match.group(1)
     if "youtube.com" not in url and "youtu.be" not in url:
         return
@@ -127,46 +136,65 @@ async def youtube_search_handler(update: Update, context: ContextTypes.DEFAULT_T
     if update.effective_chat.type != "private":
         allowed = await is_admin(update, context)
         if not allowed:
-            return  # سکوت کامل
+            return
 
-    # ذخیره لینک برای این چت
     pending_links[update.effective_chat.id] = url
 
     keyboard = [
         [InlineKeyboardButton("🎵 Audio (MP3)", callback_data="yt_audio")],
         [InlineKeyboardButton("🎬 Video (MP4)", callback_data="yt_video")],
     ]
-
     await update.message.reply_text(
         "🎬 لطفاً نوع دانلود را انتخاب کنید:",
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
 
-
 # ================================
-# مرحله ۲ و ۳ — انتخاب نوع و کیفیت
+# مرحله ۲ و ۳ — انتخاب نوع و کیفیت با کش
 # ================================
 async def youtube_quality_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
     cq = update.callback_query
     chat_id = cq.message.chat_id
     await cq.answer()
 
-    # محدودیت دسترسی در گروه
     if update.effective_chat.type != "private":
         allowed = await is_admin(update, context)
         if not allowed:
-            return  # سکوت کامل
+            return
 
-    # لینک ذخیره‌شده
     url = pending_links.get(chat_id)
     if not url:
         return await cq.edit_message_text("❌ لینک معتبر یافت نشد.")
 
     choice = cq.data
 
+    # ایجاد کش برای چت
+    if str(chat_id) not in YT_CACHE:
+        YT_CACHE[str(chat_id)] = {}
+
+    # بررسی کش
+    if url in YT_CACHE[str(chat_id)]:
+        cached = YT_CACHE[str(chat_id)][url]
+        if cached["type"] == "audio":
+            await cq.edit_message_text("🎵 ارسال صوت از کش ...")
+            await context.bot.send_audio(
+                chat_id,
+                cached["file_id"],
+                caption=f"🎵 {cached.get('title','Audio')}",
+                reply_markup=ADD_BTN if update.effective_chat.type == "private" else None
+            )
+        elif cached["type"] == "video":
+            await cq.edit_message_text("🎬 ارسال ویدیو از کش ...")
+            await context.bot.send_video(
+                chat_id,
+                cached["file_id"],
+                caption=f"🎬 {cached.get('title','YouTube Video')} ({cached.get('quality','')})",
+                reply_markup=ADD_BTN if update.effective_chat.type == "private" else None
+            )
+        return
+
     # -----------------------------
-    # Audio — دانلود فقط صوت
+    # Audio — دانلود صوت
     # -----------------------------
     if choice == "yt_audio":
         await cq.edit_message_text("⬇ در حال دانلود صوت...")
@@ -176,11 +204,21 @@ async def youtube_quality_handler(update: Update, context: ContextTypes.DEFAULT_
             executor, _download_audio_sync, url
         )
 
-        await context.bot.send_audio(
+        sent = await context.bot.send_audio(
             chat_id,
             audio=open(mp3_file, "rb"),
-            caption=f"🎵 {info.get('title', 'Audio')}"
+            caption=f"🎵 {info.get('title', 'Audio')}",
+            reply_markup=ADD_BTN if update.effective_chat.type == "private" else None
         )
+
+        # ذخیره در کش
+        YT_CACHE[str(chat_id)][url] = {
+            "file_id": sent.audio.file_id,
+            "type": "audio",
+            "title": info.get("title", "Audio")
+        }
+        save_yt_cache()
+
         if os.path.exists(mp3_file):
             os.remove(mp3_file)
         return
@@ -205,10 +243,8 @@ async def youtube_quality_handler(update: Update, context: ContextTypes.DEFAULT_
     # کیفیت ویدیو — v_144 / v_240 / ...
     # -----------------------------
     if choice.startswith("v_"):
-
-        # استخراج عدد کیفیت
-        q = choice.split("_")[1]      # مثل "360"
-        max_height = int(q)           # 360
+        q = choice.split("_")[1]
+        max_height = int(q)
         quality_label = f"{q}p"
 
         await cq.edit_message_text(f"⬇ در حال دانلود کیفیت {quality_label} ...")
@@ -218,11 +254,21 @@ async def youtube_quality_handler(update: Update, context: ContextTypes.DEFAULT_
             executor, _download_video_sync, url, max_height
         )
 
-        await context.bot.send_video(
+        sent = await context.bot.send_video(
             chat_id,
             video=open(video_file, "rb"),
-            caption=f"🎬 {info.get('title', 'YouTube Video')} ({quality_label})"
+            caption=f"🎬 {info.get('title', 'YouTube Video')} ({quality_label})",
+            reply_markup=ADD_BTN if update.effective_chat.type == "private" else None
         )
+
+        # ذخیره در کش
+        YT_CACHE[str(chat_id)][url] = {
+            "file_id": sent.video.file_id,
+            "type": "video",
+            "title": info.get("title", "YouTube Video"),
+            "quality": quality_label
+        }
+        save_yt_cache()
 
         if os.path.exists(video_file):
             os.remove(video_file)
