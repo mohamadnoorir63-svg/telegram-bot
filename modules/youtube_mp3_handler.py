@@ -6,7 +6,7 @@ from telegram import Update
 from telegram.ext import ContextTypes
 
 # ================================
-# سودو
+# سودو (کاربران مجاز)
 # ================================
 SUDO_USERS = [8588347189]
 
@@ -56,7 +56,6 @@ URL_RE = re.compile(r"(https?://[^\s]+)")
 # تابع دانلود مستقیم بدون تبدیل
 # ================================
 def download_audio_stream(query):
-    # ساخت فایل کوکی موقت در فولدر دانلود
     cookie_path = os.path.join(DOWNLOAD_FOLDER, "youtube_cookie.txt")
     with open(cookie_path, "w", encoding="utf-8") as f:
         f.write(YOUTUBE_COOKIES.strip())
@@ -83,20 +82,25 @@ async def youtube_mp3_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
         return
 
     text = update.message.text.strip()
-    msg = await update.message.reply_text("🎵 در حال آماده‌سازی دانلود ...")
+    msg = await update.message.reply_text("🔎 در حال جستجوی ویدیو در یوتیوب...")
 
     loop = asyncio.get_running_loop()
     try:
+        # دانلود مستقیم
         file_path, info = await loop.run_in_executor(None, download_audio_stream, text)
 
         if not os.path.exists(file_path):
             await msg.edit_text("❌ فایل دانلود نشد یا نام فایل معتبر نیست.")
             return
 
+        # پیام در حال ارسال فایل
+        await msg.edit_text("📤 در حال ارسال فایل...")
+
         await update.message.reply_audio(
             audio=open(file_path, "rb"),
             caption=f"🎵 {info.get('title', 'Audio')}"
         )
+
         os.remove(file_path)
         await msg.delete()
 
