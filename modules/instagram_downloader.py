@@ -13,10 +13,20 @@ SUDO_USERS = [8588347189]  # آیدی شما
 # کوکی اینستاگرام (فرمت Netscape)
 # ================================
 COOKIE_FILE = "insta_cookie.txt"
+
 INSTAGRAM_COOKIES = """# Netscape HTTP Cookie File
-.instagram.com	TRUE	/	FALSE	1893456000	csrftoken	YOUR_CSRFTOKEN
-.instagram.com	TRUE	/	FALSE	1893456000	sessionid	YOUR_SESSIONID
-.instagram.com	TRUE	/	FALSE	1893456000	datr	YOUR_DATR
+# https://curl.haxx.se/rfc/cookie_spec.html
+# This is a generated file! Do not edit.
+
+.instagram.com	TRUE	/	TRUE	1799701606	csrftoken	CSRFTOKEN_VALUE
+.instagram.com	TRUE	/	TRUE	1799687399	datr	DATR_VALUE
+.instagram.com	TRUE	/	TRUE	1796663399	ig_did	IG_DID_VALUE
+.instagram.com	TRUE	/	TRUE	1799687399	mid	MID_VALUE
+.instagram.com	TRUE	/	TRUE	1765732343	dpr	DPR_VALUE
+.instagram.com	TRUE	/	TRUE	1772917606	ds_user_id	USER_ID_VALUE
+.instagram.com	TRUE	/	TRUE	1796663585	sessionid	SESSIONID_VALUE
+.instagram.com	TRUE	/	TRUE	1765746400	wd	WD_VALUE
+.instagram.com	TRUE	/	TRUE	0	rur	RUR_VALUE
 """
 
 with open(COOKIE_FILE, "w") as f:
@@ -98,7 +108,7 @@ async def instagram_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     await update.message.reply_photo(photo=open(file, "rb"))
                 else:
                     await update.message.reply_document(document=open(file, "rb"))
-                os.remove(file)  # حذف فایل بعد از ارسال
+                os.remove(file)  # حذف فایل بعد فرستادن
 
             await msg.delete()
 
