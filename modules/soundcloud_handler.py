@@ -47,10 +47,10 @@ executor = ThreadPoolExecutor(max_workers=12)
 # جملات
 # ================================
 TXT = {
-    "searching": "🔎 در حال جستجو...",
+    "searching": "🔎 ",
     "select": "🎵 {n} نتیجه یافت شد — انتخاب کنید:",
-    "down": "⏳ دانلود...",
-    "notfound": "⚠ نتیجه‌ای پیدا نشد! در حال جستجو در یوتیوب...",
+    "down": "⌛",
+    "notfound": "⌛",
 }
 
 # ================================
@@ -95,10 +95,7 @@ def _sc_download_sync(url: str):
 # ================================
 # دانلود fallback یوتیوب
 # ================================
-def _youtube_fallback_fast(query: str):
-    """
-    نسخه سریع fallback یوتیوب: فقط لینک مستقیم به audio، تبدیل سریع.
-    """
+def _youtube_fallback_sync(query: str):
     opts = BASE_OPTS.copy()
     opts["format"] = "bestaudio"
     opts["quiet"] = True
@@ -122,7 +119,6 @@ def _youtube_fallback_fast(query: str):
         if cached:
             return info, cached
 
-        # لینک مستقیم به فایل صوتی (streamable)
         url = info.get("url")
         return info, url
 
