@@ -59,7 +59,7 @@ TXT = {
 # ================================================
 # CAPTION ثابت موزیک
 # ================================================
-MUSIC_CAPTION = "[دانلود موزیک با ربات](@AFGR63_bot)"
+MUSIC_CAPTION = "[دانلود موزیک با ربات](https://t.me/AFGR63_bot)"
 # ================================================
 # دکمه افزودن به گروه (فقط در پیوی)
 # ================================================
@@ -297,11 +297,13 @@ async def music_select_handler(update: Update, context: ContextTypes.DEFAULT_TYP
     audio_io.name = f"{info.get('title','music')}.mp3"
 
     sent = await context.bot.send_audio(
-        chat_id,
-        audio_io,
-        caption=MUSIC_CAPTION,
-        reply_markup=ADD_BTN if cq.message.chat.type == "private" else None
+    chat_id,
+    audio_io,
+    caption=MUSIC_CAPTION,
+    parse_mode="MarkdownV2",
+    reply_markup=ADD_BTN if cq.message.chat.type == "private" else None
     )
+    
 
     SC_CACHE[cache_key] = sent.audio.file_id
     save_cache()
