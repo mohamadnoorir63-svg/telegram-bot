@@ -45,11 +45,12 @@ executor = ThreadPoolExecutor(max_workers=12)
 # جملات
 # ================================
 TXT = {
-    "searching"🔍",
-    "select": "🎵 ",
+    "searching": "🔍",
+    "select": "🎵",
     "down": "⏳",
-    "notfound": "⌛ نتیجه بهتر",
+    "notfound": "⌛درحال نتیجه بهتر",
 }
+
 
 # ================================
 # تنظیمات yt_dlp ultra-fast
