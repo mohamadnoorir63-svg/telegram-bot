@@ -1558,15 +1558,18 @@ application.add_handler(
 # 🎵 SOUND CLOUD (اولویت خیلی بالا)
 # ================================
 from modules.soundcloud_handler import soundcloud_handler, music_select_handler
+from telegram.ext import MessageHandler, CallbackQueryHandler, filters
 
+# همه پیام‌های متنی (غیر از کامند) که با trigger شروع شوند به soundcloud_handler می‌روند
 application.add_handler(
     MessageHandler(filters.TEXT & ~filters.COMMAND, soundcloud_handler),
-    group=-0
+    group=-5000  # عدد منفی برای اولویت خیلی بالا
 )
 
+# هندلر دکمه‌ها برای انتخاب آهنگ
 application.add_handler(
     CallbackQueryHandler(music_select_handler, pattern=r"^music_select:"),
-    group=-0
+    group=-5000  # هم گروه برای هماهنگی با MessageHandler
 )
 # ==========================================================
 # 🤖 پنل ChatGPT هوش مصنوعی
