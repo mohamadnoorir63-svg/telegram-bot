@@ -3,7 +3,7 @@
 import os
 import asyncio
 import yt_dlp
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, TimeoutError
 import json
 
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
@@ -12,7 +12,7 @@ from telegram.ext import ContextTypes
 # ================================
 # سودوها
 # ================================
-SUDO_USERS = [8588347189]   # ← آیدی شما
+SUDO_USERS = [8588347189]  # ← آیدی شما
 
 # ================================
 # تنظیمات
@@ -22,13 +22,18 @@ os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
 
 COOKIE_FILE = "modules/youtube_cookie.txt"
 
+# ThreadPoolExecutor (Heroku-safe)
 executor = ThreadPoolExecutor(max_workers=8)
 
-track_store = {}  # کش ترک‌ها
+# کش ترک‌ها در حافظه (نتایج جستجو برای انتخاب دکمه)
+track_store = {}
 
-# کش تلگرام
+# ================================
+# کش تلگرام (file_id)
+# ================================
 CACHE_FILE = "data/custom_commands.json"
 os.makedirs("data", exist_ok=True)
+
 if not os.path.exists(CACHE_FILE):
     with open(CACHE_FILE, "w", encoding="utf-8") as f:
         json.dump({}, f)
@@ -68,7 +73,7 @@ LANG_MESSAGES = {
 }
 
 # ================================
-# تنظیمات yt_dlp
+# تنظیمات سوپر توربو yt_dlp
 # ================================
 BASE_OPTS = {
     "format": "bestaudio/best",
@@ -92,7 +97,7 @@ BASE_OPTS = {
 # ================================
 # بررسی مدیر بودن
 # ================================
-async def is_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def is_admin(update, context):
     chat = update.effective_chat
     user = update.effective_user
 
@@ -109,16 +114,17 @@ async def is_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return False
 
 # ================================
-# کش محلی mp3
+# چک کش mp3 لوکال
 # ================================
 def cache_check(id_: str):
+    """اگر mp3 با این id قبلاً دانلود شده باشد، مسیرش را برمی‌گرداند."""
     for file in os.listdir(DOWNLOAD_FOLDER):
         if file.startswith(id_) and file.endswith(".mp3"):
             return os.path.join(DOWNLOAD_FOLDER, file)
     return None
 
 # ================================
-# دانلود SoundCloud
+# دانلود SoundCloud (Turbo + Cache فایل)
 # ================================
 def _sc_download_sync(url: str):
     opts = BASE_OPTS.copy()
@@ -140,27 +146,22 @@ def _sc_download_sync(url: str):
 def _youtube_fallback_sync(query: str):
     opts = BASE_OPTS.copy()
     opts["concurrent_fragment_downloads"] = 20
-
     if os.path.exists(COOKIE_FILE):
         opts["cookiefile"] = COOKIE_FILE
-
     with yt_dlp.YoutubeDL(opts) as y:
         info = y.extract_info(f"ytsearch1:{query}", download=True)
-
         if "entries" in info:
             info = info["entries"][0]
-
         vid = str(info.get("id"))
         cached = cache_check(vid)
         if cached:
             return info, cached
-
         fname = y.prepare_filename(info)
         mp3 = fname.rsplit(".", 1)[0] + ".mp3"
         return info, mp3
 
 # ================================
-# هندلر SoundCloud
+# جستجو و ساخت لیست انتخاب
 # ================================
 async def soundcloud_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message or not update.message.text:
@@ -186,14 +187,16 @@ async def soundcloud_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
     msg = await update.message.reply_text(LANG_MESSAGES[lang]["searching"])
 
-    def _search():
-        with yt_dlp.YoutubeDL({"quiet": True}) as y:
-            return y.extract_info(f"scsearch3:{query}", download=False)
-
     loop = asyncio.get_running_loop()
-    sc_info = await loop.run_in_executor(executor, _search)
 
-    if not sc_info or not sc_info.get("entries"):
+    # Timeout برای جستجو
+    try:
+        sc_info = await loop.run_in_executor(executor, lambda: _sc_download_sync(query))
+    except Exception:
+        sc_info = None
+
+    # اگر SoundCloud نتیجه نداد → یوتیوب
+    if not sc_info:
         await msg.edit_text(LANG_MESSAGES[lang]["notfound"])
         try:
             info, mp3 = await loop.run_in_executor(executor, _youtube_fallback_sync, query)
@@ -234,27 +237,27 @@ async def soundcloud_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
         return
 
-    entries = sc_info["entries"]
-    track_store[update.effective_chat.id] = entries
+    # SoundCloud جستجو شد
+    info, mp3 = sc_info
+    track_store[update.effective_chat.id] = [info]
 
     keyboard = [
-        [InlineKeyboardButton(t["title"], callback_data=f"music_select:{t['id']}")]
-        for t in entries
+        [InlineKeyboardButton(info["title"], callback_data=f"music_select:{info['id']}")]
     ]
 
     await msg.edit_text(
-        LANG_MESSAGES[lang]["select_song"].format(n=len(entries)),
+        LANG_MESSAGES[lang]["select_song"].format(n=1),
         reply_markup=InlineKeyboardMarkup(keyboard),
     )
 
 # ================================
-# هندلر انتخاب موزیک
+# دانلود انتخاب‌شده
 # ================================
 async def music_select_handler(update, context: ContextTypes.DEFAULT_TYPE):
     cq = update.callback_query
     await cq.answer()
-
     chat = cq.message.chat_id
+
     if update.effective_chat.type != "private":
         if not await is_admin(update, context):
             return
@@ -271,11 +274,13 @@ async def music_select_handler(update, context: ContextTypes.DEFAULT_TYPE):
 
     tracks = track_store.get(chat, [])
     track = next((t for t in tracks if str(t["id"]) == track_id), None)
+
     if not track:
         return await cq.edit_message_text("❌ آهنگ پیدا نشد.")
 
     msg = await cq.edit_message_text("⬇️ در حال دانلود...")
     loop = asyncio.get_running_loop()
+
     try:
         info, mp3 = await loop.run_in_executor(executor, _sc_download_sync, track["webpage_url"])
     except Exception as e:
