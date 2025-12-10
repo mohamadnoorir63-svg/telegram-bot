@@ -49,12 +49,12 @@ executor = ThreadPoolExecutor(max_workers=12)
 TXT = {
     "searching": "🔎 در حال جستجو...",
     "select": "🎵 {n} نتیجه یافت شد — انتخاب کنید:",
-    "down": "⏳ دانلود...",
+    "down": "⏳ دانلود موزیک از @AFGR63_bot ...",
     "notfound": "⌛ ممکن است تا 15 ثانیه طول بکشد",
 }
 
 # ================================
-# تنظیمات yt_dlp
+# تنظیمات yt_dlp ultra-fast
 # ================================
 BASE_OPTS = {
     "format": "bestaudio/best",
@@ -64,6 +64,7 @@ BASE_OPTS = {
     "noplaylist": True,
     "overwrites": True,
     "concurrent_fragment_downloads": 16,
+    "ignoreerrors": True,
 }
 
 track_store = {}  # ذخیره نتایج SoundCloud
@@ -78,11 +79,11 @@ def cache_check(id_: str) -> Optional[str]:
     return None
 
 # ================================
-# دانلود SoundCloud
+# دانلود SoundCloud ultra-fast
 # ================================
 def _sc_download_sync(url: str):
     opts = BASE_OPTS.copy()
-    opts["postprocessors"] = []  # بدون تبدیل → مستقیم MP3
+    opts["postprocessors"] = []  # بدون تبدیل MP3 → مستقیم لینک صوتی
     with yt_dlp.YoutubeDL(opts) as y:
         info = y.extract_info(url, download=True)
         tid = str(info.get("id"))
@@ -90,33 +91,25 @@ def _sc_download_sync(url: str):
         if cached:
             return info, cached
         fname = y.prepare_filename(info)
-        mp3 = fname.rsplit(".", 1)[0] + ".mp3"
-        return info, mp3
+        return info, fname
 
 # ================================
-# دانلود سریع fallback یوتیوب
+# دانلود fallback یوتیوب سریع
 # ================================
-def _youtube_fallback_fast(query: str):
+def _youtube_fallback_sync(query: str):
     opts = BASE_OPTS.copy()
-    opts.update({
-        "format": "bestaudio[abr<=128]/bestaudio",
-        "quiet": True,
-        "noplaylist": True,
-        "outtmpl": f"{DOWNLOAD_FOLDER}/%(id)s.%(ext)s",
-        "noprogress": True,
-        "concurrent_fragment_downloads": 20,
-        "postprocessors": [
-            {
-                "key": "FFmpegExtractAudio",
-                "preferredcodec": "mp3",
-                "preferredquality": "128",
-            }
-        ],
-    })
-
+    opts["format"] = "bestaudio/best"
+    opts["concurrent_fragment_downloads"] = 20
     cookie_file = "modules/youtube_cookie.txt"
     if os.path.exists(cookie_file):
         opts["cookiefile"] = cookie_file
+    opts["postprocessors"] = [
+        {
+            "key": "FFmpegExtractAudio",
+            "preferredcodec": "mp3",
+            "preferredquality": "128",
+        }
+    ]
 
     with yt_dlp.YoutubeDL(opts) as y:
         info = y.extract_info(f"ytsearch1:{query}", download=True)
@@ -166,7 +159,7 @@ async def soundcloud_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
     if not result or not result.get("entries"):
         await msg.edit_text(TXT["notfound"])
         try:
-            info, mp3 = await loop.run_in_executor(executor, _youtube_fallback_fast, query)
+            info, mp3 = await loop.run_in_executor(executor, _youtube_fallback_sync, query)
         except Exception as e:
             return await msg.edit_text(f"❌ خطا در جستجوی یوتیوب:\n{e}")
 
@@ -177,15 +170,31 @@ async def soundcloud_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
         if cache_key in SC_CACHE:
             try: await msg.delete()
             except: pass
+
+            # دکمه افزودن به گروه فقط در پیوی
+            buttons = None
+            if update.effective_chat.type == "private":
+                buttons = InlineKeyboardMarkup([
+                    [InlineKeyboardButton("افزودن به گروه", url=f"https://t.me/AFGR63_bot?startgroup=true")]
+                ])
             return await update.message.reply_audio(
                 SC_CACHE[cache_key],
-                caption=f"🎵 {info.get('title', 'Music')}"
+                caption=f"🎵 دانلود موزیک از @AFGR63_bot",
+                reply_markup=buttons
             )
 
         # ارسال فایل جدید
+        buttons = None
+        if update.effective_chat.type == "private":
+            buttons = InlineKeyboardMarkup([
+                [InlineKeyboardButton("افزودن به گروه", url=f"https://t.me/AFGR63_bot?startgroup=true")]
+            ])
         try:
             with open(mp3, "rb") as f:
-                sent = await update.message.reply_audio(f, caption=f"🎵 {info.get('title', 'Music')}")
+                sent = await update.message.reply_audio(
+                    f, caption=f"🎵 دانلود موزیک از @AFGR63_bot",
+                    reply_markup=buttons
+                )
         finally:
             if os.path.exists(mp3):
                 os.remove(mp3)
@@ -196,7 +205,7 @@ async def soundcloud_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
         except: pass
         return
 
-    # SoundCloud نتیجه داد → دکمه انتخاب
+    # اگر SoundCloud نتیجه داد → دکمه انتخاب
     entries = {str(t["id"]): t for t in result["entries"]}
     track_store[update.message.message_id] = entries
 
@@ -231,7 +240,13 @@ async def music_select_handler(update: Update, context: ContextTypes.DEFAULT_TYP
             await cq.edit_message_text("⚡ در حال ارسال از کش تلگرام...")
         except Exception:
             pass
-        return await context.bot.send_audio(chat_id, SC_CACHE[cache_key])
+
+        buttons = None
+        if update.effective_chat.type == "private":
+            buttons = InlineKeyboardMarkup([
+                [InlineKeyboardButton("افزودن به گروه", url=f"https://t.me/AFGR63_bot?startgroup=true")]
+            ])
+        return await context.bot.send_audio(chat_id, SC_CACHE[cache_key], reply_markup=buttons)
 
     # دانلود SoundCloud
     msg = await cq.edit_message_text(TXT["down"])
@@ -241,10 +256,17 @@ async def music_select_handler(update: Update, context: ContextTypes.DEFAULT_TYP
     except Exception as e:
         return await msg.edit_text(f"❌ خطا در دانلود:\n{e}")
 
-    # ارسال فایل
+    buttons = None
+    if update.effective_chat.type == "private":
+        buttons = InlineKeyboardMarkup([
+            [InlineKeyboardButton("افزودن به گروه", url=f"https://t.me/AFGR63_bot?startgroup=true")]
+        ])
     try:
         with open(mp3, "rb") as f:
-            sent = await context.bot.send_audio(chat_id, f, caption=info.get("title", ""))
+            sent = await context.bot.send_audio(
+                chat_id, f, caption=f"🎵 دانلود موزیک از @AFGR63_bot",
+                reply_markup=buttons
+            )
     finally:
         if os.path.exists(mp3):
             os.remove(mp3)
