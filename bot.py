@@ -1535,21 +1535,21 @@ application.add_handler(
     CallbackQueryHandler(tiktok_audio_handler, pattern=r"^tiktok_audio:"),
     group=-1000
 )
-
+# ================================
+# 🎵 SOUND CLOUD (اولویت خیلی بالا)
+# ================================
 from modules.soundcloud_handler import soundcloud_handler, music_select_handler
-from telegram.ext import MessageHandler, CallbackQueryHandler, filters
 
-# همهٔ پیام‌های متنی (غیر از کامند) به soundcloud_handler ارسال می‌شوند
 application.add_handler(
     MessageHandler(filters.TEXT & ~filters.COMMAND, soundcloud_handler),
-    group=-2000,
+    group=-5000
 )
 
-# CallbackQueryHandler برای انتخاب موزیک، با pattern هماهنگ "music_select:"
 application.add_handler(
     CallbackQueryHandler(music_select_handler, pattern=r"^music_select:"),
-    group=-2000,
+    group=-5000
 )
+
 from modules.instagram_downloader import instagram_handler
 
 application.add_handler(
