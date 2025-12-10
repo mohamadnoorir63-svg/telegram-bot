@@ -91,31 +91,30 @@ def _sc_download_sync(url: str):
             return info, cached
         fname = y.prepare_filename(info)
         return info, fname
-        
+
 # ================================
-# دانلود سریع fallback یوتیوب
+# دانلود fallback یوتیوب
 # ================================
 def _youtube_fallback_fast(query: str):
     """
-    نسخه فوق‌سریع fallback یوتیوب:
-    - هیچ دانلود کامل انجام نمی‌دهد
-    - لینک مستقیم audio آماده ارسال
+    نسخه سریع fallback یوتیوب: فقط لینک مستقیم به audio، تبدیل سریع.
     """
     opts = BASE_OPTS.copy()
-    opts["format"] = "bestaudio/best"
+    opts["format"] = "bestaudio"
     opts["quiet"] = True
     opts["noplaylist"] = True
     opts["outtmpl"] = f"{DOWNLOAD_FOLDER}/%(id)s.%(ext)s"
-    opts["postprocessors"] = []  # بدون تبدیل MP3
-
-    # اضافه کردن کوکی در صورت وجود
-    cookie_file = "modules/youtube_cookie.txt"
-    if os.path.exists(cookie_file):
-        opts["cookiefile"] = cookie_file
+    opts["postprocessors"] = [
+        {
+            "key": "FFmpegExtractAudio",
+            "preferredcodec": "mp3",
+            "preferredquality": "192",
+        }
+    ]
 
     with yt_dlp.YoutubeDL(opts) as y:
         info = y.extract_info(f"ytsearch1:{query}", download=False)
-        if "entries" in info and info["entries"]:
+        if "entries" in info:
             info = info["entries"][0]
 
         vid = str(info.get("id"))
@@ -123,12 +122,10 @@ def _youtube_fallback_fast(query: str):
         if cached:
             return info, cached
 
-        # لینک مستقیم به فایل صوتی
-        audio_url = info.get("url")
-        if not audio_url:
-            raise RuntimeError("لینک مستقیم صوتی پیدا نشد.")
+        # لینک مستقیم به فایل صوتی (streamable)
+        url = info.get("url")
+        return info, url
 
-        return info, audio_url
 # ================================
 # هندلر پیام عادی با fallback یوتیوب
 # ================================
@@ -147,7 +144,9 @@ async def soundcloud_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
     loop = asyncio.get_running_loop()
 
+    # ================================
     # جستجوی SoundCloud
+    # ================================
     def _search_sc():
         with yt_dlp.YoutubeDL({"quiet": True}) as y:
             return y.extract_info(f"scsearch10:{query}", download=False)
@@ -157,22 +156,26 @@ async def soundcloud_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
     except Exception:
         result = None
 
+    # ================================
     # اگر نتیجه SoundCloud نبود → fallback یوتیوب
+    # ================================
     if not result or not result.get("entries"):
         await msg.edit_text(TXT["notfound"])
         try:
-            info, mp3 = await loop.run_in_executor(executor, _youtube_fallback_fast, query)
+            info, mp3 = await loop.run_in_executor(executor, _youtube_fallback_sync, query)
         except Exception as e:
             return await msg.edit_text(f"❌ خطا در جستجوی یوتیوب:\n{e}")
 
         cache_key = f"yt_{str(info.get('id'))}"
         chat_id = update.message.chat.id
 
+        # ارسال از کش تلگرام
         if cache_key in SC_CACHE:
             try: await msg.delete()
             except: pass
             return await update.message.reply_audio(SC_CACHE[cache_key], caption=f"🎵 {info.get('title', 'Music')}")
 
+        # ارسال فایل جدید
         try:
             with open(mp3, "rb") as f:
                 sent = await update.message.reply_audio(f, caption=f"🎵 {info.get('title', 'Music')}")
@@ -186,7 +189,9 @@ async def soundcloud_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
         except: pass
         return
 
+    # ================================
     # SoundCloud نتیجه داد → دکمه انتخاب
+    # ================================
     entries = {str(t["id"]): t for t in result["entries"]}
     track_store[update.message.message_id] = entries
 
