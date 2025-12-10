@@ -91,31 +91,30 @@ def _sc_download_sync(url: str):
             return info, cached
         fname = y.prepare_filename(info)
         return info, fname
-
+        
 # ================================
-# دانلود fallback یوتیوب سریع
+# دانلود سریع fallback یوتیوب
 # ================================
 def _youtube_fallback_fast(query: str):
     """
-    دانلود fallback یوتیوب سریع با mp3 واقعی
+    نسخه فوق‌سریع fallback یوتیوب:
+    - هیچ دانلود کامل انجام نمی‌دهد
+    - لینک مستقیم audio آماده ارسال
     """
     opts = BASE_OPTS.copy()
-    opts["format"] = "bestaudio/best"  # اصلاح شد
+    opts["format"] = "bestaudio/best"
+    opts["quiet"] = True
     opts["noplaylist"] = True
     opts["outtmpl"] = f"{DOWNLOAD_FOLDER}/%(id)s.%(ext)s"
+    opts["postprocessors"] = []  # بدون تبدیل MP3
+
+    # اضافه کردن کوکی در صورت وجود
     cookie_file = "modules/youtube_cookie.txt"
     if os.path.exists(cookie_file):
         opts["cookiefile"] = cookie_file
-    opts["postprocessors"] = [
-        {
-            "key": "FFmpegExtractAudio",
-            "preferredcodec": "mp3",
-            "preferredquality": "192",
-        }
-    ]
 
     with yt_dlp.YoutubeDL(opts) as y:
-        info = y.extract_info(f"ytsearch1:{query}", download=True)
+        info = y.extract_info(f"ytsearch1:{query}", download=False)
         if "entries" in info and info["entries"]:
             info = info["entries"][0]
 
@@ -124,15 +123,12 @@ def _youtube_fallback_fast(query: str):
         if cached:
             return info, cached
 
-        fname = y.prepare_filename(info)
-        mp3 = fname.rsplit(".", 1)[0] + ".mp3"
+        # لینک مستقیم به فایل صوتی
+        audio_url = info.get("url")
+        if not audio_url:
+            raise RuntimeError("لینک مستقیم صوتی پیدا نشد.")
 
-        # اگر هنوز فایل وجود ندارد، خطا بده
-        if not os.path.exists(mp3):
-            raise FileNotFoundError(f"فایل mp3 برای {vid} پیدا نشد.")
-
-        return info, mp3
-
+        return info, audio_url
 # ================================
 # هندلر پیام عادی با fallback یوتیوب
 # ================================
