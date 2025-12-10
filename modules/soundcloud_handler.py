@@ -55,6 +55,11 @@ TXT = {
 }
 
 # ================================
+# مسیر کوکی یوتیوب
+# ================================
+COOKIE_FILE = "modules/youtube_cookie.txt"
+
+# ================================
 # تنظیمات yt_dlp ultra-fast
 # ================================
 BASE_OPTS = {
@@ -79,7 +84,7 @@ def cache_check(id_: str) -> Optional[str]:
     return None
 
 # ================================
-# دانلود SoundCloud یا یوتیوب
+# دانلود SoundCloud
 # ================================
 def _download_track(url: str):
     opts = BASE_OPTS.copy()
@@ -93,8 +98,13 @@ def _download_track(url: str):
         fname = y.prepare_filename(info)
         return info, fname
 
+# ================================
+# fallback یوتیوب با کوکی
+# ================================
 def _youtube_fallback(query: str):
     opts = BASE_OPTS.copy()
+    if os.path.exists(COOKIE_FILE):
+        opts["cookiefile"] = COOKIE_FILE
     with yt_dlp.YoutubeDL(opts) as y:
         info = y.extract_info(f"ytsearch1:{query}", download=True)
         if "entries" in info:
@@ -139,7 +149,7 @@ async def soundcloud_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
         return
 
     # ================================
-    # fallback یوتیوب
+    # fallback یوتیوب با کوکی
     # ================================
     await msg.edit_text(TXT["youtube"])
     try:
