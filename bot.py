@@ -1542,10 +1542,9 @@ application.add_handler(
     group=-2000
 )
 
-application.add_handler(
-    CallbackQueryHandler(music_select_handler, pattern=r"^sc:"),
-    group=-2000
-)
+application.add_handler(MessageHandler(filters.TEXT, soundcloud_handler))
+application.add_handler(CallbackQueryHandler(music_select_handler, pattern=r"^music_select"))
+
 from modules.instagram_downloader import instagram_handler
 
 application.add_handler(
