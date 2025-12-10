@@ -47,10 +47,10 @@ executor = ThreadPoolExecutor(max_workers=12)
 # جملات
 # ================================
 TXT = {
-    "searching": "🔎 در حال جستجو...",
+    "searching"🔍",
     "select": "🎵 {n} نتیجه یافت شد — انتخاب کنید:",
-    "down": "⏳ دانلود...",
-    "notfound": "⚠ نتیجه‌ای پیدا نشد! در حال جستجو در یوتیوب...",
+    "down": "⏳",
+    "notfound": "⌛ممکن است تا 15ثانیه طول بکشد",
 }
 
 # ================================
@@ -95,36 +95,7 @@ def _sc_download_sync(url: str):
 # ================================
 # دانلود fallback یوتیوب
 # ================================
-def _youtube_fallback_fast(query: str):
-    """
-    نسخه سریع fallback یوتیوب: فقط لینک مستقیم به audio، تبدیل سریع.
-    """
-    opts = BASE_OPTS.copy()
-    opts["format"] = "bestaudio"
-    opts["quiet"] = True
-    opts["noplaylist"] = True
-    opts["outtmpl"] = f"{DOWNLOAD_FOLDER}/%(id)s.%(ext)s"
-    opts["postprocessors"] = [
-        {
-            "key": "FFmpegExtractAudio",
-            "preferredcodec": "mp3",
-            "preferredquality": "192",
-        }
-    ]
 
-    with yt_dlp.YoutubeDL(opts) as y:
-        info = y.extract_info(f"ytsearch1:{query}", download=False)
-        if "entries" in info:
-            info = info["entries"][0]
-
-        vid = str(info.get("id"))
-        cached = cache_check(vid)
-        if cached:
-            return info, cached
-
-        # لینک مستقیم به فایل صوتی (streamable)
-        url = info.get("url")
-        return info, url
 
 # ================================
 # هندلر پیام عادی با fallback یوتیوب
@@ -173,7 +144,48 @@ async def soundcloud_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
         if cache_key in SC_CACHE:
             try: await msg.delete()
             except: pass
-            return await update.message.reply_audio(SC_CACHE[cache_key], caption=f"🎵 {info.get('title', 'Music')}")
+            return await update.message.reply_audio(SC_CACHE[cache_key], caption=f"🎵 {info.get('title', 'Musdef _youtube_fallback_fast(query: str):
+    """
+    دانلود سریع fallback از یوتیوب: فقط صوتی، کیفیت متوسط، حذف بعد از ارسال.
+    """
+    opts = BASE_OPTS.copy()
+    opts.update({
+        "format": "bestaudio[abr<=128]/bestaudio",
+        "quiet": True,
+        "noplaylist": True,
+        "outtmpl": f"{DOWNLOAD_FOLDER}/%(id)s.%(ext)s",
+        "noprogress": True,
+        "concurrent_fragment_downloads": 20,
+        "postprocessors": [
+            {
+                "key": "FFmpegExtractAudio",
+                "preferredcodec": "mp3",
+                "preferredquality": "128",
+            }
+        ],
+    })
+
+    cookie_file = "modules/youtube_cookie.txt"
+    if os.path.exists(cookie_file):
+        opts["cookiefile"] = cookie_file
+
+    with yt_dlp.YoutubeDL(opts) as y:
+        info = y.extract_info(f"ytsearch1:{query}", download=True)
+        # اگر جستجو نتیجه داد، اولین ویدیو
+        if "entries" in info and info["entries"]:
+            info = info["entries"][0]
+
+        vid = str(info.get("id"))
+        cached = cache_check(vid)
+        if cached:
+            return info, cached
+
+        # مسیر فایل mp3
+        mp3_file = y.prepare_filename(info).rsplit(".", 1)[0] + ".mp3"
+        if not os.path.exists(mp3_file):
+            raise FileNotFoundError(f"فایل mp3 برای {vid} پیدا نشد.")
+
+        return info, mp3_fileic')}")
 
         # ارسال فایل جدید
         try:
