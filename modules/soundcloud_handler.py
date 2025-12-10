@@ -144,21 +144,36 @@ def _youtube_fallback_sync(query: str):
 # ================================
 # هندلر پیام عادی با fallback یوتیوب
 # ================================
-async def soundcloud_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not update.message or not update.message.text:
-        return
+def _youtube_fallback_fast(query: str):
+    """
+    نسخه سریع fallback یوتیوب: فقط لینک مستقیم به audio، تبدیل سریع.
+    """
+    opts = BASE_OPTS.copy()
+    opts["format"] = "bestaudio"
+    opts["quiet"] = True
+    opts["noplaylist"] = True
+    opts["outtmpl"] = f"{DOWNLOAD_FOLDER}/%(id)s.%(ext)s"
+    opts["postprocessors"] = [
+        {
+            "key": "FFmpegExtractAudio",
+            "preferredcodec": "mp3",
+            "preferredquality": "192",
+        }
+    ]
 
-    text = update.message.text
-    triggers = ["آهنگ ", "music ", "اهنگ ", "موزیک "]
+    with yt_dlp.YoutubeDL(opts) as y:
+        info = y.extract_info(f"ytsearch1:{query}", download=False)
+        if "entries" in info:
+            info = info["entries"][0]
 
-    if not any(text.lower().startswith(t) for t in triggers):
-        return
+        vid = str(info.get("id"))
+        cached = cache_check(vid)
+        if cached:
+            return info, cached
 
-    query = next((text[len(t):].strip() for t in triggers if text.lower().startswith(t)), "")
-    msg = await update.message.reply_text(TXT["searching"])
-
-    loop = asyncio.get_running_loop()
-
+        # لینک مستقیم به فایل صوتی (streamable)
+        url = info.get("url")
+        return info, url
     # ================================
     # جستجوی SoundCloud
     # ================================
