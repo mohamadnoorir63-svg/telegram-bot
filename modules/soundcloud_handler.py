@@ -96,84 +96,42 @@ def _sc_download_sync(url: str):
 # دانلود fallback یوتیوب
 # ================================
 def _youtube_fallback_sync(query: str):
-    """
-    دانلود fallback از یوتیوب با timeout و بررسی کش.
-    """
     opts = BASE_OPTS.copy()
     opts["concurrent_fragment_downloads"] = 20
     cookie_file = "modules/youtube_cookie.txt"
     if os.path.exists(cookie_file):
         opts["cookiefile"] = cookie_file
 
-    # همیشه download=False و بعد تبدیل MP3 با postprocessor
-    opts["format"] = "bestaudio/best"
-    opts["noplaylist"] = True
-    opts["postprocessors"] = [
-        {
-            "key": "FFmpegExtractAudio",
-            "preferredcodec": "mp3",
-            "preferredquality": "192",
-        }
-    ]
-
     with yt_dlp.YoutubeDL(opts) as y:
-        try:
-            info = y.extract_info(f"ytsearch1:{query}", download=True)
-        except Exception as e:
-            raise RuntimeError(f"خطا در yt_dlp: {e}")
-
-        # اگر ytsearch نتیجه داشت، اولین ویدیو رو انتخاب کن
-        if "entries" in info and info["entries"]:
+        info = y.extract_info(f"ytsearch1:{query}", download=True)
+        if "entries" in info:
             info = info["entries"][0]
-
         vid = str(info.get("id"))
         cached = cache_check(vid)
         if cached:
             return info, cached
-
-        # مسیر فایل mp3
         fname = y.prepare_filename(info)
         mp3 = fname.rsplit(".", 1)[0] + ".mp3"
-
-        # بررسی وجود فایل
-        if not os.path.exists(mp3):
-            raise FileNotFoundError(f"فایل mp3 برای {vid} پیدا نشد.")
-
         return info, mp3
 
 # ================================
 # هندلر پیام عادی با fallback یوتیوب
 # ================================
-def _youtube_fallback_fast(query: str):
-    """
-    نسخه سریع fallback یوتیوب: فقط لینک مستقیم به audio، تبدیل سریع.
-    """
-    opts = BASE_OPTS.copy()
-    opts["format"] = "bestaudio"
-    opts["quiet"] = True
-    opts["noplaylist"] = True
-    opts["outtmpl"] = f"{DOWNLOAD_FOLDER}/%(id)s.%(ext)s"
-    opts["postprocessors"] = [
-        {
-            "key": "FFmpegExtractAudio",
-            "preferredcodec": "mp3",
-            "preferredquality": "192",
-        }
-    ]
+async def soundcloud_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not update.message or not update.message.text:
+        return
 
-    with yt_dlp.YoutubeDL(opts) as y:
-        info = y.extract_info(f"ytsearch1:{query}", download=False)
-        if "entries" in info:
-            info = info["entries"][0]
+    text = update.message.text
+    triggers = ["آهنگ ", "music ", "اهنگ ", "موزیک "]
 
-        vid = str(info.get("id"))
-        cached = cache_check(vid)
-        if cached:
-            return info, cached
+    if not any(text.lower().startswith(t) for t in triggers):
+        return
 
-        # لینک مستقیم به فایل صوتی (streamable)
-        url = info.get("url")
-        return info, url
+    query = next((text[len(t):].strip() for t in triggers if text.lower().startswith(t)), "")
+    msg = await update.message.reply_text(TXT["searching"])
+
+    loop = asyncio.get_running_loop()
+
     # ================================
     # جستجوی SoundCloud
     # ================================
