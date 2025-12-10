@@ -24,6 +24,8 @@ os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
 CACHE_FILE = "data/sc_cache.json"
 os.makedirs("data", exist_ok=True)
 
+COOKIE_FILE = "modules/youtube_cookie.txt"
+
 if not os.path.exists(CACHE_FILE):
     with open(CACHE_FILE, "w", encoding="utf-8") as f:
         json.dump({}, f)
@@ -55,11 +57,6 @@ TXT = {
 }
 
 # ================================
-# مسیر کوکی یوتیوب
-# ================================
-COOKIE_FILE = "modules/youtube_cookie.txt"
-
-# ================================
 # تنظیمات yt_dlp ultra-fast
 # ================================
 BASE_OPTS = {
@@ -88,30 +85,45 @@ def cache_check(id_: str) -> Optional[str]:
 # ================================
 def _download_track(url: str):
     opts = BASE_OPTS.copy()
-    opts["postprocessors"] = []
+    opts["postprocessors"] = []  # مستقیم صوت
     with yt_dlp.YoutubeDL(opts) as y:
         info = y.extract_info(url, download=True)
         tid = str(info.get("id"))
         cached = cache_check(tid)
         if cached:
             return info, cached
-        fname = y.prepare_filename(info)
+        fname = y.prepare_filename(info).rsplit(".", 1)[0] + ".mp3"
         return info, fname
 
 # ================================
-# fallback یوتیوب با کوکی
+# fallback یوتیوب MP3
 # ================================
 def _youtube_fallback(query: str):
     opts = BASE_OPTS.copy()
+    # استفاده از کوکی برای جلوگیری از محدودیت
     if os.path.exists(COOKIE_FILE):
         opts["cookiefile"] = COOKIE_FILE
+    opts["postprocessors"] = [{
+        "key": "FFmpegExtractAudio",
+        "preferredcodec": "mp3",
+        "preferredquality": "192"
+    }]
     with yt_dlp.YoutubeDL(opts) as y:
-        info = y.extract_info(f"ytsearch1:{query}", download=True)
+        info = y.extract_info(f"ytsearch5:{query}", download=True)
         if "entries" in info:
-            info = info["entries"][0]
-        tid = str(info.get("id"))
-        mp3_file = y.prepare_filename(info).rsplit(".", 1)[0] + ".mp3"
-        return info, mp3_file
+            for entry in info["entries"]:
+                try:
+                    tid = str(entry.get("id"))
+                    mp3_file = os.path.join(DOWNLOAD_FOLDER, f"{tid}.mp3")
+                    if os.path.exists(mp3_file):
+                        return entry, mp3_file
+                except Exception:
+                    continue
+            raise Exception("هیچ ویدیوی قابل دانلودی یافت نشد.")
+        else:
+            tid = str(info.get("id"))
+            mp3_file = os.path.join(DOWNLOAD_FOLDER, f"{tid}.mp3")
+            return info, mp3_file
 
 # ================================
 # هندلر پیام عادی
@@ -122,7 +134,6 @@ async def soundcloud_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
     text = update.message.text
     triggers = ["آهنگ ", "music ", "اهنگ ", "موزیک "]
-
     if not any(text.lower().startswith(t) for t in triggers):
         return
 
@@ -148,9 +159,7 @@ async def soundcloud_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
         await msg.edit_text(TXT["select"].format(n=len(entries)), reply_markup=InlineKeyboardMarkup(keyboard))
         return
 
-    # ================================
-    # fallback یوتیوب با کوکی
-    # ================================
+    # fallback یوتیوب
     await msg.edit_text(TXT["youtube"])
     try:
         info, mp3 = await loop.run_in_executor(executor, _youtube_fallback, query)
