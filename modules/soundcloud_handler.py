@@ -37,7 +37,7 @@ def save_cache():
         json.dump(SC_CACHE, f, indent=2, ensure_ascii=False)
 
 # ================================
-# ThreadPool برای سرعت
+# ThreadPool برای async اجرای sync کدها
 # ================================
 executor = ThreadPoolExecutor(max_workers=12)
 
@@ -67,7 +67,7 @@ BASE_OPTS = {
 track_store = {}
 
 # ================================
-# چک کش محلی
+# بررسی کش محلی
 # ================================
 def cache_check(id_: str) -> Optional[str]:
     for file in os.listdir(DOWNLOAD_FOLDER):
@@ -76,11 +76,15 @@ def cache_check(id_: str) -> Optional[str]:
     return None
 
 # ================================
-# دانلود SoundCloud ultra-fast
+# دانلود async SoundCloud (با tempfile)
 # ================================
+async def _sc_download(url: str) -> tuple:
+    loop = asyncio.get_running_loop()
+    return await loop.run_in_executor(executor, _sc_download_sync, url)
+
 def _sc_download_sync(url: str):
     opts = BASE_OPTS.copy()
-    opts["postprocessors"] = []  # مستقیم دانلود بدون تبدیل
+    opts["postprocessors"] = []
     with yt_dlp.YoutubeDL(opts) as y:
         info = y.extract_info(url, download=True)
         tid = str(info.get("id"))
@@ -93,6 +97,10 @@ def _sc_download_sync(url: str):
 # ================================
 # fallback Tidal
 # ================================
+async def _tidal_fallback(query: str) -> tuple:
+    loop = asyncio.get_running_loop()
+    return await loop.run_in_executor(executor, _tidal_fallback_sync, query)
+
 def _tidal_fallback_sync(query: str):
     opts = BASE_OPTS.copy()
     opts.update({
@@ -103,11 +111,10 @@ def _tidal_fallback_sync(query: str):
     cookie_file = "modules/tidal_cookies.txt"
     if os.path.exists(cookie_file):
         opts["cookiefile"] = cookie_file
-
     with yt_dlp.YoutubeDL(opts) as y:
         try:
             info = y.extract_info(f"tidalsearch10:{query}", download=True)
-        except Exception:
+        except:
             return None, None
         if not info:
             return None, None
@@ -125,6 +132,10 @@ def _tidal_fallback_sync(query: str):
 # ================================
 # fallback YouTube
 # ================================
+async def _youtube_fallback(query: str) -> tuple:
+    loop = asyncio.get_running_loop()
+    return await loop.run_in_executor(executor, _youtube_fallback_sync, query)
+
 def _youtube_fallback_sync(query: str):
     opts = BASE_OPTS.copy()
     opts["concurrent_fragment_downloads"] = 20
@@ -133,7 +144,6 @@ def _youtube_fallback_sync(query: str):
         opts["cookiefile"] = cookie_file
     opts["format"] = "bestaudio/best"
     opts["postprocessors"] = [{"key": "FFmpegExtractAudio", "preferredcodec": "mp3", "preferredquality": "192"}]
-
     with yt_dlp.YoutubeDL(opts) as y:
         try:
             info = y.extract_info(f"ytsearch1:{query}", download=True)
@@ -156,45 +166,38 @@ def _youtube_fallback_sync(query: str):
 async def soundcloud_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message or not update.message.text:
         return
+
     text = update.message.text
     triggers = ["آهنگ ", "music ", "اهنگ ", "موزیک "]
     if not any(text.lower().startswith(t) for t in triggers):
         return
+
     query = next((text[len(t):].strip() for t in triggers if text.lower().startswith(t)), "")
     msg = await update.message.reply_text(TXT["searching"])
-    loop = asyncio.get_running_loop()
 
-    def _search_sc():
+    # جستجوی SoundCloud
+    loop = asyncio.get_running_loop()
+    def _search_sc(): 
         with yt_dlp.YoutubeDL({"quiet": True}) as y:
             return y.extract_info(f"scsearch10:{query}", download=False)
-
     try:
         result = await loop.run_in_executor(executor, _search_sc)
-    except Exception:
+    except:
         result = None
 
-    # اگر نتیجه SoundCloud نبود → fallback
+    # fallback اگر نتیجه نبود
     if not result or not result.get("entries"):
-        await msg.edit_text("⌛ نتیجه‌ای پیدا نشد! در حال جستجو در Tidal…")
-        try:
-            info, mp3 = await loop.run_in_executor(executor, _tidal_fallback_sync, query)
-        except Exception:
-            info, mp3 = None, None
+        await msg.edit_text("⌛ نتیجه‌ای پیدا نشد! در حال fallback به Tidal…")
+        info, mp3 = await _tidal_fallback(query)
         if not info:
-            await msg.edit_text("در حال جستجو در YouTube…")
-            try:
-                info, mp3 = await loop.run_in_executor(executor, _youtube_fallback_sync, query)
-            except Exception as e:
-                return await msg.edit_text(f"❌ خطا: {e}")
-
+            await msg.edit_text("در حال fallback به YouTube…")
+            info, mp3 = await _youtube_fallback(query)
         if info and mp3:
             cache_key = f"fallback_{info.get('id')}"
-            try:
-                with open(mp3, "rb") as f:
-                    sent = await update.message.reply_audio(f, caption=info.get("title", "Music"))
-            finally:
-                if os.path.exists(mp3):
-                    os.remove(mp3)
+            with open(mp3, "rb") as f:
+                sent = await update.message.reply_audio(f, caption=info.get("title", "Music"))
+            if os.path.exists(mp3):
+                os.remove(mp3)
             SC_CACHE[cache_key] = sent.audio.file_id
             save_cache()
             await msg.delete()
@@ -217,24 +220,21 @@ async def music_select_handler(update: Update, context: ContextTypes.DEFAULT_TYP
     await cq.answer()
     _, msg_id, tid = cq.data.split(":")
     msg_id = int(msg_id)
-    tracks = track_store.get(msg_id, {})
-    track = tracks.get(tid)
+    track = track_store.get(msg_id, {}).get(tid)
     if not track:
         return await cq.edit_message_text("❌ آهنگ یافت نشد.")
+
     cache_key = f"sc_{tid}"
     chat_id = cq.message.chat.id
-
     if cache_key in SC_CACHE:
         return await context.bot.send_audio(chat_id, SC_CACHE[cache_key])
 
     msg = await cq.edit_message_text(TXT["down"])
-    loop = asyncio.get_running_loop()
-    info, mp3 = await loop.run_in_executor(executor, _sc_download_sync, track["webpage_url"])
-
+    info, mp3 = await _sc_download(track["webpage_url"])
     with open(mp3, "rb") as f:
         sent = await context.bot.send_audio(chat_id, f, caption=info.get("title", ""))
-
-    os.remove(mp3)
+    if os.path.exists(mp3):
+        os.remove(mp3)
     SC_CACHE[cache_key] = sent.audio.file_id
     save_cache()
     await msg.delete()
