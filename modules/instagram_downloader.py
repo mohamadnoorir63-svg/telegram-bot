@@ -13,7 +13,19 @@ SUDO_USERS = [8588347189]  # آیدی شما
 # کوکی اینستاگرام (فرمت Netscape)
 # ================================
 COOKIE_FILE = "insta_cookie.txt"
+# Netscape HTTP Cookie File
+# https://curl.haxx.se/rfc/cookie_spec.html
+# This is a generated file! Do not edit.
 
+.instagram.com	TRUE	/	TRUE	1799701606	csrftoken	--d8oLwWArIVOTuxrKibqa
+.instagram.com	TRUE	/	TRUE	1799687399	datr	47Q1aZceuWl7nLkf_Uzh_kVW
+.instagram.com	TRUE	/	TRUE	1796663399	ig_did	615B02DC-3964-40ED-864D-5EDD6E7C4EA3
+.instagram.com	TRUE	/	TRUE	1799687399	mid	aTW04wABAAHoKpxsaAJbAfLsgVU3
+.instagram.com	TRUE	/	TRUE	1765732343	dpr	2
+.instagram.com	TRUE	/	TRUE	1772917606	ds_user_id	79160628834
+.instagram.com	TRUE	/	TRUE	1796663585	sessionid	79160628834%3AtMYF1zDBj9tXx3%3A7%3AAYhX_MD6k4rrVPUaIBvVhJLqxdAzNqJ0SkLDHb-ymQ
+.instagram.com	TRUE	/	TRUE	1765746400	wd	360x683
+.instagram.com	TRUE	/	TRUE	0	rur	"FRC\05479160628834\0541796677606:01feeadcb720f15c682519c2475d06626b55e5e1646ce3648355ab004152c377c46ba081"
 
 
 with open(COOKIE_FILE, "w") as f:
