@@ -93,17 +93,13 @@ async def _sc_download_bytes(url: str):
     return await loop.run_in_executor(executor, _sc_download_sync_bytes, url)
 
 # ================================================
-# fallback YouTube
-# ================================================
-async def _youtube_fallback(query: str) -> tuple:
-    loop = asyncio.get_running_loop()
-    return await loop.run_in_executor(executor, _youtube_fallback_sync, query)
 
-
-def _youtube_fallback_sync(query: str) -> tuple:
+        # ================================
+# fallback YouTube با MP3 واقعی
+# ================================
+def _youtube_fallback_sync(query: str):
     opts = BASE_OPTS.copy()
     opts["concurrent_fragment_downloads"] = 20
-
     cookie_file = "modules/youtube_cookie.txt"
     if os.path.exists(cookie_file):
         opts["cookiefile"] = cookie_file
@@ -111,11 +107,43 @@ def _youtube_fallback_sync(query: str) -> tuple:
     opts["format"] = "bestaudio/best"
     opts["noplaylist"] = True
     opts["postprocessors"] = [
-        {
-            "key": "FFmpegExtractAudio",
-            "preferredcodec": "mp3",
-            "preferredquality": "192"
-        }
+        {"key": "FFmpegExtractAudio", "preferredcodec": "mp3", "preferredquality": "192"}
+    ]
+    opts["outtmpl"] = f"{DOWNLOAD_FOLDER}/%(id)s.%(ext)s"
+
+    with yt_dlp.YoutubeDL(opts) as y:
+        try:
+            info = y.extract_info(f"ytsearch1:{query}", download=True)
+        except Exception as e:
+            raise RuntimeError(f"خطا در yt_dlp: {e}")
+
+        if "entries" in info and info["entries"]:
+            info = info["entries"][0]
+
+        vid = str(info.get("id"))
+        cached = cache_check(vid)
+        if cached:
+            return info, cached
+
+        mp3_file = y.prepare_filename(info).rsplit(".", 1)[0] + ".mp3"
+        if not os.path.exists(mp3_file):
+            raise FileNotFoundError(f"فایل mp3 برای {vid} پیدا نشد.")
+
+        return info, mp3_file
+# ================================
+# fallback YouTube (sync)
+# ================================
+def _youtube_fallback_sync(query: str):
+    opts = BASE_OPTS.copy()
+    opts["concurrent_fragment_downloads"] = 20
+    cookie_file = "modules/youtube_cookie.txt"
+    if os.path.exists(cookie_file):
+        opts["cookiefile"] = cookie_file
+
+    opts["format"] = "bestaudio/best"
+    opts["noplaylist"] = True
+    opts["postprocessors"] = [
+        {"key": "FFmpegExtractAudio", "preferredcodec": "mp3", "preferredquality": "192"}
     ]
 
     with yt_dlp.YoutubeDL(opts) as y:
@@ -128,7 +156,6 @@ def _youtube_fallback_sync(query: str) -> tuple:
             info = info["entries"][0]
 
         vid = str(info.get("id"))
-
         cached = cache_check(vid)
         if cached:
             return info, cached
@@ -138,6 +165,7 @@ def _youtube_fallback_sync(query: str) -> tuple:
             raise FileNotFoundError(f"فایل mp3 برای {vid} پیدا نشد.")
 
         return info, mp3
+        
 
 # ================================================
 # هندلر پیام اصلی
