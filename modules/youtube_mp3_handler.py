@@ -22,25 +22,36 @@ DOWNLOAD_FOLDER = "downloads"
 os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
 
 # ================================
-# regex برای لینک
+# regex برای لینک (در صورت نیاز)
 # ================================
 URL_RE = re.compile(r"(https?://[^\s]+)")
 
 # ================================
 # تابع دانلود مستقیم MP3 با کوکی
 # ================================
-def download_audio_stream(url_or_search):
+def download_audio_stream(query):
     ydl_opts = {
         "format": "bestaudio/best",
         "noplaylist": True,
         "quiet": True,
         "cookiefile": COOKIE_FILE,
-        "outtmpl": os.path.join(DOWNLOAD_FOLDER, "%(title)s.%(ext)s"),
+        "outtmpl": os.path.join(DOWNLOAD_FOLDER, "%(title).200s.%(ext)s"),
+        "postprocessors": [{
+            "key": "FFmpegExtractAudio",
+            "preferredcodec": "mp3",
+            "preferredquality": "192",
+        }],
     }
+
+    # اگر متن لینک یوتیوب باشه، مستقیم دانلود کن، وگرنه ytsearch
+    url_or_search = query if URL_RE.match(query) else f"ytsearch1:{query}"  # فقط اولین نتیجه
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(url_or_search, download=True)
-        filename = ydl.prepare_filename(info)
-    return filename, info
+        # نام فایل امن با جایگزینی کاراکترهای غیرمجاز
+        title = info.get('title', 'audio')
+        safe_title = re.sub(r'[\\/*?:"<>|]', "_", title)
+        mp3_file = os.path.join(DOWNLOAD_FOLDER, f"{safe_title}.mp3")
+    return mp3_file, info
 
 # ================================
 # هندلر تلگرام
@@ -50,19 +61,22 @@ async def youtube_mp3_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
         return
 
     text = update.message.text.strip()
-    msg = await update.message.reply_text("🎵 در حال آماده‌سازی موسیقی ...")
+    msg = await update.message.reply_text("🎵 در حال آماده‌سازی MP3 ...")
 
     loop = asyncio.get_running_loop()
     try:
-        # اگر لینک باشه مستقیم استفاده می‌کنیم، در غیر اینصورت جستجو
-        url_or_search = text if URL_RE.match(text) else f"ytsearch:{text}"
+        mp3_file, info = await loop.run_in_executor(None, download_audio_stream, text)
 
-        file_path, info = await loop.run_in_executor(None, download_audio_stream, url_or_search)
+        if not os.path.exists(mp3_file):
+            await msg.edit_text("❌ فایل دانلود نشد یا نام فایل معتبر نیست.")
+            return
 
-        # ارسال فایل صوتی
-        await update.message.reply_audio(audio=open(file_path, "rb"),
-                                         caption=f"🎵 {info.get('title', 'Audio')}")
-        os.remove(file_path)
+        await update.message.reply_audio(
+            audio=open(mp3_file, "rb"),
+            caption=f"🎵 {info.get('title', 'Audio')}"
+        )
+        os.remove(mp3_file)
         await msg.delete()
+
     except Exception as e:
-        await msg.edit_text(f"❌ خطا در دانلود یا ارسال موسیقی.\n{e}")
+        await msg.edit_text(f"❌ خطا در دانلود یا ارسال MP3.\n{e}")
