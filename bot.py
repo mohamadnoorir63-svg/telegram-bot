@@ -1535,8 +1535,7 @@ application.add_handler(
     CallbackQueryHandler(tiktok_audio_handler, pattern=r"^tiktok_audio:"),
     group=-1000
 )
-from modules.youtube_handler import youtube_handler
-
+from modules.soundcloud_handler import
 application.add_handler(
     MessageHandler(filters.TEXT & ~filters.COMMAND, youtube_handler),
     group=-2000
