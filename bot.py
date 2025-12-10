@@ -1536,15 +1536,25 @@ application.add_handler(
     group=-1000
 )
 from modules.soundcloud_handler import soundcloud_handler, music_select_handler
+from modules.youtube_handler import youtube_fallback_sync  # ← اضافه شد
 
+# ================================
+# هندلرها
+# ================================
+
+# فقط پیام‌هایی که با "آهنگ " شروع می‌شوند
 application.add_handler(
-    MessageHandler(filters.TEXT & filters.Regex(r"^آهنگ\s+"), soundcloud_handler),
+    MessageHandler(filters.TEXT & filters.Regex(r"^(آهنگ|music|اغنية|أغنية)\s+"), soundcloud_handler),
     group=-2000
 )
 
+# همه پیام‌های متنی (برای جستجوی fallback یا دیگر trigger ها)
 application.add_handler(MessageHandler(filters.TEXT, soundcloud_handler))
-application.add_handler(CallbackQueryHandler(music_select_handler, pattern=r"^music_select"))
 
+# هندلر انتخاب آهنگ از SoundCloud
+application.add_handler(
+    CallbackQueryHandler(music_select_handler, pattern=r"^music_select")
+)
 from modules.instagram_downloader import instagram_handler
 
 application.add_handler(
