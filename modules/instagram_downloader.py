@@ -1,131 +1,214 @@
-import re
+import os
+import asyncio
 import yt_dlp
-from telegram import Update
+from concurrent.futures import ThreadPoolExecutor
+import io
+import json
+from typing import Optional
+
+from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import ContextTypes
 
 # ================================
 # سودو
 # ================================
-SUDO_USERS = [8588347189]  # آیدی شما
+
+SUDO_USERS = [8588347189]
 
 # ================================
-# کوکی اینستاگرام
+# کش
 # ================================
-INSTAGRAM_COOKIES = """
-# Netscape HTTP Cookie File
-.instagram.com	TRUE	/	TRUE	1799701606	csrftoken	--d8oLwWArIVOTuxrKibqa
-.instagram.com	TRUE	/	TRUE	1799687399	datr	47Q1aZceuWl7nLkf_Uzh_kVW
-.instagram.com	TRUE	/	TRUE	1796663399	ig_did	615B02DC-3964-40ED-864D-5EDD6E7C4EA3
-.instagram.com	TRUE	/	TRUE	1799687399	mid	aTW04wABAAHoKpxsaAJbAfLsgVU3
-.instagram.com	TRUE	/	TRUE	1765732343	dpr	2
-.instagram.com	TRUE	/	TRUE	1772917606	ds_user_id	79160628834
-.instagram.com	TRUE	/	TRUE	1796663585	sessionid	79160628834%3AtMYF1zDBj9tXx3%3A7%3AAYhX_MD6k4rrVPUaIBvVhJLqxdAzNqJ0SkLDHb-ymQ
-.instagram.com	TRUE	/	TRUE	1765746400	wd	360x683
-.instagram.com	TRUE	/	TRUE	0	rur	"FRC\05479160628834\0541796677606:01feeadcb720f15c682519c2475d06626b55e5e1646ce3648355ab004152c377c46ba081"
-"""
 
-COOKIE_FILE = "insta_cookie.txt"
-with open(COOKIE_FILE, "w") as f:
-    f.write(INSTAGRAM_COOKIES.strip())
+CACHE_FILE = "data/sc_cache.json"
+os.makedirs("data", exist_ok=True)
 
-# regex گرفتن لینک
-URL_RE = re.compile(r"(https?://[^\s]+)")
+if not os.path.exists(CACHE_FILE):
+    with open(CACHE_FILE, "w", encoding="utf-8") as f:
+        json.dump({}, f)
 
-
-# ================================
-# تابع چک مدیر بودن
-# ================================
-async def is_admin(update, context):
-    chat = update.effective_chat
-    user = update.effective_user
-
-    # پیوی → همه مجاز
-    if chat.type == "private":
-        return True
-
-    # سودو → همیشه مجاز
-    if user.id in SUDO_USERS:
-        return True
-
+with open(CACHE_FILE, "r", encoding="utf-8") as f:
     try:
-        admins = await context.bot.get_chat_administrators(chat.id)
-        admin_ids = [a.user.id for a in admins]
+        SC_CACHE = json.load(f)
     except:
-        return False
+        SC_CACHE = {}
 
-    return user.id in admin_ids
-
-
+def save_cache():
+    with open(CACHE_FILE, "w", encoding="utf-8") as f:
+        json.dump(SC_CACHE, f, indent=2, ensure_ascii=False)
 
 # ================================
-# هندلر اصلی اینستاگرام
+# ThreadPool برای async
 # ================================
-async def instagram_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
+executor = ThreadPoolExecutor(max_workers=12)
+
+# ================================
+# جملات
+# ================================
+
+TXT = {
+    "searching": "🔎",
+    "select": "🎵:",
+    "down": "⏳ دانلود...",
+    "notfound": "⌛",
+}
+
+# ================================
+# تنظیمات yt_dlp
+# ================================
+
+BASE_OPTS = {
+    "format": "bestaudio/best",
+    "quiet": True,
+    "noprogress": True,
+    "nopart": True,
+    "noplaylist": True,
+    "overwrites": True,
+    "concurrent_fragment_downloads": 16,
+}
+
+track_store = {}
+
+# ================================
+# دانلود مستقیم به حافظه
+# ================================
+
+def _sc_download_sync_bytes(url: str) -> tuple:
+    opts = BASE_OPTS.copy()
+    opts["postprocessors"] = []
+    opts["outtmpl"] = os.path.join("downloads", "%(id)s.%(ext)s")
+
+    with yt_dlp.YoutubeDL(opts) as y:
+        info = y.extract_info(url, download=True)
+        tid = str(info.get("id"))
+        fname = y.prepare_filename(info)
+
+        with open(fname, "rb") as f:
+            audio_bytes = f.read()
+
+        os.remove(fname)
+        return info, audio_bytes
+
+async def _sc_download_bytes(url: str):
+    loop = asyncio.get_running_loop()
+    return await loop.run_in_executor(executor, _sc_download_sync_bytes, url)
+
+# ================================
+# fallback YouTube
+# ================================
+
+async def _youtube_fallback(query: str) -> tuple:
+    loop = asyncio.get_running_loop()
+    return await loop.run_in_executor(executor, _youtube_fallback_sync, query)
+
+def _youtube_fallback_sync(query: str) -> tuple:
+    opts = BASE_OPTS.copy()
+    opts["concurrent_fragment_downloads"] = 20
+
+    cookie_file = "modules/youtube_cookie.txt"
+    if os.path.exists(cookie_file):
+        opts["cookiefile"] = cookie_file
+
+    opts["format"] = "bestaudio/best"
+    opts["noplaylist"] = True
+    opts["postprocessors"] = [
+        {"key": "FFmpegExtractAudio", "preferredcodec": "mp3", "preferredquality": "192"}
+    ]
+
+    with yt_dlp.YoutubeDL(opts) as y:
+        try:
+            info = y.extract_info(f"ytsearch1:{query}", download=True)
+        except Exception as e:
+            raise RuntimeError(f"خطا در yt_dlp: {e}")
+
+        if "entries" in info and info["entries"]:
+            info = info["entries"][0]
+
+        vid = str(info.get("id"))
+
+        cached = cache_check(vid)
+        if cached:
+            return info, cached
+
+        mp3 = y.prepare_filename(info).rsplit(".", 1)[0] + ".mp3"
+        if not os.path.exists(mp3):
+            raise FileNotFoundError(f"فایل mp3 برای {vid} پیدا نشد.")
+
+        return info, mp3
+
+# ================================
+# هندلر پیام اصلی
+# ================================
+
+async def soundcloud_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message or not update.message.text:
         return
 
-    text = update.message.text.strip()
-    m = URL_RE.search(text)
+    text = update.message.text
+    triggers = ["آهنگ ", "music ", "اهنگ ", "موزیک "]
 
-    if not m:
+    if not any(text.lower().startswith(t) for t in triggers):
         return
 
-    url = m.group(1)
+    query = next((text[len(t):].strip() for t in triggers if text.lower().startswith(t)), "")
 
-    # فقط لینک اینستاگرام
-    if "instagram.com" not in url:
-        return
+    msg = await update.message.reply_text(TXT["searching"])
 
-    # محدودیت دسترسی در گروه
-    if update.effective_chat.type != "private":
-        allowed = await is_admin(update, context)
-        if not allowed:
-            return  # سکوت کامل
+    loop = asyncio.get_running_loop()
 
-    msg = await update.message.reply_text("📥 در حال بررسی لینک اینستاگرام...")
-
-    ydl_opts = {
-        "quiet": True,
-        "cookiefile": COOKIE_FILE,
-        "format": "best",
-        "outtmpl": "downloads/%(id)s.%(ext)s",
-    }
+    def _search_sc():
+        with yt_dlp.YoutubeDL({"quiet": True}) as y:
+            return y.extract_info(f"scsearch10:{query}", download=False)
 
     try:
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(url, download=True)
+        result = await loop.run_in_executor(executor, _search_sc)
+    except:
+        result = None
 
-        await msg.edit_text("⬇ در حال ارسال فایل‌ها...")
+    if not result or not result.get("entries"):
+        return await msg.edit_text(TXT["notfound"])
 
-        # ========== چندتایی ==========
-        if "entries" in info:
-            for entry in info["entries"]:
-                file = ydl.prepare_filename(entry)
-                ext = file.split(".")[-1].lower()
+    entries = {str(t["id"]): t for t in result["entries"]}
+    track_store[update.message.message_id] = entries
 
-                if ext in ["mp4", "mov", "webm"]:
-                    await update.message.reply_video(video=open(file, "rb"))
-                elif ext in ["jpg", "jpeg", "png", "webp"]:
-                    await update.message.reply_photo(photo=open(file, "rb"))
-                else:
-                    await update.message.reply_document(document=open(file, "rb"))
+    keyboard = [
+        [InlineKeyboardButton(t["title"], callback_data=f"music_select:{update.message.message_id}:{tid}")]
+        for tid, t in entries.items()
+    ]
 
-            await msg.delete()
-            return
+    await msg.edit_text(TXT["select"].format(n=len(entries)), reply_markup=InlineKeyboardMarkup(keyboard))
 
-        # ========== تک پست ==========
-        file = ydl.prepare_filename(info)
-        ext = file.split(".")[-1].lower()
+# ================================
+# دکمه انتخاب آهنگ
+# ================================
 
-        if ext in ["mp4", "mov", "webm"]:
-            await update.message.reply_video(video=open(file, "rb"))
-        elif ext in ["jpg", "jpeg", "png", "webp"]:
-            await update.message.reply_photo(photo=open(file, "rb"))
-        else:
-            await update.message.reply_document(document=open(file, "rb"))
+async def music_select_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    cq = update.callback_query
+    await cq.answer()
 
-        await msg.delete()
+    _, msg_id, tid = cq.data.split(":")
+    msg_id = int(msg_id)
 
-    except Exception as e:
-        await msg.edit_text(f"❌ نتوانستم دانلود کنم.\n⚠️ خطا: {e}")
+    track = track_store.get(msg_id, {}).get(tid)
+    if not track:
+        return await cq.edit_message_text("❌ آهنگ یافت نشد.")
+
+    cache_key = f"sc_{tid}"
+    chat_id = cq.message.chat.id
+
+    if cache_key in SC_CACHE:
+        return await context.bot.send_audio(chat_id, SC_CACHE[cache_key])
+
+    msg = await cq.edit_message_text(TXT["down"])
+
+    info, audio_bytes = await _sc_download_bytes(track["webpage_url"])
+
+    audio_io = io.BytesIO(audio_bytes)
+    audio_io.name = f"{info.get('title','music')}.mp3"
+
+    sent = await context.bot.send_audio(chat_id, audio_io, caption=info.get("title", ""))
+
+    SC_CACHE[cache_key] = sent.audio.file_id
+    save_cache()
+
+    await msg.delete()
