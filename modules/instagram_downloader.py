@@ -14,24 +14,11 @@ SUDO_USERS = [8588347189]  # آیدی شما
 # ================================
 COOKIE_FILE = "insta_cookie.txt"
 
-INSTAGRAM_COOKIES = """# Netscape HTTP Cookie File
-# https://curl.haxx.se/rfc/cookie_spec.html
-# This is a generated file! Do not edit.
 
-.instagram.com	TRUE	/	TRUE	1799701606	csrftoken	CSRFTOKEN_VALUE
-.instagram.com	TRUE	/	TRUE	1799687399	datr	DATR_VALUE
-.instagram.com	TRUE	/	TRUE	1796663399	ig_did	IG_DID_VALUE
-.instagram.com	TRUE	/	TRUE	1799687399	mid	MID_VALUE
-.instagram.com	TRUE	/	TRUE	1765732343	dpr	DPR_VALUE
-.instagram.com	TRUE	/	TRUE	1772917606	ds_user_id	USER_ID_VALUE
-.instagram.com	TRUE	/	TRUE	1796663585	sessionid	SESSIONID_VALUE
-.instagram.com	TRUE	/	TRUE	1765746400	wd	WD_VALUE
-.instagram.com	TRUE	/	TRUE	0	rur	RUR_VALUE
-"""
 
 with open(COOKIE_FILE, "w") as f:
     f.write(INSTAGRAM_COOKIES)
-
+    
 # ================================
 # regex گرفتن لینک
 # ================================
