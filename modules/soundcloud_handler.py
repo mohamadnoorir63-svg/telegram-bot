@@ -47,7 +47,7 @@ executor = ThreadPoolExecutor(max_workers=12)
 TXT = {
     "searching": "🔎",
     "select": "🎵:",
-    "down": "⏳ دانلود...",
+    "down": "⏳",
     "notfound": "⌛",
 }
 
