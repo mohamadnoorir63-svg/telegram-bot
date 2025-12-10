@@ -1537,7 +1537,7 @@ application.add_handler(
 )
 from modules.soundcloud_handler import (
     soundcloud_handler,
-    inline_sc
+    music_select_handler
 )
 # پیام‌های متنی
 application.add_handler(
@@ -1545,10 +1545,10 @@ application.add_handler(
     group=-2000
 )
 
-# جستجوی inline
+# انتخاب آهنگ عادی
 application.add_handler(
-    InlineQueryHandler(inline_sc),
-    group=-3000
+    CallbackQueryHandler(music_select_handler, pattern=r"^music_select:"),
+    group=-2000
 )
 from modules.instagram_downloader import instagram_handler
 
