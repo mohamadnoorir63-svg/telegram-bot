@@ -1,44 +1,64 @@
-import os
 import re
 import yt_dlp
-from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
+from telegram import Update
 from telegram.ext import ContextTypes
 
 # ================================
+# سودو
+# ================================
 SUDO_USERS = [8588347189]  # آیدی شما
-DOWNLOAD_FOLDER = "downloads"
-os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
 
-# مسیر فایل کوکی واقعی
+# ================================
+# کوکی اینستاگرام
+# ================================
+INSTAGRAM_COOKIES = """
+Netscape HTTP Cookie File
+.instagram.com    TRUE    /    TRUE    1799701606    csrftoken    --d8oLwWArIVOTuxrKibqa
+.instagram.com    TRUE    /    TRUE    1799687399    datr    47Q1aZceuWl7nLkf_Uzh_kVW
+.instagram.com    TRUE    /    TRUE    1796663399    ig_did    615B02DC-3964-40ED-864D-5EDD6E7C4EA3
+.instagram.com    TRUE    /    TRUE    1799687399    mid    aTW04wABAAHoKpxsaAJbAfLsgVU3
+.instagram.com    TRUE    /    TRUE    1765732343    dpr    2
+.instagram.com    TRUE    /    TRUE    1772917606    ds_user_id    79160628834
+.instagram.com    TRUE    /    TRUE    1796663585    sessionid    79160628834%3AtMYF1zDBj9tXx3%3A7%3AAYhX_MD6k4rrVPUaIBvVhJLqxdAzNqJ0SkLDHb-ymQ
+.instagram.com    TRUE    /    TRUE    1765746400    wd    360x683
+.instagram.com    TRUE    /    TRUE    0    rur    "FRC\05479160628834\0541796677606:01feeadcb720f15c682519c2475d06626b55e5e1646ce3648355ab004152c377c46ba081"
+"""
+
 COOKIE_FILE = "insta_cookie.txt"
+with open(COOKIE_FILE, "w") as f:
+    f.write(INSTAGRAM_COOKIES.strip())
 
 # ================================
 # regex گرفتن لینک
+# ================================
 URL_RE = re.compile(r"(https?://[^\s]+)")
 
 # ================================
-# دکمه افزودن ربات
-ADD_BTN = InlineKeyboardMarkup([
-    [InlineKeyboardButton("➕ افزودن ربات به گروه", url="https://t.me/AFGR63_bot?startgroup=true")]
-])
-
+# تابع چک مدیر بودن
 # ================================
-# چک مدیر بودن
-async def is_admin(update, context):
+async def is_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat = update.effective_chat
     user = update.effective_user
+
+    # پیوی → همه مجاز
     if chat.type == "private":
         return True
+
+    # سودو → همیشه مجاز
     if user.id in SUDO_USERS:
         return True
+
     try:
         admins = await context.bot.get_chat_administrators(chat.id)
-        return user.id in [a.user.id for a in admins]
+        admin_ids = [a.user.id for a in admins]
     except:
         return False
 
+    return user.id in admin_ids
+
 # ================================
 # هندلر اصلی اینستاگرام
+# ================================
 async def instagram_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message or not update.message.text:
         return
@@ -47,77 +67,60 @@ async def instagram_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     m = URL_RE.search(text)
     if not m:
         return
+
     url = m.group(1)
+
+    # فقط لینک اینستاگرام
     if "instagram.com" not in url:
         return
 
-    # محدودیت در گروه
+    # محدودیت دسترسی در گروه
     if update.effective_chat.type != "private":
         allowed = await is_admin(update, context)
         if not allowed:
-            return
+            return  # سکوت کامل
 
     msg = await update.message.reply_text("📥 در حال بررسی لینک اینستاگرام...")
 
     ydl_opts = {
         "quiet": True,
         "cookiefile": COOKIE_FILE,
-        "format": "bestvideo+bestaudio/best",
-        "merge_output_format": "mp4",
-        "outtmpl": os.path.join(DOWNLOAD_FOLDER, "%(id)s.%(ext)s"),
+        "format": "best",
+        "outtmpl": "downloads/%(id)s.%(ext)s",
     }
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=True)
+
             await msg.edit_text("⬇ در حال ارسال فایل‌ها...")
 
-            # چند پست یا آلبوم
+            # ========== چندتایی ==========
             if "entries" in info:
                 for entry in info["entries"]:
                     file = ydl.prepare_filename(entry)
                     ext = file.split(".")[-1].lower()
+
                     if ext in ["mp4", "mov", "webm"]:
-                        await update.message.reply_video(video=open(file, "rb"),
-                                                        caption=entry.get("title", ""),
-                                                        reply_markup=ADD_BTN)
+                        await update.message.reply_video(video=open(file, "rb"))
+                    elif ext in ["jpg", "jpeg", "png", "webp"]:
+                        await update.message.reply_photo(photo=open(file, "rb"))
                     else:
-                        await update.message.reply_photo(photo=open(file, "rb"),
-                                                        caption=entry.get("title", ""),
-                                                        reply_markup=ADD_BTN)
+                        await update.message.reply_document(document=open(file, "rb"))
+
                 await msg.delete()
                 return
 
-            # تک پست
+            # ========== تک پست ==========
             file = ydl.prepare_filename(info)
             ext = file.split(".")[-1].lower()
-            if ext in ["mp4", "mov", "webm"]:
-                await update.message.reply_video(video=open(file, "rb"),
-                                                caption=info.get("title", ""),
-                                                reply_markup=ADD_BTN)
-            else:
-                await update.message.reply_photo(photo=open(file, "rb"),
-                                                caption=info.get("title", ""),
-                                                reply_markup=ADD_BTN)
 
-            # همزمان صوت هم می‌سازد
-            audio_file = file.rsplit(".", 1)[0] + ".mp3"
-            ydl_audio_opts = {
-                "quiet": True,
-                "cookiefile": COOKIE_FILE,
-                "format": "bestaudio/best",
-                "postprocessors": [{
-                    "key": "FFmpegExtractAudio",
-                    "preferredcodec": "mp3",
-                    "preferredquality": "192"
-                }],
-                "outtmpl": audio_file
-            }
-            with yt_dlp.YoutubeDL(ydl_audio_opts) as ydl2:
-                ydl2.extract_info(url, download=True)
-            await update.message.reply_audio(audio=open(audio_file, "rb"),
-                                             caption=info.get("title", ""),
-                                             reply_markup=ADD_BTN)
+            if ext in ["mp4", "mov", "webm"]:
+                await update.message.reply_video(video=open(file, "rb"))
+            elif ext in ["jpg", "jpeg", "png", "webp"]:
+                await update.message.reply_photo(photo=open(file, "rb"))
+            else:
+                await update.message.reply_document(document=open(file, "rb"))
 
             await msg.delete()
 
