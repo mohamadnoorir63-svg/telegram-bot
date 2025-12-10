@@ -144,7 +144,10 @@ async def soundcloud_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
         if cache_key in SC_CACHE:
             try: await msg.delete()
             except: pass
-            return await update.message.reply_audio(SC_CACHE[cache_key], caption=f"🎵 {info.get('title', 'Musdef _youtube_fallback_fast(query: str):
+             return await update.message.reply_audio(
+        SC_CACHE[cache_key],
+        caption=f"🎵 {info.get('title', 'Music')}"
+        )
     """
     دانلود سریع fallback از یوتیوب: فقط صوتی، کیفیت متوسط، حذف بعد از ارسال.
     """
