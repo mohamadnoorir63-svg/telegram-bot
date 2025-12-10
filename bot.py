@@ -1535,20 +1535,6 @@ application.add_handler(
     CallbackQueryHandler(tiktok_audio_handler, pattern=r"^tiktok_audio:"),
     group=-1000
 )
-# ================================
-# 🎵 SOUND CLOUD (اولویت خیلی بالا)
-# ================================
-from modules.soundcloud_handler import soundcloud_handler, music_select_handler
-
-application.add_handler(
-    MessageHandler(filters.TEXT & ~filters.COMMAND, soundcloud_handler),
-    group=-5000
-)
-
-application.add_handler(
-    CallbackQueryHandler(music_select_handler, pattern=r"^music_select:"),
-    group=-5000
-)
 
 from modules.instagram_downloader import instagram_handler
 
@@ -1567,6 +1553,20 @@ application.add_handler(
 # هندلر دکمه‌ها (Audio / Video / کیفیت‌ها)
 application.add_handler(
     CallbackQueryHandler(youtube_quality_handler, pattern="^(yt_audio|yt_video|v_.*)$")
+)
+# ================================
+# 🎵 SOUND CLOUD (اولویت خیلی بالا)
+# ================================
+from modules.soundcloud_handler import soundcloud_handler, music_select_handler
+
+application.add_handler(
+    MessageHandler(filters.TEXT & ~filters.COMMAND, soundcloud_handler),
+    group=-5000
+)
+
+application.add_handler(
+    CallbackQueryHandler(music_select_handler, pattern=r"^music_select:"),
+    group=-5000
 )
 # ==========================================================
 # 🤖 پنل ChatGPT هوش مصنوعی
