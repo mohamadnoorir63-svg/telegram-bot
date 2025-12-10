@@ -95,24 +95,36 @@ def _sc_download_sync(url: str):
 # ================================
 # دانلود fallback یوتیوب
 # ================================
-def _youtube_fallback_sync(query: str):
+def _youtube_fallback_fast(query: str):
+    """
+    نسخه سریع fallback یوتیوب: فقط لینک مستقیم به audio، تبدیل سریع.
+    """
     opts = BASE_OPTS.copy()
-    opts["concurrent_fragment_downloads"] = 20
-    cookie_file = "modules/youtube_cookie.txt"
-    if os.path.exists(cookie_file):
-        opts["cookiefile"] = cookie_file
+    opts["format"] = "bestaudio"
+    opts["quiet"] = True
+    opts["noplaylist"] = True
+    opts["outtmpl"] = f"{DOWNLOAD_FOLDER}/%(id)s.%(ext)s"
+    opts["postprocessors"] = [
+        {
+            "key": "FFmpegExtractAudio",
+            "preferredcodec": "mp3",
+            "preferredquality": "192",
+        }
+    ]
 
     with yt_dlp.YoutubeDL(opts) as y:
-        info = y.extract_info(f"ytsearch1:{query}", download=True)
+        info = y.extract_info(f"ytsearch1:{query}", download=False)
         if "entries" in info:
             info = info["entries"][0]
+
         vid = str(info.get("id"))
         cached = cache_check(vid)
         if cached:
             return info, cached
-        fname = y.prepare_filename(info)
-        mp3 = fname.rsplit(".", 1)[0] + ".mp3"
-        return info, mp3
+
+        # لینک مستقیم به فایل صوتی (streamable)
+        url = info.get("url")
+        return info, url
 
 # ================================
 # هندلر پیام عادی با fallback یوتیوب
