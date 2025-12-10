@@ -162,7 +162,6 @@ async def _youtube_fallback(query: str):
     loop = asyncio.get_running_loop()
     return await loop.run_in_executor(executor, _youtube_fallback_sync, query)
 
-
 # ================================================
 # جستجو و fallback
 # ================================================
@@ -207,12 +206,13 @@ async def soundcloud_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
         chat_id = update.message.chat.id
 
-        # اگر file_id است → ارسال مستقیم
-        if isinstance(path_or_fileid, str) and path_or_fileid.startswith("BQ"):
+        # اگر کش YouTube است
+        if isinstance(path_or_fileid, dict) and "file_id" in path_or_fileid:
             await context.bot.send_audio(
                 chat_id,
-                path_or_fileid,
-                caption=MUSIC_CAPTION,
+                path_or_fileid["file_id"],
+                caption=path_or_fileid.get("caption", MUSIC_CAPTION),
+                parse_mode="MarkdownV2",
                 reply_markup=ADD_BTN if update.message.chat.type == "private" else None
             )
             await msg.delete()
@@ -228,10 +228,14 @@ async def soundcloud_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
             chat_id,
             audio_io,
             caption=MUSIC_CAPTION,
+            parse_mode="MarkdownV2",
             reply_markup=ADD_BTN if update.message.chat.type == "private" else None
         )
 
-        SC_CACHE[f"yt_{info['id']}"] = sent.audio.file_id
+        SC_CACHE[f"yt_{info['id']}"] = {
+            "file_id": sent.audio.file_id,
+            "caption": MUSIC_CAPTION
+        }
         save_cache()
 
         try:
@@ -278,12 +282,15 @@ async def music_select_handler(update: Update, context: ContextTypes.DEFAULT_TYP
 
     # اگر کش موجود بود
     if cache_key in SC_CACHE:
-        return await context.bot.send_audio(
+        cached = SC_CACHE[cache_key]
+        await context.bot.send_audio(
             chat_id,
-            SC_CACHE[cache_key],
-            caption=MUSIC_CAPTION,
+            cached["file_id"],
+            caption=cached.get("caption", MUSIC_CAPTION),
+            parse_mode="MarkdownV2",
             reply_markup=ADD_BTN if cq.message.chat.type == "private" else None
         )
+        return
 
     msg = await cq.edit_message_text(TXT["down"])
 
@@ -297,15 +304,18 @@ async def music_select_handler(update: Update, context: ContextTypes.DEFAULT_TYP
     audio_io.name = f"{info.get('title','music')}.mp3"
 
     sent = await context.bot.send_audio(
-    chat_id,
-    audio_io,
-    caption=MUSIC_CAPTION,
-    parse_mode="MarkdownV2",
-    reply_markup=ADD_BTN if cq.message.chat.type == "private" else None
+        chat_id,
+        audio_io,
+        caption=MUSIC_CAPTION,
+        parse_mode="MarkdownV2",
+        reply_markup=ADD_BTN if cq.message.chat.type == "private" else None
     )
-    
 
-    SC_CACHE[cache_key] = sent.audio.file_id
+    SC_CACHE[cache_key] = {
+        "file_id": sent.audio.file_id,
+        "caption": MUSIC_CAPTION
+    }
     save_cache()
 
     await msg.delete()
+        
