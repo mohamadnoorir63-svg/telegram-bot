@@ -153,7 +153,7 @@ async def youtube_search_handler(update: Update, context: ContextTypes.DEFAULT_T
     )
 
 # ================================
-# مرحله ۲ و ۳ — انتخاب نوع و کیفیت با کش
+# مرحله ۲ و ۳ — انتخاب نوع و کیفیت با کش تفکیک‌شده
 # ================================
 async def youtube_quality_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     cq = update.callback_query
@@ -175,10 +175,11 @@ async def youtube_quality_handler(update: Update, context: ContextTypes.DEFAULT_
     if str(chat_id) not in YT_CACHE:
         YT_CACHE[str(chat_id)] = {}
 
-    # بررسی کش
-    if url in YT_CACHE[str(chat_id)]:
-        cached = YT_CACHE[str(chat_id)][url]
-        if cached["type"] == "audio":
+    # بررسی کش برای نوع انتخابی
+    cache_key = f"{url}_{choice}"  # یکتا برای هر نوع: audio یا video
+    if cache_key in YT_CACHE[str(chat_id)]:
+        cached = YT_CACHE[str(chat_id)][cache_key]
+        if choice == "yt_audio":
             await cq.edit_message_text("🎵 ارسال صوت از کش ...")
             await context.bot.send_audio(
                 chat_id,
@@ -186,7 +187,7 @@ async def youtube_quality_handler(update: Update, context: ContextTypes.DEFAULT_
                 caption=f"🎵 {cached.get('title','Audio')}",
                 reply_markup=get_add_btn(update.effective_chat.type)
             )
-        elif cached["type"] == "video":
+        else:
             await cq.edit_message_text("🎬 ارسال ویدیو از کش ...")
             await context.bot.send_video(
                 chat_id,
@@ -214,8 +215,8 @@ async def youtube_quality_handler(update: Update, context: ContextTypes.DEFAULT_
             reply_markup=get_add_btn(update.effective_chat.type)
         )
 
-        # ذخیره در کش
-        YT_CACHE[str(chat_id)][url] = {
+        # ذخیره در کش برای نوع صوت
+        YT_CACHE[str(chat_id)][cache_key] = {
             "file_id": sent.audio.file_id,
             "type": "audio",
             "title": info.get("title", "Audio")
@@ -264,8 +265,9 @@ async def youtube_quality_handler(update: Update, context: ContextTypes.DEFAULT_
             reply_markup=get_add_btn(update.effective_chat.type)
         )
 
-        # ذخیره در کش
-        YT_CACHE[str(chat_id)][url] = {
+        # ذخیره در کش برای نوع ویدیو
+        cache_key = f"{url}_yt_video"
+        YT_CACHE[str(chat_id)][cache_key] = {
             "file_id": sent.video.file_id,
             "type": "video",
             "title": info.get("title", "YouTube Video"),
