@@ -128,7 +128,7 @@ def _youtube_fallback_sync(query: str) -> Tuple[dict, str]:
     opts = BASE_OPTS.copy()
     opts["concurrent_fragment_downloads"] = 20
 
-    cookie_file = os.path.join("modules", "youtube_cookie.txt")
+    cookie_file = os.path.join("modules", "youtube_cookie.txt2")
     if os.path.exists(cookie_file):
         opts["cookiefile"] = cookie_file
 
