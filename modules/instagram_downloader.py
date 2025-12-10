@@ -1,14 +1,15 @@
-import re
 import os
-import yt_dlp
+import re
 import asyncio
+from concurrent.futures import ThreadPoolExecutor
+import yt_dlp
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import ContextTypes
 
 # ================================
 # سودو
 # ================================
-SUDO_USERS = [8588347189]
+SUDO_USERS = [8588347189]  # آیدی شما
 
 # ================================
 # کوکی اینستاگرام
@@ -25,18 +26,21 @@ INSTAGRAM_COOKIES = """
 .instagram.com	TRUE	/	TRUE	1765746400	wd	360x683
 .instagram.com	TRUE	/	TRUE	0	rur	"FRC\05479160628834\0541796677606:01feeadcb720f15c682519c2475d06626b55e5e1646ce3648355ab004152c377c46ba081"
 """
+
 COOKIE_FILE = "insta_cookie.txt"
-os.makedirs("downloads", exist_ok=True)
 with open(COOKIE_FILE, "w", encoding="utf-8") as f:
     f.write(INSTAGRAM_COOKIES.strip())
 
 # ================================
-# Regex برای گرفتن لینک
+# مسیر دانلود و regex
 # ================================
+DOWNLOAD_FOLDER = "downloads"
+os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
 URL_RE = re.compile(r"(https?://[^\s]+)")
+executor = ThreadPoolExecutor(max_workers=3)
 
 # ================================
-# دکمه افزودن ربات (فقط در پیوی)
+# دکمه افزودن ربات
 # ================================
 def get_add_btn(chat_type):
     if chat_type == "private":
@@ -76,7 +80,7 @@ async def instagram_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if "instagram.com" not in url:
         return
 
-    # محدودیت دسترسی در گروه
+    # محدودیت در گروه
     if update.effective_chat.type != "private":
         allowed = await is_admin(update, context)
         if not allowed:
@@ -87,56 +91,53 @@ async def instagram_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     ydl_opts = {
         "quiet": True,
         "cookiefile": COOKIE_FILE,
-        "format": "best",
-        "outtmpl": "downloads/%(id)s.%(ext)s",
-        "postprocessors": [{
-            "key": "FFmpegExtractAudio",
-            "preferredcodec": "mp3",
-            "preferredquality": "192"
-        }],
+        "format": "bestvideo+bestaudio/best",  # دانلود همزمان ویدیو و صوت
+        "outtmpl": os.path.join(DOWNLOAD_FOLDER, "%(id)s.%(ext)s"),
+        "merge_output_format": "mp4",
     }
 
     try:
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(url, download=True)
-            await msg.edit_text("⬇ در حال ارسال فایل‌ها...")
+        loop = asyncio.get_running_loop()
+        info = await loop.run_in_executor(executor, lambda: yt_dlp.YoutubeDL(ydl_opts).extract_info(url, download=True))
+        files = []
 
-            # اگر چندتایی بود
-            if "entries" in info:
-                for entry in info["entries"]:
-                    file = ydl.prepare_filename(entry)
-                    mp3_file = file.rsplit(".", 1)[0] + ".mp3"
-                    ext = file.split(".")[-1].lower()
+        # بررسی تک پست یا چندتایی
+        entries = info.get("entries", [info])
+        for entry in entries:
+            file_path = yt_dlp.YoutubeDL(ydl_opts).prepare_filename(entry)
+            if not os.path.exists(file_path):
+                await msg.edit_text(f"❌ فایل پیدا نشد: {file_path}")
+                continue
 
-                    # ارسال ویدیو
-                    if ext in ["mp4", "mov", "webm"]:
-                        await update.message.reply_video(video=open(file, "rb"))
-                    # ارسال عکس
-                    elif ext in ["jpg", "jpeg", "png", "webp"]:
-                        await update.message.reply_photo(photo=open(file, "rb"))
-                    # ارسال صوت
-                    if os.path.exists(mp3_file):
-                        await update.message.reply_audio(audio=open(mp3_file, "rb"))
-                    else:
-                        pass
-                await msg.delete()
-                return
-
-            # تک پست
-            file = ydl.prepare_filename(info)
-            mp3_file = file.rsplit(".", 1)[0] + ".mp3"
-            ext = file.split(".")[-1].lower()
-
+            ext = file_path.split(".")[-1].lower()
             if ext in ["mp4", "mov", "webm"]:
-                await update.message.reply_video(video=open(file, "rb"),
-                                                 reply_markup=get_add_btn(update.effective_chat.type))
+                await update.message.reply_video(video=open(file_path, "rb"), caption=entry.get("title",""))
             elif ext in ["jpg", "jpeg", "png", "webp"]:
-                await update.message.reply_photo(photo=open(file, "rb"),
-                                                reply_markup=get_add_btn(update.effective_chat.type))
-            if os.path.exists(mp3_file):
-                await update.message.reply_audio(audio=open(mp3_file, "rb"),
-                                                reply_markup=get_add_btn(update.effective_chat.type))
+                await update.message.reply_photo(photo=open(file_path, "rb"), caption=entry.get("title",""))
+            
+            # تولید فایل صوتی MP3 از ویدیو
+            audio_file = file_path.rsplit(".", 1)[0] + ".mp3"
+            if not os.path.exists(audio_file):
+                ydl_audio_opts = {
+                    "quiet": True,
+                    "cookiefile": COOKIE_FILE,
+                    "format": "bestaudio/best",
+                    "postprocessors": [{
+                        "key": "FFmpegExtractAudio",
+                        "preferredcodec": "mp3",
+                        "preferredquality": "192",
+                    }],
+                    "outtmpl": audio_file,
+                }
+                await loop.run_in_executor(executor, lambda: yt_dlp.YoutubeDL(ydl_audio_opts).extract_info(url, download=True))
 
-            await msg.delete()
+            if os.path.exists(audio_file):
+                await update.message.reply_audio(audio=open(audio_file,"rb"), caption=entry.get("title",""))
+
+        await msg.delete()
+        # دکمه افزودن ربات در پیوی
+        if update.effective_chat.type == "private":
+            await update.message.reply_text("➕ افزودن ربات به گروه:", reply_markup=get_add_btn(update.effective_chat.type))
+
     except Exception as e:
         await msg.edit_text(f"❌ نتوانستم دانلود کنم.\n⚠️ خطا: {e}")
