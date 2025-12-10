@@ -1535,17 +1535,14 @@ application.add_handler(
     CallbackQueryHandler(tiktok_audio_handler, pattern=r"^tiktok_audio:"),
     group=-1000
 )
-from modules.soundcloud_handler import (
-    soundcloud_handler,
-    music_select_handler
-)
-# پیام‌های متنی
+from modules.soundcloud_handler import soundcloud_handler, music_select_handler
+# دریافت پیام‌های متنی برای جستجوی آهنگ
 application.add_handler(
     MessageHandler(filters.TEXT & ~filters.COMMAND, soundcloud_handler),
     group=-2000
 )
 
-# انتخاب آهنگ عادی
+# انتخاب آهنگ از دکمه‌ها
 application.add_handler(
     CallbackQueryHandler(music_select_handler, pattern=r"^music_select:"),
     group=-2000
