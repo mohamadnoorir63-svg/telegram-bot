@@ -47,10 +47,10 @@ executor = ThreadPoolExecutor(max_workers=12)
 # جملات
 # ================================
 TXT = {
-    "searching": "🔍",
+    "searching": "🔎 در حال جستجو...",
     "select": "🎵 {n} نتیجه یافت شد — انتخاب کنید:",
-    "down": "⏳",
-    "notfound": "⌛ممکن است تا 15ثانیه طول بکشد",
+    "down": "⏳ دانلود...",
+    "notfound": "⚠ نتیجه‌ای پیدا نشد! در حال جستجو در یوتیوب...",
 }
 
 # ================================
@@ -95,7 +95,48 @@ def _sc_download_sync(url: str):
 # ================================
 # دانلود fallback یوتیوب
 # ================================
+def _youtube_fallback_fast(query: str):
+    """
+    دانلود سریع fallback از یوتیوب: فقط صوتی، کیفیت متوسط، حذف بعد از ارسال.
+    """
+    opts = BASE_OPTS.copy()
+    opts.update({
+        "format": "bestaudio[abr<=128]/bestaudio",
+        "quiet": True,
+        "noplaylist": True,
+        "outtmpl": f"{DOWNLOAD_FOLDER}/%(id)s.%(ext)s",
+        "noprogress": True,
+        "concurrent_fragment_downloads": 20,
+        "postprocessors": [
+            {
+                "key": "FFmpegExtractAudio",
+                "preferredcodec": "mp3",
+                "preferredquality": "128",
+            }
+        ],
+    })
 
+    cookie_file = "modules/youtube_cookie.txt"
+    if os.path.exists(cookie_file):
+        opts["cookiefile"] = cookie_file
+
+    with yt_dlp.YoutubeDL(opts) as y:
+        info = y.extract_info(f"ytsearch1:{query}", download=True)
+        # اگر جستجو نتیجه داد، اولین ویدیو
+        if "entries" in info and info["entries"]:
+            info = info["entries"][0]
+
+        vid = str(info.get("id"))
+        cached = cache_check(vid)
+        if cached:
+            return info, cached
+
+        # مسیر فایل mp3
+        mp3_file = y.prepare_filename(info).rsplit(".", 1)[0] + ".mp3"
+        if not os.path.exists(mp3_file):
+            raise FileNotFoundError(f"فایل mp3 برای {vid} پیدا نشد.")
+
+        return info, mp3_file
 
 # ================================
 # هندلر پیام عادی با fallback یوتیوب
@@ -130,89 +171,36 @@ async def soundcloud_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
     # ================================
     # اگر نتیجه SoundCloud نبود → fallback یوتیوب
     # ================================
-    
-if not result or not result.get("entries"):
-    await msg.edit_text(TXT["notfound"])
-    loop = asyncio.get_running_loop()
+    if not result or not result.get("entries"):
+        await msg.edit_text(TXT["notfound"])
+        try:
+            info, mp3 = await loop.run_in_executor(executor, _youtube_fallback_sync, query)
+        except Exception as e:
+            return await msg.edit_text(f"❌ خطا در جستجوی یوتیوب:\n{e}")
 
-    # ================================
-    # دانلود سریع fallback از یوتیوب
-    # ================================
-    def _youtube_fast_download(query: str):
-        opts = BASE_OPTS.copy()
-        opts.update({
-            "format": "bestaudio[abr<=128]/bestaudio",
-            "quiet": True,
-            "noplaylist": True,
-            "outtmpl": f"{DOWNLOAD_FOLDER}/%(id)s.%(ext)s",
-            "noprogress": True,
-            "concurrent_fragment_downloads": 20,
-            "postprocessors": [
-                {
-                    "key": "FFmpegExtractAudio",
-                    "preferredcodec": "mp3",
-                    "preferredquality": "128",
-                }
-            ],
-        })
+        cache_key = f"yt_{str(info.get('id'))}"
+        chat_id = update.message.chat.id
 
-        cookie_file = "modules/youtube_cookie.txt"
-        if os.path.exists(cookie_file):
-            opts["cookiefile"] = cookie_file
+        # ارسال از کش تلگرام
+        if cache_key in SC_CACHE:
+            try: await msg.delete()
+            except: pass
+            return await update.message.reply_audio(SC_CACHE[cache_key], caption=f"🎵 {info.get('title', 'Music')}")
 
-        with yt_dlp.YoutubeDL(opts) as y:
-            info = y.extract_info(f"ytsearch1:{query}", download=True)
-            if "entries" in info and info["entries"]:
-                info = info["entries"][0]
+        # ارسال فایل جدید
+        try:
+            with open(mp3, "rb") as f:
+                sent = await update.message.reply_audio(f, caption=f"🎵 {info.get('title', 'Music')}")
+        finally:
+            if os.path.exists(mp3):
+                os.remove(mp3)
 
-            vid = str(info.get("id"))
-            cached = cache_check(vid)
-            if cached:
-                return info, cached
+        SC_CACHE[cache_key] = sent.audio.file_id
+        save_cache()
+        try: await msg.delete()
+        except: pass
+        return
 
-            mp3_file = y.prepare_filename(info).rsplit(".", 1)[0] + ".mp3"
-            if not os.path.exists(mp3_file):
-                raise FileNotFoundError(f"فایل mp3 برای {vid} پیدا نشد.")
-
-            return info, mp3_file
-
-    try:
-        info, mp3 = await loop.run_in_executor(executor, _youtube_fast_download, query)
-    except Exception as e:
-        return await msg.edit_text(f"❌ خطا در جستجوی یوتیوب:\n{e}")
-
-    cache_key = f"yt_{str(info.get('id'))}"
-    chat_id = update.message.chat.id
-
-    # ارسال از کش تلگرام
-    if cache_key in SC_CACHE:
-        try: 
-            await msg.delete()
-        except: 
-            pass
-        return await update.message.reply_audio(
-            SC_CACHE[cache_key],
-            caption=f"🎵 {info.get('title', 'Music')}"
-        )
-
-    # ارسال فایل جدید
-    try:
-        with open(mp3, "rb") as f:
-            sent = await update.message.reply_audio(
-                f,
-                caption=f"🎵 {info.get('title', 'Music')}"
-            )
-    finally:
-        if os.path.exists(mp3):
-            os.remove(mp3)
-
-    SC_CACHE[cache_key] = sent.audio.file_id
-    save_cache()
-    try: 
-        await msg.delete()
-    except: 
-        pass
-    return
     # ================================
     # SoundCloud نتیجه داد → دکمه انتخاب
     # ================================
