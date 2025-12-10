@@ -77,29 +77,37 @@ def cache_check(id_: str) -> Optional[str]:
     return None
 
 # ================================
-# دانلود SoundCloud ultra-fast
+# دانلود SoundCloud با MP3 واقعی
 # ================================
 def _sc_download_sync(url: str):
     opts = BASE_OPTS.copy()
-    opts["postprocessors"] = []  # بدون تبدیل MP3
+    # همیشه تبدیل به MP3 با کیفیت 192
+    opts["postprocessors"] = [
+        {"key": "FFmpegExtractAudio", "preferredcodec": "mp3", "preferredquality": "192"}
+    ]
+    # مسیر خروجی
+    opts["outtmpl"] = f"{DOWNLOAD_FOLDER}/%(id)s.%(ext)s"
+
     with yt_dlp.YoutubeDL(opts) as y:
         info = y.extract_info(url, download=True)
         tid = str(info.get("id"))
+        # بررسی کش محلی
         cached = cache_check(tid)
         if cached:
             return info, cached
-        fname = y.prepare_filename(info)
-        return info, fname
+        # مسیر فایل mp3
+        mp3_file = y.prepare_filename(info).rsplit(".", 1)[0] + ".mp3"
+        return info, mp3_file
 
 # ================================
-# fallback Tidal (sync)
+# fallback Tidal با MP3 واقعی
 # ================================
 def _tidal_fallback_sync(query: str):
     opts = BASE_OPTS.copy()
     opts.update({
         "format": "bestaudio[abr<=128]/bestaudio",
         "postprocessors": [
-            {"key": "FFmpegExtractAudio", "preferredcodec": "mp3", "preferredquality": "128"}
+            {"key": "FFmpegExtractAudio", "preferredcodec": "mp3", "preferredquality": "192"}
         ],
         "outtmpl": f"{DOWNLOAD_FOLDER}/%(id)s.%(ext)s",
         "quiet": True,
@@ -136,6 +144,42 @@ def _tidal_fallback_sync(query: str):
 
         return info, mp3_file
 
+# ================================
+# fallback YouTube با MP3 واقعی
+# ================================
+def _youtube_fallback_sync(query: str):
+    opts = BASE_OPTS.copy()
+    opts["concurrent_fragment_downloads"] = 20
+    cookie_file = "modules/youtube_cookie.txt"
+    if os.path.exists(cookie_file):
+        opts["cookiefile"] = cookie_file
+
+    opts["format"] = "bestaudio/best"
+    opts["noplaylist"] = True
+    opts["postprocessors"] = [
+        {"key": "FFmpegExtractAudio", "preferredcodec": "mp3", "preferredquality": "192"}
+    ]
+    opts["outtmpl"] = f"{DOWNLOAD_FOLDER}/%(id)s.%(ext)s"
+
+    with yt_dlp.YoutubeDL(opts) as y:
+        try:
+            info = y.extract_info(f"ytsearch1:{query}", download=True)
+        except Exception as e:
+            raise RuntimeError(f"خطا در yt_dlp: {e}")
+
+        if "entries" in info and info["entries"]:
+            info = info["entries"][0]
+
+        vid = str(info.get("id"))
+        cached = cache_check(vid)
+        if cached:
+            return info, cached
+
+        mp3_file = y.prepare_filename(info).rsplit(".", 1)[0] + ".mp3"
+        if not os.path.exists(mp3_file):
+            raise FileNotFoundError(f"فایل mp3 برای {vid} پیدا نشد.")
+
+        return info, mp3_file
 # ================================
 # fallback YouTube (sync)
 # ================================
