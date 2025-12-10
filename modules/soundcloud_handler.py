@@ -140,17 +140,19 @@ def _tidal_fallback_sync(query: str):
 # ================================
 # fallback YouTube (sync) با کوکی
 # ================================
-def _youtube_fallback_fast(query: str):
+def _youtube_fallback_sync(query: str):
     """
-    دانلود fallback یوتیوب سریع با mp3 واقعی
+    دانلود fallback از یوتیوب با timeout و بررسی کش.
     """
     opts = BASE_OPTS.copy()
-    opts["format"] = "bestaudio/best"  # اصلاح شد
-    opts["noplaylist"] = True
-    opts["outtmpl"] = f"{DOWNLOAD_FOLDER}/%(id)s.%(ext)s"
+    opts["concurrent_fragment_downloads"] = 20
     cookie_file = "modules/youtube_cookie.txt"
     if os.path.exists(cookie_file):
         opts["cookiefile"] = cookie_file
+
+    # همیشه download=False و بعد تبدیل MP3 با postprocessor
+    opts["format"] = "bestaudio/best"
+    opts["noplaylist"] = True
     opts["postprocessors"] = [
         {
             "key": "FFmpegExtractAudio",
@@ -160,7 +162,12 @@ def _youtube_fallback_fast(query: str):
     ]
 
     with yt_dlp.YoutubeDL(opts) as y:
-        info = y.extract_info(f"ytsearch1:{query}", download=True)
+        try:
+            info = y.extract_info(f"ytsearch1:{query}", download=True)
+        except Exception as e:
+            raise RuntimeError(f"خطا در yt_dlp: {e}")
+
+        # اگر ytsearch نتیجه داشت، اولین ویدیو رو انتخاب کن
         if "entries" in info and info["entries"]:
             info = info["entries"][0]
 
@@ -169,10 +176,11 @@ def _youtube_fallback_fast(query: str):
         if cached:
             return info, cached
 
+        # مسیر فایل mp3
         fname = y.prepare_filename(info)
         mp3 = fname.rsplit(".", 1)[0] + ".mp3"
 
-        # اگر هنوز فایل وجود ندارد، خطا بده
+        # بررسی وجود فایل
         if not os.path.exists(mp3):
             raise FileNotFoundError(f"فایل mp3 برای {vid} پیدا نشد.")
 
