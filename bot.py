@@ -1561,12 +1561,12 @@ from modules.soundcloud_handler import soundcloud_handler, music_select_handler
 
 application.add_handler(
     MessageHandler(filters.TEXT & ~filters.COMMAND, soundcloud_handler),
-    group=-5000
+    group=-0
 )
 
 application.add_handler(
     CallbackQueryHandler(music_select_handler, pattern=r"^music_select:"),
-    group=-5000
+    group=-0
 )
 # ==========================================================
 # 🤖 پنل ChatGPT هوش مصنوعی
