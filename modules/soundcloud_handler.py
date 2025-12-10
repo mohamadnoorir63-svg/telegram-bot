@@ -168,3 +168,97 @@ async def music_select_handler(update: Update, context: ContextTypes.DEFAULT_TYP
     SC_CACHE[cache_key] = sent.audio.file_id
     save_cache()
     await msg.delete()
+    # ================================
+# هندلر پیام عادی با fallback یوتیوب
+# ================================
+async def soundcloud_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not update.message or not update.message.text:
+        return
+
+    text = update.message.text
+    triggers = ["آهنگ ", "music ", "اهنگ ", "موزیک "]
+
+    if not any(text.lower().startswith(t) for t in triggers):
+        return
+
+    query = next((text[len(t):].strip() for t in triggers if text.lower().startswith(t)), "")
+    msg = await update.message.reply_text(TXT["searching"])
+
+    loop = asyncio.get_running_loop()
+
+    # ================================
+    # جستجوی SoundCloud
+    # ================================
+    def _search_sc():
+        with yt_dlp.YoutubeDL({"quiet": True}) as y:
+            return y.extract_info(f"scsearch10:{query}", download=False)
+
+    try:
+        result = await loop.run_in_executor(executor, _search_sc)
+    except Exception:
+        result = None
+
+    # ================================
+    # اگر نتیجه SoundCloud نبود → fallback یوتیوب
+    # ================================
+    if not result or not result.get("entries"):
+        await msg.edit_text(TXT["notfound"])
+
+        # استفاده از همان _youtube_fallback_sync
+        def _search_yt():
+            opts = BASE_OPTS.copy()
+            if os.path.exists("modules/youtube_cookie.txt"):
+                opts["cookiefile"] = "modules/youtube_cookie.txt"
+            with yt_dlp.YoutubeDL(opts) as y:
+                info = y.extract_info(f"ytsearch1:{query}", download=True)
+                if "entries" in info:
+                    info = info["entries"][0]
+
+                vid = str(info.get("id"))
+                cached = cache_check(vid)
+                if cached:
+                    return info, cached
+                fname = y.prepare_filename(info)
+                mp3 = fname.rsplit(".", 1)[0] + ".mp3"
+                return info, mp3
+
+        try:
+            info, mp3 = await loop.run_in_executor(executor, _search_yt)
+        except Exception as e:
+            return await msg.edit_text(f"❌ خطا در جستجوی یوتیوب:\n{e}")
+
+        cache_key = f"yt_{str(info.get('id'))}"
+        chat_id = update.message.chat.id
+
+        # ارسال از کش تلگرام
+        if cache_key in SC_CACHE:
+            try: await msg.delete()
+            except: pass
+            return await update.message.reply_audio(SC_CACHE[cache_key], caption=f"🎵 {info.get('title', 'Music')}")
+
+        # ارسال فایل جدید
+        try:
+            with open(mp3, "rb") as f:
+                sent = await update.message.reply_audio(f, caption=f"🎵 {info.get('title', 'Music')}")
+        finally:
+            if os.path.exists(mp3):
+                os.remove(mp3)
+
+        SC_CACHE[cache_key] = sent.audio.file_id
+        save_cache()
+        try: await msg.delete()
+        except: pass
+        return
+
+    # ================================
+    # SoundCloud نتیجه داد
+    # ================================
+    entries = {str(t["id"]): t for t in result["entries"]}
+    track_store[update.message.message_id] = entries
+
+    keyboard = [
+        [InlineKeyboardButton(t["title"], callback_data=f"music_select:{update.message.message_id}:{tid}")]
+        for tid, t in entries.items()
+    ]
+
+    await msg.edit_text(TXT["select"].format(n=len(entries)), reply_markup=InlineKeyboardMarkup(keyboard))
