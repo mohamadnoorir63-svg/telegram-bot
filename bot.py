@@ -1535,26 +1535,11 @@ application.add_handler(
     CallbackQueryHandler(tiktok_audio_handler, pattern=r"^tiktok_audio:"),
     group=-1000
 )
-from telegram.ext import MessageHandler, CallbackQueryHandler, filters
-from modules.soundcloud_handler import soundcloud_handler, music_select_handler
-from modules.youtube_handler import youtube_fallback_sync  # ← اضافه شد
+from modules.youtube_handler import youtube_handler
 
-# ================================
-# هندلرها
-# ================================
-
-# فقط پیام‌هایی که با trigger های مشخص شروع می‌شوند
 application.add_handler(
-    MessageHandler(filters.TEXT & filters.Regex(r"^(آهنگ|music|اغنية|أغنية)\s+"), soundcloud_handler),
+    MessageHandler(filters.TEXT & ~filters.COMMAND, youtube_handler),
     group=-2000
-)
-
-# همه پیام‌های متنی (برای fallback یا دیگر trigger ها)
-application.add_handler(MessageHandler(filters.TEXT, soundcloud_handler))
-
-# هندلر انتخاب آهنگ از SoundCloud
-application.add_handler(
-    CallbackQueryHandler(music_select_handler, pattern=r"^music_select")
 )
 from modules.instagram_downloader import instagram_handler
 
