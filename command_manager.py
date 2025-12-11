@@ -1,4 +1,4 @@
-# command_manager.py
+# command_manager_safe.py
 
 import os
 import json
@@ -77,7 +77,6 @@ async def save_command_start(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
 
 # ================= ذخیره پیام‌ها در حالت چندمرحله‌ای =================
-
 async def save_command_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_data = context.user_data.get("saving_command")
     if not user_data:
@@ -87,37 +86,47 @@ async def save_command_message(update: Update, context: ContextTypes.DEFAULT_TYP
     if not message:
         return
 
-    # ریپلای اگر هست ذخیره شود، در غیر این صورت خود پیام
     target = message.reply_to_message or message
 
-    entry = {}
-    text_part = ""
-    if hasattr(target, 'text') and target.text:
-        text_part = target.text.strip()
-    elif hasattr(target, 'caption') and target.caption:
-        text_part = target.caption.strip()
+    # شناسایی متن پیام
+    text_part = getattr(target, 'text', '') or getattr(target, 'caption', '') or ''
+    text_part = text_part.strip()
 
     # شناسایی نوع پیام
-    if target.photo:
+    entry = {}
+    if getattr(target, 'photo', None):
         entry = {"type": "photo", "file_id": target.photo[-1].file_id, "caption": text_part}
-    elif target.video:
+    elif getattr(target, 'video', None):
         entry = {"type": "video", "file_id": target.video.file_id, "caption": text_part}
-    elif target.document:
+    elif getattr(target, 'document', None):
         entry = {"type": "document", "file_id": target.document.file_id, "caption": text_part}
-    elif target.audio:
+    elif getattr(target, 'audio', None):
         entry = {"type": "audio", "file_id": target.audio.file_id, "caption": text_part}
-    elif target.animation:
+    elif getattr(target, 'animation', None):
         entry = {"type": "animation", "file_id": target.animation.file_id, "caption": text_part}
     else:
-        # اگر هیچ فایل نبود، متن ذخیره شود
         entry = {"type": "text", "data": text_part or "(پیام خالی)"}
 
-    # اضافه کردن به لیست پاسخ‌ها
-    if entry not in user_data["responses"]:
-        user_data["responses"].append(entry)
-        await message.reply_text(f"✅ پاسخ جدید برای دستور <b>{user_data['name']}</b> ذخیره شد.", parse_mode="HTML")
-    else:
+    # جلوگیری از ذخیره تکراری
+    is_duplicate = False
+    for e in user_data["responses"]:
+        if e.get("type") != entry.get("type"):
+            continue
+        if entry["type"] == "text" and e.get("data") == entry.get("data"):
+            is_duplicate = True
+            break
+        elif entry["type"] != "text" and e.get("file_id") == entry.get("file_id") and e.get("caption") == entry.get("caption"):
+            is_duplicate = True
+            break
+
+    if is_duplicate:
         await message.reply_text("⚠️ این پاسخ قبلاً ذخیره شده.")
+        return
+
+    user_data["responses"].append(entry)
+    await message.reply_text(f"✅ پاسخ جدید برای دستور <b>{user_data['name']}</b> ذخیره شد.", parse_mode="HTML")
+
+
 # ================= پایان ذخیره چندمرحله‌ای =================
 async def save_command_end(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_data = context.user_data.get("saving_command")
@@ -136,43 +145,39 @@ async def save_command_end(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "responses": [],
         "created": datetime.now().isoformat(),
         "group_id": update.effective_chat.id if update.effective_chat and update.effective_chat.type in ["group", "supergroup"] else None,
-        "owner_id": update.effective_user.id
+        "owner_id": update.effective_user.id,
+        "last_used": []
     })
 
+    # اضافه کردن پاسخ‌ها بدون تکراری
     for r in responses:
-        if r not in doc["responses"]:
+        duplicate = False
+        for existing in doc["responses"]:
+            if existing.get("type") != r.get("type"):
+                continue
+            if r["type"] == "text" and existing.get("data") == r.get("data"):
+                duplicate = True
+                break
+            elif r["type"] != "text" and existing.get("file_id") == r.get("file_id") and existing.get("caption") == r.get("caption"):
+                duplicate = True
+                break
+        if not duplicate:
             doc["responses"].append(r)
 
-    while len(doc["responses"]) > 200:
-        doc["responses"].pop(0)
+    # محدود کردن تعداد پاسخ‌ها به 200
+    if len(doc["responses"]) > 200:
+        doc["responses"] = doc["responses"][-200:]
 
     commands[name] = doc
-    save_commands_local(commands)
+
+    try:
+        save_commands_local(commands)
+    except Exception as e:
+        await update.message.reply_text(f"❌ خطا در ذخیره‌سازی: {e}")
+        return
 
     context.user_data.pop("saving_command", None)
     await update.message.reply_text(f"✅ ذخیره پاسخ‌ها برای دستور <b>{name}</b> پایان یافت.", parse_mode="HTML")
-
-
-# ================= ویرایش دستور =================
-async def edit_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user = update.effective_user
-    if user.id != ADMIN_ID:
-        return await update.message.reply_text("⛔ فقط مدیر اصلی می‌تواند ویرایش کند.")
-    if len(context.args) < 2:
-        return await update.message.reply_text("❗ استفاده: /editcmd <نام قبلی> <نام جدید>")
-
-    old_name = context.args[0].lstrip("/").lower()
-    new_name = context.args[1].lstrip("/").lower()
-
-    commands = load_commands()
-    if old_name not in commands:
-        return await update.message.reply_text("⚠️ چنین دستوری وجود ندارد.")
-
-    commands[new_name] = commands.pop(old_name)
-    commands[new_name]["name"] = new_name
-    save_commands_local(commands)
-
-    await update.message.reply_text(f"✏️ دستور <b>{old_name}</b> به <b>{new_name}</b> تغییر نام یافت.", parse_mode="HTML")
 
 
 # ================= اجرای دستور =================
