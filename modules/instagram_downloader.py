@@ -1,4 +1,5 @@
-# modules/instagram_handler.py
+# telegram-bot/modules/instagram_downloader.py
+
 import os
 import shutil
 import subprocess
@@ -28,7 +29,7 @@ INSTAGRAM_COOKIES = """\
 """
 
 # ================================
-# کش برای مسیر فایل‌ها
+# کش مسیر فایل‌ها
 # ================================
 video_store = {}
 
@@ -39,12 +40,14 @@ async def convert_to_mp3(video_path: str) -> str:
     mp3_path = video_path.rsplit(".", 1)[0] + ".mp3"
     if not shutil.which("ffmpeg"):
         return None
+
     def ffmpeg_run():
         subprocess.run([
             "ffmpeg", "-y", "-i", video_path,
             "-vn", "-ab", "192k", "-ar", "44100",
             "-f", "mp3", mp3_path
         ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
     await asyncio.to_thread(ffmpeg_run)
     return mp3_path if os.path.exists(mp3_path) else None
 
@@ -165,11 +168,10 @@ async def instagram_audio_handler(update: Update, context: ContextTypes.DEFAULT_
         return await cq.edit_message_text("❌ فایل ویدیو پیدا نشد.")
 
     video_path = video_store[video_id]
-    loop = asyncio.get_running_loop()
-    mp3_path = await loop.run_in_executor(None, lambda: subprocess.run(
-        ["ffmpeg", "-y", "-i", video_path, "-vn", "-ab", "192k", "-ar", "44100", video_path.rsplit('.',1)[0]+".mp3"],
-        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
-    ) or video_path.rsplit('.',1)[0]+".mp3")
+    mp3_path = video_path.rsplit('.',1)[0] + ".mp3"
+
+    # تبدیل غیر بلوک‌کننده
+    mp3_path = await convert_to_mp3(video_path)
 
     if not mp3_path or not os.path.exists(mp3_path):
         return await cq.edit_message_text("❌ تبدیل به صوت ممکن نیست.")
