@@ -2,7 +2,9 @@
 
 import os
 import re
+import glob
 import asyncio
+import subprocess
 from concurrent.futures import ThreadPoolExecutor
 
 import yt_dlp
@@ -29,9 +31,7 @@ os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
 
 URL_RE = re.compile(r"(https?://[^\s]+)")
 
-# 🚀 ThreadPool توربو مخصوص Heroku / VPS
 executor = ThreadPoolExecutor(max_workers=12)
-
 pending_links = {}
 
 # ================================
@@ -56,24 +56,20 @@ async def is_admin(update, context):
 # ================================
 # SUPER ULTRA TURBO OPTIONS
 # ================================
-
 def turbo_video_opts(max_height):
     return {
         "cookiefile": COOKIE_FILE,
         "quiet": True,
         "ignoreerrors": True,
-
-        # بهترین فرمت ممکن برای تلگرام
         "format": (
             f"bestvideo[height<={max_height}][ext=mp4]"
             f"+bestaudio[ext=m4a]/best[height<={max_height}]"
         ),
-
         "merge_output_format": "mp4",
 
-        # ==== ULTRA TURBO ====
+        # Ultra Turbo Boost
         "concurrent_fragment_downloads": 50,
-        "http_chunk_size": 5242880,  # 5MB
+        "http_chunk_size": 5242880,
         "retries": 50,
         "fragment_retries": 50,
         "buffersize": 0,
@@ -85,7 +81,7 @@ def turbo_video_opts(max_height):
         "noprogress": True,
         "overwrites": True,
 
-        # خروجی کاملا سازگار با تلگرام
+        # کیفیت نهایی کاملا استاندارد برای تلگرام
         "postprocessors": [
             {
                 "key": "FFmpegVideoConvertor",
@@ -102,7 +98,6 @@ def turbo_audio_opts():
         "cookiefile": COOKIE_FILE,
         "quiet": True,
         "ignoreerrors": True,
-
         "format": "bestaudio/best",
 
         "concurrent_fragment_downloads": 50,
@@ -125,20 +120,67 @@ def turbo_audio_opts():
 
 
 # ================================
-# دانلود ویدیو (ULTRA-TURBO)
+# پیدا کردن فایل خروجی نهایی
 # ================================
-def _download_video_sync(url, max_height: int):
+def find_final_video_file(video_id):
+    files = glob.glob(f"{DOWNLOAD_FOLDER}/{video_id}.*")
+    files = [f for f in files if not f.endswith(".part")]
+
+    if not files:
+        return None
+
+    for f in files:
+        if f.endswith(".mp4"):
+            return f
+
+    return files[0]
+
+
+# ================================
+# تبدیل به MP4 استاندارد برای تلگرام
+# ================================
+def ensure_mp4(filepath):
+    if filepath.endswith(".mp4"):
+        return filepath
+
+    new_path = filepath.rsplit(".", 1)[0] + ".mp4"
+
+    subprocess.run([
+        "ffmpeg", "-y",
+        "-i", filepath,
+        "-c:v", "libx264",
+        "-c:a", "aac",
+        new_path
+    ])
+
+    try:
+        os.remove(filepath)
+    except:
+        pass
+
+    return new_path
+
+
+# ================================
+# دانلود ویدیو (ULTRA TURBO + SAFE)
+# ================================
+def _download_video_sync(url, max_height):
     opts = turbo_video_opts(max_height)
 
     with yt_dlp.YoutubeDL(opts) as y:
         info = y.extract_info(url, download=True)
-        filename = y.prepare_filename(info)
 
-    return info, filename
+    video_id = info.get("id")
+
+    final_file = find_final_video_file(video_id)
+
+    final_file = ensure_mp4(final_file)
+
+    return info, final_file
 
 
 # ================================
-# دانلود صوت (ULTRA-TURBO)
+# دانلود صوت (ULTRA TURBO)
 # ================================
 def _download_audio_sync(url):
     opts = turbo_audio_opts()
@@ -242,7 +284,7 @@ async def youtube_quality_handler(update: Update, context: ContextTypes.DEFAULT_
         )
 
     # ------------------------------
-    # VIDEO DL
+    # VIDEO DOWNLOAD
     # ------------------------------
     if choice.startswith("v_"):
         q = int(choice.split("_")[1])
