@@ -61,7 +61,6 @@ async def save_command_start(update: Update, context: ContextTypes.DEFAULT_TYPE)
     if not context.args:
         return await update.message.reply_text("❗ استفاده: /save <نام دستور>")
 
-    # حذف اسلش اول و ترکیب چندکلمه‌ای
     name = " ".join(context.args).lstrip("/").lower()
 
     context.user_data["saving_command"] = {
@@ -89,7 +88,6 @@ async def save_command_message(update: Update, context: ContextTypes.DEFAULT_TYP
 
     entry = {}
 
-    # اگر ریپلای باشد، پیام ریپلای را ذخیره کن
     target = message.reply_to_message or message
     text_part = target.text.strip() if target.text else (target.caption.strip() if target.caption else "")
 
