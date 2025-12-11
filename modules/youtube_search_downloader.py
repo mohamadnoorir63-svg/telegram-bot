@@ -6,18 +6,24 @@ import yt_dlp
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import ContextTypes
 
-# ================================
-# تنظیمات
-# ================================
 SUDO_USERS = [8588347189]
-COOKIE_FILE = "modules/youtube_cookie.txt"
+COOKIE_FILE = "modules/youtube_cookie.txt2"
 URL_RE = re.compile(r"(https?://[^\s]+)")
 DOWNLOAD_FOLDER = "downloads"
 os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
 
-executor = ThreadPoolExecutor(max_workers=6)  # 🔥 افزایش سرعت
-
+executor = ThreadPoolExecutor(max_workers=4)
 pending_links = {}
+
+# ================================
+def clean_parts():
+    """حذف فایل‌های .part برای جلوگیری از خطا"""
+    for f in os.listdir(DOWNLOAD_FOLDER):
+        if f.endswith(".part") or "Frag" in f:
+            try:
+                os.remove(os.path.join(DOWNLOAD_FOLDER, f))
+            except:
+                pass
 
 # ================================
 def get_add_btn(chat_type):
@@ -40,19 +46,21 @@ async def is_admin(update, context):
         return False
 
 # ================================
-# دانلود ویدیو یا صوت روی دیسک
-# ================================
-def _download_to_disk(url, audio_only=False):
+def _download_to_disk(url, audio=False):
+    """دانلود پایدار و بدون خطای Frag"""
+    clean_parts()
+
     ydl_opts = {
         "quiet": True,
         "noplaylist": True,
-        "noprogress": True,
         "cookiefile": COOKIE_FILE,
         "outtmpl": os.path.join(DOWNLOAD_FOLDER, "%(id)s.%(ext)s"),
-        "concurrent_fragment_downloads": 16,   # 🔥 سرعت آتشی
+        "concurrent_fragment_downloads": 4,   # 🔥 پایدار و سریع
+        "retries": 10,                        # 🔁 ریترای اتوماتیک
+        "fragment_retries": 10,
     }
 
-    if audio_only:
+    if audio:
         ydl_opts["format"] = "bestaudio/best"
         ydl_opts["postprocessors"] = [{
             "key": "FFmpegExtractAudio",
@@ -65,24 +73,23 @@ def _download_to_disk(url, audio_only=False):
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(url, download=True)
         filename = ydl.prepare_filename(info)
-
-        if audio_only:
+        if audio:
             filename = filename.rsplit(".", 1)[0] + ".mp3"
-
         return info, filename
 
 # ================================
-async def youtube_search_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def youtube_search_handler(update, context):
     if not update.message or not update.message.text:
         return
 
     text = update.message.text.strip()
-    match = URL_RE.search(text)
-    if not match:
+    m = URL_RE.search(text)
+
+    if not m:
         return
 
-    url = match.group(1)
-    if "youtube.com" not in url and "youtu.be" not in url:
+    url = m.group(1)
+    if "youtube" not in url:
         return
 
     if update.effective_chat.type != "private":
@@ -91,18 +98,18 @@ async def youtube_search_handler(update: Update, context: ContextTypes.DEFAULT_T
 
     pending_links[update.effective_chat.id] = url
 
-    keyboard = [
+    kb = [
         [InlineKeyboardButton("🎵 Audio (MP3)", callback_data="yt_audio")],
         [InlineKeyboardButton("🎬 Video (MP4)", callback_data="yt_video")],
     ]
 
     await update.message.reply_text(
-        "🎬 لطفاً نوع دانلود را انتخاب کنید:",
-        reply_markup=InlineKeyboardMarkup(keyboard)
+        "🎧 لطفاً نوع دانلود را انتخاب کنید:",
+        reply_markup=InlineKeyboardMarkup(kb)
     )
 
 # ================================
-async def youtube_quality_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def youtube_quality_handler(update, context):
     cq = update.callback_query
     chat_id = cq.message.chat_id
     await cq.answer()
@@ -116,8 +123,7 @@ async def youtube_quality_handler(update: Update, context: ContextTypes.DEFAULT_
         return await cq.message.reply_text("❌ لینک معتبر یافت نشد.")
 
     choice = cq.data
-
-    msg = await cq.message.reply_text("⬇ در حال دانلود با سرعت آتشی ...")
+    msg = await cq.message.reply_text("⬇ در حال دانلود پایدار ...")
 
     loop = asyncio.get_running_loop()
 
@@ -136,7 +142,7 @@ async def youtube_quality_handler(update: Update, context: ContextTypes.DEFAULT_
         await context.bot.send_document(
             chat_id,
             document=open(file_path, "rb"),
-            caption=info.get("title", "File"),
+            caption=info.get("title", "file"),
             reply_markup=get_add_btn(update.effective_chat.type)
         )
 
@@ -145,6 +151,7 @@ async def youtube_quality_handler(update: Update, context: ContextTypes.DEFAULT_
         return
 
     finally:
+        clean_parts()
         if os.path.exists(file_path):
-            os.remove(file_path)  # حذف فایل بعد ارسال
+            os.remove(file_path)
         await msg.delete()
