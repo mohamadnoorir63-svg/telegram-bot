@@ -1427,14 +1427,14 @@ application.add_handler(CommandHandler("listsudo", list_sudos))
 # شروع ذخیره چندمرحله‌ای
 application.add_handler(CommandHandler("save", save_command_start))
 # پایان ذخیره چندمرحله‌ای
-application.add_handler(CommandHandler("end", save_command_end))
+application.add_handler(CommandHandler("endsave", save_command_end))
 # دریافت پیام‌ها برای ذخیره در حالت چندمرحله‌ای
 application.add_handler(MessageHandler(filters.ALL & ~filters.COMMAND, save_command_message))
 
 # ویرایش، حذف، لیست و اجرای دستور
-application.add_handler(CommandHandler("edit", edit_command))
-application.add_handler(CommandHandler("del", delete_command))
-application.add_handler(CommandHandler("list", list_commands))
+application.add_handler(CommandHandler("editcmd", edit_command))
+application.add_handler(CommandHandler("delcmd", delete_command))
+application.add_handler(CommandHandler("listcmds", list_commands))
 application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_custom_command))
 
 application.add_handler(
