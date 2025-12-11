@@ -1,4 +1,4 @@
-# command_manager_safe.py
+# command_manager_complete.py
 
 import os
 import json
@@ -88,11 +88,11 @@ async def save_command_message(update: Update, context: ContextTypes.DEFAULT_TYP
 
     target = message.reply_to_message or message
 
-    # شناسایی متن پیام
+    # بررسی متن یا caption
     text_part = getattr(target, 'text', '') or getattr(target, 'caption', '') or ''
     text_part = text_part.strip()
 
-    # شناسایی نوع پیام
+    # تشخیص نوع پیام
     entry = {}
     if getattr(target, 'photo', None):
         entry = {"type": "photo", "file_id": target.photo[-1].file_id, "caption": text_part}
@@ -106,22 +106,6 @@ async def save_command_message(update: Update, context: ContextTypes.DEFAULT_TYP
         entry = {"type": "animation", "file_id": target.animation.file_id, "caption": text_part}
     else:
         entry = {"type": "text", "data": text_part or "(پیام خالی)"}
-
-    # جلوگیری از ذخیره تکراری
-    is_duplicate = False
-    for e in user_data["responses"]:
-        if e.get("type") != entry.get("type"):
-            continue
-        if entry["type"] == "text" and e.get("data") == entry.get("data"):
-            is_duplicate = True
-            break
-        elif entry["type"] != "text" and e.get("file_id") == entry.get("file_id") and e.get("caption") == entry.get("caption"):
-            is_duplicate = True
-            break
-
-    if is_duplicate:
-        await message.reply_text("⚠️ این پاسخ قبلاً ذخیره شده.")
-        return
 
     user_data["responses"].append(entry)
     await message.reply_text(f"✅ پاسخ جدید برای دستور <b>{user_data['name']}</b> ذخیره شد.", parse_mode="HTML")
@@ -296,7 +280,9 @@ def cleanup_group_commands(chat_id: int):
         print(f"[command_manager] cleaned {removed} commands from group {chat_id}")
     except Exception as e:
         print(f"[command_manager] cleanup error: {e}")
-        # ================= ویرایش دستور =================
+
+
+# ================= ویرایش دستور =================
 async def edit_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     if user.id != ADMIN_ID:
