@@ -8,7 +8,6 @@ from typing import Dict, Any
 from telegram import Update
 from telegram.ext import ContextTypes
 
-
 # ====== تنظیمات ======
 ADMIN_ID = 8588347189
 
@@ -66,9 +65,11 @@ async def save_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat = update.effective_chat
 
     if not context.args:
-        return await update.message.reply_text("❗ استفاده: /save <نام دستور> (روی پیام ریپلای کنید)")
+        return await update.message.reply_text(
+            "❗ استفاده: /save <نام دستور> (روی پیام ریپلای کنید)"
+        )
 
-    # گرفتن نام دستور به صورت RAW (با نگه داشتن /)
+    # گرفتن نام دستور از متن کامل پیام (با حفظ اسلش)
     raw = update.message.text
     name = raw.replace("/save", "", 1).strip()
     name = name.lower()
@@ -270,3 +271,24 @@ async def delete_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     save_commands_local(commands)
 
     await update.message.reply_text(f"🗑 دستور <b>{name}</b> حذف شد.", parse_mode="HTML")
+
+
+# ================= پاکسازی دستورات گروه =================
+
+def cleanup_group_commands(chat_id: int):
+    try:
+        commands = load_commands()
+        new_data = {}
+        removed = 0
+
+        for name, info in commands.items():
+            if info.get("group_id") == chat_id and info.get("owner_id") != ADMIN_ID:
+                removed += 1
+                continue
+            new_data[name] = info
+
+        save_commands_local(new_data)
+        print(f"[command_manager] cleaned {removed} commands from group {chat_id}")
+
+    except Exception as e:
+        print(f"[command_manager] cleanup error: {e}")
