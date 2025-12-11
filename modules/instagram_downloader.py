@@ -4,14 +4,19 @@ import shutil
 import subprocess
 import asyncio
 import yt_dlp
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from io import BytesIO
+from telegram import Update
 from telegram.ext import ContextTypes
 
 DOWNLOAD_FOLDER = "downloads"
 os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
 
+# ================================
+# کوکی اینستاگرام درون‌خطی (Netscape format)
+# ================================
 INSTAGRAM_COOKIES = """\
 # Netscape HTTP Cookie File
+# https://curl.haxx.se/rfc/cookie_spec.html
 .instagram.com	TRUE	/	TRUE	1799974131	csrftoken	--d8oLwWArIVOTuxrKibqa
 .instagram.com	TRUE	/	TRUE	1799687399	datr	47Q1aZceuWl7nLkf_Uzh_kVW
 .instagram.com	TRUE	/	TRUE	1796663399	ig_did	615B02DC-3964-40ED-864D-5EDD6E7C4EA3
@@ -23,6 +28,9 @@ INSTAGRAM_COOKIES = """\
 .instagram.com	TRUE	/	TRUE	0	rur	"CLN\05479160628834\0541796950131:01fed2aade586e74cf94cfdcf02e9379c728a311e957c784caaee1ea3b4fedca58ea662c"
 """
 
+# ================================
+# تبدیل ویدیو به MP3 غیر بلوک‌کننده
+# ================================
 async def convert_to_mp3(video_path: str) -> str:
     mp3_path = video_path.rsplit(".", 1)[0] + ".mp3"
     if not shutil.which("ffmpeg"):
@@ -38,6 +46,9 @@ async def convert_to_mp3(video_path: str) -> str:
     await asyncio.to_thread(ffmpeg_run)
     return mp3_path if os.path.exists(mp3_path) else None
 
+# ================================
+# هندلر دانلود اینستاگرام
+# ================================
 async def instagram_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message or not update.message.text:
         return
@@ -65,11 +76,6 @@ async def instagram_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "ignoreerrors": True
     }
 
-    # دکمه افزودن به گروه
-    group_button = InlineKeyboardMarkup([
-        [InlineKeyboardButton("➕ افزودن به گروه", url="https://t.me/AFGR63_bot?startgroup=true")]
-    ])
-
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=True)
@@ -84,25 +90,18 @@ async def instagram_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 if not os.path.exists(filename):
                     continue
 
-                # ارسال ویدیو با دکمه
+                # ارسال ویدیو
                 with open(filename, "rb") as fvideo:
-                    await context.bot.send_video(
-                        chat_id, fvideo,
-                        caption=f"🎬 {entry.get('title', 'Instagram Video')}",
-                        reply_markup=group_button
-                    )
+                    await context.bot.send_video(chat_id, fvideo, caption=f"🎬 {entry.get('title', 'Instagram Video')}")
 
-                # تبدیل و ارسال MP3 با همان دکمه
+                # تبدیل و ارسال MP3
                 mp3_path = await convert_to_mp3(filename)
                 if mp3_path and os.path.exists(mp3_path):
                     with open(mp3_path, "rb") as faudio:
-                        await context.bot.send_audio(
-                            chat_id, faudio,
-                            caption="🎵 صوت ویدیو",
-                            reply_markup=group_button
-                        )
+                        await context.bot.send_audio(chat_id, faudio, caption="🎵 صوت ویدیو")
                     os.remove(mp3_path)
 
+                # حذف فایل ویدیو
                 os.remove(filename)
 
         os.remove(cookie_path)
