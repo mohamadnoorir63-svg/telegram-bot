@@ -296,3 +296,23 @@ def cleanup_group_commands(chat_id: int):
         print(f"[command_manager] cleaned {removed} commands from group {chat_id}")
     except Exception as e:
         print(f"[command_manager] cleanup error: {e}")
+        # ================= ویرایش دستور =================
+async def edit_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    if user.id != ADMIN_ID:
+        return await update.message.reply_text("⛔ فقط مدیر اصلی می‌تواند ویرایش کند.")
+    if len(context.args) < 2:
+        return await update.message.reply_text("❗ استفاده: /editcmd <نام قبلی> <نام جدید>")
+
+    old_name = context.args[0].lstrip("/").lower()
+    new_name = context.args[1].lstrip("/").lower()
+
+    commands = load_commands()
+    if old_name not in commands:
+        return await update.message.reply_text("⚠️ چنین دستوری وجود ندارد.")
+
+    commands[new_name] = commands.pop(old_name)
+    commands[new_name]["name"] = new_name
+    save_commands_local(commands)
+
+    await update.message.reply_text(f"✏️ دستور <b>{old_name}</b> به <b>{new_name}</b> تغییر نام یافت.", parse_mode="HTML")
