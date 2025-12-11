@@ -14,7 +14,7 @@ SUDO_USERS = [8588347189]  # آیدی شما
 # ================================
 # تنظیمات
 # ================================
-COOKIE_FILE = "modules/youtube_cookie.txt2"  # کوکی یوتیوب شما
+COOKIE_FILE = "modules/youtube_cookie.txt"  # کوکی یوتیوب شما
 URL_RE = re.compile(r"(https?://[^\s]+)")
 executor = ThreadPoolExecutor(max_workers=3)
 pending_links = {}
