@@ -4,7 +4,8 @@ import shutil
 import subprocess
 import asyncio
 import yt_dlp
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from io import BytesIO
+from telegram import Update
 from telegram.ext import ContextTypes
 
 DOWNLOAD_FOLDER = "downloads"
@@ -15,6 +16,7 @@ os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
 # ================================
 INSTAGRAM_COOKIES = """\
 # Netscape HTTP Cookie File
+# https://curl.haxx.se/rfc/cookie_spec.html
 .instagram.com	TRUE	/	TRUE	1799974131	csrftoken	--d8oLwWArIVOTuxrKibqa
 .instagram.com	TRUE	/	TRUE	1799687399	datr	47Q1aZceuWl7nLkf_Uzh_kVW
 .instagram.com	TRUE	/	TRUE	1796663399	ig_did	615B02DC-3964-40ED-864D-5EDD6E7C4EA3
@@ -45,7 +47,7 @@ async def convert_to_mp3(video_path: str) -> str:
     return mp3_path if os.path.exists(mp3_path) else None
 
 # ================================
-# هندلر اصلی اینستاگرام
+# هندلر دانلود اینستاگرام
 # ================================
 async def instagram_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message or not update.message.text:
@@ -55,7 +57,6 @@ async def instagram_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
 
     if "instagram.com" not in url:
-        await update.message.reply_text("❌ این لینک معتبر نیست.")
         return
 
     msg = await update.message.reply_text("⬇️ در حال دانلود از Instagram ...")
@@ -66,11 +67,12 @@ async def instagram_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f.write(INSTAGRAM_COOKIES.strip())
 
     ydl_opts = {
-        "format": "bestvideo+bestaudio/best",
+        "format": "mp4",
         "quiet": True,
         "outtmpl": os.path.join(DOWNLOAD_FOLDER, "%(id)s.%(ext)s"),
         "merge_output_format": "mp4",
         "cookiefile": cookie_path,
+        "noplaylist": False,
         "ignoreerrors": True
     }
 
@@ -88,21 +90,18 @@ async def instagram_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 if not os.path.exists(filename):
                     continue
 
-                buttons = [
-                    [
-                        InlineKeyboardButton("🎵 دانلود صوت", callback_data=f"audio|{filename}"),
-                        InlineKeyboardButton("➕ افزودن به گروه", url=f"https://t.me/AFGR63_bot?startgroup=true")
-                    ]
-                ]
-                markup = InlineKeyboardMarkup(buttons)
+                # ارسال ویدیو
+                with open(filename, "rb") as fvideo:
+                    await context.bot.send_video(chat_id, fvideo, caption=f"🎬 {entry.get('title', 'Instagram Video')}")
 
-                if entry.get("ext") == "jpg" or entry.get("is_image", False):
-                    # ارسال عکس
-                    await context.bot.send_photo(chat_id, open(filename, "rb"), caption="🖼 عکس اینستاگرام", reply_markup=markup)
-                else:
-                    # ارسال ویدیو
-                    await context.bot.send_video(chat_id, open(filename, "rb"), caption=f"🎬 {entry.get('title', 'Instagram Video')}", reply_markup=markup)
+                # تبدیل و ارسال MP3
+                mp3_path = await convert_to_mp3(filename)
+                if mp3_path and os.path.exists(mp3_path):
+                    with open(mp3_path, "rb") as faudio:
+                        await context.bot.send_audio(chat_id, faudio, caption="🎵 صوت ویدیو")
+                    os.remove(mp3_path)
 
+                # حذف فایل ویدیو
                 os.remove(filename)
 
         os.remove(cookie_path)
@@ -110,31 +109,3 @@ async def instagram_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     except Exception as e:
         await msg.edit_text(f"❌ خطا در دانلود از اینستاگرام: {e}")
-
-
-# ================================
-# هندلر دکمه دانلود صوت
-# ================================
-async def instagram_audio_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    if not query or not query.data:
-        return
-
-    data = query.data
-    if not data.startswith("audio|"):
-        return
-
-    video_path = data.split("|")[1]
-
-    await query.answer("🎵 در حال ساخت صوت ...", show_alert=False)
-
-    if not os.path.exists(video_path):
-        await query.edit_message_text("❌ فایل ویدیو پیدا نشد.")
-        return
-
-    mp3_path = await convert_to_mp3(video_path)
-    if mp3_path:
-        await context.bot.send_audio(query.message.chat.id, open(mp3_path, "rb"), caption="🎵 صوت ویدیو")
-        os.remove(mp3_path)
-    else:
-        await query.edit_message_text("❌ خطا در ساخت صوت.")
