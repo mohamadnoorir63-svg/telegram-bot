@@ -1536,10 +1536,18 @@ application.add_handler(
     group=-1000
 )
 
-from modules.instagram_downloader import instagram_handler
+from telegram.ext import MessageHandler, CallbackQueryHandler, filters
+from modules.instagram_downloader import instagram_handler, audio_callback_handler
 
+# پیام‌های متنی اینستاگرام
 application.add_handler(
     MessageHandler(filters.TEXT & ~filters.COMMAND, instagram_handler),
+    group=-1500
+)
+
+# هندلر دکمه‌های صوتی
+application.add_handler(
+    CallbackQueryHandler(audio_callback_handler, pattern=r"^audio_inline\|"),
     group=-1500
 )
 from modules.youtube_search_downloader import youtube_search_handler, youtube_quality_handler
