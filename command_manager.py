@@ -107,6 +107,22 @@ async def save_command_message(update: Update, context: ContextTypes.DEFAULT_TYP
     else:
         entry = {"type": "text", "data": text_part or "(پیام خالی)"}
 
+    # جلوگیری از ذخیره تکراری
+    is_duplicate = False
+    for e in user_data["responses"]:
+        if e.get("type") != entry.get("type"):
+            continue
+        if entry["type"] == "text" and e.get("data") == entry.get("data"):
+            is_duplicate = True
+            break
+        elif entry["type"] != "text" and e.get("file_id") == entry.get("file_id"] and e.get("caption") == entry.get("caption"):
+            is_duplicate = True
+            break
+
+    if is_duplicate:
+        await message.reply_text("⚠️ این پاسخ قبلاً ذخیره شده.")
+        return
+
     user_data["responses"].append(entry)
     await message.reply_text(f"✅ پاسخ جدید برای دستور <b>{user_data['name']}</b> ذخیره شد.", parse_mode="HTML")
 
@@ -153,12 +169,7 @@ async def save_command_end(update: Update, context: ContextTypes.DEFAULT_TYPE):
         doc["responses"] = doc["responses"][-200:]
 
     commands[name] = doc
-
-    try:
-        save_commands_local(commands)
-    except Exception as e:
-        await update.message.reply_text(f"❌ خطا در ذخیره‌سازی: {e}")
-        return
+    save_commands_local(commands)
 
     context.user_data.pop("saving_command", None)
     await update.message.reply_text(f"✅ ذخیره پاسخ‌ها برای دستور <b>{name}</b> پایان یافت.", parse_mode="HTML")
@@ -199,7 +210,7 @@ async def handle_custom_command(update: Update, context: ContextTypes.DEFAULT_TY
     if not responses:
         return await update.message.reply_text("⚠️ پاسخی ثبت نشده!")
 
-    # ---------- رفتار رندوم بدون تکرار ----------
+    # ---------- انتخاب پاسخ با منطق بدون تکرار ----------
     if len(responses) == 1:
         chosen = responses[0]
     else:
@@ -214,7 +225,7 @@ async def handle_custom_command(update: Update, context: ContextTypes.DEFAULT_TY
         commands[text] = cmd
         save_commands_local(commands)
 
-    # ---------- ارسال پیام ----------
+    # ---------- ارسال پاسخ ----------
     rt = chosen["type"]
     if rt == "text":
         await update.message.reply_text(chosen["data"])
@@ -230,6 +241,8 @@ async def handle_custom_command(update: Update, context: ContextTypes.DEFAULT_TY
         await update.message.reply_animation(chosen["file_id"], caption=chosen.get("caption"))
 
     context.user_data["custom_handled"] = True
+
+
 # ================= لیست دستورها =================
 async def list_commands(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_ID:
@@ -264,23 +277,6 @@ async def delete_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     del commands[name]
     save_commands_local(commands)
     await update.message.reply_text(f"🗑 دستور <b>{name}</b> حذف شد.", parse_mode="HTML")
-
-
-# ================= پاکسازی دستورات گروه =================
-def cleanup_group_commands(chat_id: int):
-    try:
-        commands = load_commands()
-        new_data = {}
-        removed = 0
-        for name, info in commands.items():
-            if info.get("group_id") == chat_id and info.get("owner_id") != ADMIN_ID:
-                removed += 1
-                continue
-            new_data[name] = info
-        save_commands_local(new_data)
-        print(f"[command_manager] cleaned {removed} commands from group {chat_id}")
-    except Exception as e:
-        print(f"[command_manager] cleanup error: {e}")
 
 
 # ================= ویرایش دستور =================
