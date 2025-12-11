@@ -7,7 +7,7 @@ from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import ContextTypes
 
 SUDO_USERS = [8588347189]
-COOKIE_FILE = "modules/youtube_cookie.txt2"
+COOKIE_FILE = "modules/youtube_cookie.txt"
 URL_RE = re.compile(r"(https?://[^\s]+)")
 DOWNLOAD_FOLDER = "downloads"
 os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
