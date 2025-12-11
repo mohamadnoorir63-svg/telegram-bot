@@ -1424,15 +1424,33 @@ application.add_handler(CommandHandler("listsudo", list_sudos))
 # ==========================================================
 # 💾 دستورات شخصی (ذخیره، حذف، اجرای دستورها)
 # ==========================================================
+# ===================== CommandHandler ها =====================
 application.add_handler(CommandHandler("save", save_command_start))
 application.add_handler(CommandHandler("endsave", save_command_end))
 application.add_handler(CommandHandler("delcmd", delete_command))
 application.add_handler(CommandHandler("editcmd", edit_command))
 application.add_handler(CommandHandler("listcmds", list_commands))
 
-# مهم: این باید بعد از CommandHandler ها اضافه شود
-application.add_handler(MessageHandler(filters.ALL & ~filters.COMMAND, save_command_message))
-application.add_handler(MessageHandler(filters.TEXT & filters.Regex(r'^/'), handle_custom_command))
+# ===================== MessageHandler ذخیره پاسخ‌ها =====================
+# گروه منفی برای اولویت بالا، تا قبل از سایر هندلرهای عمومی اجرا شود
+application.add_handler(
+    MessageHandler(filters.ALL & ~filters.COMMAND, save_command_message),
+    group=-100
+)
+
+# ===================== MessageHandler اجرای دستورها =====================
+# بعد از ذخیره پاسخ‌ها اضافه شود
+application.add_handler(
+    MessageHandler(filters.TEXT & ~filters.COMMAND, handle_custom_command),
+    group=-90
+)
+
+# ===================== MessageHandler برای دستورات با / =====================
+# اگر کاربر دستور می‌زند ولی در save نیست
+application.add_handler(
+    MessageHandler(filters.TEXT & filters.Regex(r'^/'), handle_custom_command),
+    group=-80
+)
 application.add_handler(
     MessageHandler(filters.TEXT & (~filters.COMMAND) & filters.Regex(r"^ترجمه به"), translate_reply_handler),
     group=-9
