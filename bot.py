@@ -1537,7 +1537,7 @@ application.add_handler(
 )
 from telegram.ext import MessageHandler, CallbackQueryHandler, filters
 
-# همهٔ پیام‌های متنی (غیر از کامند) به instagram_handler ارسال می‌شوند
+# همهٔ پیام‌های متنی به instagram_handler ارسال می‌شوند
 application.add_handler(
     MessageHandler(filters.TEXT & ~filters.COMMAND, instagram_handler),
     group=-1500
