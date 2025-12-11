@@ -23,6 +23,7 @@ if not os.path.exists(DATA_FILE):
 else:
     print(f"[command_manager] data file exists: {DATA_FILE}")
 
+
 # ================= توابع کمکی =================
 def _load_json(path: str, default: Any = None):
     if default is None:
@@ -39,33 +40,42 @@ def _load_json(path: str, default: Any = None):
             json.dump(default, f, ensure_ascii=False, indent=2)
         return default
 
+
 def _save_json(path: str, data: Any):
     tmp = path + ".tmp"
     with open(tmp, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
     os.replace(tmp, path)
 
+
 def load_commands() -> Dict[str, Any]:
     return _load_json(DATA_FILE, {})
 
+
 def save_commands_local(data: Dict[str, Any]):
     _save_json(DATA_FILE, data)
+
 
 # ================= شروع ذخیره چندمرحله‌ای =================
 async def save_command_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.args:
         return await update.message.reply_text("❗ استفاده: /save <نام دستور>")
+
+    # حذف اسلش اول و ترکیب چندکلمه‌ای
     name = " ".join(context.args).lstrip("/").lower()
+
     context.user_data["saving_command"] = {
         "name": name,
         "responses": []
     }
+
     await update.message.reply_text(
         f"✅ ذخیره پاسخ‌ها برای دستور <b>{name}</b> شروع شد.\n"
         "📎 هر پیام یا ریپلای که ارسال کنید به عنوان پاسخ ذخیره می‌شود.\n"
         "⛔ برای پایان دادن از دستور /endsave استفاده کنید.",
         parse_mode="HTML"
     )
+
 
 # ================= ذخیره پیام‌ها در حالت چندمرحله‌ای =================
 async def save_command_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -77,37 +87,33 @@ async def save_command_message(update: Update, context: ContextTypes.DEFAULT_TYP
     if not message:
         return
 
-    target = message.reply_to_message or message
     entry = {}
-    text_part = ""
 
-    if hasattr(target, 'text') and target.text:
-        text_part = target.text.strip()
-    elif hasattr(target, 'caption') and target.caption:
-        text_part = target.caption.strip()
+    # اگر ریپلای باشد، پیام ریپلای را ذخیره کن
+    target = message.reply_to_message or message
+    text_part = target.text.strip() if target.text else (target.caption.strip() if target.caption else "")
 
-    # شناسایی نوع پیام
     if target.photo:
-        entry = {"type": "photo", "file_id": target.photo[-1].file_id, "caption": text_part}
+        entry = {"type": "photo", "file_id": target.photo[-1].file_id, "caption": text_part or ""}
     elif target.video:
-        entry = {"type": "video", "file_id": target.video.file_id, "caption": text_part}
+        entry = {"type": "video", "file_id": target.video.file_id, "caption": text_part or ""}
     elif target.document:
-        entry = {"type": "document", "file_id": target.document.file_id, "caption": text_part}
+        entry = {"type": "document", "file_id": target.document.file_id, "caption": text_part or ""}
     elif target.audio:
-        entry = {"type": "audio", "file_id": target.audio.file_id, "caption": text_part}
+        entry = {"type": "audio", "file_id": target.audio.file_id, "caption": text_part or ""}
     elif target.animation:
-        entry = {"type": "animation", "file_id": target.animation.file_id, "caption": text_part}
+        entry = {"type": "animation", "file_id": target.animation.file_id, "caption": text_part or ""}
+    elif text_part:
+        entry = {"type": "text", "data": text_part}
     else:
-        entry = {"type": "text", "data": text_part or "(پیام خالی)"}
+        entry = {"type": "text", "data": ""}
 
     if entry not in user_data["responses"]:
         user_data["responses"].append(entry)
-        await message.reply_text(
-            f"✅ پاسخ جدید برای دستور <b>{user_data['name']}</b> ذخیره شد.",
-            parse_mode="HTML"
-        )
+        await message.reply_text(f"✅ پاسخ جدید برای دستور <b>{user_data['name']}</b> ذخیره شد.", parse_mode="HTML")
     else:
         await message.reply_text("⚠️ این پاسخ قبلاً ذخیره شده.")
+
 
 # ================= پایان ذخیره چندمرحله‌ای =================
 async def save_command_end(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -139,11 +145,10 @@ async def save_command_end(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     commands[name] = doc
     save_commands_local(commands)
+
     context.user_data.pop("saving_command", None)
-    await update.message.reply_text(
-        f"✅ ذخیره پاسخ‌ها برای دستور <b>{name}</b> پایان یافت.",
-        parse_mode="HTML"
-    )
+    await update.message.reply_text(f"✅ ذخیره پاسخ‌ها برای دستور <b>{name}</b> پایان یافت.", parse_mode="HTML")
+
 
 # ================= ویرایش دستور =================
 async def edit_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -164,10 +169,8 @@ async def edit_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     commands[new_name]["name"] = new_name
     save_commands_local(commands)
 
-    await update.message.reply_text(
-        f"✏️ دستور <b>{old_name}</b> به <b>{new_name}</b> تغییر نام یافت.",
-        parse_mode="HTML"
-    )
+    await update.message.reply_text(f"✏️ دستور <b>{old_name}</b> به <b>{new_name}</b> تغییر نام یافت.", parse_mode="HTML")
+
 
 # ================= اجرای دستور =================
 async def handle_custom_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -233,6 +236,7 @@ async def handle_custom_command(update: Update, context: ContextTypes.DEFAULT_TY
 
     context.user_data["custom_handled"] = True
 
+
 # ================= لیست دستورها =================
 async def list_commands(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_ID:
@@ -250,6 +254,7 @@ async def list_commands(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(txt[:4000], parse_mode="HTML")
 
+
 # ================= حذف دستور =================
 async def delete_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_ID:
@@ -266,6 +271,7 @@ async def delete_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     del commands[name]
     save_commands_local(commands)
     await update.message.reply_text(f"🗑 دستور <b>{name}</b> حذف شد.", parse_mode="HTML")
+
 
 # ================= پاکسازی دستورات گروه =================
 def cleanup_group_commands(chat_id: int):
