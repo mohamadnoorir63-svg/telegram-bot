@@ -14,7 +14,7 @@ SUDO_USERS = [8588347189]  # آیدی شما
 # ================================
 # تنظیمات
 # ================================
-COOKIE_FILE = "modules/youtube_cookie.txt"  # کوکی یوتیوب شما
+COOKIE_FILE = "modules/youtube_cookie.txt2"  # کوکی یوتیوب شما
 URL_RE = re.compile(r"(https?://[^\s]+)")
 executor = ThreadPoolExecutor(max_workers=3)
 pending_links = {}
@@ -48,21 +48,16 @@ async def is_admin(update, context):
 # ================================
 def _download_audio_bytes(url):
     buffer = io.BytesIO()
-    opts = {
+    ydl_opts = {
         "format": "bestaudio/best",
         "quiet": True,
         "noplaylist": True,
         "noprogress": True,
         "cookiefile": COOKIE_FILE,
-        "outtmpl": "downloads/%(id)s.%(ext)s",
-        "postprocessors": [{
-            "key": "FFmpegExtractAudio",
-            "preferredcodec": "mp3",
-            "preferredquality": "192"
-        }],
-        "prefer_ffmpeg": True,
+        "postprocessors": [],  # غیرفعال کردن ffmpeg داخلی
+        "outtmpl": "%(id)s.%(ext)s",
     }
-    with yt_dlp.YoutubeDL(opts) as ydl:
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(url)
         filename = ydl.prepare_filename(info)
         with open(filename, "rb") as f:
@@ -76,16 +71,16 @@ def _download_audio_bytes(url):
 # ================================
 def _download_video_bytes(url):
     buffer = io.BytesIO()
-    opts = {
+    ydl_opts = {
         "format": "bestvideo+bestaudio/best",
         "quiet": True,
         "noplaylist": True,
         "noprogress": True,
         "cookiefile": COOKIE_FILE,
-        "outtmpl": "downloads/%(id)s.%(ext)s",
-        "prefer_ffmpeg": True,
+        "postprocessors": [],  # غیرفعال کردن ffmpeg داخلی
+        "outtmpl": "%(id)s.%(ext)s",
     }
-    with yt_dlp.YoutubeDL(opts) as ydl:
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(url)
         filename = ydl.prepare_filename(info)
         with open(filename, "rb") as f:
@@ -95,7 +90,7 @@ def _download_video_bytes(url):
     return info, buffer
 
 # ================================
-# دریافت لینک و انتخاب نوع
+# مرحله ۱ — دریافت لینک و انتخاب نوع
 # ================================
 async def youtube_search_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message or not update.message.text:
@@ -121,7 +116,7 @@ async def youtube_search_handler(update: Update, context: ContextTypes.DEFAULT_T
     )
 
 # ================================
-# دانلود مستقیم و ارسال
+# مرحله ۲ — دانلود مستقیم و ارسال
 # ================================
 async def youtube_quality_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     cq = update.callback_query
