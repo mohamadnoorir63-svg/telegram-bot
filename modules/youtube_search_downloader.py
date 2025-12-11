@@ -1,7 +1,6 @@
-# modules/youtube_search_downloader.py
-
 import os
 import re
+import io
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
 import json
@@ -28,7 +27,7 @@ if not os.path.exists(COOKIE_FILE):
         f.write("# Paste YouTube cookies here in Netscape format\n")
 
 URL_RE = re.compile(r"(https?://[^\s]+)")
-executor = ThreadPoolExecutor(max_workers=3)
+executor = ThreadPoolExecutor(max_workers=12)  # افزایش concurrency
 
 # ================================
 # کش YouTube
@@ -82,7 +81,7 @@ async def is_admin(update, context):
         return False
 
 # ================================
-# دانلود ویدیو با حداکثر ارتفاع سفارشی
+# دانلود ویدئو با حداکثر ارتفاع سفارشی و concurrency
 # ================================
 def _download_video_sync(url, max_height: int = 720):
     fmt = f"bestvideo[height<={max_height}]+bestaudio/best[height<={max_height}]/best"
@@ -93,6 +92,8 @@ def _download_video_sync(url, max_height: int = 720):
         "merge_output_format": "mp4",
         "noplaylist": True,
         "outtmpl": f"{DOWNLOAD_FOLDER}/%(id)s.%(ext)s",
+        "noprogress": True,
+        "concurrent_fragment_downloads": 16,
     }
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(url, download=True)
@@ -100,7 +101,7 @@ def _download_video_sync(url, max_height: int = 720):
     return info, filename
 
 # ================================
-# دانلود صوت (MP3)
+# دانلود صوت (MP3) با concurrency
 # ================================
 def _download_audio_sync(url):
     ydl_opts = {
@@ -113,6 +114,8 @@ def _download_audio_sync(url):
             "preferredquality": "192"
         }],
         "outtmpl": f"{DOWNLOAD_FOLDER}/%(id)s.%(ext)s",
+        "noprogress": True,
+        "concurrent_fragment_downloads": 16,
     }
     with yt_dlp.YoutubeDL(ydl_opts) as y:
         info = y.extract_info(url, download=True)
@@ -135,7 +138,6 @@ async def youtube_search_handler(update: Update, context: ContextTypes.DEFAULT_T
     if "youtube.com" not in url and "youtu.be" not in url:
         return
 
-    # محدودیت دسترسی در گروه
     if update.effective_chat.type != "private":
         allowed = await is_admin(update, context)
         if not allowed:
@@ -175,8 +177,7 @@ async def youtube_quality_handler(update: Update, context: ContextTypes.DEFAULT_
     if str(chat_id) not in YT_CACHE:
         YT_CACHE[str(chat_id)] = {}
 
-    # بررسی کش برای نوع انتخابی
-    cache_key = f"{url}_{choice}"  # یکتا برای هر نوع: audio یا video
+    cache_key = f"{url}_{choice}"
     if cache_key in YT_CACHE[str(chat_id)]:
         cached = YT_CACHE[str(chat_id)][cache_key]
         if choice == "yt_audio":
@@ -198,7 +199,7 @@ async def youtube_quality_handler(update: Update, context: ContextTypes.DEFAULT_
         return
 
     # -----------------------------
-    # Audio — دانلود صوت
+    # Audio
     # -----------------------------
     if choice == "yt_audio":
         await cq.edit_message_text("⬇ در حال دانلود صوت...")
@@ -215,7 +216,6 @@ async def youtube_quality_handler(update: Update, context: ContextTypes.DEFAULT_
             reply_markup=get_add_btn(update.effective_chat.type)
         )
 
-        # ذخیره در کش برای نوع صوت
         YT_CACHE[str(chat_id)][cache_key] = {
             "file_id": sent.audio.file_id,
             "type": "audio",
@@ -228,7 +228,7 @@ async def youtube_quality_handler(update: Update, context: ContextTypes.DEFAULT_
         return
 
     # -----------------------------
-    # Video — نمایش گزینه کیفیت
+    # Video — نمایش کیفیت
     # -----------------------------
     if choice == "yt_video":
         keyboard = [
@@ -243,9 +243,6 @@ async def youtube_quality_handler(update: Update, context: ContextTypes.DEFAULT_
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
 
-    # -----------------------------
-    # کیفیت ویدیو — v_144 / v_240 / ...
-    # -----------------------------
     if choice.startswith("v_"):
         q = choice.split("_")[1]
         max_height = int(q)
@@ -265,7 +262,6 @@ async def youtube_quality_handler(update: Update, context: ContextTypes.DEFAULT_
             reply_markup=get_add_btn(update.effective_chat.type)
         )
 
-        # ذخیره در کش برای نوع ویدیو
         cache_key = f"{url}_yt_video"
         YT_CACHE[str(chat_id)][cache_key] = {
             "file_id": sent.video.file_id,
