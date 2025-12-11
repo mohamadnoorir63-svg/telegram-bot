@@ -1545,11 +1545,6 @@ application.add_handler(
     group=-1500
 )
 
-# هندلر دکمه‌های صوتی
-application.add_handler(
-    CallbackQueryHandler(audio_callback_handler, pattern=r"^audio_inline\|"),
-    group=-1500
-)
 from modules.youtube_search_downloader import youtube_search_handler, youtube_quality_handler
 
 # دریافت لینک و نمایش پنل اولیه (Audio / Video)
