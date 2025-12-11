@@ -1,128 +1,111 @@
-import re
+# modules/instagram_handler.py
 import os
+import shutil
+import subprocess
+import asyncio
 import yt_dlp
-from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
+from io import BytesIO
+from telegram import Update
 from telegram.ext import ContextTypes
 
-# ================================
-# سودو
-# ================================
-SUDO_USERS = [8588347189]  # آیدی شما
+DOWNLOAD_FOLDER = "downloads"
+os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
 
 # ================================
-# کوکی اینستاگرام (فرمت Netscape)
+# کوکی اینستاگرام درون‌خطی (Netscape format)
 # ================================
-COOKIE_FILE = "insta_cookie.txt"
-INSTAGRAM_COOKIES = """
+INSTAGRAM_COOKIES = """\
 # Netscape HTTP Cookie File
 # https://curl.haxx.se/rfc/cookie_spec.html
-# This is a generated file! Do not edit.
-
-.instagram.com	TRUE	/	TRUE	1799957598	csrftoken	--d8oLwWArIVOTuxrKibqa
+.instagram.com	TRUE	/	TRUE	1799974131	csrftoken	--d8oLwWArIVOTuxrKibqa
 .instagram.com	TRUE	/	TRUE	1799687399	datr	47Q1aZceuWl7nLkf_Uzh_kVW
 .instagram.com	TRUE	/	TRUE	1796663399	ig_did	615B02DC-3964-40ED-864D-5EDD6E7C4EA3
 .instagram.com	TRUE	/	TRUE	1799687399	mid	aTW04wABAAHoKpxsaAJbAfLsgVU3
 .instagram.com	TRUE	/	TRUE	1765732343	dpr	2
-.instagram.com	TRUE	/	TRUE	1773173598	ds_user_id	79160628834
-.instagram.com	TRUE	/	TRUE	1766002389	wd	360x683
+.instagram.com	TRUE	/	TRUE	1773190131	ds_user_id	79160628834
+.instagram.com	TRUE	/	TRUE	1766018928	wd	360x683
 .instagram.com	TRUE	/	TRUE	1796933591	sessionid	79160628834%3AtMYF1zDBj9tXx3%3A7%3AAYjlXAe8pz6DF9H0JRMzmLpz4PmyQSRhYqRixrTn5w
-.instagram.com	TRUE	/	TRUE	0	rur	"FRC\05479160628834\0541796933598:01fead04be85583bdc9a948cf624144307c2c30317f269dc8601cb133056379a7362cb6b"
+.instagram.com	TRUE	/	TRUE	0	rur	"CLN\05479160628834\0541796950131:01fed2aade586e74cf94cfdcf02e9379c728a311e957c784caaee1ea3b4fedca58ea662c"
 """
 
-with open(COOKIE_FILE, "w", encoding="utf-8") as f:
-    f.write(INSTAGRAM_COOKIES.strip())
+# ================================
+# تبدیل ویدیو به MP3 غیر بلوک‌کننده
+# ================================
+async def convert_to_mp3(video_path: str) -> str:
+    mp3_path = video_path.rsplit(".", 1)[0] + ".mp3"
+    if not shutil.which("ffmpeg"):
+        return None
+
+    def ffmpeg_run():
+        subprocess.run([
+            "ffmpeg", "-y", "-i", video_path,
+            "-vn", "-ab", "192k", "-ar", "44100",
+            "-f", "mp3", mp3_path
+        ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+    await asyncio.to_thread(ffmpeg_run)
+    return mp3_path if os.path.exists(mp3_path) else None
 
 # ================================
-# regex گرفتن لینک
-# ================================
-URL_RE = re.compile(r"(https?://[^\s]+)")
-
-# ================================
-# چک مدیر بودن
-# ================================
-async def is_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    chat = update.effective_chat
-    user = update.effective_user
-
-    if chat.type == "private":
-        return True
-    if user.id in SUDO_USERS:
-        return True
-
-    try:
-        admins = await context.bot.get_chat_administrators(chat.id)
-        admin_ids = [a.user.id for a in admins]
-    except:
-        return False
-
-    return user.id in admin_ids
-
-# ================================
-# دکمه افزودن ربات به گروه (فقط در پیوی)
-# ================================
-def get_add_btn(chat_type):
-    if chat_type == "private":
-        return InlineKeyboardMarkup([
-            [InlineKeyboardButton("➕ افزودن ربات به گروه", url="https://t.me/AFGR63_bot?startgroup=true")]
-        ])
-    return None
-
-# ================================
-# هندلر اصلی اینستاگرام
+# هندلر دانلود اینستاگرام
 # ================================
 async def instagram_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message or not update.message.text:
         return
 
-    text = update.message.text.strip()
-    m = URL_RE.search(text)
-    if not m:
-        return
+    url = update.message.text.strip()
+    chat_id = update.effective_chat.id
 
-    url = m.group(1)
     if "instagram.com" not in url:
         return
 
-    if update.effective_chat.type != "private":
-        allowed = await is_admin(update, context)
-        if not allowed:
-            return
+    msg = await update.message.reply_text("⬇️ در حال دانلود از Instagram ...")
 
-    msg = await update.message.reply_text("📥 در حال بررسی لینک اینستاگرام...")
+    # فایل کوکی موقت بساز
+    cookie_path = os.path.join(DOWNLOAD_FOLDER, "instagram_cookie.txt")
+    with open(cookie_path, "w", encoding="utf-8") as f:
+        f.write(INSTAGRAM_COOKIES.strip())
 
     ydl_opts = {
+        "format": "mp4",
         "quiet": True,
-        "cookiefile": COOKIE_FILE,
-        "format": "bestvideo+bestaudio/best",
-        "outtmpl": "downloads/%(id)s.%(ext)s",
+        "outtmpl": os.path.join(DOWNLOAD_FOLDER, "%(id)s.%(ext)s"),
         "merge_output_format": "mp4",
-        "noplaylist": True,
+        "cookiefile": cookie_path,
+        "noplaylist": False,
+        "ignoreerrors": True
     }
 
     try:
-        os.makedirs("downloads", exist_ok=True)
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=True)
-            await msg.edit_text("⬇ در حال ارسال فایل‌ها...")
+            if info is None:
+                await msg.edit_text("❌ امکان دانلود این پست وجود ندارد.")
+                return
 
-            files_to_send = []
+            entries = info.get("entries", [info])
 
-            if "entries" in info:  # چندتایی
-                files_to_send = [ydl.prepare_filename(entry) for entry in info["entries"]]
-            else:  # تک پست
-                files_to_send = [ydl.prepare_filename(info)]
+            for entry in entries:
+                filename = ydl.prepare_filename(entry)
+                if not os.path.exists(filename):
+                    continue
 
-            for file in files_to_send:
-                ext = file.split(".")[-1].lower()
-                if ext in ["mp4", "mov", "webm"]:
-                    await update.message.reply_video(video=open(file, "rb"), reply_markup=get_add_btn(update.effective_chat.type))
-                elif ext in ["jpg", "jpeg", "png", "webp"]:
-                    await update.message.reply_photo(photo=open(file, "rb"), reply_markup=get_add_btn(update.effective_chat.type))
-                else:
-                    await update.message.reply_document(document=open(file, "rb"), reply_markup=get_add_btn(update.effective_chat.type))
-                os.remove(file)  # حذف فایل بعد فرستادن
+                # ارسال ویدیو
+                with open(filename, "rb") as fvideo:
+                    await context.bot.send_video(chat_id, fvideo, caption=f"🎬 {entry.get('title', 'Instagram Video')}")
 
-            await msg.delete()
+                # تبدیل و ارسال MP3
+                mp3_path = await convert_to_mp3(filename)
+                if mp3_path and os.path.exists(mp3_path):
+                    with open(mp3_path, "rb") as faudio:
+                        await context.bot.send_audio(chat_id, faudio, caption="🎵 صوت ویدیو")
+                    os.remove(mp3_path)
+
+                # حذف فایل ویدیو
+                os.remove(filename)
+
+        os.remove(cookie_path)
+        await msg.delete()
 
     except Exception as e:
-        await msg.edit_text(f"❌ نتوانستم دانلود کنم.\n⚠️ خطا: {e}")
+        await msg.edit_text(f"❌ خطا در دانلود از اینستاگرام: {e}")
