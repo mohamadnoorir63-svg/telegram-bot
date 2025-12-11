@@ -29,10 +29,9 @@ os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
 
 URL_RE = re.compile(r"(https?://[^\s]+)")
 
-# 🚀 ThreadPool توربو مخصوص Heroku
+# 🚀 ThreadPool توربو مخصوص Heroku / VPS
 executor = ThreadPoolExecutor(max_workers=12)
 
-# ذخیره لینک‌ها برای انتخاب کیفیت
 pending_links = {}
 
 # ================================
@@ -55,7 +54,7 @@ async def is_admin(update, context):
 
 
 # ================================
-# SUPER TURBO yt_dlp OPTIONS
+# SUPER ULTRA TURBO OPTIONS
 # ================================
 
 def turbo_video_opts(max_height):
@@ -63,18 +62,36 @@ def turbo_video_opts(max_height):
         "cookiefile": COOKIE_FILE,
         "quiet": True,
         "ignoreerrors": True,
-        "format": f"bestvideo[height<={max_height}]+bestaudio/best[height<={max_height}]/best",
+
+        # بهترین فرمت ممکن برای تلگرام
+        "format": (
+            f"bestvideo[height<={max_height}][ext=mp4]"
+            f"+bestaudio[ext=m4a]/best[height<={max_height}]"
+        ),
+
         "merge_output_format": "mp4",
 
-        # 🚀 مهم‌ترین بخش برای افزایش سرعت
-        "concurrent_fragment_downloads": 20,
-        "http_chunk_size": 1048576,  # 1MB chunks → بهترین سرعت روی Heroku
+        # ==== ULTRA TURBO ====
+        "concurrent_fragment_downloads": 50,
+        "http_chunk_size": 5242880,  # 5MB
+        "retries": 50,
+        "fragment_retries": 50,
+        "buffersize": 0,
+        "ratelimit": 0,
+        "throttled-rate": 0,
+        "socket_timeout": 30,
 
-        "retries": 25,
-        "fragment_retries": 25,
         "nopart": True,
         "noprogress": True,
         "overwrites": True,
+
+        # خروجی کاملا سازگار با تلگرام
+        "postprocessors": [
+            {
+                "key": "FFmpegVideoConvertor",
+                "preferedformat": "mp4"
+            }
+        ],
 
         "outtmpl": f"{DOWNLOAD_FOLDER}/%(id)s.%(ext)s",
     }
@@ -85,12 +102,13 @@ def turbo_audio_opts():
         "cookiefile": COOKIE_FILE,
         "quiet": True,
         "ignoreerrors": True,
+
         "format": "bestaudio/best",
 
-        "concurrent_fragment_downloads": 20,
-        "http_chunk_size": 1048576,
-        "retries": 25,
-        "fragment_retries": 25,
+        "concurrent_fragment_downloads": 50,
+        "http_chunk_size": 5242880,
+        "retries": 50,
+        "fragment_retries": 50,
 
         "nopart": True,
         "noprogress": True,
@@ -190,7 +208,7 @@ async def youtube_quality_handler(update: Update, context: ContextTypes.DEFAULT_
     # AUDIO DL
     # ------------------------------
     if choice == "yt_audio":
-        await cq.edit_message_text("⬇ در حال دانلود صوت (Turbo)...")
+        await cq.edit_message_text("⬇ در حال دانلود صوت (Ultra Turbo)...")
 
         loop = asyncio.get_running_loop()
         info, mp3_file = await loop.run_in_executor(
@@ -230,7 +248,7 @@ async def youtube_quality_handler(update: Update, context: ContextTypes.DEFAULT_
         q = int(choice.split("_")[1])
         quality_label = f"{q}p"
 
-        await cq.edit_message_text(f"⬇ در حال دانلود کیفیت {quality_label} (Turbo)...")
+        await cq.edit_message_text(f"⬇ در حال دانلود کیفیت {quality_label} (Ultra Turbo)...")
 
         loop = asyncio.get_running_loop()
         info, video_file = await loop.run_in_executor(
