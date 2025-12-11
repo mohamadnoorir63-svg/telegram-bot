@@ -115,7 +115,7 @@ async def save_command_message(update: Update, context: ContextTypes.DEFAULT_TYP
         if entry["type"] == "text" and e.get("data") == entry.get("data"):
             is_duplicate = True
             break
-        elif entry["type"] != "text" and e.get("file_id") == entry.get("file_id"] and e.get("caption") == entry.get("caption"):
+        elif entry["type"] != "text" and e.get("file_id") == entry.get("file_id") and e.get("caption") == entry.get("caption"):
             is_duplicate = True
             break
 
@@ -169,7 +169,12 @@ async def save_command_end(update: Update, context: ContextTypes.DEFAULT_TYPE):
         doc["responses"] = doc["responses"][-200:]
 
     commands[name] = doc
-    save_commands_local(commands)
+
+    try:
+        save_commands_local(commands)
+    except Exception as e:
+        await update.message.reply_text(f"❌ خطا در ذخیره‌سازی: {e}")
+        return
 
     context.user_data.pop("saving_command", None)
     await update.message.reply_text(f"✅ ذخیره پاسخ‌ها برای دستور <b>{name}</b> پایان یافت.", parse_mode="HTML")
@@ -185,47 +190,27 @@ async def handle_custom_command(update: Update, context: ContextTypes.DEFAULT_TY
     if text not in commands:
         return
 
-    user = update.effective_user
-    chat = update.effective_chat
     cmd = commands[text]
-
-    # دسترسی
-    is_allowed = False
-    if chat and chat.type in ["group", "supergroup"]:
-        if user.id == ADMIN_ID:
-            is_allowed = True
-        else:
-            try:
-                member = await chat.get_member(user.id)
-                if member.status in ["administrator", "creator"]:
-                    is_allowed = True
-            except:
-                pass
-        if not is_allowed:
-            return
-    else:
-        is_allowed = True
-
     responses = cmd.get("responses", [])
     if not responses:
         return await update.message.reply_text("⚠️ پاسخی ثبت نشده!")
 
-    # ---------- انتخاب پاسخ با منطق بدون تکرار ----------
-    if len(responses) == 1:
-        chosen = responses[0]
-    else:
-        used = cmd.get("last_used", [])
-        if len(used) >= len(responses):
-            used = []
-        unused = [i for i in range(len(responses)) if i not in used]
-        chosen_index = random.choice(unused)
-        chosen = responses[chosen_index]
-        used.append(chosen_index)
-        cmd["last_used"] = used
-        commands[text] = cmd
-        save_commands_local(commands)
+    # تعیین index پاسخ بدون تکرار تا همه پاسخ‌ها ارسال شوند
+    used = cmd.get("last_used", [])
+    if len(used) >= len(responses):
+        used = []
 
-    # ---------- ارسال پاسخ ----------
+    unused = [i for i in range(len(responses)) if i not in used]
+    chosen_index = random.choice(unused)
+    chosen = responses[chosen_index]
+
+    # ذخیره index استفاده شده
+    used.append(chosen_index)
+    cmd["last_used"] = used
+    commands[text] = cmd
+    save_commands_local(commands)
+
+    # ارسال پاسخ بر اساس نوع
     rt = chosen["type"]
     if rt == "text":
         await update.message.reply_text(chosen["data"])
@@ -277,6 +262,23 @@ async def delete_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     del commands[name]
     save_commands_local(commands)
     await update.message.reply_text(f"🗑 دستور <b>{name}</b> حذف شد.", parse_mode="HTML")
+
+
+# ================= پاکسازی دستورات گروه =================
+def cleanup_group_commands(chat_id: int):
+    try:
+        commands = load_commands()
+        new_data = {}
+        removed = 0
+        for name, info in commands.items():
+            if info.get("group_id") == chat_id and info.get("owner_id") != ADMIN_ID:
+                removed += 1
+                continue
+            new_data[name] = info
+        save_commands_local(new_data)
+        print(f"[command_manager] cleaned {removed} commands from group {chat_id}")
+    except Exception as e:
+        print(f"[command_manager] cleanup error: {e}")
 
 
 # ================= ویرایش دستور =================
