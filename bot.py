@@ -29,6 +29,7 @@ from auto_brain import auto_backup
 from command_manager import (
     save_command,
     delete_command,
+    edit_command,      # ⬅️ اینو اضافه کن
     handle_custom_command,
     list_commands,
     cleanup_group_commands
@@ -1424,6 +1425,7 @@ application.add_handler(CommandHandler("listsudo", list_sudos))
 application.add_handler(CommandHandler("save", save_command))
 application.add_handler(CommandHandler("del", delete_command))
 application.add_handler(CommandHandler("listcmds", list_commands))
+application.add_handler(CommandHandler("editcmd", edit_command))
 
 application.add_handler(
     MessageHandler(filters.TEXT & (~filters.COMMAND) & filters.Regex(r"^ترجمه به"), translate_reply_handler),
