@@ -1571,14 +1571,7 @@ application.add_handler(
     CallbackQueryHandler(music_select_handler, pattern=r"^music_select:"),
     group=-5000  # هم گروه برای هماهنگی با MessageHandler
 )
-from modules.youtube_mp3_handler import youtube_mp3_handler
-from telegram.ext import MessageHandler, filters
 
-# همه پیام‌های متنی (غیر از کامند) که شامل اسم آهنگ یا لینک هستند
-application.add_handler(
-    MessageHandler(filters.TEXT & ~filters.COMMAND, youtube_mp3_handler),
-    group=4000  # عدد برای اولویت
-)
 # ==========================================================
 # 🤖 پنل ChatGPT هوش مصنوعی
 # ==========================================================
