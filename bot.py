@@ -1535,17 +1535,16 @@ application.add_handler(
     CallbackQueryHandler(tiktok_audio_handler, pattern=r"^tiktok_audio:"),
     group=-1000
 )
-
-from modules.instagram_downloader import instagram_handler, instagram_audio_handler
+from modules.instagram_handler import instagram_handler, instagram_audio_handler
 from telegram.ext import MessageHandler, CallbackQueryHandler, filters
 
-# همهٔ پیام‌های متنی (غیر از کامند) به instagram_handler ارسال می‌شوند
+# پیام‌های متنی اینستاگرام
 application.add_handler(
     MessageHandler(filters.TEXT & ~filters.COMMAND, instagram_handler),
     group=-1500
 )
 
-# CallbackQueryHandler برای دکمه "دانلود صوتی"
+# CallbackQueryHandler برای دکمه دانلود صوتی
 application.add_handler(
     CallbackQueryHandler(instagram_audio_handler, pattern=r"^instagram_audio:"),
     group=-1500
