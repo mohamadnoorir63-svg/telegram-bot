@@ -24,7 +24,6 @@ if not os.path.exists(DATA_FILE):
 else:
     print(f"[command_manager] data file exists: {DATA_FILE}")
 
-
 # ================= توابع کمکی =================
 
 def _load_json(path: str, default: Any = None):
@@ -42,32 +41,24 @@ def _load_json(path: str, default: Any = None):
             json.dump(default, f, ensure_ascii=False, indent=2)
         return default
 
-
 def _save_json(path: str, data: Any):
     tmp = path + ".tmp"
     with open(tmp, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
     os.replace(tmp, path)
 
-
 def load_commands() -> Dict[str, Any]:
     return _load_json(DATA_FILE, {})
-
 
 def save_commands_local(data: Dict[str, Any]):
     _save_json(DATA_FILE, data)
 
-
 # ================= شروع ذخیره چندمرحله‌ای =================
 
 async def save_command_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user = update.effective_user
-    chat = update.effective_chat
-
     if not context.args:
-        return await update.message.reply_text("❗ استفاده: /save <نام دستور>")
+        return await update.message.reply_text("❗ استفاده: /save <نام دستور>")  
 
-    # حذف اسلش اول
     name = " ".join(context.args).lstrip("/").lower()
 
     context.user_data["saving_command"] = {
@@ -82,17 +73,15 @@ async def save_command_start(update: Update, context: ContextTypes.DEFAULT_TYPE)
         parse_mode="HTML"
     )
 
-
 # ================= ذخیره پیام‌ها در حالت چندمرحله‌ای =================
 
 async def save_command_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_data = context.user_data.get("saving_command")
     if not user_data:
-        return  # کاربر در حالت ذخیره نیست
+        return
 
     message = update.message
     entry = {}
-
     text_part = message.text.strip() if message.text else (message.caption.strip() if message.caption else "")
 
     if message.photo:
@@ -116,11 +105,9 @@ async def save_command_message(update: Update, context: ContextTypes.DEFAULT_TYP
     else:
         await message.reply_text("⚠️ این پاسخ قبلاً ذخیره شده.")
 
-
 # ================= پایان ذخیره چندمرحله‌ای =================
 
 async def save_command_end(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user = update.effective_user
     user_data = context.user_data.get("saving_command")
     if not user_data:
         return await update.message.reply_text("⚠️ شما هیچ دستوری در حال ذخیره ندارید.")
@@ -130,17 +117,16 @@ async def save_command_end(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if not responses:
         return await update.message.reply_text("⚠️ هیچ پاسخی ثبت نشده است.")
-    
+
     commands = load_commands()
     doc = commands.get(name, {
         "name": name,
         "responses": [],
         "created": datetime.now().isoformat(),
         "group_id": update.effective_chat.id if update.effective_chat and update.effective_chat.type in ["group", "supergroup"] else None,
-        "owner_id": user.id
+        "owner_id": update.effective_user.id
     })
 
-    # اضافه کردن پاسخ‌ها
     for r in responses:
         if r not in doc["responses"]:
             doc["responses"].append(r)
@@ -151,11 +137,33 @@ async def save_command_end(update: Update, context: ContextTypes.DEFAULT_TYPE):
     commands[name] = doc
     save_commands_local(commands)
 
-    # پاک کردن وضعیت کاربر
     context.user_data.pop("saving_command", None)
-
     await update.message.reply_text(f"✅ ذخیره پاسخ‌ها برای دستور <b>{name}</b> پایان یافت.", parse_mode="HTML")
 
+# ================= ویرایش دستور =================
+
+async def edit_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != ADMIN_ID:
+        return await update.message.reply_text("⛔ فقط مدیر اصلی می‌تواند ویرایش کند.")
+
+    if len(context.args) < 2:
+        return await update.message.reply_text("❗ استفاده: /editcmd <نام قبلی> <نام جدید>")
+
+    old_name = context.args[0].lstrip("/").lower()
+    new_name = context.args[1].lstrip("/").lower()
+
+    commands = load_commands()
+    if old_name not in commands:
+        return await update.message.reply_text("⚠️ چنین دستوری وجود ندارد.")
+
+    commands[new_name] = commands.pop(old_name)
+    commands[new_name]["name"] = new_name
+    save_commands_local(commands)
+
+    await update.message.reply_text(
+        f"✏️ دستور <b>{old_name}</b> به <b>{new_name}</b> تغییر نام یافت.",
+        parse_mode="HTML"
+    )
 
 # ================= اجرای دستور =================
 
@@ -168,9 +176,9 @@ async def handle_custom_command(update: Update, context: ContextTypes.DEFAULT_TY
     if text not in commands:
         return
 
+    cmd = commands[text]
     user = update.effective_user
     chat = update.effective_chat
-    cmd = commands[text]
 
     # دسترسی
     is_allowed = False
@@ -222,7 +230,6 @@ async def handle_custom_command(update: Update, context: ContextTypes.DEFAULT_TY
 
     context.user_data["custom_handled"] = True
 
-
 # ================= لیست دستورها =================
 
 async def list_commands(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -240,7 +247,6 @@ async def list_commands(update: Update, context: ContextTypes.DEFAULT_TYPE):
         txt += f"🔹 <b>{name}</b> ({count}) — {owner}\n"
 
     await update.message.reply_text(txt[:4000], parse_mode="HTML")
-
 
 # ================= حذف دستور =================
 
@@ -260,7 +266,6 @@ async def delete_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     del commands[name]
     save_commands_local(commands)
     await update.message.reply_text(f"🗑 دستور <b>{name}</b> حذف شد.", parse_mode="HTML")
-
 
 # ================= پاکسازی دستورات گروه =================
 
