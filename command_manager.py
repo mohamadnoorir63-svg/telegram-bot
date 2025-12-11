@@ -199,19 +199,22 @@ async def handle_custom_command(update: Update, context: ContextTypes.DEFAULT_TY
     if not responses:
         return await update.message.reply_text("⚠️ پاسخی ثبت نشده!")
 
-    used = cmd.get("last_used", [])
-    if len(used) >= len(responses):
-        used = []
+    # ---------- رفتار رندوم بدون تکرار ----------
+    if len(responses) == 1:
+        chosen = responses[0]
+    else:
+        used = cmd.get("last_used", [])
+        if len(used) >= len(responses):
+            used = []
+        unused = [i for i in range(len(responses)) if i not in used]
+        chosen_index = random.choice(unused)
+        chosen = responses[chosen_index]
+        used.append(chosen_index)
+        cmd["last_used"] = used
+        commands[text] = cmd
+        save_commands_local(commands)
 
-    unused = [i for i in range(len(responses)) if i not in used]
-    chosen_index = random.choice(unused)
-    chosen = responses[chosen_index]
-
-    used.append(chosen_index)
-    cmd["last_used"] = used
-    commands[text] = cmd
-    save_commands_local(commands)
-
+    # ---------- ارسال پیام ----------
     rt = chosen["type"]
     if rt == "text":
         await update.message.reply_text(chosen["data"])
@@ -227,8 +230,6 @@ async def handle_custom_command(update: Update, context: ContextTypes.DEFAULT_TY
         await update.message.reply_animation(chosen["file_id"], caption=chosen.get("caption"))
 
     context.user_data["custom_handled"] = True
-
-
 # ================= لیست دستورها =================
 async def list_commands(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_ID:
