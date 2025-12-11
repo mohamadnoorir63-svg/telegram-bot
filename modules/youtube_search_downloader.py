@@ -1,155 +1,81 @@
-import io
-import re
+import os
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
+
 import yt_dlp
-from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
+from telegram import Update
 from telegram.ext import ContextTypes
 
 # ================================
-# سودو
-# ================================
-SUDO_USERS = [8588347189]  # آیدی شما
+SUDO_USERS = [8588347189]
+DOWNLOAD_FOLDER = "downloads"
+os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
+
+executor = ThreadPoolExecutor(max_workers=4)  # افزایش سرعت با چند Thread
 
 # ================================
-# تنظیمات
+# دانلود ویدیو یا صوت
 # ================================
-COOKIE_FILE = "modules/youtube_cookie.txt"  # کوکی یوتیوب شما
-URL_RE = re.compile(r"(https?://[^\s]+)")
-executor = ThreadPoolExecutor(max_workers=3)
-pending_links = {}
-
-# ================================
-# دکمه افزودن ربات
-# ================================
-def get_add_btn(chat_type):
-    if chat_type == "private":
-        return InlineKeyboardMarkup([
-            [InlineKeyboardButton("➕ افزودن ربات به گروه", url="https://t.me/AFGR63_bot?startgroup=true")]
-        ])
-    return None
-
-# ================================
-# چک مدیر بودن
-# ================================
-async def is_admin(update, context):
-    chat = update.effective_chat
-    user = update.effective_user
-    if chat.type == "private" or user.id in SUDO_USERS:
-        return True
-    try:
-        admins = await context.bot.get_chat_administrators(chat.id)
-        return user.id in [a.user.id for a in admins]
-    except:
-        return False
-
-# ================================
-# دانلود مستقیم صوت به BytesIO
-# ================================
-def _download_audio_bytes(url):
-    buffer = io.BytesIO()
-    ydl_opts = {
-        "format": "bestaudio/best",
+def _download_file(url, audio_only=False):
+    opts = {
+        "format": "bestaudio/best" if audio_only else "bestaudio/best",
         "quiet": True,
         "noplaylist": True,
         "noprogress": True,
-        "cookiefile": COOKIE_FILE,
-        "postprocessors": [],  # غیرفعال کردن ffmpeg داخلی
-        "outtmpl": "%(id)s.%(ext)s",
+        "outtmpl": os.path.join(DOWNLOAD_FOLDER, "%(id)s.%(ext)s"),
+        "concurrent_fragment_downloads": 16,
     }
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        info = ydl.extract_info(url)
+    if audio_only:
+        opts["postprocessors"] = [{
+            "key": "FFmpegExtractAudio",
+            "preferredcodec": "mp3",
+            "preferredquality": "192",
+        }]
+    with yt_dlp.YoutubeDL(opts) as ydl:
+        info = ydl.extract_info(url, download=True)
         filename = ydl.prepare_filename(info)
-        with open(filename, "rb") as f:
-            buffer.write(f.read())
-    buffer.seek(0)
-    buffer.name = f"{info.get('title','audio')}.mp3"
-    return info, buffer
+        if audio_only:
+            filename = filename.rsplit(".", 1)[0] + ".mp3"
+    return info, filename
 
 # ================================
-# دانلود مستقیم ویدیو به BytesIO
+# هندلر دانلود
 # ================================
-def _download_video_bytes(url):
-    buffer = io.BytesIO()
-    ydl_opts = {
-        "format": "bestvideo+bestaudio/best",
-        "quiet": True,
-        "noplaylist": True,
-        "noprogress": True,
-        "cookiefile": COOKIE_FILE,
-        "postprocessors": [],  # غیرفعال کردن ffmpeg داخلی
-        "outtmpl": "%(id)s.%(ext)s",
-    }
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        info = ydl.extract_info(url)
-        filename = ydl.prepare_filename(info)
-        with open(filename, "rb") as f:
-            buffer.write(f.read())
-    buffer.seek(0)
-    buffer.name = f"{info.get('title','video')}.mp4"
-    return info, buffer
-
-# ================================
-# مرحله ۱ — دریافت لینک و انتخاب نوع
-# ================================
-async def youtube_search_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def download_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message or not update.message.text:
         return
-    text = update.message.text.strip()
-    match = URL_RE.search(text)
-    if not match:
-        return
-    url = match.group(1)
-    if "youtube.com" not in url and "youtu.be" not in url:
-        return
-    if update.effective_chat.type != "private":
-        if not await is_admin(update, context):
-            return
-    pending_links[update.effective_chat.id] = url
-    keyboard = [
-        [InlineKeyboardButton("🎵 Audio (MP3)", callback_data="yt_audio")],
-        [InlineKeyboardButton("🎬 Video (MP4)", callback_data="yt_video")],
-    ]
-    await update.message.reply_text(
-        "🎬 لطفاً نوع دانلود را انتخاب کنید:",
-        reply_markup=InlineKeyboardMarkup(keyboard)
-    )
 
-# ================================
-# مرحله ۲ — دانلود مستقیم و ارسال
-# ================================
-async def youtube_quality_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    cq = update.callback_query
-    chat_id = cq.message.chat_id
-    await cq.answer()
+    url = update.message.text.strip()
+    chat_id = update.effective_chat.id
+
+    # محدودیت در گروه
     if update.effective_chat.type != "private":
-        if not await is_admin(update, context):
+        user = update.effective_user
+        if user.id not in SUDO_USERS:
             return
-    url = pending_links.get(chat_id)
-    if not url:
-        return await cq.message.reply_text("❌ لینک معتبر یافت نشد.")
-    choice = cq.data
+
+    msg = await update.message.reply_text("⬇ در حال دانلود ...")
+
     loop = asyncio.get_running_loop()
-    status_msg = await cq.message.reply_text("⬇ در حال دانلود مستقیم ...")
+    # مشخص کنید صوت یا ویدیو
+    audio_only = False  # True برای MP3
 
-    if choice == "yt_audio":
-        info, audio_bytes = await loop.run_in_executor(executor, _download_audio_bytes, url)
-        await context.bot.send_audio(
+    try:
+        info, filename = await loop.run_in_executor(executor, _download_file, url, audio_only)
+
+        await msg.edit_text("⬇ در حال ارسال فایل ...")
+        # ارسال با send_document (پشتیبانی تا 2 گیگ)
+        sent = await context.bot.send_document(
             chat_id,
-            audio=audio_bytes,
-            caption=f"🎵 {info.get('title','Audio')}",
-            reply_markup=get_add_btn(update.effective_chat.type)
+            open(filename, "rb"),
+            caption=info.get("title", "File")
         )
-        await status_msg.delete()
+
+    except Exception as e:
+        await msg.edit_text(f"❌ خطا: {e}")
         return
 
-    if choice == "yt_video":
-        info, video_bytes = await loop.run_in_executor(executor, _download_video_bytes, url)
-        await context.bot.send_video(
-            chat_id,
-            video=video_bytes,
-            caption=f"🎬 {info.get('title','Video')}",
-            reply_markup=get_add_btn(update.effective_chat.type)
-        )
-        await status_msg.delete()
-        return
+    finally:
+        if os.path.exists(filename):
+            os.remove(filename)
+        await msg.delete()
