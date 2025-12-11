@@ -69,10 +69,9 @@ async def save_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "❗ استفاده: /save <نام دستور> (روی پیام ریپلای کنید)"
         )
 
-    # گرفتن نام دستور از متن کامل پیام (با حفظ اسلش)
-    raw = update.message.text
-    name = raw.replace("/save", "", 1).strip()
-    name = name.lower()
+    # گرفتن نام دستور از متن کامل پیام و حذف اسلش اول
+    raw = update.message.text.replace("/save", "", 1).strip()
+    name = raw.lstrip("/").lower()  # حذف اسلش اول
 
     reply = update.message.reply_to_message
     if not reply:
@@ -91,11 +90,7 @@ async def save_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     entry = {}
 
     # متن یا کپشن پیام
-    text_part = ""
-    if reply.text:
-        text_part = reply.text.strip()
-    elif reply.caption:
-        text_part = reply.caption.strip()
+    text_part = reply.text.strip() if reply.text else (reply.caption.strip() if reply.caption else "")
 
     # فایل‌ها
     if reply.photo:
@@ -113,51 +108,40 @@ async def save_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         return await update.message.reply_text("⚠️ این نوع پیام پشتیبانی نمی‌شود!")
 
-    # جلوگیری از ورود تکراری
     if entry not in doc["responses"]:
         doc["responses"].append(entry)
-
         while len(doc["responses"]) > 200:
             doc["responses"].pop(0)
-
         commands[name] = doc
         save_commands_local(commands)
-
-        return await update.message.reply_text(
+        await update.message.reply_text(
             f"✅ پاسخ برای دستور <b>{name}</b> ذخیره شد.",
             parse_mode="HTML"
         )
-
     else:
-        return await update.message.reply_text("⚠️ این پاسخ قبلاً ذخیره شده.")
+        await update.message.reply_text("⚠️ این پاسخ قبلاً ذخیره شده.")
 
 
-# ================= ویرایش یک دستور =================
+# ================= ویرایش دستور =================
 
 async def edit_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
-
     if user.id != ADMIN_ID:
         return await update.message.reply_text("⛔ فقط مدیر اصلی می‌تواند ویرایش کند.")
-
     if len(context.args) < 2:
         return await update.message.reply_text("❗ استفاده: /editcmd <نام قبلی> <نام جدید>")
 
-    old_name = context.args[0].lower()
-    new_name = context.args[1].lower()
+    old_name = context.args[0].lstrip("/").lower()
+    new_name = context.args[1].lstrip("/").lower()
 
     commands = load_commands()
-
     if old_name not in commands:
         return await update.message.reply_text("⚠️ چنین دستوری وجود ندارد.")
 
-    # انتقال اطلاعات دستور
     commands[new_name] = commands.pop(old_name)
     commands[new_name]["name"] = new_name
-
     save_commands_local(commands)
-
-    return await update.message.reply_text(
+    await update.message.reply_text(
         f"✏️ دستور <b>{old_name}</b> به <b>{new_name}</b> تغییر نام یافت.",
         parse_mode="HTML"
     )
@@ -169,18 +153,16 @@ async def handle_custom_command(update: Update, context: ContextTypes.DEFAULT_TY
     if not update.message or not update.message.text:
         return
 
-    text = update.message.text.strip().lower()
+    text = update.message.text.strip().lower().lstrip("/")  # حذف اسلش اول
     commands = load_commands()
-
     if text not in commands:
         return
 
     user = update.effective_user
     chat = update.effective_chat
-
     cmd = commands[text]
 
-    # دسترسی‌ها
+    # دسترسی
     is_allowed = False
     if chat and chat.type in ["group", "supergroup"]:
         if user.id == ADMIN_ID:
@@ -205,7 +187,6 @@ async def handle_custom_command(update: Update, context: ContextTypes.DEFAULT_TY
     if len(used) >= len(responses):
         used = []
 
-    # انتخاب تصادفی بدون تکرار
     unused = [i for i in range(len(responses)) if i not in used]
     chosen_index = random.choice(unused)
     chosen = responses[chosen_index]
@@ -216,7 +197,6 @@ async def handle_custom_command(update: Update, context: ContextTypes.DEFAULT_TY
     save_commands_local(commands)
 
     rt = chosen["type"]
-
     if rt == "text":
         await update.message.reply_text(chosen["data"])
     elif rt == "photo":
@@ -252,7 +232,7 @@ async def list_commands(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(txt[:4000], parse_mode="HTML")
 
 
-# ================= حذف یک دستور =================
+# ================= حذف دستور =================
 
 async def delete_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_ID:
@@ -261,7 +241,7 @@ async def delete_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.args:
         return await update.message.reply_text("❗ استفاده: /delcmd <نام دستور>")
 
-    name = context.args[0].lower()
+    name = context.args[0].lstrip("/").lower()
     commands = load_commands()
 
     if name not in commands:
@@ -269,7 +249,6 @@ async def delete_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     del commands[name]
     save_commands_local(commands)
-
     await update.message.reply_text(f"🗑 دستور <b>{name}</b> حذف شد.", parse_mode="HTML")
 
 
@@ -280,15 +259,12 @@ def cleanup_group_commands(chat_id: int):
         commands = load_commands()
         new_data = {}
         removed = 0
-
         for name, info in commands.items():
             if info.get("group_id") == chat_id and info.get("owner_id") != ADMIN_ID:
                 removed += 1
                 continue
             new_data[name] = info
-
         save_commands_local(new_data)
         print(f"[command_manager] cleaned {removed} commands from group {chat_id}")
-
     except Exception as e:
         print(f"[command_manager] cleanup error: {e}")
