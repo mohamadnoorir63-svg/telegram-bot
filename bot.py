@@ -27,9 +27,11 @@ from telegram.ext import InlineQueryHandler
 from selective_backup import selective_backup_menu, selective_backup_buttons
 from auto_brain import auto_backup
 from command_manager import (
-    save_command,
+    save_command_start,     # شروع ذخیره چندمرحله‌ای
+    save_command_end,       # پایان ذخیره چندمرحله‌ای
+    save_command_message,   # ذخیره پیام‌ها در حالت چندمرحله‌ای
     delete_command,
-    edit_command,      # ⬅️ اینو اضافه کن
+    edit_command,           # ویرایش دستور
     handle_custom_command,
     list_commands,
     cleanup_group_commands
@@ -1422,10 +1424,18 @@ application.add_handler(CommandHandler("listsudo", list_sudos))
 # ==========================================================
 # 💾 دستورات شخصی (ذخیره، حذف، اجرای دستورها)
 # ==========================================================
-application.add_handler(CommandHandler("save", save_command))
+# شروع ذخیره چندمرحله‌ای
+application.add_handler(CommandHandler("save", save_command_start))
+# پایان ذخیره چندمرحله‌ای
+application.add_handler(CommandHandler("end", save_command_end))
+# دریافت پیام‌ها برای ذخیره در حالت چندمرحله‌ای
+application.add_handler(MessageHandler(filters.ALL & ~filters.COMMAND, save_command_message))
+
+# ویرایش، حذف، لیست و اجرای دستور
+application.add_handler(CommandHandler("edit", edit_command))
 application.add_handler(CommandHandler("del", delete_command))
-application.add_handler(CommandHandler("listcmds", list_commands))
-application.add_handler(CommandHandler("editcmd", edit_command))
+application.add_handler(CommandHandler("list", list_commands))
+application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_custom_command))
 
 application.add_handler(
     MessageHandler(filters.TEXT & (~filters.COMMAND) & filters.Regex(r"^ترجمه به"), translate_reply_handler),
