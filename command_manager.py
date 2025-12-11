@@ -77,6 +77,7 @@ async def save_command_start(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
 
 # ================= ذخیره پیام‌ها در حالت چندمرحله‌ای =================
+
 async def save_command_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_data = context.user_data.get("saving_command")
     if not user_data:
@@ -86,33 +87,37 @@ async def save_command_message(update: Update, context: ContextTypes.DEFAULT_TYP
     if not message:
         return
 
-    entry = {}
-
+    # ریپلای اگر هست ذخیره شود، در غیر این صورت خود پیام
     target = message.reply_to_message or message
-    text_part = target.text.strip() if target.text else (target.caption.strip() if target.caption else "")
 
+    entry = {}
+    text_part = ""
+    if hasattr(target, 'text') and target.text:
+        text_part = target.text.strip()
+    elif hasattr(target, 'caption') and target.caption:
+        text_part = target.caption.strip()
+
+    # شناسایی نوع پیام
     if target.photo:
-        entry = {"type": "photo", "file_id": target.photo[-1].file_id, "caption": text_part or ""}
+        entry = {"type": "photo", "file_id": target.photo[-1].file_id, "caption": text_part}
     elif target.video:
-        entry = {"type": "video", "file_id": target.video.file_id, "caption": text_part or ""}
+        entry = {"type": "video", "file_id": target.video.file_id, "caption": text_part}
     elif target.document:
-        entry = {"type": "document", "file_id": target.document.file_id, "caption": text_part or ""}
+        entry = {"type": "document", "file_id": target.document.file_id, "caption": text_part}
     elif target.audio:
-        entry = {"type": "audio", "file_id": target.audio.file_id, "caption": text_part or ""}
+        entry = {"type": "audio", "file_id": target.audio.file_id, "caption": text_part}
     elif target.animation:
-        entry = {"type": "animation", "file_id": target.animation.file_id, "caption": text_part or ""}
-    elif text_part:
-        entry = {"type": "text", "data": text_part}
+        entry = {"type": "animation", "file_id": target.animation.file_id, "caption": text_part}
     else:
-        entry = {"type": "text", "data": ""}
+        # اگر هیچ فایل نبود، متن ذخیره شود
+        entry = {"type": "text", "data": text_part or "(پیام خالی)"}
 
+    # اضافه کردن به لیست پاسخ‌ها
     if entry not in user_data["responses"]:
         user_data["responses"].append(entry)
         await message.reply_text(f"✅ پاسخ جدید برای دستور <b>{user_data['name']}</b> ذخیره شد.", parse_mode="HTML")
     else:
         await message.reply_text("⚠️ این پاسخ قبلاً ذخیره شده.")
-
-
 # ================= پایان ذخیره چندمرحله‌ای =================
 async def save_command_end(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_data = context.user_data.get("saving_command")
