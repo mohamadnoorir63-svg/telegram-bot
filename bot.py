@@ -1424,19 +1424,15 @@ application.add_handler(CommandHandler("listsudo", list_sudos))
 # ==========================================================
 # 💾 دستورات شخصی (ذخیره، حذف، اجرای دستورها)
 # ==========================================================
-# شروع ذخیره چندمرحله‌ای
 application.add_handler(CommandHandler("save", save_command_start))
-# پایان ذخیره چندمرحله‌ای
 application.add_handler(CommandHandler("endsave", save_command_end))
-# دریافت پیام‌ها برای ذخیره در حالت چندمرحله‌ای
-application.add_handler(MessageHandler(filters.ALL & ~filters.COMMAND, save_command_message))
-
-# ویرایش، حذف، لیست و اجرای دستور
-application.add_handler(CommandHandler("editcmd", edit_command))
 application.add_handler(CommandHandler("delcmd", delete_command))
+application.add_handler(CommandHandler("editcmd", edit_command))
 application.add_handler(CommandHandler("listcmds", list_commands))
-application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_custom_command))
 
+# مهم: این باید بعد از CommandHandler ها اضافه شود
+application.add_handler(MessageHandler(filters.ALL & ~filters.COMMAND, save_command_message))
+application.add_handler(MessageHandler(filters.TEXT & filters.Regex(r'^/'), handle_custom_command))
 application.add_handler(
     MessageHandler(filters.TEXT & (~filters.COMMAND) & filters.Regex(r"^ترجمه به"), translate_reply_handler),
     group=-9
