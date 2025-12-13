@@ -69,7 +69,6 @@ def turbo_video_opts():
         "overwrites": True,
         "ignoreerrors": True,
         "allow_unplayable_formats": True,
-        "progress_hooks": [],
     }
 
 def turbo_audio_opts():
@@ -89,7 +88,6 @@ def turbo_audio_opts():
         }],
         "ignoreerrors": True,
         "allow_unplayable_formats": True,
-        "progress_hooks": [],
     }
 
 # ====================================
@@ -108,7 +106,7 @@ def _download_video_sync(url):
         return info, video_file
 
 # ====================================
-# GET DIRECT URL
+# GET DIRECT URL (برای لینک مستقیم ویدیو)
 # ====================================
 def get_direct_url(url, is_audio=False):
     if url in info_cache:
@@ -128,8 +126,7 @@ def cleanup_temp():
         file_path = os.path.join(DOWNLOAD_FOLDER, f)
         try:
             if os.path.isfile(file_path):
-                # حذف فایل‌های قدیمی‌تر از 10 دقیقه
-                if time.time() - os.path.getmtime(file_path) > 600:
+                if time.time() - os.path.getmtime(file_path) > 600:  # 10 دقیقه
                     os.remove(file_path)
         except Exception:
             pass
@@ -170,7 +167,7 @@ async def youtube_search_handler(update: Update, context: ContextTypes.DEFAULT_T
 # STEP 2 — DOWNLOAD / SEND (HYBRID)
 # ====================================
 async def youtube_download_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    cleanup_temp()  # پاکسازی فایل‌های قدیمی
+    cleanup_temp()
     cq = update.callback_query
     await cq.answer()
     chat_id = cq.message.chat_id
@@ -185,21 +182,26 @@ async def youtube_download_handler(update: Update, context: ContextTypes.DEFAULT
 
     loop = asyncio.get_running_loop()
 
-    # AUDIO → لینک مستقیم
+    # ==================
+    # AUDIO → دانلود و ارسال
+    # ==================
     if cq.data == "yt_audio":
-        await cq.edit_message_text("🎵 در حال دریافت لینک صوت...")
+        await cq.edit_message_text("🎵 در حال دانلود صوت (MP3)...")
         try:
-            audio_url, info = get_direct_url(url, is_audio=True)
+            info, audio_file = await loop.run_in_executor(executor, _download_audio_sync, url)
             await context.bot.send_audio(
                 chat_id=chat_id,
-                audio=audio_url,
+                audio=open(audio_file, "rb"),
                 caption=f"🎵 {info.get('title','')}"
             )
+            os.remove(audio_file)
         except Exception as e:
-            return await context.bot.send_message(chat_id, f"❌ خطا در ارسال صوت\n{e}")
+            return await context.bot.send_message(chat_id, f"❌ دانلود یا ارسال صوت ناموفق بود\n{e}")
         return
 
+    # ==================
     # VIDEO → بررسی حجم
+    # ==================
     try:
         with yt_dlp.YoutubeDL(turbo_video_opts()) as y:
             info = y.extract_info(url, download=False)
@@ -209,7 +211,7 @@ async def youtube_download_handler(update: Update, context: ContextTypes.DEFAULT
 
     estimated_size = info.get('filesize') or info.get('filesize_approx') or 0
 
-    # حجم پایین → دانلود و ارسال
+    # دانلود و ارسال اگر حجم پایین
     if estimated_size <= MAX_TELEGRAM_SIZE:
         await cq.edit_message_text("🎬 در حال دانلود ویدیو (بهترین کیفیت)...")
         try:
@@ -223,7 +225,7 @@ async def youtube_download_handler(update: Update, context: ContextTypes.DEFAULT
         except Exception as e:
             return await context.bot.send_message(chat_id, f"❌ دانلود ویدیو ناموفق بود\n{e}")
     else:
-        # حجم بالا → ارسال لینک مستقیم بدون دانلود
+        # حجم بالا → لینک مستقیم بدون دانلود
         await cq.edit_message_text("🎬 حجم ویدیو بزرگ است، ارسال لینک مستقیم...")
         try:
             video_url, info = get_direct_url(url)
