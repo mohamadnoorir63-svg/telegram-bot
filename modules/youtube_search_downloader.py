@@ -24,6 +24,7 @@ if not os.path.exists(COOKIE_FILE):
         f.write("# Paste YouTube cookies here (Netscape format)\n")
 
 URL_RE = re.compile(r"(https?://[^\s]+)")
+
 executor = ThreadPoolExecutor(max_workers=20)
 pending_links = {}  # chat_id: url
 
@@ -78,49 +79,19 @@ def audio_opts():
     }
 
 # ====================================
-# SAFE SIZE CHECK (NO DOWNLOAD)
-# ====================================
-def get_best_video_audio_size(url):
-    opts = {
-        "quiet": True,
-        "cookiefile": COOKIE_FILE,
-        "skip_download": True,
-    }
-
-    with yt_dlp.YoutubeDL(opts) as y:
-        info = y.extract_info(url, download=False)
-
-    formats = info.get("formats", [])
-
-    best_video = max(
-        (f for f in formats if f.get("vcodec") != "none" and f.get("acodec") == "none"),
-        key=lambda x: x.get("height", 0),
-        default=None
-    )
-
-    best_audio = max(
-        (f for f in formats if f.get("acodec") != "none" and f.get("vcodec") == "none"),
-        key=lambda x: x.get("abr", 0),
-        default=None
-    )
-
-    video_size = best_video.get("filesize") or best_video.get("filesize_approx") or 0
-    audio_size = best_audio.get("filesize") or best_audio.get("filesize_approx") or 0
-
-    return video_size + audio_size, info
-
-# ====================================
 # SYNC DOWNLOAD
 # ====================================
 def _download_audio_sync(url):
     with yt_dlp.YoutubeDL(audio_opts()) as y:
         info = y.extract_info(url, download=True)
-        return info, f"{DOWNLOAD_FOLDER}/{info['id']}.mp3"
+        audio_file = f"{DOWNLOAD_FOLDER}/{info['id']}.mp3"
+        return info, audio_file
 
 def _download_video_sync(url):
     with yt_dlp.YoutubeDL(video_opts()) as y:
         info = y.extract_info(url, download=True)
-        return info, f"{DOWNLOAD_FOLDER}/{info['id']}.mp4"
+        video_file = f"{DOWNLOAD_FOLDER}/{info['id']}.mp4"
+        return info, video_file
 
 # ====================================
 # CLEAN TEMP FILES
@@ -167,7 +138,7 @@ async def youtube_search_handler(update: Update, context: ContextTypes.DEFAULT_T
     )
 
 # ====================================
-# STEP 2 — DOWNLOAD
+# STEP 2 — DOWNLOAD (SAFE SIZE CHECK)
 # ====================================
 async def youtube_download_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     cleanup_temp()
@@ -192,6 +163,7 @@ async def youtube_download_handler(update: Update, context: ContextTypes.DEFAULT
             info, audio_file = await loop.run_in_executor(
                 executor, _download_audio_sync, url
             )
+
             if os.path.getsize(audio_file) > MAX_FILE_SIZE:
                 os.remove(audio_file)
                 return await cq.edit_message_text("❌ حجم صوت بیشتر از حد مجاز است")
@@ -208,19 +180,36 @@ async def youtube_download_handler(update: Update, context: ContextTypes.DEFAULT
 
     # ---------- VIDEO ----------
     if cq.data == "yt_video":
-        await cq.edit_message_text("🎬 در حال بررسی حجم واقعی...")
+        await cq.edit_message_text("🎬 در حال بررسی حجم ویدیو...")
 
         try:
-            total_size, info = await loop.run_in_executor(
-                executor, get_best_video_audio_size, url
-            )
+            opts = {
+                "quiet": True,
+                "cookiefile": COOKIE_FILE,
+                "format": "bestvideo+bestaudio/best",
+                "skip_download": True,
+            }
+
+            with yt_dlp.YoutubeDL(opts) as y:
+                info = y.extract_info(url, download=False)
+
+            total_size = 0
+
+            if "requested_formats" in info:
+                for f in info["requested_formats"]:
+                    total_size += f.get("filesize") or f.get("filesize_approx") or 0
+            else:
+                total_size = info.get("filesize") or info.get("filesize_approx") or 0
+
         except Exception as e:
-            return await cq.edit_message_text(f"❌ خطا در بررسی حجم\n{e}")
+            return await context.bot.send_message(
+                chat_id, f"❌ دریافت اطلاعات ویدیو ناموفق بود\n{e}"
+            )
 
         if total_size > MAX_FILE_SIZE:
             size_mb = total_size / (1024 * 1024)
             return await cq.edit_message_text(
-                f"❌ حجم ویدیو {size_mb:.1f}MB است (بیشتر از 800MB)"
+                f"❌ حجم ویدیو {size_mb:.1f}MB است و بیشتر از حد مجاز (800MB) می‌باشد"
             )
 
         await cq.edit_message_text("🎬 حجم مجاز است، شروع دانلود...")
@@ -231,11 +220,11 @@ async def youtube_download_handler(update: Update, context: ContextTypes.DEFAULT
             )
             with open(video_file, "rb") as f:
                 await context.bot.send_video(
-                    chat_id,
+                    chat_id=chat_id,
                     video=f,
                     caption=f"🎬 {info.get('title','')}",
                     supports_streaming=True
                 )
             os.remove(video_file)
         except Exception as e:
-            await context.bot.send_message(chat_id, f"❌ خطا\n{e}")
+            await context.bot.send_message(chat_id, f"❌ دانلود ناموفق\n{e}")
