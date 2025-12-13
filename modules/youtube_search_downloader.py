@@ -13,7 +13,7 @@ executor = ThreadPoolExecutor(max_workers=1)
 pending_links = {}
 
 # ==========================
-# Helper: Admin check
+# Admin check
 # ==========================
 async def is_admin(update, context):
     chat = update.effective_chat
@@ -53,21 +53,24 @@ async def youtube_search_handler(update: Update, context: ContextTypes.DEFAULT_T
     )
 
 # ==========================
-# STEP 2: Stream Download
+# STEP 2: Download / Stream
 # ==========================
 async def youtube_download_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     cq = update.callback_query
     await cq.answer()
     chat_id = cq.message.chat_id
+
     if update.effective_chat.type != "private":
         if not await is_admin(update, context):
             return
+
     url = pending_links.get(chat_id)
     if not url:
         return await cq.edit_message_text("❌ لینک یافت نشد")
-    await cq.edit_message_text("⬇️ در حال پردازش و دانلود...")
-    loop = asyncio.get_running_loop()
 
+    await cq.edit_message_text("⬇️ در حال پردازش و دانلود...")
+
+    loop = asyncio.get_running_loop()
     if cq.data == "yt_audio":
         await loop.run_in_executor(executor, stream_audio, url, context, chat_id)
     elif cq.data == "yt_video":
@@ -98,11 +101,18 @@ def stream_audio(url, context, chat_id):
                 ["ffmpeg", "-i", url, "-f", "mp3", "pipe:1"],
                 stdout=subprocess.PIPE
             )
-            context.bot.send_audio(chat_id, audio=process.stdout, caption=f"🎵 {title}")
+            # Send audio coroutine safely
+            asyncio.run_coroutine_threadsafe(
+                context.bot.send_audio(chat_id, audio=process.stdout, caption=f"🎵 {title}"),
+                asyncio.get_event_loop()
+            )
             process.stdout.close()
             process.wait()
     except Exception as e:
-        asyncio.run(context.bot.send_message(chat_id, f"❌ دانلود صوت ناموفق بود\n{e}"))
+        asyncio.run_coroutine_threadsafe(
+            context.bot.send_message(chat_id, f"❌ دانلود صوت ناموفق بود\n{e}"),
+            asyncio.get_event_loop()
+        )
 
 # ==========================
 # STREAM VIDEO
@@ -124,8 +134,15 @@ def stream_video(url, context, chat_id):
                 ["ffmpeg", "-i", url, "-f", "mp4", "pipe:1"],
                 stdout=subprocess.PIPE
             )
-            context.bot.send_video(chat_id, video=process.stdout, caption=f"🎬 {title}")
+            # Send video coroutine safely
+            asyncio.run_coroutine_threadsafe(
+                context.bot.send_video(chat_id, video=process.stdout, caption=f"🎬 {title}"),
+                asyncio.get_event_loop()
+            )
             process.stdout.close()
             process.wait()
     except Exception as e:
-        asyncio.run(context.bot.send_message(chat_id, f"❌ دانلود ویدیو ناموفق بود\n{e}"))
+        asyncio.run_coroutine_threadsafe(
+            context.bot.send_message(chat_id, f"❌ دانلود ویدیو ناموفق بود\n{e}"),
+            asyncio.get_event_loop()
+        )
