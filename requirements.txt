@@ -51,5 +51,6 @@ deep-translator==1.11.4
 youtube-search
 mutagen
 rapidfuzz==3.9.1
-yt-dlp 
+#yt-dlp 
 ffmpeg-python
+yt-dlp>=2024.12.07
