@@ -14,7 +14,7 @@ from telegram.ext import ContextTypes
 SUDO_USERS = [8588347189]
 COOKIE_FILE = "modules/youtube_cookie.txt"
 DOWNLOAD_FOLDER = "downloads"
-MAX_VIDEO_SIZE = 500 * 1024 * 1024  # 500MB
+MAX_FILE_SIZE = 1500 * 1024 * 1024  # 1500MB
 
 os.makedirs("modules", exist_ok=True)
 os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
@@ -25,7 +25,7 @@ if not os.path.exists(COOKIE_FILE):
 
 URL_RE = re.compile(r"(https?://[^\s]+)")
 
-executor = ThreadPoolExecutor(max_workers=30)
+executor = ThreadPoolExecutor(max_workers=20)
 pending_links = {}  # chat_id: url
 info_cache = {}     # url: info dict
 
@@ -50,7 +50,7 @@ async def is_admin(update, context):
 # ====================================
 # YTDLP OPTIONS
 # ====================================
-def turbo_video_opts():
+def video_opts():
     return {
         "cookiefile": COOKIE_FILE,
         "quiet": True,
@@ -67,7 +67,7 @@ def turbo_video_opts():
         "allow_unplayable_formats": True,
     }
 
-def turbo_audio_opts():
+def audio_opts():
     return {
         "cookiefile": COOKIE_FILE,
         "quiet": True,
@@ -90,7 +90,7 @@ def turbo_audio_opts():
 # SYNC DOWNLOAD
 # ====================================
 def _download_audio_sync(url):
-    with yt_dlp.YoutubeDL(turbo_audio_opts()) as y:
+    with yt_dlp.YoutubeDL(audio_opts()) as y:
         info = y.extract_info(url, download=True)
         if info is None or 'id' not in info:
             raise ValueError("❌ استخراج اطلاعات صوت ناموفق بود")
@@ -98,7 +98,7 @@ def _download_audio_sync(url):
         return info, audio_file
 
 def _download_video_sync(url):
-    with yt_dlp.YoutubeDL(turbo_video_opts()) as y:
+    with yt_dlp.YoutubeDL(video_opts()) as y:
         info = y.extract_info(url, download=True)
         if info is None or 'id' not in info:
             raise ValueError("❌ استخراج اطلاعات ویدیو ناموفق بود")
@@ -112,10 +112,9 @@ def cleanup_temp():
     for f in os.listdir(DOWNLOAD_FOLDER):
         file_path = os.path.join(DOWNLOAD_FOLDER, f)
         try:
-            if os.path.isfile(file_path):
-                if time.time() - os.path.getmtime(file_path) > 600:
-                    os.remove(file_path)
-        except Exception:
+            if os.path.isfile(file_path) and time.time() - os.path.getmtime(file_path) > 600:
+                os.remove(file_path)
+        except:
             pass
 
 # ====================================
@@ -170,50 +169,51 @@ async def youtube_download_handler(update: Update, context: ContextTypes.DEFAULT
     loop = asyncio.get_running_loop()
 
     # ------------------------
-    # AUDIO → دانلود روی سرور
+    # AUDIO → دانلود روی سرور خودت
     # ------------------------
     if cq.data == "yt_audio":
         await cq.edit_message_text("🎵 در حال دانلود صوت (MP3)...")
-        try:    
-            info, audio_file = await loop.run_in_executor(executor, _download_audio_sync, url)    
-        except Exception as e:    
-            return await context.bot.send_message(chat_id, f"❌ دانلود یا ارسال صوت ناموفق بود\n{e}")    
+        try:
+            info, audio_file = await loop.run_in_executor(executor, _download_audio_sync, url)
+        except Exception as e:
+            return await context.bot.send_message(chat_id, f"❌ دانلود یا ارسال صوت ناموفق بود\n{e}")
 
-        await context.bot.send_document(    
-            chat_id,    
-            document=open(audio_file, "rb"),    
-            caption=f"🎵 {info.get('title', '')}"    
-        )    
-        os.remove(audio_file)    
+        size = os.path.getsize(audio_file)
+        if size > MAX_FILE_SIZE:
+            os.remove(audio_file)
+            return await cq.edit_message_text("❌ حجم فایل صوتی بیشتر از حد مجاز (1500MB) است")
+
+        await context.bot.send_document(
+            chat_id,
+            document=open(audio_file, "rb"),
+            caption=f"🎵 {info.get('title', '')}"
+        )
+        os.remove(audio_file)
         return
 
     # ------------------------
-    # VIDEO → دانلود روی سرور با محدودیت حجم
+    # VIDEO → دانلود روی سرور تلگرام
     # ------------------------
     if cq.data == "yt_video":
         await cq.edit_message_text("🎬 در حال بررسی حجم ویدیو...")
-
-        # بررسی حجم بدون دانلود کامل
         try:
             opts = {"quiet": True, "format": "bestvideo+bestaudio/best", "cookiefile": COOKIE_FILE}
             with yt_dlp.YoutubeDL(opts) as y:
                 info = y.extract_info(url, download=False)
-                info_cache[url] = info
                 estimated_size = info.get('filesize') or info.get('filesize_approx') or 0
         except Exception as e:
             return await context.bot.send_message(chat_id, f"❌ دریافت اطلاعات ویدیو ناموفق بود\n{e}")
 
-        if estimated_size > MAX_VIDEO_SIZE:
-            return await cq.edit_message_text("❌ حجم ویدیو بیشتر از حد مجاز (500MB) است")
+        if estimated_size > MAX_FILE_SIZE:
+            return await cq.edit_message_text("❌ حجم ویدیو بیشتر از حد مجاز (1500MB) است")
 
-        # دانلود و ارسال
-        await cq.edit_message_text("🎬 در حال دانلود ویدیو (بهترین کیفیت)...")
+        await cq.edit_message_text("🎬 در حال دانلود ویدیو روی سرور تلگرام...")
         try:
             info, video_file = await loop.run_in_executor(executor, _download_video_sync, url)
             await context.bot.send_video(
                 chat_id=chat_id,
                 video=open(video_file, "rb"),
-                caption=f"🎬 {info.get('title','')}",
+                caption=f"🎬 {info.get('title', '')}",
                 supports_streaming=True
             )
             os.remove(video_file)
