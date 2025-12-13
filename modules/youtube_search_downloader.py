@@ -185,7 +185,7 @@ async def youtube_download_handler(update: Update, context: ContextTypes.DEFAULT
 # DOWNLOAD WORKER
 # ====================================
 
-async def download_worker(context: ContextTypes.DEFAULT_TYPE):
+async def download_worker(bot):
     while True:
         chat_id, cq, url = await download_queue.get()
         loop = asyncio.get_running_loop()
@@ -197,7 +197,7 @@ async def download_worker(context: ContextTypes.DEFAULT_TYPE):
             try:
                 info, audio_file = await loop.run_in_executor(executor, _download_audio_sync, url)
             except Exception as e:
-                await context.bot.send_message(chat_id, f"❌ دانلود یا ارسال صوت ناموفق بود\n{e}")
+                await bot.send_message(chat_id, f"❌ دانلود یا ارسال صوت ناموفق بود\n{e}")
                 download_queue.task_done()
                 continue
 
@@ -209,7 +209,7 @@ async def download_worker(context: ContextTypes.DEFAULT_TYPE):
                 continue
 
             with open(audio_file, "rb") as f:
-                await context.bot.send_document(chat_id, document=f, caption=f"🎵 {info.get('title', '')}")
+                await bot.send_document(chat_id, document=f, caption=f"🎵 {info.get('title', '')}")
             os.remove(audio_file)
 
         # VIDEO
@@ -221,7 +221,7 @@ async def download_worker(context: ContextTypes.DEFAULT_TYPE):
                     info = y.extract_info(url, download=False)
                     estimated_size = info.get('filesize') or info.get('filesize_approx') or 0
             except Exception as e:
-                await context.bot.send_message(chat_id, f"❌ دریافت اطلاعات ویدیو ناموفق بود\n{e}")
+                await bot.send_message(chat_id, f"❌ دریافت اطلاعات ویدیو ناموفق بود\n{e}")
                 download_queue.task_done()
                 continue
 
@@ -234,7 +234,7 @@ async def download_worker(context: ContextTypes.DEFAULT_TYPE):
             try:
                 info, video_file = await loop.run_in_executor(executor, _download_video_sync, url)
                 with open(video_file, "rb") as f:
-                    await context.bot.send_video(
+                    await bot.send_video(
                         chat_id=chat_id,
                         video=f,
                         caption=f"🎬 {info.get('title', '')}",
@@ -242,7 +242,7 @@ async def download_worker(context: ContextTypes.DEFAULT_TYPE):
                     )
                 os.remove(video_file)
             except Exception as e:
-                await context.bot.send_message(chat_id, f"❌ دانلود یا ارسال ویدیو ناموفق بود\n{e}")
+                await bot.send_message(chat_id, f"❌ دانلود یا ارسال ویدیو ناموفق بود\n{e}")
 
         download_queue.task_done()
 
@@ -258,8 +258,11 @@ async def main():
     app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), youtube_search_handler))
     app.add_handler(CallbackQueryHandler(youtube_download_handler))
 
-    # شروع worker
-    asyncio.create_task(download_worker(app.bot))
+    # شروع worker بعد از راه‌اندازی بات
+    async def on_startup(app):
+        app.create_task(download_worker(app.bot))
+
+    app.post_init(on_startup)
 
     await app.run_polling()
 
