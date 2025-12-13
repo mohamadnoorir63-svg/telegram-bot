@@ -4,7 +4,7 @@ import asyncio
 from concurrent.futures import ThreadPoolExecutor
 import yt_dlp
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
-from telegram.ext import ContextTypes, ApplicationBuilder, CommandHandler, CallbackQueryHandler, MessageHandler, filters
+from telegram.ext import ContextTypes, ApplicationBuilder, MessageHandler, CallbackQueryHandler, filters
 
 # ====================================
 # CONFIG
@@ -17,7 +17,7 @@ os.makedirs("modules", exist_ok=True)
 os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
 
 URL_RE = re.compile(r"(https?://[^\s]+)")
-executor = ThreadPoolExecutor(max_workers=40)
+executor = ThreadPoolExecutor(max_workers=20)
 pending_links = {}
 
 # ====================================
@@ -35,19 +35,19 @@ async def is_admin(update, context):
         return False
 
 # ====================================
-# ULTRA TURBO YT-DLP OPTIONS
+# YT-DLP OPTIONS
 # ====================================
-def video_opts(max_height):
+def video_opts():
     return {
         "quiet": True,
         "cookiefile": COOKIE_FILE,
-        "format": f"bv*[height<={max_height}]/b[height<={max_height}]/best",
+        "format": "bv+b[ext=m4a]/best",  # بهترین ویدیو + صدا، fallback خود yt-dlp
         "merge_output_format": "mp4",
         "outtmpl": f"{DOWNLOAD_FOLDER}/%(id)s.%(ext)s",
-        "concurrent_fragment_downloads": 64,
+        "concurrent_fragment_downloads": 16,
         "http_chunk_size": 8*1024*1024,
-        "retries": 50,
-        "fragment_retries": 50,
+        "retries": 10,
+        "fragment_retries": 10,
         "ignoreerrors": True,
         "allow_unplayable_formats": True,
         "extractor_args": {"youtube": {"player_client": ["android", "web", "tv", "firetv"]}},
@@ -60,33 +60,27 @@ def audio_opts():
         "format": "ba/best",
         "outtmpl": f"{DOWNLOAD_FOLDER}/%(id)s.%(ext)s",
         "postprocessors": [{"key": "FFmpegExtractAudio","preferredcodec": "mp3","preferredquality": "192"}],
-        "concurrent_fragment_downloads": 64,
+        "concurrent_fragment_downloads": 16,
         "http_chunk_size": 8*1024*1024,
-        "retries": 50,
-        "fragment_retries": 50,
+        "retries": 10,
+        "fragment_retries": 10,
         "ignoreerrors": True,
         "allow_unplayable_formats": True,
         "extractor_args": {"youtube": {"player_client": ["android", "web", "tv", "firetv"]}},
     }
 
 # ====================================
-# SAFE DOWNLOAD FUNCTIONS
+# SAFE DOWNLOAD
 # ====================================
-def safe_download_video(url, req_height):
-    heights = [req_height, 720, 480, 360, 240]
-    for h in heights:
-        try:
-            with yt_dlp.YoutubeDL(video_opts(h)) as y:
-                info = y.extract_info(url, download=True)
-                if not info or not info.get("id"):
-                    continue
-                vid = info["id"]
-                path = f"{DOWNLOAD_FOLDER}/{vid}.mp4"
-                if os.path.exists(path):
-                    return info, path, h
-        except Exception:
-            continue
-    raise RuntimeError("هیچ کیفیت قابل دانلودی پیدا نشد")
+def safe_download_video(url):
+    with yt_dlp.YoutubeDL(video_opts()) as y:
+        info = y.extract_info(url, download=True)
+        if not info or not info.get("id"):
+            raise RuntimeError("دانلود ویدیو ناموفق بود")
+        path = f"{DOWNLOAD_FOLDER}/{info['id']}.mp4"
+        if not os.path.exists(path):
+            raise RuntimeError("فایل ویدیو ساخته نشد")
+    return info, path
 
 def safe_download_audio(url):
     with yt_dlp.YoutubeDL(audio_opts()) as y:
@@ -121,42 +115,30 @@ async def youtube_search_handler(update: Update, context: ContextTypes.DEFAULT_T
         ])
     )
 
-async def youtube_quality_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def youtube_download_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     cq = update.callback_query
     chat_id = cq.message.chat_id
-    await cq.answer("⏳ در حال پردازش...")
+    await cq.answer("⏳ در حال دانلود...")
     url = pending_links.get(chat_id)
     if not url:
         return await cq.edit_message_text("❌ لینک منقضی شده")
     loop = asyncio.get_running_loop()
     if cq.data == "yt_audio":
-        await cq.edit_message_text("🎵 دانلود صوت...")
+        await cq.edit_message_text("🎵 دانلود صوت در حال انجام است...")
         try:
             info, path = await loop.run_in_executor(executor, safe_download_audio, url)
         except Exception as e:
             return await context.bot.send_message(chat_id, f"❌ خطا:\n{e}")
-        await context.bot.send_document(chat_id, document=open(path, "rb"), caption=f"🎵 {info.get('title','')}")
+        await context.bot.send_document(chat_id, document=open(path,"rb"), caption=f"🎵 {info.get('title','')}")
         os.remove(path)
         return
     if cq.data == "yt_video":
-        await cq.edit_message_text(
-            "📺 کیفیت:",
-            reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("720p", callback_data="v_720")],
-                [InlineKeyboardButton("480p", callback_data="v_480")],
-                [InlineKeyboardButton("360p", callback_data="v_360")],
-                [InlineKeyboardButton("240p", callback_data="v_240")],
-            ])
-        )
-        return
-    if cq.data.startswith("v_"):
-        q = int(cq.data.split("_")[1])
-        await cq.edit_message_text(f"🎬 دانلود {q}p ...")
+        await cq.edit_message_text("🎬 دانلود ویدیو در حال انجام است...")
         try:
-            info, path, real_q = await loop.run_in_executor(executor, safe_download_video, url, q)
+            info, path = await loop.run_in_executor(executor, safe_download_video, url)
         except Exception as e:
             return await context.bot.send_message(chat_id, f"❌ خطا:\n{e}")
-        await context.bot.send_document(chat_id, document=open(path, "rb"), caption=f"🎬 {info.get('title','')} ({real_q}p)")
+        await context.bot.send_document(chat_id, document=open(path,"rb"), caption=f"🎬 {info.get('title','')}")
         os.remove(path)
         return
 
@@ -169,6 +151,6 @@ if __name__ == "__main__":
     TOKEN = os.environ.get("BOT_TOKEN")  # ست کن
     app = ApplicationBuilder().token(TOKEN).build()
     app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), youtube_search_handler))
-    app.add_handler(CallbackQueryHandler(youtube_quality_handler))
+    app.add_handler(CallbackQueryHandler(youtube_download_handler))
     print("🤖 Bot is running...")
     app.run_polling()
