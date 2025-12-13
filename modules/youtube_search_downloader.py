@@ -11,6 +11,7 @@ from telegram.ext import ContextTypes
 # ====================================
 # CONFIG
 # ====================================
+
 SUDO_USERS = [8588347189]
 COOKIE_FILE = "modules/youtube_cookie.txt"
 DOWNLOAD_FOLDER = "downloads"
@@ -24,12 +25,14 @@ if not os.path.exists(COOKIE_FILE):
         f.write("# Paste YouTube cookies here (Netscape format)\n")
 
 URL_RE = re.compile(r"(https?://[^\s]+)")
-executor = ThreadPoolExecutor(max_workers=10)
+
+executor = ThreadPoolExecutor(max_workers=20)
 pending_links = {}  # chat_id: url
 
 # ====================================
 # ADMIN CHECK
 # ====================================
+
 async def is_admin(update, context):
     chat = update.effective_chat
     user = update.effective_user
@@ -48,6 +51,7 @@ async def is_admin(update, context):
 # ====================================
 # YTDLP OPTIONS
 # ====================================
+
 def video_opts():
     return {
         "cookiefile": COOKIE_FILE,
@@ -55,16 +59,14 @@ def video_opts():
         "format": "bestvideo+bestaudio/best",
         "merge_output_format": "mp4",
         "outtmpl": f"{DOWNLOAD_FOLDER}/%(id)s.%(ext)s",
-
-        # 🔥 KILL SWITCH (حیاتی)
-        "max_filesize": MAX_FILE_SIZE,
-
-        "concurrent_fragment_downloads": 8,
-        "retries": 10,
-        "fragment_retries": 10,
+        "concurrent_fragment_downloads": 32,
+        "http_chunk_size": 8 * 1024 * 1024,
+        "retries": 20,
+        "fragment_retries": 20,
         "nopart": True,
         "overwrites": True,
-        "ignoreerrors": False,
+        "ignoreerrors": True,
+        "allow_unplayable_formats": True,
     }
 
 def audio_opts():
@@ -73,47 +75,64 @@ def audio_opts():
         "quiet": True,
         "format": "bestaudio/best",
         "outtmpl": f"{DOWNLOAD_FOLDER}/%(id)s.%(ext)s",
-        "postprocessors": [{
-            "key": "FFmpegExtractAudio",
-            "preferredcodec": "mp3",
-            "preferredquality": "192",
-        }],
+        "concurrent_fragment_downloads": 32,
+        "http_chunk_size": 8 * 1024 * 1024,
+        "retries": 20,
+        "fragment_retries": 20,
+        "postprocessors": [
+            {
+                "key": "FFmpegExtractAudio",
+                "preferredcodec": "mp3",
+                "preferredquality": "192",
+            }
+        ],
         "ignoreerrors": True,
+        "allow_unplayable_formats": True,
     }
 
 # ====================================
 # SYNC DOWNLOAD
 # ====================================
+
 def _download_audio_sync(url):
     with yt_dlp.YoutubeDL(audio_opts()) as y:
         info = y.extract_info(url, download=True)
-        return info, f"{DOWNLOAD_FOLDER}/{info['id']}.mp3"
+        if info is None or 'id' not in info:
+            raise ValueError("❌ استخراج اطلاعات صوت ناموفق بود")
+        audio_file = f"{DOWNLOAD_FOLDER}/{info['id']}.mp3"
+        return info, audio_file
 
 def _download_video_sync(url):
     with yt_dlp.YoutubeDL(video_opts()) as y:
         info = y.extract_info(url, download=True)
-        return info, f"{DOWNLOAD_FOLDER}/{info['id']}.mp4"
+        if info is None or 'id' not in info:
+            raise ValueError("❌ استخراج اطلاعات ویدیو ناموفق بود")
+        video_file = f"{DOWNLOAD_FOLDER}/{info['id']}.mp4"
+        return info, video_file
 
 # ====================================
 # CLEAN TEMP FILES
 # ====================================
+
 def cleanup_temp():
     for f in os.listdir(DOWNLOAD_FOLDER):
-        path = os.path.join(DOWNLOAD_FOLDER, f)
+        file_path = os.path.join(DOWNLOAD_FOLDER, f)
         try:
-            if os.path.isfile(path) and time.time() - os.path.getmtime(path) > 600:
-                os.remove(path)
+            if os.path.isfile(file_path) and time.time() - os.path.getmtime(file_path) > 600:
+                os.remove(file_path)
         except:
             pass
 
 # ====================================
 # STEP 1 — LINK
 # ====================================
+
 async def youtube_search_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message:
         return
 
-    match = URL_RE.search(update.message.text)
+    text = update.message.text
+    match = URL_RE.search(text)
     if not match:
         return
 
@@ -138,8 +157,9 @@ async def youtube_search_handler(update: Update, context: ContextTypes.DEFAULT_T
     )
 
 # ====================================
-# STEP 2 — DOWNLOAD (SAFE)
+# STEP 2 — DOWNLOAD / SEND (HYBRID)
 # ====================================
+
 async def youtube_download_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     cleanup_temp()
     cq = update.callback_query
@@ -156,78 +176,56 @@ async def youtube_download_handler(update: Update, context: ContextTypes.DEFAULT
 
     loop = asyncio.get_running_loop()
 
-    # ---------- AUDIO ----------
+    # ------------------------
+    # AUDIO → دانلود روی سرور خودت
+    # ------------------------
     if cq.data == "yt_audio":
-        await cq.edit_message_text("🎵 در حال دانلود صوت...")
+        await cq.edit_message_text("🎵 در حال دانلود صوت (MP3)...")
         try:
-            info, audio_file = await loop.run_in_executor(
-                executor, _download_audio_sync, url
-            )
-
-            if os.path.getsize(audio_file) > MAX_FILE_SIZE:
-                os.remove(audio_file)
-                return await cq.edit_message_text("❌ حجم صوت بیشتر از حد مجاز است")
-
-            with open(audio_file, "rb") as f:
-                await context.bot.send_document(
-                    chat_id,
-                    document=f,
-                    caption=f"🎵 {info.get('title','')}"
-                )
-            os.remove(audio_file)
+            info, audio_file = await loop.run_in_executor(executor, _download_audio_sync, url)
         except Exception as e:
-            await context.bot.send_message(chat_id, f"❌ خطا\n{e}")
+            return await context.bot.send_message(chat_id, f"❌ دانلود یا ارسال صوت ناموفق بود\n{e}")
 
-    # ---------- VIDEO ----------
+        size = os.path.getsize(audio_file)
+        if size > MAX_FILE_SIZE:
+            os.remove(audio_file)
+            return await cq.edit_message_text("❌ حجم فایل صوتی بیشتر از حد مجاز (800MB) است")
+
+        with open(audio_file, "rb") as f:
+            await context.bot.send_document(
+                chat_id,
+                document=f,
+                caption=f"🎵 {info.get('title', '')}"
+            )
+        os.remove(audio_file)
+        return
+
+    # ------------------------
+    # VIDEO → بررسی حجم قبل از دانلود
+    # ------------------------
     if cq.data == "yt_video":
         await cq.edit_message_text("🎬 در حال بررسی حجم ویدیو...")
-
         try:
-            opts = {
-                "quiet": True,
-                "cookiefile": COOKIE_FILE,
-                "format": "bestvideo+bestaudio/best",
-                "skip_download": True,
-            }
-
+            opts = {"quiet": True, "format": "bestvideo+bestaudio/best", "cookiefile": COOKIE_FILE}
             with yt_dlp.YoutubeDL(opts) as y:
                 info = y.extract_info(url, download=False)
-
-            total_size = 0
-            if "requested_formats" in info:
-                for f in info["requested_formats"]:
-                    total_size += f.get("filesize") or f.get("filesize_approx") or 0
-            else:
-                total_size = info.get("filesize") or info.get("filesize_approx") or 0
-
+                estimated_size = info.get('filesize') or info.get('filesize_approx') or 0
         except Exception as e:
-            return await cq.edit_message_text(f"❌ خطا در بررسی حجم\n{e}")
+            return await context.bot.send_message(chat_id, f"❌ دریافت اطلاعات ویدیو ناموفق بود\n{e}")
 
-        if total_size > MAX_FILE_SIZE:
-            size_mb = total_size / (1024 * 1024)
-            return await cq.edit_message_text(
-                f"❌ حجم ویدیو {size_mb:.1f}MB است (بیشتر از 800MB)"
-            )
+        if estimated_size > MAX_FILE_SIZE:
+            return await cq.edit_message_text("❌ حجم ویدیو بیشتر از حد مجاز (800MB) است")
 
-        await cq.edit_message_text("🎬 شروع دانلود...")
-
+        await cq.edit_message_text("🎬 در حال دانلود ویدیو روی سرور تلگرام...")
         try:
-            info, video_file = await loop.run_in_executor(
-                executor, _download_video_sync, url
-            )
-
+            info, video_file = await loop.run_in_executor(executor, _download_video_sync, url)
             with open(video_file, "rb") as f:
                 await context.bot.send_video(
                     chat_id=chat_id,
                     video=f,
-                    caption=f"🎬 {info.get('title','')}",
+                    caption=f"🎬 {info.get('title', '')}",
                     supports_streaming=True
                 )
-
             os.remove(video_file)
-
         except Exception as e:
-            await context.bot.send_message(
-                chat_id,
-                f"❌ دانلود متوقف شد یا حجم بیش از حد مجاز بود\n{e}"
-            )
+            return await context.bot.send_message(chat_id, f"❌ دانلود یا ارسال ویدیو ناموفق بود\n{e}")
