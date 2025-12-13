@@ -27,7 +27,6 @@ URL_RE = re.compile(r"(https?://[^\s]+)")
 
 executor = ThreadPoolExecutor(max_workers=20)
 pending_links = {}  # chat_id: url
-info_cache = {}     # url: info dict
 
 # ====================================
 # ADMIN CHECK
@@ -183,16 +182,17 @@ async def youtube_download_handler(update: Update, context: ContextTypes.DEFAULT
             os.remove(audio_file)
             return await cq.edit_message_text("❌ حجم فایل صوتی بیشتر از حد مجاز (800MB) است")
 
-        await context.bot.send_document(
-            chat_id,
-            document=open(audio_file, "rb"),
-            caption=f"🎵 {info.get('title', '')}"
-        )
+        with open(audio_file, "rb") as f:
+            await context.bot.send_document(
+                chat_id,
+                document=f,
+                caption=f"🎵 {info.get('title', '')}"
+            )
         os.remove(audio_file)
         return
 
     # ------------------------
-    # VIDEO → دانلود روی سرور تلگرام
+    # VIDEO → بررسی حجم قبل از دانلود
     # ------------------------
     if cq.data == "yt_video":
         await cq.edit_message_text("🎬 در حال بررسی حجم ویدیو...")
@@ -210,12 +210,13 @@ async def youtube_download_handler(update: Update, context: ContextTypes.DEFAULT
         await cq.edit_message_text("🎬 در حال دانلود ویدیو روی سرور تلگرام...")
         try:
             info, video_file = await loop.run_in_executor(executor, _download_video_sync, url)
-            await context.bot.send_video(
-                chat_id=chat_id,
-                video=open(video_file, "rb"),
-                caption=f"🎬 {info.get('title', '')}",
-                supports_streaming=True
-            )
+            with open(video_file, "rb") as f:
+                await context.bot.send_video(
+                    chat_id=chat_id,
+                    video=f,
+                    caption=f"🎬 {info.get('title', '')}",
+                    supports_streaming=True
+                )
             os.remove(video_file)
         except Exception as e:
             return await context.bot.send_message(chat_id, f"❌ دانلود یا ارسال ویدیو ناموفق بود\n{e}")
