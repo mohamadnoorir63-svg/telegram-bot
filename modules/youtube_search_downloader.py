@@ -52,7 +52,6 @@ def video_opts():
     return {
         "cookiefile": COOKIE_FILE,
         "quiet": True,
-
         # 🔥 کلید نجات: اصلاً فرمت سنگین انتخاب نمی‌شود
         "format": (
             "bestvideo[filesize_approx<=800M]/"
@@ -60,15 +59,11 @@ def video_opts():
             "bestaudio[filesize_approx<=100M]/"
             "best"
         ),
-
         "merge_output_format": "mp4",
         "outtmpl": f"{DOWNLOAD_FOLDER}/%(id)s.%(ext)s",
-
-        # سبک برای سرور
         "concurrent_fragment_downloads": 4,
         "retries": 5,
         "fragment_retries": 5,
-
         "nopart": True,
         "overwrites": True,
         "ignoreerrors": False,
@@ -172,14 +167,22 @@ async def youtube_download_handler(update: Update, context: ContextTypes.DEFAULT
             )
 
             with open(audio_file, "rb") as f:
-                await context.bot.send_document(
+                msg = await context.bot.send_document(
                     chat_id,
                     document=f,
                     caption=f"🎵 {info.get('title','')}"
                 )
             os.remove(audio_file)
-        except Exception as e:
-            await context.bot.send_message(chat_id, f"❌ خطا\n{e}")
+
+            # پاک کردن کش تلگرام
+            if msg.document.file_id:
+                await context.bot.delete_message(chat_id, msg.message_id)
+
+        except Exception:
+            await context.bot.send_message(
+                chat_id,
+                "❌ ویدیو بیش از حد مجاز است و دانلود نمی‌شود"
+            )
 
     # ---------- VIDEO ----------
     if cq.data == "yt_video":
@@ -191,18 +194,20 @@ async def youtube_download_handler(update: Update, context: ContextTypes.DEFAULT
             )
 
             with open(video_file, "rb") as f:
-                await context.bot.send_video(
+                msg = await context.bot.send_video(
                     chat_id=chat_id,
                     video=f,
                     caption=f"🎬 {info.get('title','')}",
                     supports_streaming=True
                 )
-
             os.remove(video_file)
 
-        except Exception as e:
+            # پاک کردن کش تلگرام
+            if msg.video.file_id:
+                await context.bot.delete_message(chat_id, msg.message_id)
+
+        except Exception:
             await context.bot.send_message(
                 chat_id,
-                "❌ این ویدیو به دلیل محدودیت حجم قابل دانلود نیست\n"
-                f"{e}"
+                "❌ ویدیو بیش از حد مجاز است و دانلود نمی‌شود"
             )
