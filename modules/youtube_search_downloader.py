@@ -4,11 +4,7 @@ import asyncio
 from concurrent.futures import ThreadPoolExecutor
 
 import yt_dlp
-from telegram import (
-    Update,
-    InlineKeyboardMarkup,
-    InlineKeyboardButton
-)
+from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import ContextTypes
 
 # ====================================
@@ -22,10 +18,6 @@ DOWNLOAD_FOLDER = "downloads"
 
 os.makedirs("modules", exist_ok=True)
 os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
-
-if not os.path.exists(COOKIE_FILE):
-    with open(COOKIE_FILE, "w", encoding="utf-8") as f:
-        f.write("# YouTube cookies (Netscape format)\n")
 
 URL_RE = re.compile(r"(https?://[^\s]+)")
 
@@ -56,72 +48,79 @@ async def is_admin(update, context):
 # YT-DLP OPTIONS (2025 SAFE)
 # ====================================
 
-COMMON_EXTRACTOR_ARGS = {
+EXTRACTOR_ARGS = {
     "youtube": {
         "player_client": ["android", "web"],
         "skip": ["dash"],
     }
 }
 
-def video_opts(max_height):
+def video_opts(q):
     return {
-        "cookiefile": COOKIE_FILE,
         "quiet": True,
-        "ignoreerrors": True,
-
-        "format": (
-            f"bestvideo[height<={max_height}][ext=mp4]+bestaudio[ext=m4a]"
-            f"/best[height<={max_height}]"
-        ),
+        "cookiefile": COOKIE_FILE,
+        "format": f"bestvideo[height<={q}][ext=mp4]+bestaudio[ext=m4a]/best[height<={q}]",
         "merge_output_format": "mp4",
         "outtmpl": f"{DOWNLOAD_FOLDER}/%(id)s.mp4",
-
         "concurrent_fragment_downloads": 16,
         "http_chunk_size": 8 * 1024 * 1024,
-        "retries": 20,
-        "fragment_retries": 20,
-        "nopart": True,
-        "overwrites": True,
-
-        "extractor_args": COMMON_EXTRACTOR_ARGS,
+        "retries": 10,
+        "fragment_retries": 10,
+        "extractor_args": EXTRACTOR_ARGS,
     }
 
 def audio_opts():
     return {
-        "cookiefile": COOKIE_FILE,
         "quiet": True,
-        "ignoreerrors": True,
-
+        "cookiefile": COOKIE_FILE,
         "format": "bestaudio/best",
         "outtmpl": f"{DOWNLOAD_FOLDER}/%(id)s.%(ext)s",
-
         "concurrent_fragment_downloads": 16,
         "http_chunk_size": 8 * 1024 * 1024,
-        "retries": 20,
-
+        "retries": 10,
         "postprocessors": [{
             "key": "FFmpegExtractAudio",
             "preferredcodec": "mp3",
             "preferredquality": "192",
         }],
-
-        "extractor_args": COMMON_EXTRACTOR_ARGS,
+        "extractor_args": EXTRACTOR_ARGS,
     }
 
 # ====================================
-# DOWNLOADERS (SYNC)
+# SAFE DOWNLOADERS
 # ====================================
 
-def download_audio(url):
+def safe_download_video(url, quality):
+    qualities = [quality, 480, 360, 240]
+
+    for q in qualities:
+        try:
+            with yt_dlp.YoutubeDL(video_opts(q)) as y:
+                info = y.extract_info(url, download=True)
+
+                if not info or not info.get("id"):
+                    raise RuntimeError("extract failed")
+
+                path = f"{DOWNLOAD_FOLDER}/{info['id']}.mp4"
+                if os.path.exists(path):
+                    return info, path, q
+
+        except Exception:
+            continue
+
+    raise RuntimeError("هیچ کیفیتی قابل دانلود نبود")
+
+def safe_download_audio(url):
     with yt_dlp.YoutubeDL(audio_opts()) as y:
         info = y.extract_info(url, download=True)
-        path = f"{DOWNLOAD_FOLDER}/{info['id']}.mp3"
-    return info, path
 
-def download_video(url, q):
-    with yt_dlp.YoutubeDL(video_opts(q)) as y:
-        info = y.extract_info(url, download=True)
-        path = f"{DOWNLOAD_FOLDER}/{info['id']}.mp4"
+        if not info or not info.get("id"):
+            raise RuntimeError("audio extract failed")
+
+        path = f"{DOWNLOAD_FOLDER}/{info['id']}.mp3"
+        if not os.path.exists(path):
+            raise RuntimeError("audio file missing")
+
     return info, path
 
 # ====================================
@@ -132,13 +131,12 @@ async def youtube_search_handler(update: Update, context: ContextTypes.DEFAULT_T
     if not update.message:
         return
 
-    text = update.message.text
-    m = URL_RE.search(text)
+    m = URL_RE.search(update.message.text)
     if not m:
         return
 
     url = m.group(1)
-    if "youtube.com" not in url and "youtu.be" not in url:
+    if "youtube" not in url and "youtu.be" not in url:
         return
 
     if update.effective_chat.type != "private":
@@ -148,44 +146,42 @@ async def youtube_search_handler(update: Update, context: ContextTypes.DEFAULT_T
     pending_links[update.effective_chat.id] = url
 
     await update.message.reply_text(
-        "⬇️ نوع دانلود را انتخاب کنید:",
+        "⬇️ انتخاب نوع دانلود:",
         reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton("🎵 Audio (MP3)", callback_data="yt_audio")],
-            [InlineKeyboardButton("🎬 Video (MP4)", callback_data="yt_video")],
+            [InlineKeyboardButton("🎵 صوت MP3", callback_data="yt_audio")],
+            [InlineKeyboardButton("🎬 ویدیو MP4", callback_data="yt_video")],
         ])
     )
 
 # ====================================
-# STEP 2 — CALLBACK (SAFE)
+# STEP 2 — CALLBACK
 # ====================================
 
 async def youtube_quality_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     cq = update.callback_query
     chat_id = cq.message.chat_id
 
-    # پاسخ سریع (حل Query too old)
     try:
-        await cq.answer("⏳ پردازش...", show_alert=False)
+        await cq.answer("⏳ در حال پردازش...")
     except:
         pass
 
-    if update.effective_chat.type != "private":
-        if not await is_admin(update, context):
-            return
-
     url = pending_links.get(chat_id)
     if not url:
-        return await cq.edit_message_text("❌ لینک منقضی شده است")
+        return await cq.edit_message_text("❌ لینک منقضی شده")
 
     loop = asyncio.get_running_loop()
 
-    # ===== AUDIO =====
+    # AUDIO
     if cq.data == "yt_audio":
-        await cq.edit_message_text("🎵 دانلود صوت شروع شد...")
+        await cq.edit_message_text("🎵 دانلود صوت...")
 
-        info, path = await loop.run_in_executor(
-            executor, download_audio, url
-        )
+        try:
+            info, path = await loop.run_in_executor(
+                executor, safe_download_audio, url
+            )
+        except Exception as e:
+            return await context.bot.send_message(chat_id, f"❌ خطا:\n{e}")
 
         await context.bot.send_document(
             chat_id,
@@ -196,39 +192,33 @@ async def youtube_quality_handler(update: Update, context: ContextTypes.DEFAULT_
         os.remove(path)
         return
 
-    # ===== VIDEO MENU =====
+    # VIDEO MENU
     if cq.data == "yt_video":
         return await cq.edit_message_text(
-            "📺 کیفیت را انتخاب کنید:",
+            "📺 کیفیت:",
             reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("144p", callback_data="v_144")],
-                [InlineKeyboardButton("240p", callback_data="v_240")],
-                [InlineKeyboardButton("360p", callback_data="v_360")],
-                [InlineKeyboardButton("480p", callback_data="v_480")],
                 [InlineKeyboardButton("720p", callback_data="v_720")],
+                [InlineKeyboardButton("480p", callback_data="v_480")],
+                [InlineKeyboardButton("360p", callback_data="v_360")],
             ])
         )
 
-    # ===== VIDEO DOWNLOAD =====
+    # VIDEO DOWNLOAD
     if cq.data.startswith("v_"):
         q = int(cq.data.split("_")[1])
-        await cq.edit_message_text(f"🎬 دانلود {q}p شروع شد...")
+        await cq.edit_message_text(f"🎬 دانلود {q}p ...")
 
-        info, path = await loop.run_in_executor(
-            executor, download_video, url, q
-        )
-
-        if os.path.getsize(path) > 1900 * 1024 * 1024:
-            os.remove(path)
-            return await context.bot.send_message(
-                chat_id, "❌ حجم ویدیو بیش از محدودیت تلگرام است"
+        try:
+            info, path, real_q = await loop.run_in_executor(
+                executor, safe_download_video, url, q
             )
+        except Exception as e:
+            return await context.bot.send_message(chat_id, f"❌ خطا:\n{e}")
 
         await context.bot.send_document(
             chat_id,
             document=open(path, "rb"),
-            caption=f"🎬 {info.get('title','')} ({q}p)"
+            caption=f"🎬 {info.get('title','')} ({real_q}p)"
         )
 
         os.remove(path)
-        return
