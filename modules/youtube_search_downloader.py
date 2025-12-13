@@ -30,7 +30,7 @@ URL_RE = re.compile(r"(https?://[^\s]+)")
 # ====================================
 # THREADPOOL
 # ====================================
-executor = ThreadPoolExecutor(max_workers=5)  # کاهش برای کم کردن مصرف RAM
+executor = ThreadPoolExecutor(max_workers=1)  # فقط 1 نخ برای مصرف RAM پایین
 pending_links = {}
 
 # ====================================
@@ -50,17 +50,17 @@ async def is_admin(update, context):
         return False
 
 # ====================================
-# YTDLP OPTIONS
+# YTDLP OPTIONS (Memory-Safe)
 # ====================================
 def turbo_video_opts():
     return {
         "cookiefile": COOKIE_FILE,
         "quiet": True,
-        "format": "bestvideo+bestaudio/best",
+        "format": "bestvideo[height<=720]+bestaudio/best",  # محدود به 720p
         "merge_output_format": "mp4",
         "outtmpl": f"{DOWNLOAD_FOLDER}/%(id)s.%(ext)s",
-        "concurrent_fragment_downloads": 4,  # کاهش برای حفظ RAM
-        "http_chunk_size": 4 * 1024 * 1024, # کاهش حجم fragment
+        "concurrent_fragment_downloads": 1,  # مصرف RAM حداقل
+        "http_chunk_size": 2 * 1024 * 1024,  # fragment کوچک
         "retries": 15,
         "fragment_retries": 15,
         "nopart": True,
@@ -75,8 +75,8 @@ def turbo_audio_opts():
         "quiet": True,
         "format": "bestaudio/best",
         "outtmpl": f"{DOWNLOAD_FOLDER}/%(id)s.%(ext)s",
-        "concurrent_fragment_downloads": 4,
-        "http_chunk_size": 4 * 1024 * 1024,
+        "concurrent_fragment_downloads": 1,
+        "http_chunk_size": 2 * 1024 * 1024,
         "retries": 15,
         "fragment_retries": 15,
         "postprocessors": [{
@@ -172,13 +172,13 @@ async def youtube_download_handler(update: Update, context: ContextTypes.DEFAULT
 
     # VIDEO
     if cq.data == "yt_video":
-        await cq.edit_message_text("🎬 در حال دانلود ویدیو (بهترین کیفیت)...")
+        await cq.edit_message_text("🎬 در حال دانلود ویدیو (بهترین کیفیت 720p)...")
         try:
             info, video_file = await loop.run_in_executor(executor, _download_video_sync, url)
         except Exception as e:
             return await context.bot.send_message(chat_id, f"❌ دانلود ویدیو ناموفق بود\n{e}")
 
-        if os.path.getsize(video_file) > 1500 * 1024 * 1024:  # کاهش سقف به ~1.5GB
+        if os.path.getsize(video_file) > 1500 * 1024 * 1024:  # سقف ~1.5GB
             os.remove(video_file)
             return await context.bot.send_message(
                 chat_id, "❌ حجم ویدیو بیشتر از حد مجاز تلگرام است"
