@@ -1,5 +1,3 @@
-# youtube_search_downloader.py — ULTRA TURBO v6 (AUTO BEST QUALITY)
-
 import os
 import re
 import asyncio
@@ -12,13 +10,11 @@ from telegram.ext import ContextTypes
 # ====================================
 # SUDO USERS
 # ====================================
-
 SUDO_USERS = [8588347189]
 
 # ====================================
 # PATHS
 # ====================================
-
 COOKIE_FILE = "modules/youtube_cookie.txt"
 DOWNLOAD_FOLDER = "downloads"
 
@@ -34,22 +30,17 @@ URL_RE = re.compile(r"(https?://[^\s]+)")
 # ====================================
 # THREADPOOL
 # ====================================
-
-executor = ThreadPoolExecutor(max_workers=30)  # افزایش سرعت دانلود
+executor = ThreadPoolExecutor(max_workers=5)  # کاهش برای کم کردن مصرف RAM
 pending_links = {}
 
 # ====================================
 # ADMIN CHECK
 # ====================================
-
 async def is_admin(update, context):
     chat = update.effective_chat
     user = update.effective_user
 
-    if chat.type == "private":
-        return True
-
-    if user.id in SUDO_USERS:
+    if chat.type == "private" or user.id in SUDO_USERS:
         return True
 
     try:
@@ -61,7 +52,6 @@ async def is_admin(update, context):
 # ====================================
 # YTDLP OPTIONS
 # ====================================
-
 def turbo_video_opts():
     return {
         "cookiefile": COOKIE_FILE,
@@ -69,10 +59,10 @@ def turbo_video_opts():
         "format": "bestvideo+bestaudio/best",
         "merge_output_format": "mp4",
         "outtmpl": f"{DOWNLOAD_FOLDER}/%(id)s.%(ext)s",
-        "concurrent_fragment_downloads": 32,
-        "http_chunk_size": 8 * 1024 * 1024,
-        "retries": 20,
-        "fragment_retries": 20,
+        "concurrent_fragment_downloads": 4,  # کاهش برای حفظ RAM
+        "http_chunk_size": 4 * 1024 * 1024, # کاهش حجم fragment
+        "retries": 15,
+        "fragment_retries": 15,
         "nopart": True,
         "overwrites": True,
         "ignoreerrors": True,
@@ -85,10 +75,10 @@ def turbo_audio_opts():
         "quiet": True,
         "format": "bestaudio/best",
         "outtmpl": f"{DOWNLOAD_FOLDER}/%(id)s.%(ext)s",
-        "concurrent_fragment_downloads": 32,
-        "http_chunk_size": 8 * 1024 * 1024,
-        "retries": 20,
-        "fragment_retries": 20,
+        "concurrent_fragment_downloads": 4,
+        "http_chunk_size": 4 * 1024 * 1024,
+        "retries": 15,
+        "fragment_retries": 15,
         "postprocessors": [{
             "key": "FFmpegExtractAudio",
             "preferredcodec": "mp3",
@@ -101,7 +91,6 @@ def turbo_audio_opts():
 # ====================================
 # SYNC DOWNLOAD
 # ====================================
-
 def _download_audio_sync(url):
     with yt_dlp.YoutubeDL(turbo_audio_opts()) as y:
         info = y.extract_info(url, download=True)
@@ -117,7 +106,6 @@ def _download_video_sync(url):
 # ====================================
 # STEP 1 — LINK
 # ====================================
-
 async def youtube_search_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message:
         return
@@ -150,7 +138,6 @@ async def youtube_search_handler(update: Update, context: ContextTypes.DEFAULT_T
 # ====================================
 # STEP 2 — DOWNLOAD (BEST QUALITY AUTO)
 # ====================================
-
 async def youtube_download_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     cq = update.callback_query
     await cq.answer()
@@ -170,7 +157,6 @@ async def youtube_download_handler(update: Update, context: ContextTypes.DEFAULT
     # AUDIO
     if cq.data == "yt_audio":
         await cq.edit_message_text("🎵 در حال دانلود صوت (بهترین کیفیت)...")
-
         try:
             info, audio_file = await loop.run_in_executor(executor, _download_audio_sync, url)
         except Exception as e:
@@ -187,13 +173,12 @@ async def youtube_download_handler(update: Update, context: ContextTypes.DEFAULT
     # VIDEO
     if cq.data == "yt_video":
         await cq.edit_message_text("🎬 در حال دانلود ویدیو (بهترین کیفیت)...")
-
         try:
             info, video_file = await loop.run_in_executor(executor, _download_video_sync, url)
         except Exception as e:
             return await context.bot.send_message(chat_id, f"❌ دانلود ویدیو ناموفق بود\n{e}")
 
-        if os.path.getsize(video_file) > 1900 * 1024 * 1024:
+        if os.path.getsize(video_file) > 1500 * 1024 * 1024:  # کاهش سقف به ~1.5GB
             os.remove(video_file)
             return await context.bot.send_message(
                 chat_id, "❌ حجم ویدیو بیشتر از حد مجاز تلگرام است"
