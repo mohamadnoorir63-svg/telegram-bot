@@ -14,6 +14,7 @@ from telegram.ext import ContextTypes
 SUDO_USERS = [8588347189]
 COOKIE_FILE = "modules/youtube_cookie.txt"
 DOWNLOAD_FOLDER = "downloads"
+MAX_VIDEO_SIZE = 500 * 1024 * 1024  # 500MB
 
 os.makedirs("modules", exist_ok=True)
 os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
@@ -25,7 +26,6 @@ if not os.path.exists(COOKIE_FILE):
 URL_RE = re.compile(r"(https?://[^\s]+)")
 
 executor = ThreadPoolExecutor(max_workers=30)
-
 pending_links = {}  # chat_id: url
 info_cache = {}     # url: info dict
 
@@ -38,7 +38,6 @@ async def is_admin(update, context):
 
     if chat.type == "private":
         return True
-
     if user.id in SUDO_USERS:
         return True
 
@@ -98,7 +97,13 @@ def _download_audio_sync(url):
         audio_file = f"{DOWNLOAD_FOLDER}/{info['id']}.mp3"
         return info, audio_file
 
-# برای ویدیو دانلود نمی‌کنیم، لینک مستقیم استفاده می‌کنیم
+def _download_video_sync(url):
+    with yt_dlp.YoutubeDL(turbo_video_opts()) as y:
+        info = y.extract_info(url, download=True)
+        if info is None or 'id' not in info:
+            raise ValueError("❌ استخراج اطلاعات ویدیو ناموفق بود")
+        video_file = f"{DOWNLOAD_FOLDER}/{info['id']}.mp4"
+        return info, video_file
 
 # ====================================
 # CLEAN TEMP FILES
@@ -183,23 +188,34 @@ async def youtube_download_handler(update: Update, context: ContextTypes.DEFAULT
         return
 
     # ------------------------
-    # VIDEO → لینک مستقیم استریم
+    # VIDEO → دانلود روی سرور با محدودیت حجم
     # ------------------------
     if cq.data == "yt_video":
-        await cq.edit_message_text("🎬 در حال آماده‌سازی ویدیو (استریم مستقیم)...")
+        await cq.edit_message_text("🎬 در حال بررسی حجم ویدیو...")
+
+        # بررسی حجم بدون دانلود کامل
         try:
-            opts = {"quiet": True, "format": "bestvideo+bestaudio/best"}
+            opts = {"quiet": True, "format": "bestvideo+bestaudio/best", "cookiefile": COOKIE_FILE}
             with yt_dlp.YoutubeDL(opts) as y:
                 info = y.extract_info(url, download=False)
                 info_cache[url] = info
-                video_url = info['url']
+                estimated_size = info.get('filesize') or info.get('filesize_approx') or 0
+        except Exception as e:
+            return await context.bot.send_message(chat_id, f"❌ دریافت اطلاعات ویدیو ناموفق بود\n{e}")
 
+        if estimated_size > MAX_VIDEO_SIZE:
+            return await cq.edit_message_text("❌ حجم ویدیو بیشتر از حد مجاز (500MB) است")
+
+        # دانلود و ارسال
+        await cq.edit_message_text("🎬 در حال دانلود ویدیو (بهترین کیفیت)...")
+        try:
+            info, video_file = await loop.run_in_executor(executor, _download_video_sync, url)
             await context.bot.send_video(
                 chat_id=chat_id,
-                video=video_url,
-                caption=f"🎬 {info.get('title', '')}",
+                video=open(video_file, "rb"),
+                caption=f"🎬 {info.get('title','')}",
                 supports_streaming=True
             )
-
+            os.remove(video_file)
         except Exception as e:
-            return await context.bot.send_message(chat_id, f"❌ ارسال ویدیو مستقیم ناموفق بود\n{e}")
+            return await context.bot.send_message(chat_id, f"❌ دانلود یا ارسال ویدیو ناموفق بود\n{e}")
