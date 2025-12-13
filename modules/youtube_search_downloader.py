@@ -14,7 +14,7 @@ from telegram.ext import ContextTypes
 SUDO_USERS = [8588347189]
 COOKIE_FILE = "modules/youtube_cookie.txt"
 DOWNLOAD_FOLDER = "downloads"
-MAX_FILE_SIZE = 1500 * 1024 * 1024  # 1500MB
+MAX_FILE_SIZE = 800 * 1024 * 1024  # 800MB
 
 os.makedirs("modules", exist_ok=True)
 os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
@@ -181,7 +181,7 @@ async def youtube_download_handler(update: Update, context: ContextTypes.DEFAULT
         size = os.path.getsize(audio_file)
         if size > MAX_FILE_SIZE:
             os.remove(audio_file)
-            return await cq.edit_message_text("❌ حجم فایل صوتی بیشتر از حد مجاز (1500MB) است")
+            return await cq.edit_message_text("❌ حجم فایل صوتی بیشتر از حد مجاز (800MB) است")
 
         await context.bot.send_document(
             chat_id,
@@ -205,7 +205,7 @@ async def youtube_download_handler(update: Update, context: ContextTypes.DEFAULT
             return await context.bot.send_message(chat_id, f"❌ دریافت اطلاعات ویدیو ناموفق بود\n{e}")
 
         if estimated_size > MAX_FILE_SIZE:
-            return await cq.edit_message_text("❌ حجم ویدیو بیشتر از حد مجاز (1500MB) است")
+            return await cq.edit_message_text("❌ حجم ویدیو بیشتر از حد مجاز (800MB) است")
 
         await cq.edit_message_text("🎬 در حال دانلود ویدیو روی سرور تلگرام...")
         try:
