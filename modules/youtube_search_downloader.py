@@ -14,7 +14,6 @@ from telegram.ext import ContextTypes
 SUDO_USERS = [8588347189]
 COOKIE_FILE = "modules/youtube_cookie.txt"
 DOWNLOAD_FOLDER = "downloads"
-MAX_TELEGRAM_SIZE = 1900 * 1024 * 1024  # 1.9GB
 
 os.makedirs("modules", exist_ok=True)
 os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
@@ -25,10 +24,8 @@ if not os.path.exists(COOKIE_FILE):
 
 URL_RE = re.compile(r"(https?://[^\s]+)")
 
-# ThreadPool برای افزایش سرعت
 executor = ThreadPoolExecutor(max_workers=30)
 
-# نگهداری لینک‌ها و cache
 pending_links = {}  # chat_id: url
 info_cache = {}     # url: info dict
 
@@ -96,27 +93,12 @@ def turbo_audio_opts():
 def _download_audio_sync(url):
     with yt_dlp.YoutubeDL(turbo_audio_opts()) as y:
         info = y.extract_info(url, download=True)
+        if info is None or 'id' not in info:
+            raise ValueError("❌ استخراج اطلاعات صوت ناموفق بود")
         audio_file = f"{DOWNLOAD_FOLDER}/{info['id']}.mp3"
         return info, audio_file
 
-def _download_video_sync(url):
-    with yt_dlp.YoutubeDL(turbo_video_opts()) as y:
-        info = y.extract_info(url, download=True)
-        video_file = f"{DOWNLOAD_FOLDER}/{info['id']}.mp4"
-        return info, video_file
-
-# ====================================
-# GET DIRECT URL (برای لینک مستقیم ویدیو)
-# ====================================
-def get_direct_url(url, is_audio=False):
-    if url in info_cache:
-        info = info_cache[url]
-    else:
-        opts = {"quiet": True, "format": "bestaudio/best" if is_audio else "best"}
-        with yt_dlp.YoutubeDL(opts) as y:
-            info = y.extract_info(url, download=False)
-            info_cache[url] = info
-    return info["url"], info
+# برای ویدیو دانلود نمی‌کنیم، لینک مستقیم استفاده می‌کنیم
 
 # ====================================
 # CLEAN TEMP FILES
@@ -126,7 +108,7 @@ def cleanup_temp():
         file_path = os.path.join(DOWNLOAD_FOLDER, f)
         try:
             if os.path.isfile(file_path):
-                if time.time() - os.path.getmtime(file_path) > 600:  # 10 دقیقه
+                if time.time() - os.path.getmtime(file_path) > 600:
                     os.remove(file_path)
         except Exception:
             pass
@@ -170,7 +152,7 @@ async def youtube_download_handler(update: Update, context: ContextTypes.DEFAULT
     cleanup_temp()
     cq = update.callback_query
     await cq.answer()
-    chat_id = cq.message.chat_id
+    chat_id = cq.message.chat.id
 
     if update.effective_chat.type != "private":
         if not await is_admin(update, context):
@@ -182,58 +164,42 @@ async def youtube_download_handler(update: Update, context: ContextTypes.DEFAULT
 
     loop = asyncio.get_running_loop()
 
-    # ==================
-    # AUDIO → دانلود و ارسال
-    # ==================
+    # ------------------------
+    # AUDIO → دانلود روی سرور
+    # ------------------------
     if cq.data == "yt_audio":
         await cq.edit_message_text("🎵 در حال دانلود صوت (MP3)...")
-        try:
-            info, audio_file = await loop.run_in_executor(executor, _download_audio_sync, url)
-            await context.bot.send_audio(
-                chat_id=chat_id,
-                audio=open(audio_file, "rb"),
-                caption=f"🎵 {info.get('title','')}"
-            )
-            os.remove(audio_file)
-        except Exception as e:
-            return await context.bot.send_message(chat_id, f"❌ دانلود یا ارسال صوت ناموفق بود\n{e}")
+        try:    
+            info, audio_file = await loop.run_in_executor(executor, _download_audio_sync, url)    
+        except Exception as e:    
+            return await context.bot.send_message(chat_id, f"❌ دانلود یا ارسال صوت ناموفق بود\n{e}")    
+
+        await context.bot.send_document(    
+            chat_id,    
+            document=open(audio_file, "rb"),    
+            caption=f"🎵 {info.get('title', '')}"    
+        )    
+        os.remove(audio_file)    
         return
 
-    # ==================
-    # VIDEO → بررسی حجم
-    # ==================
-    try:
-        with yt_dlp.YoutubeDL(turbo_video_opts()) as y:
-            info = y.extract_info(url, download=False)
-            info_cache[url] = info
-    except Exception as e:
-        return await context.bot.send_message(chat_id, f"❌ دریافت اطلاعات ویدیو ناموفق بود\n{e}")
-
-    estimated_size = info.get('filesize') or info.get('filesize_approx') or 0
-
-    # دانلود و ارسال اگر حجم پایین
-    if estimated_size <= MAX_TELEGRAM_SIZE:
-        await cq.edit_message_text("🎬 در حال دانلود ویدیو (بهترین کیفیت)...")
+    # ------------------------
+    # VIDEO → لینک مستقیم استریم
+    # ------------------------
+    if cq.data == "yt_video":
+        await cq.edit_message_text("🎬 در حال آماده‌سازی ویدیو (استریم مستقیم)...")
         try:
-            info, video_file = await loop.run_in_executor(executor, _download_video_sync, url)
-            await context.bot.send_document(
-                chat_id,
-                document=open(video_file, "rb"),
-                caption=f"🎬 {info.get('title','')}"
-            )
-            os.remove(video_file)
-        except Exception as e:
-            return await context.bot.send_message(chat_id, f"❌ دانلود ویدیو ناموفق بود\n{e}")
-    else:
-        # حجم بالا → لینک مستقیم بدون دانلود
-        await cq.edit_message_text("🎬 حجم ویدیو بزرگ است، ارسال لینک مستقیم...")
-        try:
-            video_url, info = get_direct_url(url)
+            opts = {"quiet": True, "format": "bestvideo+bestaudio/best"}
+            with yt_dlp.YoutubeDL(opts) as y:
+                info = y.extract_info(url, download=False)
+                info_cache[url] = info
+                video_url = info['url']
+
             await context.bot.send_video(
-                chat_id,
+                chat_id=chat_id,
                 video=video_url,
-                caption=f"🎬 {info.get('title','')}",
+                caption=f"🎬 {info.get('title', '')}",
                 supports_streaming=True
             )
+
         except Exception as e:
-            return await context.bot.send_message(chat_id, f"❌ ارسال لینک مستقیم ناموفق بود\n{e}")
+            return await context.bot.send_message(chat_id, f"❌ ارسال ویدیو مستقیم ناموفق بود\n{e}")
