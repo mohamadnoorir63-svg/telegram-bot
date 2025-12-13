@@ -1,58 +1,33 @@
-# youtube_search_downloader.py — ULTRA TURBO v5 (STABLE)
-
 import os
 import re
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
-
 import yt_dlp
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
-from telegram.ext import ContextTypes
+from telegram.ext import ContextTypes, ApplicationBuilder, CommandHandler, CallbackQueryHandler, MessageHandler, filters
 
 # ====================================
-# SUDO USERS
+# CONFIG
 # ====================================
-
 SUDO_USERS = [8588347189]
-
-# ====================================
-# PATHS
-# ====================================
-
 COOKIE_FILE = "modules/youtube_cookie.txt"
 DOWNLOAD_FOLDER = "downloads"
 
 os.makedirs("modules", exist_ok=True)
 os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
 
-if not os.path.exists(COOKIE_FILE):
-    with open(COOKIE_FILE, "w", encoding="utf-8") as f:
-        f.write("# Paste YouTube cookies here (Netscape format)\n")
-
 URL_RE = re.compile(r"(https?://[^\s]+)")
-
-# ====================================
-# THREADPOOL
-# ====================================
-
-executor = ThreadPoolExecutor(max_workers=20)
-
+executor = ThreadPoolExecutor(max_workers=40)
 pending_links = {}
 
 # ====================================
 # ADMIN CHECK
 # ====================================
-
 async def is_admin(update, context):
     chat = update.effective_chat
     user = update.effective_user
-
-    if chat.type == "private":
+    if chat.type == "private" or user.id in SUDO_USERS:
         return True
-
-    if user.id in SUDO_USERS:
-        return True
-
     try:
         admins = await context.bot.get_chat_administrators(chat.id)
         return user.id in [a.user.id for a in admins]
@@ -60,168 +35,140 @@ async def is_admin(update, context):
         return False
 
 # ====================================
-# YTDLP OPTIONS
+# ULTRA TURBO YT-DLP OPTIONS
 # ====================================
-
-def turbo_video_opts(max_height):
+def video_opts(max_height):
     return {
-        "cookiefile": COOKIE_FILE,
         "quiet": True,
-        "format": (
-            f"bestvideo[height<={max_height}][ext=mp4]+bestaudio[ext=m4a]"
-            f"/best[height<={max_height}]"
-        ),
+        "cookiefile": COOKIE_FILE,
+        "format": f"bv*[height<={max_height}]/b[height<={max_height}]/best",
         "merge_output_format": "mp4",
-        "outtmpl": f"{DOWNLOAD_FOLDER}/%(id)s.mp4",
-
-        # Stable Turbo
-        "concurrent_fragment_downloads": 16,
-        "http_chunk_size": 8 * 1024 * 1024,
-        "retries": 20,
-        "fragment_retries": 20,
-        "nopart": True,
-        "overwrites": True,
-    }
-
-def turbo_audio_opts():
-    return {
-        "cookiefile": COOKIE_FILE,
-        "quiet": True,
-        "format": "bestaudio/best",
         "outtmpl": f"{DOWNLOAD_FOLDER}/%(id)s.%(ext)s",
+        "concurrent_fragment_downloads": 64,
+        "http_chunk_size": 8*1024*1024,
+        "retries": 50,
+        "fragment_retries": 50,
+        "ignoreerrors": True,
+        "allow_unplayable_formats": True,
+        "extractor_args": {"youtube": {"player_client": ["android", "web", "tv", "firetv"]}},
+    }
 
-        "concurrent_fragment_downloads": 16,
-        "http_chunk_size": 8 * 1024 * 1024,
-        "retries": 20,
-
-        "postprocessors": [{
-            "key": "FFmpegExtractAudio",
-            "preferredcodec": "mp3",
-            "preferredquality": "192",
-        }],
+def audio_opts():
+    return {
+        "quiet": True,
+        "cookiefile": COOKIE_FILE,
+        "format": "ba/best",
+        "outtmpl": f"{DOWNLOAD_FOLDER}/%(id)s.%(ext)s",
+        "postprocessors": [{"key": "FFmpegExtractAudio","preferredcodec": "mp3","preferredquality": "192"}],
+        "concurrent_fragment_downloads": 64,
+        "http_chunk_size": 8*1024*1024,
+        "retries": 50,
+        "fragment_retries": 50,
+        "ignoreerrors": True,
+        "allow_unplayable_formats": True,
+        "extractor_args": {"youtube": {"player_client": ["android", "web", "tv", "firetv"]}},
     }
 
 # ====================================
-# SYNC DOWNLOAD
+# SAFE DOWNLOAD FUNCTIONS
 # ====================================
+def safe_download_video(url, req_height):
+    heights = [req_height, 720, 480, 360, 240]
+    for h in heights:
+        try:
+            with yt_dlp.YoutubeDL(video_opts(h)) as y:
+                info = y.extract_info(url, download=True)
+                if not info or not info.get("id"):
+                    continue
+                vid = info["id"]
+                path = f"{DOWNLOAD_FOLDER}/{vid}.mp4"
+                if os.path.exists(path):
+                    return info, path, h
+        except Exception:
+            continue
+    raise RuntimeError("هیچ کیفیت قابل دانلودی پیدا نشد")
 
-def _download_audio_sync(url):
-    with yt_dlp.YoutubeDL(turbo_audio_opts()) as y:
+def safe_download_audio(url):
+    with yt_dlp.YoutubeDL(audio_opts()) as y:
         info = y.extract_info(url, download=True)
-        audio_file = f"{DOWNLOAD_FOLDER}/{info['id']}.mp3"
-    return info, audio_file
-
-def _download_video_sync(url, q):
-    with yt_dlp.YoutubeDL(turbo_video_opts(q)) as y:
-        info = y.extract_info(url, download=True)
-        video_file = f"{DOWNLOAD_FOLDER}/{info['id']}.mp4"
-    return info, video_file
+        if not info or not info.get("id"):
+            raise RuntimeError("دانلود صوت ناموفق بود")
+        path = f"{DOWNLOAD_FOLDER}/{info['id']}.mp3"
+        if not os.path.exists(path):
+            raise RuntimeError("فایل صوت ساخته نشد")
+    return info, path
 
 # ====================================
-# STEP 1 — LINK
+# TELEGRAM HANDLERS
 # ====================================
-
 async def youtube_search_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message:
         return
-
-    text = update.message.text
-    match = URL_RE.search(text)
-    if not match:
+    m = URL_RE.search(update.message.text)
+    if not m:
         return
-
-    url = match.group(1)
-    if "youtube.com" not in url and "youtu.be" not in url:
+    url = m.group(1)
+    if "youtube" not in url and "youtu.be" not in url:
         return
-
-    if update.effective_chat.type != "private":
-        if not await is_admin(update, context):
-            return
-
+    if update.effective_chat.type != "private" and not await is_admin(update, context):
+        return
     pending_links[update.effective_chat.id] = url
-
-    keyboard = [
-        [InlineKeyboardButton("🎵 Audio (MP3)", callback_data="yt_audio")],
-        [InlineKeyboardButton("🎬 Video (MP4)", callback_data="yt_video")],
-    ]
-
     await update.message.reply_text(
-        "⬇️ نوع دانلود را انتخاب کنید:",
-        reply_markup=InlineKeyboardMarkup(keyboard)
+        "⬇️ انتخاب نوع دانلود:",
+        reply_markup=InlineKeyboardMarkup([
+            [InlineKeyboardButton("🎵 صوت MP3", callback_data="yt_audio")],
+            [InlineKeyboardButton("🎬 ویدیو MP4", callback_data="yt_video")],
+        ])
     )
-
-# ====================================
-# STEP 2 — QUALITY & DOWNLOAD
-# ====================================
 
 async def youtube_quality_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     cq = update.callback_query
-    await cq.answer()
-
     chat_id = cq.message.chat_id
-
-    if update.effective_chat.type != "private":
-        if not await is_admin(update, context):
-            return
-
+    await cq.answer("⏳ در حال پردازش...")
     url = pending_links.get(chat_id)
     if not url:
-        return await cq.edit_message_text("❌ لینک یافت نشد")
-
+        return await cq.edit_message_text("❌ لینک منقضی شده")
     loop = asyncio.get_running_loop()
-
-    # AUDIO
     if cq.data == "yt_audio":
-        await cq.edit_message_text("🎵 در حال دانلود صوت...")
-
-        info, audio_file = await loop.run_in_executor(
-            executor, _download_audio_sync, url
-        )
-
-        await context.bot.send_document(
-            chat_id,
-            document=open(audio_file, "rb"),
-            caption=f"🎵 {info.get('title', '')}"
-        )
-
-        os.remove(audio_file)
+        await cq.edit_message_text("🎵 دانلود صوت...")
+        try:
+            info, path = await loop.run_in_executor(executor, safe_download_audio, url)
+        except Exception as e:
+            return await context.bot.send_message(chat_id, f"❌ خطا:\n{e}")
+        await context.bot.send_document(chat_id, document=open(path, "rb"), caption=f"🎵 {info.get('title','')}")
+        os.remove(path)
         return
-
-    # VIDEO MENU
     if cq.data == "yt_video":
-        keyboard = [
-            [InlineKeyboardButton("144p", callback_data="v_144")],
-            [InlineKeyboardButton("240p", callback_data="v_240")],
-            [InlineKeyboardButton("360p", callback_data="v_360")],
-            [InlineKeyboardButton("480p", callback_data="v_480")],
-            [InlineKeyboardButton("720p", callback_data="v_720")],
-        ]
-
-        return await cq.edit_message_text(
-            "📺 کیفیت را انتخاب کنید:",
-            reply_markup=InlineKeyboardMarkup(keyboard)
+        await cq.edit_message_text(
+            "📺 کیفیت:",
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("720p", callback_data="v_720")],
+                [InlineKeyboardButton("480p", callback_data="v_480")],
+                [InlineKeyboardButton("360p", callback_data="v_360")],
+                [InlineKeyboardButton("240p", callback_data="v_240")],
+            ])
         )
-
-    # VIDEO DOWNLOAD
+        return
     if cq.data.startswith("v_"):
         q = int(cq.data.split("_")[1])
         await cq.edit_message_text(f"🎬 دانلود {q}p ...")
-
-        info, video_file = await loop.run_in_executor(
-            executor, _download_video_sync, url, q
-        )
-
-        if os.path.getsize(video_file) > 1900 * 1024 * 1024:
-            os.remove(video_file)
-            return await context.bot.send_message(
-                chat_id, "❌ حجم ویدیو بیشتر از حد مجاز تلگرام است"
-            )
-
-        await context.bot.send_document(
-            chat_id,
-            document=open(video_file, "rb"),
-            caption=f"🎬 {info.get('title', '')} ({q}p)"
-        )
-
-        os.remove(video_file)
+        try:
+            info, path, real_q = await loop.run_in_executor(executor, safe_download_video, url, q)
+        except Exception as e:
+            return await context.bot.send_message(chat_id, f"❌ خطا:\n{e}")
+        await context.bot.send_document(chat_id, document=open(path, "rb"), caption=f"🎬 {info.get('title','')} ({real_q}p)")
+        os.remove(path)
         return
+
+# ====================================
+# START BOT
+# ====================================
+if __name__ == "__main__":
+    import logging
+    logging.basicConfig(level=logging.INFO)
+    TOKEN = os.environ.get("BOT_TOKEN")  # ست کن
+    app = ApplicationBuilder().token(TOKEN).build()
+    app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), youtube_search_handler))
+    app.add_handler(CallbackQueryHandler(youtube_quality_handler))
+    print("🤖 Bot is running...")
+    app.run_polling()
