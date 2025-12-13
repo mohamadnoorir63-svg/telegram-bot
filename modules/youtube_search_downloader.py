@@ -30,7 +30,7 @@ URL_RE = re.compile(r"(https?://[^\s]+)")
 # ====================================
 # THREADPOOL
 # ====================================
-executor = ThreadPoolExecutor(max_workers=30)  # افزایش سرعت دانلود
+executor = ThreadPoolExecutor(max_workers=30)
 pending_links = {}
 
 # ====================================
@@ -107,6 +107,18 @@ def _download_video_sync(url):
         return info, video_file
 
 # ====================================
+# GET DIRECT URL (WITHOUT DOWNLOAD)
+# ====================================
+def get_direct_url(url, is_audio=False):
+    opts = {
+        "quiet": True,
+        "format": "bestaudio/best" if is_audio else "best",
+    }
+    with yt_dlp.YoutubeDL(opts) as y:
+        info = y.extract_info(url, download=False)
+        return info["url"], info
+
+# ====================================
 # STEP 1 — LINK
 # ====================================
 async def youtube_search_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -139,7 +151,7 @@ async def youtube_search_handler(update: Update, context: ContextTypes.DEFAULT_T
     )
 
 # ====================================
-# STEP 2 — DOWNLOAD (BEST QUALITY AUTO)
+# STEP 2 — DOWNLOAD / SEND
 # ====================================
 async def youtube_download_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     cq = update.callback_query
@@ -156,50 +168,52 @@ async def youtube_download_handler(update: Update, context: ContextTypes.DEFAULT
 
     loop = asyncio.get_running_loop()
 
-    # دریافت اطلاعات ویدیو/صوت بدون دانلود کامل
-    try:
-        if cq.data == "yt_video":
-            ydl_opts = turbo_video_opts()
-        else:
-            ydl_opts = turbo_audio_opts()
+    # AUDIO: لینک مستقیم
+    if cq.data == "yt_audio":
+        await cq.edit_message_text("🎵 در حال دریافت لینک صوت...")
+        try:
+            audio_url, info = get_direct_url(url, is_audio=True)
+            await context.bot.send_audio(
+                chat_id=chat_id,
+                audio=audio_url,
+                caption=f"🎵 {info.get('title','')}"
+            )
+        except Exception as e:
+            return await context.bot.send_message(chat_id, f"❌ خطا در ارسال صوت\n{e}")
+        return
 
-        with yt_dlp.YoutubeDL(ydl_opts) as y:
+    # VIDEO: بررسی حجم
+    try:
+        with yt_dlp.YoutubeDL(turbo_video_opts()) as y:
             info = y.extract_info(url, download=False)
     except Exception as e:
-        return await context.bot.send_message(chat_id, f"❌ دریافت اطلاعات ناموفق بود\n{e}")
+        return await context.bot.send_message(chat_id, f"❌ دریافت اطلاعات ویدیو ناموفق بود\n{e}")
 
-    # چک کردن حجم فایل قبل از دانلود (برای ویدیو)
-    if cq.data == "yt_video":
-        estimated_size = info.get('filesize') or info.get('filesize_approx') or 0
-        if estimated_size > 1900 * 1024 * 1024:  # حدود 1.9GB
-            return await context.bot.send_message(chat_id, "❌ حجم ویدیو بیشتر از حد مجاز تلگرام است")
+    estimated_size = info.get('filesize') or info.get('filesize_approx') or 0
 
+    # اگر حجم کمتر از 1.9GB → دانلود و ارسال
+    if estimated_size <= 1900 * 1024 * 1024:
         await cq.edit_message_text("🎬 در حال دانلود ویدیو (بهترین کیفیت)...")
         try:
             info, video_file = await loop.run_in_executor(executor, _download_video_sync, url)
+            await context.bot.send_document(
+                chat_id,
+                document=open(video_file, "rb"),
+                caption=f"🎬 {info.get('title','')}"
+            )
+            os.remove(video_file)
         except Exception as e:
             return await context.bot.send_message(chat_id, f"❌ دانلود ویدیو ناموفق بود\n{e}")
-
-        await context.bot.send_document(
-            chat_id,
-            document=open(video_file, "rb"),
-            caption=f"🎬 {info.get('title', '')}"
-        )
-        os.remove(video_file)
-        return
-
-    # دانلود صوت
-    if cq.data == "yt_audio":
-        await cq.edit_message_text("🎵 در حال دانلود صوت (بهترین کیفیت)...")
+    else:
+        # حجم بالاست → لینک مستقیم بدون دانلود
+        await cq.edit_message_text("🎬 حجم ویدیو بزرگ است، ارسال لینک مستقیم...")
         try:
-            info, audio_file = await loop.run_in_executor(executor, _download_audio_sync, url)
+            video_url, info = get_direct_url(url)
+            await context.bot.send_video(
+                chat_id,
+                video=video_url,
+                caption=f"🎬 {info.get('title','')}",
+                supports_streaming=True
+            )
         except Exception as e:
-            return await context.bot.send_message(chat_id, f"❌ دانلود صوت ناموفق بود\n{e}")
-
-        await context.bot.send_document(
-            chat_id,
-            document=open(audio_file, "rb"),
-            caption=f"🎵 {info.get('title', '')}"
-        )
-        os.remove(audio_file)
-        return
+            return await context.bot.send_message(chat_id, f"❌ ارسال لینک مستقیم ناموفق بود\n{e}")
