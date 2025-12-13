@@ -1550,8 +1550,7 @@ application.add_handler(
     CallbackQueryHandler(instagram_audio_handler, pattern=r"^instagram_audio:"),
     group=-1500
 )
-
-from modules.youtube_search_downloader import youtube_search_handler, youtube_quality_handler
+from modules.youtube_search_downloader import youtube_search_handler, youtube_download_handler
 
 # دریافت لینک و نمایش پنل اولیه (Audio / Video)
 application.add_handler(
@@ -1559,10 +1558,11 @@ application.add_handler(
     group=-3000
 )
 
-# هندلر دکمه‌ها (Audio / Video / کیفیت‌ها)
+# هندلر دکمه‌ها (Audio / Video)
 application.add_handler(
-    CallbackQueryHandler(youtube_quality_handler, pattern="^(yt_audio|yt_video|v_.*)$")
+    CallbackQueryHandler(youtube_download_handler, pattern="^(yt_audio|yt_video)$")
 )
+
 # ================================
 # 🎵 SOUND CLOUD (اولویت خیلی بالا)
 # ================================
