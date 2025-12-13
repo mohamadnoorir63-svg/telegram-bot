@@ -6,7 +6,7 @@ import time
 
 import yt_dlp
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
-from telegram.ext import ContextTypes
+from telegram.ext import ApplicationBuilder, ContextTypes, CommandHandler, MessageHandler, CallbackQueryHandler, filters
 
 # ====================================
 # CONFIG
@@ -28,6 +28,9 @@ URL_RE = re.compile(r"(https?://[^\s]+)")
 
 executor = ThreadPoolExecutor(max_workers=20)
 pending_links = {}  # chat_id: url
+
+# صف دانلود
+download_queue = asyncio.Queue()
 
 # ====================================
 # ADMIN CHECK
@@ -157,7 +160,7 @@ async def youtube_search_handler(update: Update, context: ContextTypes.DEFAULT_T
     )
 
 # ====================================
-# STEP 2 — DOWNLOAD / SEND (HYBRID)
+# STEP 2 — ADD TO QUEUE
 # ====================================
 
 async def youtube_download_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -174,58 +177,91 @@ async def youtube_download_handler(update: Update, context: ContextTypes.DEFAULT
     if not url:
         return await cq.edit_message_text("❌ لینک یافت نشد")
 
-    loop = asyncio.get_running_loop()
+    # اضافه کردن به صف
+    await download_queue.put((chat_id, cq, url))
+    await cq.edit_message_text("⏳ لینک شما به صف دانلود اضافه شد. لطفاً منتظر بمانید...")
 
-    # ------------------------
-    # AUDIO → دانلود روی سرور خودت
-    # ------------------------
-    if cq.data == "yt_audio":
-        await cq.edit_message_text("🎵 در حال دانلود صوت (MP3)...")
-        try:
-            info, audio_file = await loop.run_in_executor(executor, _download_audio_sync, url)
-        except Exception as e:
-            return await context.bot.send_message(chat_id, f"❌ دانلود یا ارسال صوت ناموفق بود\n{e}")
+# ====================================
+# DOWNLOAD WORKER
+# ====================================
 
-        size = os.path.getsize(audio_file)
-        if size > MAX_FILE_SIZE:
+async def download_worker(context: ContextTypes.DEFAULT_TYPE):
+    while True:
+        chat_id, cq, url = await download_queue.get()
+        loop = asyncio.get_running_loop()
+        cleanup_temp()
+
+        # AUDIO
+        if cq.data == "yt_audio":
+            await cq.edit_message_text("🎵 در حال دانلود صوت (MP3)...")
+            try:
+                info, audio_file = await loop.run_in_executor(executor, _download_audio_sync, url)
+            except Exception as e:
+                await context.bot.send_message(chat_id, f"❌ دانلود یا ارسال صوت ناموفق بود\n{e}")
+                download_queue.task_done()
+                continue
+
+            size = os.path.getsize(audio_file)
+            if size > MAX_FILE_SIZE:
+                os.remove(audio_file)
+                await cq.edit_message_text("❌ حجم فایل صوتی بیشتر از حد مجاز (800MB) است")
+                download_queue.task_done()
+                continue
+
+            with open(audio_file, "rb") as f:
+                await context.bot.send_document(chat_id, document=f, caption=f"🎵 {info.get('title', '')}")
             os.remove(audio_file)
-            return await cq.edit_message_text("❌ حجم فایل صوتی بیشتر از حد مجاز (800MB) است")
 
-        with open(audio_file, "rb") as f:
-            await context.bot.send_document(
-                chat_id,
-                document=f,
-                caption=f"🎵 {info.get('title', '')}"
-            )
-        os.remove(audio_file)
-        return
+        # VIDEO
+        elif cq.data == "yt_video":
+            await cq.edit_message_text("🎬 در حال بررسی حجم ویدیو...")
+            try:
+                opts = {"quiet": True, "format": "bestvideo+bestaudio/best", "cookiefile": COOKIE_FILE}
+                with yt_dlp.YoutubeDL(opts) as y:
+                    info = y.extract_info(url, download=False)
+                    estimated_size = info.get('filesize') or info.get('filesize_approx') or 0
+            except Exception as e:
+                await context.bot.send_message(chat_id, f"❌ دریافت اطلاعات ویدیو ناموفق بود\n{e}")
+                download_queue.task_done()
+                continue
 
-    # ------------------------
-    # VIDEO → بررسی حجم قبل از دانلود
-    # ------------------------
-    if cq.data == "yt_video":
-        await cq.edit_message_text("🎬 در حال بررسی حجم ویدیو...")
-        try:
-            opts = {"quiet": True, "format": "bestvideo+bestaudio/best", "cookiefile": COOKIE_FILE}
-            with yt_dlp.YoutubeDL(opts) as y:
-                info = y.extract_info(url, download=False)
-                estimated_size = info.get('filesize') or info.get('filesize_approx') or 0
-        except Exception as e:
-            return await context.bot.send_message(chat_id, f"❌ دریافت اطلاعات ویدیو ناموفق بود\n{e}")
+            if estimated_size > MAX_FILE_SIZE:
+                await cq.edit_message_text("❌ حجم ویدیو بیشتر از حد مجاز (800MB) است")
+                download_queue.task_done()
+                continue
 
-        if estimated_size > MAX_FILE_SIZE:
-            return await cq.edit_message_text("❌ حجم ویدیو بیشتر از حد مجاز (800MB) است")
+            await cq.edit_message_text("🎬 در حال دانلود ویدیو روی سرور تلگرام...")
+            try:
+                info, video_file = await loop.run_in_executor(executor, _download_video_sync, url)
+                with open(video_file, "rb") as f:
+                    await context.bot.send_video(
+                        chat_id=chat_id,
+                        video=f,
+                        caption=f"🎬 {info.get('title', '')}",
+                        supports_streaming=True
+                    )
+                os.remove(video_file)
+            except Exception as e:
+                await context.bot.send_message(chat_id, f"❌ دانلود یا ارسال ویدیو ناموفق بود\n{e}")
 
-        await cq.edit_message_text("🎬 در حال دانلود ویدیو روی سرور تلگرام...")
-        try:
-            info, video_file = await loop.run_in_executor(executor, _download_video_sync, url)
-            with open(video_file, "rb") as f:
-                await context.bot.send_video(
-                    chat_id=chat_id,
-                    video=f,
-                    caption=f"🎬 {info.get('title', '')}",
-                    supports_streaming=True
-                )
-            os.remove(video_file)
-        except Exception as e:
-            return await context.bot.send_message(chat_id, f"❌ دانلود یا ارسال ویدیو ناموفق بود\n{e}")
+        download_queue.task_done()
+
+# ====================================
+# MAIN
+# ====================================
+
+async def main():
+    BOT_TOKEN = "YOUR_BOT_TOKEN_HERE"  # توکن باتت را اینجا وارد کن
+    app = ApplicationBuilder().token(BOT_TOKEN).build()
+
+    # هندلرها
+    app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), youtube_search_handler))
+    app.add_handler(CallbackQueryHandler(youtube_download_handler))
+
+    # شروع worker
+    asyncio.create_task(download_worker(app.bot))
+
+    await app.run_polling()
+
+if __name__ == "__main__":
+    asyncio.run(main())
