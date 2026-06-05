@@ -14,6 +14,8 @@ DATA_FOLDER = "data"
 DOWNLOAD_FOLDER = "downloads"
 CACHE_FILE = os.path.join(DATA_FOLDER, "sc_cache.json")
 
+MAX_FILE_SIZE = 48 * 1024 * 1024
+
 os.makedirs(DATA_FOLDER, exist_ok=True)
 os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
 
@@ -21,12 +23,12 @@ if os.path.exists(CACHE_FILE):
     try:
         with open(CACHE_FILE, "r", encoding="utf-8") as f:
             SC_CACHE = json.load(f)
-    except:
+    except Exception:
         SC_CACHE = {}
 else:
     SC_CACHE = {}
 
-executor = ThreadPoolExecutor(max_workers=6)
+executor = ThreadPoolExecutor(max_workers=3)
 track_store = {}
 
 MUSIC_CAPTION = "[دانلود موزیک با ربات](https://t.me/AFGR63_bot)"
@@ -45,12 +47,12 @@ def clean_file(path):
     try:
         if path and os.path.exists(path):
             os.remove(path)
-    except:
+    except Exception:
         pass
 
 
-def safe_title(name):
-    return "".join(c for c in name if c.isalnum() or c in " ._-")[:60] or "music"
+def is_too_big(path):
+    return os.path.exists(path) and os.path.getsize(path) > MAX_FILE_SIZE
 
 
 BASE_OPTS = {
@@ -63,7 +65,7 @@ BASE_OPTS = {
     "socket_timeout": 25,
     "retries": 3,
     "fragment_retries": 3,
-    "format": "bestaudio/best",
+    "format": "bestaudio[filesize<45M]/bestaudio[filesize_approx<45M]/worstaudio/best",
 }
 
 
@@ -81,7 +83,6 @@ def _search_soundcloud(query):
 
 def _download_audio(url):
     file_key = str(uuid.uuid4())
-
     opts = BASE_OPTS.copy()
     opts["outtmpl"] = os.path.join(DOWNLOAD_FOLDER, f"{file_key}.%(ext)s")
 
@@ -102,7 +103,6 @@ def _download_audio(url):
 
 def _youtube_fallback_sync(query):
     file_key = str(uuid.uuid4())
-
     opts = BASE_OPTS.copy()
     opts["outtmpl"] = os.path.join(DOWNLOAD_FOLDER, f"{file_key}.%(ext)s")
 
@@ -156,21 +156,24 @@ async def soundcloud_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
     try:
         result = await loop.run_in_executor(executor, _search_soundcloud, query)
-    except:
+    except Exception:
         result = None
 
     if not result or not result.get("entries"):
         await msg.edit_text("🔁 در SoundCloud پیدا نشد؛ جستجو در YouTube...")
 
+        file_path = None
+
         try:
             info, file_path = await loop.run_in_executor(executor, _youtube_fallback_sync, query)
-        except Exception as e:
-            return await msg.edit_text(f"❌ آهنگ پیدا نشد:\n{e}")
 
-        if not file_path or not os.path.exists(file_path):
-            return await msg.edit_text("❌ فایل آهنگ دانلود نشد.")
+            if not file_path or not os.path.exists(file_path):
+                return await msg.edit_text("❌ فایل آهنگ دانلود نشد.")
 
-        try:
+            if is_too_big(file_path):
+                clean_file(file_path)
+                return await msg.edit_text("❌ حجم آهنگ زیاد است. لطفاً آهنگ کوتاه‌تر انتخاب کن.")
+
             with open(file_path, "rb") as audio:
                 sent = await context.bot.send_audio(
                     chat_id=update.effective_chat.id,
@@ -194,7 +197,7 @@ async def soundcloud_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
             await msg.delete()
 
         except Exception as e:
-            await msg.edit_text(f"❌ خطا در ارسال آهنگ:\n{e}")
+            await msg.edit_text(f"❌ خطا در دانلود:\n{e}")
 
         finally:
             clean_file(file_path)
@@ -202,6 +205,7 @@ async def soundcloud_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
         return
 
     entries = []
+
     for item in result.get("entries", []):
         if not item:
             continue
@@ -240,7 +244,7 @@ async def music_select_handler(update: Update, context: ContextTypes.DEFAULT_TYP
     try:
         _, msg_id, tid = cq.data.split(":", 2)
         msg_id = int(msg_id)
-    except:
+    except Exception:
         return await cq.message.reply_text("❌ داده دکمه خراب است.")
 
     track = track_store.get(msg_id, {}).get(tid)
@@ -271,6 +275,10 @@ async def music_select_handler(update: Update, context: ContextTypes.DEFAULT_TYP
 
         if not file_path or not os.path.exists(file_path):
             return await msg.edit_text("❌ فایل دانلود نشد.")
+
+        if is_too_big(file_path):
+            clean_file(file_path)
+            return await msg.edit_text("❌ حجم آهنگ زیاد است. لطفاً آهنگ کوتاه‌تر انتخاب کن.")
 
         title = info.get("title") or track.get("title") or "Music"
 
