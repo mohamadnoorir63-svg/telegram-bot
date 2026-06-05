@@ -207,4 +207,61 @@ async def instagram_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     chat_id=chat_id,
                     video=fvideo,
                     caption=f"🎬 {item.get('title') or 'Instagram Video'}",
-                    reply_markup=InlineKeyboardMarkup(key
+                    reply_markup=InlineKeyboardMarkup(keyboard),
+                    supports_streaming=True,
+                    read_timeout=120,
+                    write_timeout=120,
+                    connect_timeout=60
+                )
+
+            sent_any = True
+
+        if sent_any:
+            await msg.delete()
+        else:
+            await msg.edit_text("❌ فایل دانلود شد اما برای ارسال پیدا نشد.")
+
+    except Exception as e:
+        await msg.edit_text(f"❌ خطا در دانلود از اینستاگرام:\n{e}")
+
+
+async def instagram_audio_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    cq = update.callback_query
+    await cq.answer("🎵 در حال آماده‌سازی صوت...")
+
+    video_id = cq.data.split(":", 1)[1]
+    data = video_store.get(video_id)
+
+    if not data:
+        return await cq.message.reply_text("❌ لینک پیدا نشد. دوباره لینک Instagram را بفرست.")
+
+    url = data["url"]
+    wait_msg = await cq.message.reply_text("⚡ در حال دانلود صوت...")
+
+    audio_path = None
+
+    try:
+        loop = asyncio.get_running_loop()
+        info, audio_path = await loop.run_in_executor(None, _download_instagram_audio, url)
+
+        if not audio_path or not os.path.exists(audio_path):
+            return await wait_msg.edit_text("❌ فایل صوتی دانلود نشد.")
+
+        with open(audio_path, "rb") as faudio:
+            await context.bot.send_audio(
+                chat_id=cq.message.chat_id,
+                audio=faudio,
+                caption="🎵 نسخه صوتی Instagram",
+                title=(info or {}).get("title") or "Instagram Audio",
+                read_timeout=120,
+                write_timeout=120,
+                connect_timeout=60
+            )
+
+        await wait_msg.delete()
+
+    except Exception as e:
+        await wait_msg.edit_text(f"❌ خطا در دانلود صوت:\n{e}")
+
+    finally:
+        clean_file(audio_path)
