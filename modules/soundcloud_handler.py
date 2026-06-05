@@ -1,10 +1,10 @@
 import os
 import asyncio
+import yt_dlp
 import json
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 
-import yt_dlp
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import ContextTypes
 
@@ -18,19 +18,20 @@ os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
 try:
     with open(CACHE_FILE, "r", encoding="utf-8") as f:
         SC_CACHE = json.load(f)
-except Exception:
+except:
     SC_CACHE = {}
 
 executor = ThreadPoolExecutor(max_workers=4)
 track_store = {}
 
-MUSIC_CAPTION = "[دانلود موزیک با ربات](https://t.me/AFGR63_bot)"
+MUSIC_CAPTION = "🎵 دانلود موزیک با ربات @AFGR63_bot"
 
 ADD_BTN = InlineKeyboardMarkup([
     [InlineKeyboardButton("➕ افزودن ربات به گروه", url="https://t.me/AFGR63_bot?startgroup=true")]
 ])
 
 BASE_OPTS = {
+    "format": "bestaudio[filesize<48M]/bestaudio[filesize_approx<48M]/worstaudio/best",
     "quiet": True,
     "no_warnings": True,
     "noprogress": True,
@@ -38,9 +39,9 @@ BASE_OPTS = {
     "noplaylist": True,
     "overwrites": True,
     "socket_timeout": 20,
-    "retries": 1,
-    "fragment_retries": 1,
-    "format": "bestaudio[filesize<48M]/bestaudio[filesize_approx<48M]/worstaudio/best",
+    "retries": 2,
+    "fragment_retries": 2,
+    "concurrent_fragment_downloads": 4,
 }
 
 
@@ -53,7 +54,7 @@ def clean_file(path):
     try:
         if path and os.path.exists(path):
             os.remove(path)
-    except Exception:
+    except:
         pass
 
 
@@ -62,7 +63,7 @@ def get_real_file(path):
         return path
 
     base = os.path.splitext(path)[0]
-    for ext in ["m4a", "webm", "opus", "mp3"]:
+    for ext in ["mp3", "m4a", "webm", "opus"]:
         p = base + "." + ext
         if os.path.exists(p):
             return p
@@ -70,33 +71,29 @@ def get_real_file(path):
     return path
 
 
-def _search_soundcloud(query):
-    opts = {
+def _search_sc(query):
+    with yt_dlp.YoutubeDL({
         "quiet": True,
         "no_warnings": True,
         "extract_flat": True,
         "socket_timeout": 15,
-    }
-
-    with yt_dlp.YoutubeDL(opts) as ydl:
-        return ydl.extract_info(f"scsearch8:{query}", download=False)
+    }) as y:
+        return y.extract_info(f"scsearch8:{query}", download=False)
 
 
-def _download_direct(url):
+def _download_audio(url):
     file_key = str(uuid.uuid4())
-
     opts = BASE_OPTS.copy()
     opts["outtmpl"] = os.path.join(DOWNLOAD_FOLDER, f"{file_key}.%(ext)s")
 
-    with yt_dlp.YoutubeDL(opts) as ydl:
-        info = ydl.extract_info(url, download=True)
-        path = get_real_file(ydl.prepare_filename(info))
+    with yt_dlp.YoutubeDL(opts) as y:
+        info = y.extract_info(url, download=True)
+        path = get_real_file(y.prepare_filename(info))
         return info, path
 
 
-def _youtube_direct(query):
+def _youtube_fallback_sync(query):
     file_key = str(uuid.uuid4())
-
     opts = BASE_OPTS.copy()
     opts["outtmpl"] = os.path.join(DOWNLOAD_FOLDER, f"{file_key}.%(ext)s")
 
@@ -104,13 +101,13 @@ def _youtube_direct(query):
     if os.path.exists(cookie_file):
         opts["cookiefile"] = cookie_file
 
-    with yt_dlp.YoutubeDL(opts) as ydl:
-        info = ydl.extract_info(f"ytsearch1:{query}", download=True)
+    with yt_dlp.YoutubeDL(opts) as y:
+        info = y.extract_info(f"ytsearch1:{query}", download=True)
 
         if "entries" in info and info["entries"]:
             info = info["entries"][0]
 
-        path = get_real_file(ydl.prepare_filename(info))
+        path = get_real_file(y.prepare_filename(info))
         return info, path
 
 
@@ -118,18 +115,15 @@ async def send_audio_file(context, chat_id, path, title, reply_markup=None):
     if not path or not os.path.exists(path):
         return None
 
-    size = os.path.getsize(path)
-
-    if size > 49 * 1024 * 1024:
+    if os.path.getsize(path) > 49 * 1024 * 1024:
         return None
 
-    with open(path, "rb") as f:
+    with open(path, "rb") as audio:
         return await context.bot.send_audio(
             chat_id=chat_id,
-            audio=f,
+            audio=audio,
             title=title or "Music",
             caption=MUSIC_CAPTION,
-            parse_mode="MarkdownV2",
             reply_markup=reply_markup,
             read_timeout=180,
             write_timeout=180,
@@ -164,45 +158,42 @@ async def soundcloud_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
     try:
         result = await asyncio.wait_for(
-            loop.run_in_executor(executor, _search_soundcloud, query),
+            loop.run_in_executor(executor, _search_sc, query),
             timeout=25
         )
-    except Exception:
+    except:
         result = None
 
     if not result or not result.get("entries"):
-        await msg.edit_text("🔁 در SoundCloud پیدا نشد؛ جستجو در YouTube...")
+        await msg.edit_text("🔁 SoundCloud نتیجه نداشت، جستجو در YouTube...")
 
         path = None
 
         try:
             info, path = await asyncio.wait_for(
-                loop.run_in_executor(executor, _youtube_direct, query),
-                timeout=90
+                loop.run_in_executor(executor, _youtube_fallback_sync, query),
+                timeout=100
             )
 
             sent = await send_audio_file(
-                context=context,
-                chat_id=update.effective_chat.id,
-                path=path,
-                title=info.get("title") or "Music",
-                reply_markup=ADD_BTN if update.effective_chat.type == "private" else None,
+                context,
+                update.effective_chat.id,
+                path,
+                info.get("title") or "Music",
+                ADD_BTN if update.effective_chat.type == "private" else None
             )
 
             if not sent:
-                return await msg.edit_text("❌ فایل بزرگ است یا تلگرام قبول نکرد. یک آهنگ کوتاه‌تر انتخاب کن.")
+                return await msg.edit_text("❌ فایل بزرگ است یا تلگرام قبول نکرد.")
 
             if sent.audio:
-                SC_CACHE[f"yt_{info.get('id')}"] = {
-                    "file_id": sent.audio.file_id,
-                    "caption": MUSIC_CAPTION,
-                }
+                SC_CACHE[f"yt_{info.get('id')}"] = sent.audio.file_id
                 save_cache()
 
             await msg.delete()
 
         except asyncio.TimeoutError:
-            await msg.edit_text("⏳ دانلود طول کشید. یک آهنگ دیگر امتحان کن.")
+            await msg.edit_text("⏳ دانلود طول کشید. آهنگ دیگری امتحان کن.")
         except Exception as e:
             await msg.edit_text(f"❌ خطا در دانلود:\n{e}")
         finally:
@@ -211,7 +202,6 @@ async def soundcloud_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
         return
 
     entries = []
-
     for item in result.get("entries", []):
         if not item:
             continue
@@ -224,7 +214,7 @@ async def soundcloud_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
             entries.append((tid, title, url))
 
     if not entries:
-        return await msg.edit_text("❌ نتیجه قابل دانلود پیدا نشد.")
+        return await msg.edit_text("❌ نتیجه‌ای پیدا نشد.")
 
     entries = entries[:8]
 
@@ -248,7 +238,7 @@ async def music_select_handler(update: Update, context: ContextTypes.DEFAULT_TYP
     try:
         _, msg_id, tid = cq.data.split(":", 2)
         msg_id = int(msg_id)
-    except Exception:
+    except:
         return await cq.message.reply_text("❌ دکمه خراب است.")
 
     track = track_store.get(msg_id, {}).get(tid)
@@ -260,12 +250,10 @@ async def music_select_handler(update: Update, context: ContextTypes.DEFAULT_TYP
     chat_id = cq.message.chat.id
 
     if cache_key in SC_CACHE:
-        cached = SC_CACHE[cache_key]
         return await context.bot.send_audio(
             chat_id=chat_id,
-            audio=cached["file_id"],
-            caption=cached.get("caption", MUSIC_CAPTION),
-            parse_mode="MarkdownV2",
+            audio=SC_CACHE[cache_key],
+            caption=MUSIC_CAPTION,
             reply_markup=ADD_BTN if cq.message.chat.type == "private" else None,
         )
 
@@ -277,28 +265,25 @@ async def music_select_handler(update: Update, context: ContextTypes.DEFAULT_TYP
         loop = asyncio.get_running_loop()
 
         info, path = await asyncio.wait_for(
-            loop.run_in_executor(executor, _download_direct, track["url"]),
-            timeout=90
+            loop.run_in_executor(executor, _download_audio, track["url"]),
+            timeout=100
         )
 
         title = info.get("title") or track.get("title") or "Music"
 
         sent = await send_audio_file(
-            context=context,
-            chat_id=chat_id,
-            path=path,
-            title=title,
-            reply_markup=ADD_BTN if cq.message.chat.type == "private" else None,
+            context,
+            chat_id,
+            path,
+            title,
+            ADD_BTN if cq.message.chat.type == "private" else None
         )
 
         if not sent:
-            return await msg.edit_text("❌ فایل بزرگ است یا تلگرام قبول نکرد. یک آهنگ کوتاه‌تر انتخاب کن.")
+            return await msg.edit_text("❌ فایل بزرگ است یا تلگرام قبول نکرد.")
 
         if sent.audio:
-            SC_CACHE[cache_key] = {
-                "file_id": sent.audio.file_id,
-                "caption": MUSIC_CAPTION,
-            }
+            SC_CACHE[cache_key] = sent.audio.file_id
             save_cache()
 
         await msg.delete()
