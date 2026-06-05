@@ -14,7 +14,7 @@ DATA_FOLDER = "data"
 DOWNLOAD_FOLDER = "downloads"
 CACHE_FILE = os.path.join(DATA_FOLDER, "sc_cache.json")
 
-MAX_FILE_SIZE = 48 * 1024 * 1024
+AUDIO_LIMIT = 48 * 1024 * 1024
 
 os.makedirs(DATA_FOLDER, exist_ok=True)
 os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
@@ -51,10 +51,6 @@ def clean_file(path):
         pass
 
 
-def is_too_big(path):
-    return os.path.exists(path) and os.path.getsize(path) > MAX_FILE_SIZE
-
-
 BASE_OPTS = {
     "quiet": True,
     "no_warnings": True,
@@ -62,10 +58,10 @@ BASE_OPTS = {
     "nopart": True,
     "noplaylist": True,
     "overwrites": True,
-    "socket_timeout": 25,
+    "socket_timeout": 30,
     "retries": 3,
     "fragment_retries": 3,
-    "format": "bestaudio[filesize<45M]/bestaudio[filesize_approx<45M]/worstaudio/best",
+    "format": "bestaudio/best",
 }
 
 
@@ -83,6 +79,7 @@ def _search_soundcloud(query):
 
 def _download_audio(url):
     file_key = str(uuid.uuid4())
+
     opts = BASE_OPTS.copy()
     opts["outtmpl"] = os.path.join(DOWNLOAD_FOLDER, f"{file_key}.%(ext)s")
 
@@ -103,6 +100,7 @@ def _download_audio(url):
 
 def _youtube_fallback_sync(query):
     file_key = str(uuid.uuid4())
+
     opts = BASE_OPTS.copy()
     opts["outtmpl"] = os.path.join(DOWNLOAD_FOLDER, f"{file_key}.%(ext)s")
 
@@ -127,6 +125,35 @@ def _youtube_fallback_sync(query):
                     break
 
         return info, file_path
+
+
+async def send_music_file(context, chat_id, file_path, title, reply_markup=None):
+    size = os.path.getsize(file_path)
+
+    with open(file_path, "rb") as audio:
+        if size <= AUDIO_LIMIT:
+            return await context.bot.send_audio(
+                chat_id=chat_id,
+                audio=audio,
+                caption=MUSIC_CAPTION,
+                parse_mode="MarkdownV2",
+                title=title or "Music",
+                reply_markup=reply_markup,
+                read_timeout=300,
+                write_timeout=300,
+                connect_timeout=120,
+            )
+        else:
+            return await context.bot.send_document(
+                chat_id=chat_id,
+                document=audio,
+                caption=f"📦 فایل آهنگ حجیم بود، به صورت فایل ارسال شد.\n\n{MUSIC_CAPTION}",
+                parse_mode="MarkdownV2",
+                reply_markup=reply_markup,
+                read_timeout=300,
+                write_timeout=300,
+                connect_timeout=120,
+            )
 
 
 async def soundcloud_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -170,24 +197,15 @@ async def soundcloud_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
             if not file_path or not os.path.exists(file_path):
                 return await msg.edit_text("❌ فایل آهنگ دانلود نشد.")
 
-            if is_too_big(file_path):
-                clean_file(file_path)
-                return await msg.edit_text("❌ حجم آهنگ زیاد است. لطفاً آهنگ کوتاه‌تر انتخاب کن.")
+            sent = await send_music_file(
+                context=context,
+                chat_id=update.effective_chat.id,
+                file_path=file_path,
+                title=info.get("title") or "Music",
+                reply_markup=ADD_BTN if update.effective_chat.type == "private" else None,
+            )
 
-            with open(file_path, "rb") as audio:
-                sent = await context.bot.send_audio(
-                    chat_id=update.effective_chat.id,
-                    audio=audio,
-                    caption=MUSIC_CAPTION,
-                    parse_mode="MarkdownV2",
-                    title=info.get("title") or "Music",
-                    reply_markup=ADD_BTN if update.effective_chat.type == "private" else None,
-                    read_timeout=120,
-                    write_timeout=120,
-                    connect_timeout=60,
-                )
-
-            if sent.audio:
+            if getattr(sent, "audio", None):
                 SC_CACHE[f"yt_{info.get('id')}"] = {
                     "file_id": sent.audio.file_id,
                     "caption": MUSIC_CAPTION,
@@ -276,26 +294,17 @@ async def music_select_handler(update: Update, context: ContextTypes.DEFAULT_TYP
         if not file_path or not os.path.exists(file_path):
             return await msg.edit_text("❌ فایل دانلود نشد.")
 
-        if is_too_big(file_path):
-            clean_file(file_path)
-            return await msg.edit_text("❌ حجم آهنگ زیاد است. لطفاً آهنگ کوتاه‌تر انتخاب کن.")
-
         title = info.get("title") or track.get("title") or "Music"
 
-        with open(file_path, "rb") as audio:
-            sent = await context.bot.send_audio(
-                chat_id=chat_id,
-                audio=audio,
-                caption=MUSIC_CAPTION,
-                parse_mode="MarkdownV2",
-                title=title,
-                reply_markup=ADD_BTN if cq.message.chat.type == "private" else None,
-                read_timeout=120,
-                write_timeout=120,
-                connect_timeout=60,
-            )
+        sent = await send_music_file(
+            context=context,
+            chat_id=chat_id,
+            file_path=file_path,
+            title=title,
+            reply_markup=ADD_BTN if cq.message.chat.type == "private" else None,
+        )
 
-        if sent.audio:
+        if getattr(sent, "audio", None):
             SC_CACHE[cache_key] = {
                 "file_id": sent.audio.file_id,
                 "caption": MUSIC_CAPTION,
