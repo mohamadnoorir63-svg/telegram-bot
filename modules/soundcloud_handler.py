@@ -8,24 +8,17 @@ from concurrent.futures import ThreadPoolExecutor
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import ContextTypes
 
-SUDO_USERS = [8588347189]
-
 DATA_FOLDER = "data"
 DOWNLOAD_FOLDER = "downloads"
 CACHE_FILE = os.path.join(DATA_FOLDER, "sc_cache.json")
 
-AUDIO_LIMIT = 48 * 1024 * 1024
-
 os.makedirs(DATA_FOLDER, exist_ok=True)
 os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
 
-if os.path.exists(CACHE_FILE):
-    try:
-        with open(CACHE_FILE, "r", encoding="utf-8") as f:
-            SC_CACHE = json.load(f)
-    except Exception:
-        SC_CACHE = {}
-else:
+try:
+    with open(CACHE_FILE, "r", encoding="utf-8") as f:
+        SC_CACHE = json.load(f)
+except Exception:
     SC_CACHE = {}
 
 executor = ThreadPoolExecutor(max_workers=3)
@@ -59,48 +52,45 @@ BASE_OPTS = {
     "noplaylist": True,
     "overwrites": True,
     "socket_timeout": 30,
-    "retries": 3,
-    "fragment_retries": 3,
+    "retries": 2,
+    "fragment_retries": 2,
     "format": "bestaudio/best",
+    "postprocessors": [{
+        "key": "FFmpegExtractAudio",
+        "preferredcodec": "mp3",
+        "preferredquality": "64",
+    }],
 }
 
 
 def _search_soundcloud(query):
-    opts = {
+    with yt_dlp.YoutubeDL({
         "quiet": True,
         "no_warnings": True,
         "extract_flat": True,
         "socket_timeout": 20,
-    }
-
-    with yt_dlp.YoutubeDL(opts) as ydl:
+    }) as ydl:
         return ydl.extract_info(f"scsearch8:{query}", download=False)
 
 
 def _download_audio(url):
     file_key = str(uuid.uuid4())
-
     opts = BASE_OPTS.copy()
     opts["outtmpl"] = os.path.join(DOWNLOAD_FOLDER, f"{file_key}.%(ext)s")
 
     with yt_dlp.YoutubeDL(opts) as ydl:
         info = ydl.extract_info(url, download=True)
-        file_path = ydl.prepare_filename(info)
+        raw_path = ydl.prepare_filename(info)
+        mp3_path = os.path.splitext(raw_path)[0] + ".mp3"
 
-        if not os.path.exists(file_path):
-            base = os.path.splitext(file_path)[0]
-            for ext in ["mp3", "m4a", "webm", "opus"]:
-                test = base + "." + ext
-                if os.path.exists(test):
-                    file_path = test
-                    break
+        if os.path.exists(mp3_path):
+            return info, mp3_path
 
-        return info, file_path
+        return info, raw_path
 
 
 def _youtube_fallback_sync(query):
     file_key = str(uuid.uuid4())
-
     opts = BASE_OPTS.copy()
     opts["outtmpl"] = os.path.join(DOWNLOAD_FOLDER, f"{file_key}.%(ext)s")
 
@@ -114,46 +104,28 @@ def _youtube_fallback_sync(query):
         if "entries" in info and info["entries"]:
             info = info["entries"][0]
 
-        file_path = ydl.prepare_filename(info)
+        raw_path = ydl.prepare_filename(info)
+        mp3_path = os.path.splitext(raw_path)[0] + ".mp3"
 
-        if not os.path.exists(file_path):
-            base = os.path.splitext(file_path)[0]
-            for ext in ["mp3", "m4a", "webm", "opus"]:
-                test = base + "." + ext
-                if os.path.exists(test):
-                    file_path = test
-                    break
+        if os.path.exists(mp3_path):
+            return info, mp3_path
 
-        return info, file_path
+        return info, raw_path
 
 
-async def send_music_file(context, chat_id, file_path, title, reply_markup=None):
-    size = os.path.getsize(file_path)
-
+async def send_music(context, chat_id, file_path, title, reply_markup=None):
     with open(file_path, "rb") as audio:
-        if size <= AUDIO_LIMIT:
-            return await context.bot.send_audio(
-                chat_id=chat_id,
-                audio=audio,
-                caption=MUSIC_CAPTION,
-                parse_mode="MarkdownV2",
-                title=title or "Music",
-                reply_markup=reply_markup,
-                read_timeout=300,
-                write_timeout=300,
-                connect_timeout=120,
-            )
-        else:
-            return await context.bot.send_document(
-                chat_id=chat_id,
-                document=audio,
-                caption=f"📦 فایل آهنگ حجیم بود، به صورت فایل ارسال شد.\n\n{MUSIC_CAPTION}",
-                parse_mode="MarkdownV2",
-                reply_markup=reply_markup,
-                read_timeout=300,
-                write_timeout=300,
-                connect_timeout=120,
-            )
+        return await context.bot.send_audio(
+            chat_id=chat_id,
+            audio=audio,
+            caption=MUSIC_CAPTION,
+            parse_mode="MarkdownV2",
+            title=title or "Music",
+            reply_markup=reply_markup,
+            read_timeout=300,
+            write_timeout=300,
+            connect_timeout=120,
+        )
 
 
 async def soundcloud_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -192,27 +164,33 @@ async def soundcloud_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
         file_path = None
 
         try:
-            info, file_path = await loop.run_in_executor(executor, _youtube_fallback_sync, query)
+            info, file_path = await asyncio.wait_for(
+                loop.run_in_executor(executor, _youtube_fallback_sync, query),
+                timeout=180
+            )
 
             if not file_path or not os.path.exists(file_path):
                 return await msg.edit_text("❌ فایل آهنگ دانلود نشد.")
 
-            sent = await send_music_file(
-                context=context,
-                chat_id=update.effective_chat.id,
-                file_path=file_path,
-                title=info.get("title") or "Music",
-                reply_markup=ADD_BTN if update.effective_chat.type == "private" else None,
+            sent = await send_music(
+                context,
+                update.effective_chat.id,
+                file_path,
+                info.get("title") or "Music",
+                ADD_BTN if update.effective_chat.type == "private" else None
             )
 
-            if getattr(sent, "audio", None):
+            if sent.audio:
                 SC_CACHE[f"yt_{info.get('id')}"] = {
                     "file_id": sent.audio.file_id,
-                    "caption": MUSIC_CAPTION,
+                    "caption": MUSIC_CAPTION
                 }
                 save_cache()
 
             await msg.delete()
+
+        except asyncio.TimeoutError:
+            await msg.edit_text("⏳ دانلود زیاد طول کشید. لطفاً آهنگ دیگری انتخاب کن.")
 
         except Exception as e:
             await msg.edit_text(f"❌ خطا در دانلود:\n{e}")
@@ -232,10 +210,8 @@ async def soundcloud_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
         title = item.get("title") or "Unknown"
         url = item.get("url") or item.get("webpage_url")
 
-        if not url:
-            continue
-
-        entries.append((tid, title, url))
+        if url:
+            entries.append((tid, title, url))
 
     if not entries:
         return await msg.edit_text("❌ نتیجه قابل دانلود پیدا نشد.")
@@ -257,7 +233,7 @@ async def soundcloud_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
 async def music_select_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     cq = update.callback_query
-    await cq.answer("⏳ در حال آماده‌سازی...")
+    await cq.answer("⏳ در حال دانلود...")
 
     try:
         _, msg_id, tid = cq.data.split(":", 2)
@@ -289,29 +265,36 @@ async def music_select_handler(update: Update, context: ContextTypes.DEFAULT_TYP
 
     try:
         loop = asyncio.get_running_loop()
-        info, file_path = await loop.run_in_executor(executor, _download_audio, track["url"])
+
+        info, file_path = await asyncio.wait_for(
+            loop.run_in_executor(executor, _download_audio, track["url"]),
+            timeout=180
+        )
 
         if not file_path or not os.path.exists(file_path):
             return await msg.edit_text("❌ فایل دانلود نشد.")
 
         title = info.get("title") or track.get("title") or "Music"
 
-        sent = await send_music_file(
-            context=context,
-            chat_id=chat_id,
-            file_path=file_path,
-            title=title,
-            reply_markup=ADD_BTN if cq.message.chat.type == "private" else None,
+        sent = await send_music(
+            context,
+            chat_id,
+            file_path,
+            title,
+            ADD_BTN if cq.message.chat.type == "private" else None
         )
 
-        if getattr(sent, "audio", None):
+        if sent.audio:
             SC_CACHE[cache_key] = {
                 "file_id": sent.audio.file_id,
-                "caption": MUSIC_CAPTION,
+                "caption": MUSIC_CAPTION
             }
             save_cache()
 
         await msg.delete()
+
+    except asyncio.TimeoutError:
+        await msg.edit_text("⏳ دانلود بیش از حد طول کشید. یک نتیجه دیگر انتخاب کن.")
 
     except Exception as e:
         await msg.edit_text(f"❌ خطا در دانلود:\n{e}")
