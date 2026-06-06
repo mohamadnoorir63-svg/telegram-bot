@@ -1418,7 +1418,7 @@ from group_control.force_join import (
     force_check_callback
 )
 
-register_force_join(application, group_number=5)
+register_force_join(application, group_number=16)
 
 application.add_handler(
     CallbackQueryHandler(force_check_callback, pattern="force_check")
