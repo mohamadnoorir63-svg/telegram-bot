@@ -109,12 +109,25 @@ async def handle_admin_management(update: Update, context: ContextTypes.DEFAULT_
             asyncio.create_task(_auto_delete(context.bot, chat.id, reply.message_id, 10))
             return
         try:
-            await context.bot.promote_chat_member(
-                chat.id, target.id,
-                can_change_info=True, can_delete_messages=True, can_manage_video_chats=True,
-                can_restrict_members=True, can_invite_users=True, can_pin_messages=True,
-                can_promote_members=True, can_manage_topics=True
-            )
+            member = await context.bot.get_chat_member(chat.id, target.id)
+
+if member.status == "creator":
+    reply = await msg.reply_text("⚠️ مالک گروه از قبل بالاترین دسترسی را دارد.")
+    asyncio.create_task(_auto_delete(context.bot, chat.id, reply.message_id, 10))
+    return
+
+await context.bot.promote_chat_member(
+    chat_id=chat.id,
+    user_id=target.id,
+    can_change_info=True,
+    can_delete_messages=True,
+    can_manage_video_chats=True,
+    can_restrict_members=True,
+    can_invite_users=True,
+    can_pin_messages=True,
+    can_manage_topics=True,
+    can_promote_members=False,  # امنیت بیشتر
+)
             data[chat_key].append(target.id)
             _save_json(ADMINS_FILE, data)
             reply = await msg.reply_text(f"✅ {target.first_name} به‌عنوان مدیر اضافه شد.")
@@ -139,12 +152,43 @@ async def handle_admin_management(update: Update, context: ContextTypes.DEFAULT_
             asyncio.create_task(_auto_delete(context.bot, chat.id, reply.message_id, 10))
             return
         try:
-            await context.bot.promote_chat_member(
-                chat.id, target.id,
-                can_change_info=False, can_delete_messages=False, can_manage_video_chats=False,
-                can_restrict_members=False, can_invite_users=False, can_pin_messages=False,
-                can_promote_members=False, can_manage_topics=False
-            )
+            member = await context.bot.get_chat_member(chat.id, target.id)
+
+if member.status == "creator":
+    reply = await msg.reply_text("🚫 مالک گروه قابل حذف از مدیریت نیست.")
+    asyncio.create_task(_auto_delete(context.bot, chat.id, reply.message_id, 10))
+    return
+
+if member.status != "administrator":
+    reply = await msg.reply_text("⚠️ این کاربر مدیر نیست.")
+    asyncio.create_task(_auto_delete(context.bot, chat.id, reply.message_id, 10))
+    return
+
+await context.bot.promote_chat_member(
+    chat_id=chat.id,
+    user_id=target.id,
+    is_anonymous=False,
+    can_manage_chat=False,
+    can_delete_messages=False,
+    can_manage_video_chats=False,
+    can_restrict_members=False,
+    can_promote_members=False,
+    can_change_info=False,
+    can_invite_users=False,
+    can_pin_messages=False,
+    can_manage_topics=False,
+)
+
+if target.id in data.get(chat_key, []):
+    data[chat_key].remove(target.id)
+    _save_json(ADMINS_FILE, data)
+
+reply = await msg.reply_text(
+    f"⚙️ {target.first_name} از مدیریت برکنار شد."
+)
+asyncio.create_task(
+    _auto_delete(context.bot, chat.id, reply.message_id, 10)
+)
             data[chat_key].remove(target.id)
             _save_json(ADMINS_FILE, data)
             reply = await msg.reply_text(f"⚙️ {target.first_name} از مدیران حذف شد.")
