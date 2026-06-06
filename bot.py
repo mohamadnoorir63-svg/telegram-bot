@@ -1369,9 +1369,7 @@ application.add_handler(
     CallbackQueryHandler(link_panel_buttons, pattern="^link_"),
     group=-10
 )
-from group_control.force_join import register_force_join
 
-register_force_join(application, group_number=-6000)
 
 # ==========================================================
 # 📦 کنترل گروه‌ها
