@@ -1,8 +1,9 @@
 import os
 import json
 import asyncio
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import ContextTypes, MessageHandler, filters
+
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
+from telegram.ext import ContextTypes, MessageHandler, filters, CallbackQueryHandler
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_FILE = os.path.join(BASE_DIR, "force_db.json")
@@ -30,34 +31,9 @@ def get_channels(chat_id):
     return data.get(str(chat_id), [])
 
 
-def add_channel(chat_id, channel):
-    data = load_db()
+# ================= CHECK JOIN =================
 
-    chat_id = str(chat_id)
-
-    if chat_id not in data:
-        data[chat_id] = []
-
-    if channel not in data[chat_id]:
-        data[chat_id].append(channel)
-
-    save_db(data)
-
-
-def remove_channel(chat_id, channel):
-    data = load_db()
-
-    chat_id = str(chat_id)
-
-    if chat_id in data and channel in data[chat_id]:
-        data[chat_id].remove(channel)
-
-    save_db(data)
-
-
-# ================= CHECK USER =================
-
-async def check_force_join(bot, chat_id, user_id):
+async def check_join(bot, chat_id, user_id):
     channels = get_channels(chat_id)
 
     not_joined = []
@@ -77,7 +53,7 @@ async def check_force_join(bot, chat_id, user_id):
 
 # ================= MIDDLEWARE =================
 
-async def force_join_middleware(update, context):
+async def force_join_middleware(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     msg = update.effective_message
     chat = update.effective_chat
@@ -89,11 +65,7 @@ async def force_join_middleware(update, context):
     if chat.type not in ["group", "supergroup"]:
         return True
 
-    not_joined = await check_force_join(
-        context.bot,
-        chat.id,
-        user.id
-    )
+    not_joined = await check_join(context.bot, chat.id, user.id)
 
     if not not_joined:
         return True
@@ -109,14 +81,11 @@ async def force_join_middleware(update, context):
         ])
 
     buttons.append([
-        InlineKeyboardButton(
-            "🔄 بررسی عضویت",
-            callback_data="force_check"
-        )
+        InlineKeyboardButton("🔄 بررسی عضویت", callback_data="force_check")
     ])
 
     await msg.reply_text(
-        "❌ برای استفاده از ربات باید عضو کانال‌های زیر شوید:",
+        "❌ برای استفاده از ربات باید عضو کانال‌ها شوید:",
         reply_markup=InlineKeyboardMarkup(buttons)
     )
 
@@ -125,32 +94,38 @@ async def force_join_middleware(update, context):
 
 # ================= CALLBACK =================
 
-async def force_check_callback(update, context):
+async def force_check_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     query = update.callback_query
+    await query.answer()
+
     user_id = query.from_user.id
     chat_id = query.message.chat.id
 
-    not_joined = await check_force_join(
-        context.bot,
-        chat_id,
-        user_id
-    )
+    not_joined = await check_join(context.bot, chat_id, user_id)
 
     if not not_joined:
-        await query.message.edit_text("✅ عضویت تایید شد.")
+        await query.message.edit_text("✅ عضویت تایید شد، می‌تونی استفاده کنی.")
     else:
         await query.answer("❌ هنوز عضو کامل نشدی", show_alert=True)
 
 
 # ================= REGISTER =================
 
-def register_force_join(application, group_number=15):
+def register_force_join(application, group_number=0):
 
     application.add_handler(
         MessageHandler(
-            filters.TEXT & ~filters.COMMAND,
+            filters.ALL,
             force_join_middleware
+        ),
+        group=group_number
+    )
+
+    application.add_handler(
+        CallbackQueryHandler(
+            force_check_callback,
+            pattern="force_check"
         ),
         group=group_number
     )
