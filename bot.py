@@ -1369,7 +1369,16 @@ application.add_handler(
     CallbackQueryHandler(link_panel_buttons, pattern="^link_"),
     group=-10
 )
+from group_control.force_join import (
+    register_force_join,
+    force_check_callback
+)
 
+register_force_join(application, group_number=0)
+
+application.add_handler(
+    CallbackQueryHandler(force_check_callback, pattern="force_check")
+)
 # ==========================================================
 # 📦 کنترل گروه‌ها
 # ==========================================================
@@ -1412,17 +1421,6 @@ register_tag_handlers(application, group_number=14)
 
 from group_control.admin_manager import register_admin_handlers
 register_admin_handlers(application, group_number=15)
-
-from group_control.force_join import (
-    register_force_join,
-    force_check_callback
-)
-
-register_force_join(application, group_number=16)
-
-application.add_handler(
-    CallbackQueryHandler(force_check_callback, pattern="force_check")
-)
 
 # ==========================================================
 # 👑 مدیریت سودوها
