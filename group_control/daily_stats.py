@@ -5,11 +5,9 @@ from datetime import datetime
 from telegram import Update
 from telegram.ext import ContextTypes
 
-STATS_FILE = "stats.json"
+STATS_FILE = "daily_stats.json"
 SUDO_ID = 8588347189
 
-
-# ================= فایل =================
 
 def load_stats():
     if os.path.exists(STATS_FILE):
@@ -29,8 +27,6 @@ def save_stats():
 stats = load_stats()
 
 
-# ================= ایجاد روز =================
-
 def init_day(chat_id):
     today = datetime.now().strftime("%Y-%m-%d")
 
@@ -49,8 +45,10 @@ def init_day(chat_id):
 
 # ================= ثبت پیام =================
 
-async def record_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
+async def record_message_activity(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE
+):
     if not update.message:
         return
 
@@ -62,19 +60,19 @@ async def record_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     today = init_day(chat_id)
 
-    data = stats[chat_id][today]
-
-    data["messages"][user_id] = (
-        data["messages"].get(user_id, 0) + 1
+    stats[chat_id][today]["messages"][user_id] = (
+        stats[chat_id][today]["messages"].get(user_id, 0) + 1
     )
 
     save_stats()
 
 
-# ================= ثبت ورود =================
+# ================= ثبت عضو جدید =================
 
-async def record_join(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
+async def record_new_members(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE
+):
     if not update.message:
         return
 
@@ -94,8 +92,10 @@ async def record_join(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ================= ثبت خروج =================
 
-async def record_left(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
+async def record_left_members(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE
+):
     if not update.message:
         return
 
@@ -111,13 +111,12 @@ async def record_left(update: Update, context: ContextTypes.DEFAULT_TYPE):
     save_stats()
 
 
-# ================= آمار گروه =================
+# ================= نمایش آمار =================
 
 async def show_group_stats(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE
 ):
-
     user = update.effective_user
     chat = update.effective_chat
 
@@ -128,9 +127,8 @@ async def show_group_stats(
         )
 
         if (
-            user.id != SUDO_ID
-            and member.status
-            not in ["creator", "administrator"]
+            user.id != SUDO_ID and
+            member.status not in ["creator", "administrator"]
         ):
             return
 
@@ -164,23 +162,20 @@ async def show_group_stats(
     text = (
         "📊 آمار امروز گروه\n\n"
         f"💬 کل پیام‌ها: {total_messages}\n"
-        f"👥 ورود اعضا: {data['joins']}\n"
-        f"🚪 خروج اعضا: {data['lefts']}\n\n"
+        f"👥 اعضای وارد شده: {data['joins']}\n"
+        f"🚪 اعضای خارج شده: {data['lefts']}\n\n"
         "🏆 5 کاربر فعال:\n"
     )
 
     rank = 1
 
     for uid, count in top_users:
-
         try:
             member = await context.bot.get_chat_member(
                 chat.id,
                 int(uid)
             )
-
             name = member.user.first_name
-
         except:
             name = "کاربر"
 
