@@ -1369,16 +1369,10 @@ application.add_handler(
     CallbackQueryHandler(link_panel_buttons, pattern="^link_"),
     group=-10
 )
-from group_control.force_join import (
-    register_force_join,
-    force_check_callback
-)
+from group_control.force_join import register_force_join
 
-register_force_join(application, group_number=0)
+register_force_join(application, group_number=-1)
 
-application.add_handler(
-    CallbackQueryHandler(force_check_callback, pattern="force_check")
-)
 # ==========================================================
 # 📦 کنترل گروه‌ها
 # ==========================================================
