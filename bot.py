@@ -1371,7 +1371,7 @@ application.add_handler(
 )
 from group_control.force_join import register_force_join
 
-register_force_join(application, group_number=-20)
+register_force_join(application, group_number=-6000)
 
 # ==========================================================
 # 📦 کنترل گروه‌ها
