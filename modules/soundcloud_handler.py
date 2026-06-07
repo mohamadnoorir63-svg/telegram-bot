@@ -86,13 +86,24 @@ def youtube_opts(file_key):
         "nopart": True,
         "noplaylist": True,
         "overwrites": True,
-        "format": "bestaudio/best",
+
+        # فرمت پایدار برای YouTube
+        "format": "140/251/250/249/bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio/best",
+
         "outtmpl": os.path.join(DOWNLOAD_FOLDER, f"{file_key}.%(ext)s"),
         "socket_timeout": 30,
-        "retries": 5,
-        "fragment_retries": 5,
+        "retries": 10,
+        "fragment_retries": 10,
         "concurrent_fragment_downloads": 8,
         "http_chunk_size": 8 * 1024 * 1024,
+
+        # کمک برای حل مشکل signature و n challenge
+        "extractor_args": {
+            "youtube": {
+                "player_client": ["android", "web"]
+            }
+        },
+
         "postprocessors": [
             {
                 "key": "FFmpegExtractAudio",
@@ -123,13 +134,15 @@ def _youtube_download_sync(query):
         title = info.get("title") or query
         video_id = info.get("id") or file_key
 
-        path = os.path.join(DOWNLOAD_FOLDER, f"{file_key}.mp3")
+        mp3_path = os.path.join(DOWNLOAD_FOLDER, f"{file_key}.mp3")
 
-        if not os.path.exists(path):
+        if os.path.exists(mp3_path):
+            path = mp3_path
+        else:
             prepared = ydl.prepare_filename(info)
             path = get_real_file(prepared)
 
-        if not os.path.exists(path):
+        if not path or not os.path.exists(path):
             raise FileNotFoundError("فایل MP3 ساخته نشد.")
 
         return {
@@ -207,7 +220,7 @@ async def soundcloud_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
         info, path = await asyncio.wait_for(
             loop.run_in_executor(executor, _youtube_download_sync, query),
-            timeout=160
+            timeout=180
         )
 
         sent = await send_audio_file(
