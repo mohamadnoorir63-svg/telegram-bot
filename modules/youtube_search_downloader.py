@@ -1,87 +1,100 @@
 import os
 import re
+import time
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
-import time
 
 import yt_dlp
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
-from telegram.ext import ApplicationBuilder, ContextTypes, CommandHandler, MessageHandler, CallbackQueryHandler, filters
-
-# ====================================
-# CONFIG
-# ====================================
+from telegram.ext import ContextTypes
 
 SUDO_USERS = [8588347189]
-COOKIE_FILE = "modules/youtube_cookie.txt"
-DOWNLOAD_FOLDER = "downloads"
-MAX_FILE_SIZE = 800 * 1024 * 1024  # 800MB
 
-os.makedirs("modules", exist_ok=True)
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+COOKIE_FILE = os.path.join(BASE_DIR, "modules", "youtube_cookie.txt")
+DOWNLOAD_FOLDER = os.path.join(BASE_DIR, "downloads")
+
+MAX_FILE_SIZE = 800 * 1024 * 1024
+
+os.makedirs(os.path.dirname(COOKIE_FILE), exist_ok=True)
 os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
 
 if not os.path.exists(COOKIE_FILE):
     with open(COOKIE_FILE, "w", encoding="utf-8") as f:
-        f.write("# Paste YouTube cookies here (Netscape format)\n")
+        f.write("# Paste YouTube cookies here in Netscape format\n")
 
 URL_RE = re.compile(r"(https?://[^\s]+)")
+executor = ThreadPoolExecutor(max_workers=4)
 
-executor = ThreadPoolExecutor(max_workers=20)
-pending_links = {}  # chat_id: url
-
-# صف دانلود
+pending_links = {}
 download_queue = asyncio.Queue()
 
-# ====================================
-# ADMIN CHECK
-# ====================================
 
-async def is_admin(update, context):
+async def is_admin(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
     chat = update.effective_chat
     user = update.effective_user
 
+    if not chat or not user:
+        return False
+
     if chat.type == "private":
         return True
+
     if user.id in SUDO_USERS:
         return True
 
     try:
-        admins = await context.bot.get_chat_administrators(chat.id)
-        return user.id in [a.user.id for a in admins]
-    except:
+        member = await context.bot.get_chat_member(chat.id, user.id)
+        return member.status in ("creator", "administrator")
+    except Exception:
         return False
 
-# ====================================
-# YTDLP OPTIONS
-# ====================================
+
+def cleanup_temp():
+    now = time.time()
+
+    for name in os.listdir(DOWNLOAD_FOLDER):
+        path = os.path.join(DOWNLOAD_FOLDER, name)
+
+        try:
+            if os.path.isfile(path) and now - os.path.getmtime(path) > 600:
+                os.remove(path)
+        except Exception:
+            pass
+
 
 def video_opts():
     return {
         "cookiefile": COOKIE_FILE,
         "quiet": True,
+        "no_warnings": True,
+        "noplaylist": True,
         "format": "bestvideo+bestaudio/best",
         "merge_output_format": "mp4",
-        "outtmpl": f"{DOWNLOAD_FOLDER}/%(id)s.%(ext)s",
-        "concurrent_fragment_downloads": 32,
+        "outtmpl": os.path.join(DOWNLOAD_FOLDER, "%(id)s.%(ext)s"),
+        "concurrent_fragment_downloads": 8,
         "http_chunk_size": 8 * 1024 * 1024,
-        "retries": 20,
-        "fragment_retries": 20,
+        "retries": 10,
+        "fragment_retries": 10,
         "nopart": True,
         "overwrites": True,
-        "ignoreerrors": True,
-        "allow_unplayable_formats": True,
     }
+
 
 def audio_opts():
     return {
         "cookiefile": COOKIE_FILE,
         "quiet": True,
+        "no_warnings": True,
+        "noplaylist": True,
         "format": "bestaudio/best",
-        "outtmpl": f"{DOWNLOAD_FOLDER}/%(id)s.%(ext)s",
-        "concurrent_fragment_downloads": 32,
+        "outtmpl": os.path.join(DOWNLOAD_FOLDER, "%(id)s.%(ext)s"),
+        "concurrent_fragment_downloads": 8,
         "http_chunk_size": 8 * 1024 * 1024,
-        "retries": 20,
-        "fragment_retries": 20,
+        "retries": 10,
+        "fragment_retries": 10,
+        "nopart": True,
+        "overwrites": True,
         "postprocessors": [
             {
                 "key": "FFmpegExtractAudio",
@@ -89,57 +102,51 @@ def audio_opts():
                 "preferredquality": "192",
             }
         ],
-        "ignoreerrors": True,
-        "allow_unplayable_formats": True,
     }
 
-# ====================================
-# SYNC DOWNLOAD
-# ====================================
 
-def _download_audio_sync(url):
-    with yt_dlp.YoutubeDL(audio_opts()) as y:
-        info = y.extract_info(url, download=True)
-        if info is None or 'id' not in info:
-            raise ValueError("❌ استخراج اطلاعات صوت ناموفق بود")
-        audio_file = f"{DOWNLOAD_FOLDER}/{info['id']}.mp3"
-        return info, audio_file
+def _download_audio_sync(url: str):
+    with yt_dlp.YoutubeDL(audio_opts()) as ydl:
+        info = ydl.extract_info(url, download=True)
 
-def _download_video_sync(url):
-    with yt_dlp.YoutubeDL(video_opts()) as y:
-        info = y.extract_info(url, download=True)
-        if info is None or 'id' not in info:
-            raise ValueError("❌ استخراج اطلاعات ویدیو ناموفق بود")
-        video_file = f"{DOWNLOAD_FOLDER}/{info['id']}.mp4"
-        return info, video_file
+    if not info or "id" not in info:
+        raise RuntimeError("استخراج اطلاعات صوت ناموفق بود.")
 
-# ====================================
-# CLEAN TEMP FILES
-# ====================================
+    path = os.path.join(DOWNLOAD_FOLDER, f"{info['id']}.mp3")
 
-def cleanup_temp():
-    for f in os.listdir(DOWNLOAD_FOLDER):
-        file_path = os.path.join(DOWNLOAD_FOLDER, f)
-        try:
-            if os.path.isfile(file_path) and time.time() - os.path.getmtime(file_path) > 600:
-                os.remove(file_path)
-        except:
-            pass
+    if not os.path.exists(path):
+        raise FileNotFoundError("فایل MP3 ساخته نشد.")
 
-# ====================================
-# STEP 1 — LINK
-# ====================================
+    return info, path
+
+
+def _download_video_sync(url: str):
+    with yt_dlp.YoutubeDL(video_opts()) as ydl:
+        info = ydl.extract_info(url, download=True)
+
+    if not info or "id" not in info:
+        raise RuntimeError("استخراج اطلاعات ویدیو ناموفق بود.")
+
+    path = os.path.join(DOWNLOAD_FOLDER, f"{info['id']}.mp4")
+
+    if not os.path.exists(path):
+        raise FileNotFoundError("فایل MP4 ساخته نشد.")
+
+    return info, path
+
 
 async def youtube_search_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not update.message:
+    if not update.message or not update.message.text:
         return
 
-    text = update.message.text
+    text = update.message.text.strip()
     match = URL_RE.search(text)
+
     if not match:
         return
 
     url = match.group(1)
+
     if "youtube.com" not in url and "youtu.be" not in url:
         return
 
@@ -150,8 +157,10 @@ async def youtube_search_handler(update: Update, context: ContextTypes.DEFAULT_T
     pending_links[update.effective_chat.id] = url
 
     keyboard = [
-        [InlineKeyboardButton("🎵 Audio (MP3)", callback_data="yt_audio")],
-        [InlineKeyboardButton("🎬 Video (MP4)", callback_data="yt_video")],
+        [
+            InlineKeyboardButton("🎵 دانلود صوت MP3", callback_data="yt_audio"),
+            InlineKeyboardButton("🎬 دانلود ویدیو MP4", callback_data="yt_video"),
+        ]
     ]
 
     await update.message.reply_text(
@@ -159,112 +168,138 @@ async def youtube_search_handler(update: Update, context: ContextTypes.DEFAULT_T
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
 
-# ====================================
-# STEP 2 — ADD TO QUEUE
-# ====================================
 
 async def youtube_download_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    cleanup_temp()
     cq = update.callback_query
+
+    if not cq:
+        return
+
     await cq.answer()
+
     chat_id = cq.message.chat.id
 
-    if update.effective_chat.type != "private":
-        if not await is_admin(update, context):
-            return
+    if cq.message.chat.type != "private":
+        member = await context.bot.get_chat_member(chat_id, cq.from_user.id)
+        if cq.from_user.id not in SUDO_USERS and member.status not in ("creator", "administrator"):
+            return await cq.answer("⛔ فقط مدیران گروه مجاز هستند.", show_alert=True)
 
     url = pending_links.get(chat_id)
-    if not url:
-        return await cq.edit_message_text("❌ لینک یافت نشد")
 
-    # اضافه کردن به صف
-    await download_queue.put((chat_id, cq, url))
+    if not url:
+        return await cq.edit_message_text("❌ لینک پیدا نشد. دوباره لینک یوتیوب را بفرست.")
+
+    mode = cq.data
+
+    await download_queue.put({
+        "chat_id": chat_id,
+        "message_id": cq.message.message_id,
+        "url": url,
+        "mode": mode,
+    })
+
     await cq.edit_message_text("⏳ لینک شما به صف دانلود اضافه شد. لطفاً منتظر بمانید...")
 
-# ====================================
-# DOWNLOAD WORKER
-# ====================================
 
 async def download_worker(bot):
     while True:
-        chat_id, cq, url = await download_queue.get()
-        loop = asyncio.get_running_loop()
+        item = await download_queue.get()
+
+        chat_id = item["chat_id"]
+        message_id = item["message_id"]
+        url = item["url"]
+        mode = item["mode"]
+
         cleanup_temp()
+        loop = asyncio.get_running_loop()
 
-        # AUDIO
-        if cq.data == "yt_audio":
-            await cq.edit_message_text("🎵 در حال دانلود صوت (MP3)...")
-            try:
-                info, audio_file = await loop.run_in_executor(executor, _download_audio_sync, url)
-            except Exception as e:
-                await bot.send_message(chat_id, f"❌ دانلود یا ارسال صوت ناموفق بود\n{e}")
-                download_queue.task_done()
-                continue
+        try:
+            if mode == "yt_audio":
+                await bot.edit_message_text(
+                    chat_id=chat_id,
+                    message_id=message_id,
+                    text="🎵 در حال دانلود و تبدیل به MP3..."
+                )
 
-            size = os.path.getsize(audio_file)
-            if size > MAX_FILE_SIZE:
-                os.remove(audio_file)
-                await cq.edit_message_text("❌ حجم فایل صوتی بیشتر از حد مجاز (800MB) است")
-                download_queue.task_done()
-                continue
+                info, audio_path = await loop.run_in_executor(
+                    executor,
+                    _download_audio_sync,
+                    url
+                )
 
-            with open(audio_file, "rb") as f:
-                await bot.send_document(chat_id, document=f, caption=f"🎵 {info.get('title', '')}")
-            os.remove(audio_file)
+                size = os.path.getsize(audio_path)
 
-        # VIDEO
-        elif cq.data == "yt_video":
-            await cq.edit_message_text("🎬 در حال بررسی حجم ویدیو...")
-            try:
-                opts = {"quiet": True, "format": "bestvideo+bestaudio/best", "cookiefile": COOKIE_FILE}
-                with yt_dlp.YoutubeDL(opts) as y:
-                    info = y.extract_info(url, download=False)
-                    estimated_size = info.get('filesize') or info.get('filesize_approx') or 0
-            except Exception as e:
-                await bot.send_message(chat_id, f"❌ دریافت اطلاعات ویدیو ناموفق بود\n{e}")
-                download_queue.task_done()
-                continue
+                if size > MAX_FILE_SIZE:
+                    os.remove(audio_path)
+                    await bot.send_message(chat_id, "❌ حجم فایل صوتی بیشتر از 800MB است.")
+                    continue
 
-            if estimated_size > MAX_FILE_SIZE:
-                await cq.edit_message_text("❌ حجم ویدیو بیشتر از حد مجاز (800MB) است")
-                download_queue.task_done()
-                continue
+                title = info.get("title") or "YouTube Audio"
 
-            await cq.edit_message_text("🎬 در حال دانلود ویدیو روی سرور تلگرام...")
-            try:
-                info, video_file = await loop.run_in_executor(executor, _download_video_sync, url)
-                with open(video_file, "rb") as f:
+                with open(audio_path, "rb") as f:
+                    await bot.send_audio(
+                        chat_id=chat_id,
+                        audio=f,
+                        title=title,
+                        caption=f"🎵 {title}",
+                        read_timeout=180,
+                        write_timeout=180,
+                        connect_timeout=60,
+                    )
+
+                os.remove(audio_path)
+
+                try:
+                    await bot.delete_message(chat_id, message_id)
+                except Exception:
+                    pass
+
+            elif mode == "yt_video":
+                await bot.edit_message_text(
+                    chat_id=chat_id,
+                    message_id=message_id,
+                    text="🎬 در حال دانلود ویدیو MP4..."
+                )
+
+                info, video_path = await loop.run_in_executor(
+                    executor,
+                    _download_video_sync,
+                    url
+                )
+
+                size = os.path.getsize(video_path)
+
+                if size > MAX_FILE_SIZE:
+                    os.remove(video_path)
+                    await bot.send_message(chat_id, "❌ حجم ویدیو بیشتر از 800MB است.")
+                    continue
+
+                title = info.get("title") or "YouTube Video"
+
+                with open(video_path, "rb") as f:
                     await bot.send_video(
                         chat_id=chat_id,
                         video=f,
-                        caption=f"🎬 {info.get('title', '')}",
-                        supports_streaming=True
+                        caption=f"🎬 {title}",
+                        supports_streaming=True,
+                        read_timeout=180,
+                        write_timeout=180,
+                        connect_timeout=60,
                     )
-                os.remove(video_file)
-            except Exception as e:
-                await bot.send_message(chat_id, f"❌ دانلود یا ارسال ویدیو ناموفق بود\n{e}")
 
-        download_queue.task_done()
+                os.remove(video_path)
 
-# ====================================
-# MAIN
-# ====================================
+                try:
+                    await bot.delete_message(chat_id, message_id)
+                except Exception:
+                    pass
 
-async def main():
-    BOT_TOKEN = "YOUR_BOT_TOKEN_HERE"  # توکن باتت را اینجا وارد کن
-    app = ApplicationBuilder().token(BOT_TOKEN).build()
+        except Exception as e:
+            try:
+                await bot.send_message(chat_id, f"❌ خطا در دانلود:\n{e}")
+            except Exception:
+                pass
 
-    # هندلرها
-    app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), youtube_search_handler))
-    app.add_handler(CallbackQueryHandler(youtube_download_handler))
-
-    # شروع worker بعد از راه‌اندازی بات
-    async def on_startup(app):
-        app.create_task(download_worker(app.bot))
-
-    app.post_init(on_startup)
-
-    await app.run_polling()
-
-if __name__ == "__main__":
-    asyncio.run(main())
+        finally:
+            cleanup_temp()
+            download_queue.task_done()
