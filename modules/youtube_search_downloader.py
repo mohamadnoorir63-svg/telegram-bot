@@ -11,17 +11,31 @@ from telegram.ext import ContextTypes
 SUDO_USERS = [8588347189]
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-COOKIE_FILE = os.path.join(BASE_DIR, "modules", "youtube_cookie.txt")
 DOWNLOAD_FOLDER = os.path.join(BASE_DIR, "downloads")
+COOKIE_FILE = os.path.join(BASE_DIR, "modules", "youtube_cookie.txt")
 
 MAX_FILE_SIZE = 800 * 1024 * 1024
 
 os.makedirs(os.path.dirname(COOKIE_FILE), exist_ok=True)
 os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
 
-if not os.path.exists(COOKIE_FILE):
-    with open(COOKIE_FILE, "w", encoding="utf-8") as f:
-        f.write("# Paste YouTube cookies here in Netscape format\n")
+# ==========================
+
+# ==========================
+
+COOKIE_DATA = r"""
+# Netscape HTTP Cookie File
+# https://curl.haxx.se/rfc/cookie_spec.html
+# This is a generated file! Do not edit.
+
+
+
+"""
+
+with open(COOKIE_FILE, "w", encoding="utf-8") as f:
+    f.write(COOKIE_DATA.strip() + "\n")
+
+# ==========================
 
 URL_RE = re.compile(r"(https?://[^\s]+)")
 executor = ThreadPoolExecutor(max_workers=4)
@@ -52,33 +66,13 @@ async def is_admin(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
 
 def cleanup_temp():
     now = time.time()
-
     for name in os.listdir(DOWNLOAD_FOLDER):
         path = os.path.join(DOWNLOAD_FOLDER, name)
-
         try:
             if os.path.isfile(path) and now - os.path.getmtime(path) > 600:
                 os.remove(path)
         except Exception:
             pass
-
-
-def video_opts():
-    return {
-        "cookiefile": COOKIE_FILE,
-        "quiet": True,
-        "no_warnings": True,
-        "noplaylist": True,
-        "format": "bestvideo+bestaudio/best",
-        "merge_output_format": "mp4",
-        "outtmpl": os.path.join(DOWNLOAD_FOLDER, "%(id)s.%(ext)s"),
-        "concurrent_fragment_downloads": 8,
-        "http_chunk_size": 8 * 1024 * 1024,
-        "retries": 10,
-        "fragment_retries": 10,
-        "nopart": True,
-        "overwrites": True,
-    }
 
 
 def audio_opts():
@@ -87,14 +81,17 @@ def audio_opts():
         "quiet": True,
         "no_warnings": True,
         "noplaylist": True,
-        "format": "bestaudio/best",
+        "format": "140/251/250/249/bestaudio/best",
         "outtmpl": os.path.join(DOWNLOAD_FOLDER, "%(id)s.%(ext)s"),
-        "concurrent_fragment_downloads": 8,
-        "http_chunk_size": 8 * 1024 * 1024,
         "retries": 10,
         "fragment_retries": 10,
         "nopart": True,
         "overwrites": True,
+        "extractor_args": {
+            "youtube": {
+                "player_client": ["android", "web"]
+            }
+        },
         "postprocessors": [
             {
                 "key": "FFmpegExtractAudio",
@@ -105,6 +102,35 @@ def audio_opts():
     }
 
 
+def video_opts():
+    return {
+        "cookiefile": COOKIE_FILE,
+        "quiet": True,
+        "no_warnings": True,
+        "noplaylist": True,
+        "format": "18/best",
+        "merge_output_format": "mp4",
+        "outtmpl": os.path.join(DOWNLOAD_FOLDER, "%(id)s.%(ext)s"),
+        "retries": 10,
+        "fragment_retries": 10,
+        "nopart": True,
+        "overwrites": True,
+        "extractor_args": {
+            "youtube": {
+                "player_client": ["android", "web"]
+            }
+        },
+    }
+
+
+def find_file(video_id, exts):
+    for ext in exts:
+        path = os.path.join(DOWNLOAD_FOLDER, f"{video_id}.{ext}")
+        if os.path.exists(path):
+            return path
+    return None
+
+
 def _download_audio_sync(url: str):
     with yt_dlp.YoutubeDL(audio_opts()) as ydl:
         info = ydl.extract_info(url, download=True)
@@ -112,10 +138,11 @@ def _download_audio_sync(url: str):
     if not info or "id" not in info:
         raise RuntimeError("استخراج اطلاعات صوت ناموفق بود.")
 
-    path = os.path.join(DOWNLOAD_FOLDER, f"{info['id']}.mp3")
+    video_id = info["id"]
+    path = find_file(video_id, ["mp3", "m4a", "webm", "opus"])
 
-    if not os.path.exists(path):
-        raise FileNotFoundError("فایل MP3 ساخته نشد.")
+    if not path:
+        raise FileNotFoundError("فایل صوتی ساخته نشد.")
 
     return info, path
 
@@ -127,10 +154,11 @@ def _download_video_sync(url: str):
     if not info or "id" not in info:
         raise RuntimeError("استخراج اطلاعات ویدیو ناموفق بود.")
 
-    path = os.path.join(DOWNLOAD_FOLDER, f"{info['id']}.mp4")
+    video_id = info["id"]
+    path = find_file(video_id, ["mp4", "webm", "mkv"])
 
-    if not os.path.exists(path):
-        raise FileNotFoundError("فایل MP4 ساخته نشد.")
+    if not path:
+        raise FileNotFoundError("فایل ویدیو ساخته نشد.")
 
     return info, path
 
@@ -189,13 +217,11 @@ async def youtube_download_handler(update: Update, context: ContextTypes.DEFAULT
     if not url:
         return await cq.edit_message_text("❌ لینک پیدا نشد. دوباره لینک یوتیوب را بفرست.")
 
-    mode = cq.data
-
     await download_queue.put({
         "chat_id": chat_id,
         "message_id": cq.message.message_id,
         "url": url,
-        "mode": mode,
+        "mode": cq.data,
     })
 
     await cq.edit_message_text("⏳ لینک شما به صف دانلود اضافه شد. لطفاً منتظر بمانید...")
@@ -227,9 +253,7 @@ async def download_worker(bot):
                     url
                 )
 
-                size = os.path.getsize(audio_path)
-
-                if size > MAX_FILE_SIZE:
+                if os.path.getsize(audio_path) > MAX_FILE_SIZE:
                     os.remove(audio_path)
                     await bot.send_message(chat_id, "❌ حجم فایل صوتی بیشتر از 800MB است.")
                     continue
@@ -249,11 +273,6 @@ async def download_worker(bot):
 
                 os.remove(audio_path)
 
-                try:
-                    await bot.delete_message(chat_id, message_id)
-                except Exception:
-                    pass
-
             elif mode == "yt_video":
                 await bot.edit_message_text(
                     chat_id=chat_id,
@@ -267,9 +286,7 @@ async def download_worker(bot):
                     url
                 )
 
-                size = os.path.getsize(video_path)
-
-                if size > MAX_FILE_SIZE:
+                if os.path.getsize(video_path) > MAX_FILE_SIZE:
                     os.remove(video_path)
                     await bot.send_message(chat_id, "❌ حجم ویدیو بیشتر از 800MB است.")
                     continue
@@ -289,10 +306,10 @@ async def download_worker(bot):
 
                 os.remove(video_path)
 
-                try:
-                    await bot.delete_message(chat_id, message_id)
-                except Exception:
-                    pass
+            try:
+                await bot.delete_message(chat_id, message_id)
+            except Exception:
+                pass
 
         except Exception as e:
             try:
