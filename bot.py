@@ -1684,7 +1684,7 @@ async def start_main_bot():
 
     loop.create_task(test_main_bot())       # اجرا روی همان loop
     loop.create_task(start_userbot()) # اجرای یوزربات جانبی همزمان
-    loop.create_task(download_worker(application.bot))
+
     # ================================
     # 🟢 مرحله‌ای که ربات LOGIN و آماده ارسال پیام می‌شود
     # ================================
