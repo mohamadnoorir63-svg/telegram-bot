@@ -116,6 +116,9 @@ def _youtube_download_sync(query):
         if "entries" in info and info["entries"]:
             info = info["entries"][0]
 
+        if not info:
+            raise RuntimeError("نتیجه‌ای از YouTube پیدا نشد.")
+
         title = info.get("title") or query
         video_id = info.get("id") or file_key
 
@@ -225,7 +228,4 @@ async def soundcloud_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
         await msg.delete()
 
     except asyncio.TimeoutError:
-        await msg.edit_text("⏳ دانلود طول کشید. یک آهنگ دیگر امتحان کن.")
-
-    except Exception as e:
-        await msg.edit_text(f"❌ خطا در
+        await msg.edit_text("⏳ دانلود طول کشید. یک آهنگ دیگر امتح
