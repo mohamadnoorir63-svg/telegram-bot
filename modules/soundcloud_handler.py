@@ -38,8 +38,11 @@ ADD_BTN = InlineKeyboardMarkup([
 
 
 def save_cache():
-    with open(CACHE_FILE, "w", encoding="utf-8") as f:
-        json.dump(MUSIC_CACHE, f, ensure_ascii=False)
+    try:
+        with open(CACHE_FILE, "w", encoding="utf-8") as f:
+            json.dump(MUSIC_CACHE, f, ensure_ascii=False, indent=2)
+    except Exception:
+        pass
 
 
 def clean_file(path):
@@ -52,15 +55,13 @@ def clean_file(path):
 
 def cleanup_old_files():
     now = time.time()
-
-    for name in os.listdir(DOWNLOAD_FOLDER):
-        path = os.path.join(DOWNLOAD_FOLDER, name)
-
-        try:
+    try:
+        for name in os.listdir(DOWNLOAD_FOLDER):
+            path = os.path.join(DOWNLOAD_FOLDER, name)
             if os.path.isfile(path) and now - os.path.getmtime(path) > 600:
                 os.remove(path)
-        except Exception:
-            pass
+    except Exception:
+        pass
 
 
 def get_real_file(path):
@@ -69,7 +70,7 @@ def get_real_file(path):
 
     base = os.path.splitext(path)[0]
 
-    for ext in ["mp3", "m4a", "webm", "opus"]:
+    for ext in ("mp3", "m4a", "webm", "opus"):
         p = base + "." + ext
         if os.path.exists(p):
             return p
@@ -101,7 +102,7 @@ def youtube_opts(file_key):
         ],
     }
 
-    if os.path.exists(COOKIE_FILE):
+    if os.path.exists(COOKIE_FILE) and os.path.getsize(COOKIE_FILE) > 50:
         opts["cookiefile"] = COOKIE_FILE
 
     return opts
@@ -113,7 +114,7 @@ def _youtube_download_sync(query):
     with yt_dlp.YoutubeDL(youtube_opts(file_key)) as ydl:
         info = ydl.extract_info(f"ytsearch1:{query}", download=True)
 
-        if "entries" in info and info["entries"]:
+        if info and "entries" in info and info["entries"]:
             info = info["entries"][0]
 
         if not info:
@@ -125,7 +126,8 @@ def _youtube_download_sync(query):
         path = os.path.join(DOWNLOAD_FOLDER, f"{file_key}.mp3")
 
         if not os.path.exists(path):
-            path = get_real_file(ydl.prepare_filename(info))
+            prepared = ydl.prepare_filename(info)
+            path = get_real_file(prepared)
 
         if not os.path.exists(path):
             raise FileNotFoundError("فایل MP3 ساخته نشد.")
@@ -177,7 +179,6 @@ async def soundcloud_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
         return
 
     query = ""
-
     for t in triggers:
         if low.startswith(t.lower()):
             query = text[len(t):].strip()
@@ -202,7 +203,6 @@ async def soundcloud_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
     try:
         cleanup_old_files()
-
         loop = asyncio.get_running_loop()
 
         info, path = await asyncio.wait_for(
@@ -219,7 +219,8 @@ async def soundcloud_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
         )
 
         if not sent:
-            return await msg.edit_text("❌ فایل بزرگ است یا تلگرام قبول نکرد.")
+            await msg.edit_text("❌ فایل بزرگ است یا تلگرام قبول نکرد.")
+            return
 
         if sent.audio:
             MUSIC_CACHE[cache_key] = sent.audio.file_id
@@ -235,6 +236,7 @@ async def soundcloud_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
     finally:
         clean_file(path)
+        cleanup_old_files()
 
 
 async def music_select_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
