@@ -24,7 +24,7 @@ COOKIE_DATA = r"""
 # https://curl.haxx.se/rfc/cookie_spec.html
 # This is a generated file! Do not edit.
 
-اینجا کوکی یوتیوب خودت را Paste کن
+# کوکی کامل YouTube را اینجا Paste کن
 """
 
 with open(COOKIE_FILE, "w", encoding="utf-8") as f:
