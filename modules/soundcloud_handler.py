@@ -228,4 +228,16 @@ async def soundcloud_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
         await msg.delete()
 
     except asyncio.TimeoutError:
-        await msg.edit_text("⏳ دانلود طول کشید. یک آهنگ دیگر امتح
+        await msg.edit_text("⏳ دانلود طول کشید. یک آهنگ دیگر امتحان کن.")
+
+    except Exception as e:
+        await msg.edit_text(f"❌ خطا در دانلود از YouTube:\n{e}")
+
+    finally:
+        clean_file(path)
+
+
+async def music_select_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    cq = update.callback_query
+    if cq:
+        await cq.answer("این نسخه فقط با جستجوی مستقیم از YouTube کار می‌کند.", show_alert=True)
