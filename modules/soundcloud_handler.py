@@ -17,19 +17,14 @@ COOKIE_FILE = os.path.join("modules", "youtube_cookie.txt")
 
 os.makedirs(DATA_FOLDER, exist_ok=True)
 os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
-os.makedirs("modules", exist_ok=True)
 
-if not os.path.exists(COOKIE_FILE):
-    with open(COOKIE_FILE, "w", encoding="utf-8") as f:
-        f.write("# Paste YouTube cookies here in Netscape format\n")
+executor = ThreadPoolExecutor(max_workers=3)
 
 try:
     with open(CACHE_FILE, "r", encoding="utf-8") as f:
         MUSIC_CACHE = json.load(f)
 except Exception:
     MUSIC_CACHE = {}
-
-executor = ThreadPoolExecutor(max_workers=3)
 
 MUSIC_CAPTION = "🎵 دانلود موزیک با ربات @AFGR63_bot"
 
@@ -41,11 +36,19 @@ URL_RE = re.compile(r"https?://\S+")
 
 
 def save_cache():
-    try:
-        with open(CACHE_FILE, "w", encoding="utf-8") as f:
-            json.dump(MUSIC_CACHE, f, ensure_ascii=False, indent=2)
-    except Exception:
-        pass
+    with open(CACHE_FILE, "w", encoding="utf-8") as f:
+        json.dump(MUSIC_CACHE, f, ensure_ascii=False, indent=2)
+
+
+def cleanup_old_files():
+    now = time.time()
+    for name in os.listdir(DOWNLOAD_FOLDER):
+        path = os.path.join(DOWNLOAD_FOLDER, name)
+        try:
+            if os.path.isfile(path) and now - os.path.getmtime(path) > 600:
+                os.remove(path)
+        except Exception:
+            pass
 
 
 def clean_file(path):
@@ -56,27 +59,14 @@ def clean_file(path):
         pass
 
 
-def cleanup_old_files():
-    now = time.time()
-    try:
-        for name in os.listdir(DOWNLOAD_FOLDER):
-            path = os.path.join(DOWNLOAD_FOLDER, name)
-            if os.path.isfile(path) and now - os.path.getmtime(path) > 600:
-                os.remove(path)
-    except Exception:
-        pass
-
-
-def find_created_file(file_key):
+def find_file(file_key):
     for name in os.listdir(DOWNLOAD_FOLDER):
         if name.startswith(file_key):
-            path = os.path.join(DOWNLOAD_FOLDER, name)
-            if os.path.isfile(path):
-                return path
+            return os.path.join(DOWNLOAD_FOLDER, name)
     return None
 
 
-def youtube_opts(file_key):
+def yt_opts(file_key):
     opts = {
         "quiet": True,
         "no_warnings": True,
@@ -85,8 +75,8 @@ def youtube_opts(file_key):
         "noplaylist": True,
         "overwrites": True,
 
-        # فقط صوت؛ اگر صوت جدا نبود، از بهترین فرمت صدا استخراج می‌کند
-        "format": "bestaudio/best",
+        # فرمت‌هایی که روی سرورت دیدیم
+        "format": "140/251/250/249/18/best",
 
         "outtmpl": os.path.join(DOWNLOAD_FOLDER, f"{file_key}.%(ext)s"),
         "socket_timeout": 40,
@@ -110,23 +100,20 @@ def youtube_opts(file_key):
         ],
     }
 
-    if os.path.exists(COOKIE_FILE) and os.path.getsize(COOKIE_FILE) > 50:
+    if os.path.exists(COOKIE_FILE):
         opts["cookiefile"] = COOKIE_FILE
 
     return opts
 
 
-def _youtube_download_sync(query):
+def download_youtube_audio(query):
     file_key = str(uuid.uuid4())
-    opts = youtube_opts(file_key)
 
-    with yt_dlp.YoutubeDL(opts) as ydl:
-
-        # اول فقط اطلاعات را بگیر
+    with yt_dlp.YoutubeDL(yt_opts(file_key)) as ydl:
         if query.startswith("http://") or query.startswith("https://"):
-            info = ydl.extract_info(query, download=False)
+            info = ydl.extract_info(query, download=True)
         else:
-            result = ydl.extract_info(f"ytsearch1:{query}", download=False)
+            result = ydl.extract_info(f"ytsearch1:{query}", download=True)
 
             if not result or not result.get("entries"):
                 raise RuntimeError("نتیجه‌ای از YouTube پیدا نشد.")
@@ -138,23 +125,16 @@ def _youtube_download_sync(query):
 
         title = info.get("title") or query
         video_id = info.get("id") or file_key
-        webpage_url = info.get("webpage_url") or info.get("url")
-
-        if not webpage_url:
-            raise RuntimeError("لینک واقعی ویدیو پیدا نشد.")
-
-        # بعد همان لینک واقعی را دانلود کن
-        ydl.download([webpage_url])
 
         mp3_path = os.path.join(DOWNLOAD_FOLDER, f"{file_key}.mp3")
 
         if os.path.exists(mp3_path):
             path = mp3_path
         else:
-            path = find_created_file(file_key)
+            path = find_file(file_key)
 
         if not path or not os.path.exists(path):
-            raise FileNotFoundError("فایل صوتی ساخته نشد.")
+            raise RuntimeError("فایل صوتی ساخته نشد.")
 
         return {
             "id": video_id,
@@ -192,9 +172,9 @@ async def soundcloud_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
     triggers = [
         "آهنگ ",
         "اهنگ ",
+        "موزیک ",
         "music ",
         "musik ",
-        "موزیک ",
         "اغنية ",
         "أغنية ",
     ]
@@ -228,7 +208,7 @@ async def soundcloud_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
             reply_markup=ADD_BTN if update.effective_chat.type == "private" else None,
         )
 
-    msg = await update.message.reply_text("🎧 در حال دانلود صوت از YouTube...")
+    msg = await update.message.reply_text("🎧 در حال دانلود از YouTube...")
 
     path = None
 
@@ -237,7 +217,7 @@ async def soundcloud_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
         loop = asyncio.get_running_loop()
         info, path = await asyncio.wait_for(
-            loop.run_in_executor(executor, _youtube_download_sync, query_for_download),
+            loop.run_in_executor(executor, download_youtube_audio, query_for_download),
             timeout=240
         )
 
@@ -250,7 +230,7 @@ async def soundcloud_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
         )
 
         if not sent:
-            await msg.edit_text("❌ فایل صوتی بزرگ است یا تلگرام قبول نکرد.")
+            await msg.edit_text("❌ فایل بزرگ است یا تلگرام قبول نکرد.")
             return
 
         if sent.audio:
@@ -263,7 +243,7 @@ async def soundcloud_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
         await msg.edit_text("⏳ دانلود طول کشید. یک آهنگ دیگر امتحان کن.")
 
     except Exception as e:
-        await msg.edit_text(f"❌ خطا در دانلود صوت از YouTube:\n{e}")
+        await msg.edit_text(f"❌ خطا در دانلود از YouTube:\n{e}")
 
     finally:
         clean_file(path)
@@ -273,4 +253,4 @@ async def soundcloud_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
 async def music_select_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     cq = update.callback_query
     if cq:
-        await cq.answer("این نسخه فقط دانلود صوت مستقیم از YouTube دارد.", show_alert=True)
+        await cq.answer("این نسخه فقط دانلود مستقیم YouTube دارد.", show_alert=True)
