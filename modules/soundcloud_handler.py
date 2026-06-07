@@ -91,7 +91,7 @@ def youtube_opts(file_key):
         "overwrites": True,
 
         # فقط صوت؛ اول m4a بعد webm بعد هر صوتی
-        "format": "bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio/best",
+        "format": "140/251/250/249/bestaudio/18/best/worst",
 
         "outtmpl": os.path.join(DOWNLOAD_FOLDER, f"{file_key}.%(ext)s"),
         "socket_timeout": 30,
