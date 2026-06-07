@@ -29,7 +29,7 @@ try:
 except Exception:
     MUSIC_CACHE = {}
 
-executor = ThreadPoolExecutor(max_workers=4)
+executor = ThreadPoolExecutor(max_workers=3)
 
 MUSIC_CAPTION = "🎵 دانلود موزیک با ربات @AFGR63_bot"
 
@@ -67,18 +67,13 @@ def cleanup_old_files():
         pass
 
 
-def get_real_file(path):
-    if path and os.path.exists(path):
-        return path
-
-    base = os.path.splitext(path)[0]
-
-    for ext in ("mp3", "m4a", "webm", "opus"):
-        p = base + "." + ext
-        if os.path.exists(p):
-            return p
-
-    return path
+def find_created_file(file_key):
+    for name in os.listdir(DOWNLOAD_FOLDER):
+        if name.startswith(file_key):
+            path = os.path.join(DOWNLOAD_FOLDER, name)
+            if os.path.isfile(path):
+                return path
+    return None
 
 
 def youtube_opts(file_key):
@@ -90,15 +85,15 @@ def youtube_opts(file_key):
         "noplaylist": True,
         "overwrites": True,
 
-        # فقط صوت؛ اول m4a بعد webm بعد هر صوتی
-        "format": "140/251/250/249/bestaudio/18/best/worst",
+        # فقط صوت؛ اگر صوت جدا نبود، از بهترین فرمت صدا استخراج می‌کند
+        "format": "bestaudio/best",
 
         "outtmpl": os.path.join(DOWNLOAD_FOLDER, f"{file_key}.%(ext)s"),
-        "socket_timeout": 30,
+        "socket_timeout": 40,
         "retries": 10,
         "fragment_retries": 10,
-        "concurrent_fragment_downloads": 8,
         "http_chunk_size": 8 * 1024 * 1024,
+        "concurrent_fragment_downloads": 8,
 
         "extractor_args": {
             "youtube": {
@@ -123,32 +118,43 @@ def youtube_opts(file_key):
 
 def _youtube_download_sync(query):
     file_key = str(uuid.uuid4())
+    opts = youtube_opts(file_key)
 
-    with yt_dlp.YoutubeDL(youtube_opts(file_key)) as ydl:
+    with yt_dlp.YoutubeDL(opts) as ydl:
+
+        # اول فقط اطلاعات را بگیر
         if query.startswith("http://") or query.startswith("https://"):
-            info = ydl.extract_info(query, download=True)
+            info = ydl.extract_info(query, download=False)
         else:
-            info = ydl.extract_info(f"ytsearch1:{query}", download=True)
+            result = ydl.extract_info(f"ytsearch1:{query}", download=False)
 
-            if info and "entries" in info and info["entries"]:
-                info = info["entries"][0]
+            if not result or not result.get("entries"):
+                raise RuntimeError("نتیجه‌ای از YouTube پیدا نشد.")
+
+            info = result["entries"][0]
 
         if not info:
-            raise RuntimeError("نتیجه‌ای از YouTube پیدا نشد.")
+            raise RuntimeError("اطلاعات ویدیو دریافت نشد.")
 
         title = info.get("title") or query
         video_id = info.get("id") or file_key
+        webpage_url = info.get("webpage_url") or info.get("url")
+
+        if not webpage_url:
+            raise RuntimeError("لینک واقعی ویدیو پیدا نشد.")
+
+        # بعد همان لینک واقعی را دانلود کن
+        ydl.download([webpage_url])
 
         mp3_path = os.path.join(DOWNLOAD_FOLDER, f"{file_key}.mp3")
 
         if os.path.exists(mp3_path):
             path = mp3_path
         else:
-            prepared = ydl.prepare_filename(info)
-            path = get_real_file(prepared)
+            path = find_created_file(file_key)
 
         if not path or not os.path.exists(path):
-            raise FileNotFoundError("فایل MP3 ساخته نشد.")
+            raise FileNotFoundError("فایل صوتی ساخته نشد.")
 
         return {
             "id": video_id,
@@ -206,12 +212,13 @@ async def soundcloud_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
         return await update.message.reply_text("🎵 اسم آهنگ را بنویس.")
 
     url_match = URL_RE.search(query)
+
     if url_match:
-        cache_key = "yt_url_" + url_match.group(0)
         query_for_download = url_match.group(0)
+        cache_key = "yt_url_" + query_for_download
     else:
-        cache_key = "yt_search_" + query.lower().strip()
         query_for_download = query
+        cache_key = "yt_search_" + query.lower().strip()
 
     if cache_key in MUSIC_CACHE:
         return await context.bot.send_audio(
@@ -221,17 +228,17 @@ async def soundcloud_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
             reply_markup=ADD_BTN if update.effective_chat.type == "private" else None,
         )
 
-    msg = await update.message.reply_text("🎧 در حال جستجو و دانلود صوت از YouTube...")
+    msg = await update.message.reply_text("🎧 در حال دانلود صوت از YouTube...")
 
     path = None
 
     try:
         cleanup_old_files()
-        loop = asyncio.get_running_loop()
 
+        loop = asyncio.get_running_loop()
         info, path = await asyncio.wait_for(
             loop.run_in_executor(executor, _youtube_download_sync, query_for_download),
-            timeout=180
+            timeout=240
         )
 
         sent = await send_audio_file(
