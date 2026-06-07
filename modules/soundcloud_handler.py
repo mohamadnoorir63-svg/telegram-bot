@@ -3,6 +3,7 @@ import json
 import uuid
 import time
 import asyncio
+import re
 from concurrent.futures import ThreadPoolExecutor
 
 import yt_dlp
@@ -35,6 +36,8 @@ MUSIC_CAPTION = "🎵 دانلود موزیک با ربات @AFGR63_bot"
 ADD_BTN = InlineKeyboardMarkup([
     [InlineKeyboardButton("➕ افزودن ربات به گروه", url="https://t.me/AFGR63_bot?startgroup=true")]
 ])
+
+URL_RE = re.compile(r"https?://\S+")
 
 
 def save_cache():
@@ -87,9 +90,8 @@ def youtube_opts(file_key):
         "noplaylist": True,
         "overwrites": True,
 
-        # فرمت پایدار برای YouTube
-        
-        "format": "bv*+ba/bestaudio/best/b",
+        # فقط صوت؛ اول m4a بعد webm بعد هر صوتی
+        "format": "bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio/best",
 
         "outtmpl": os.path.join(DOWNLOAD_FOLDER, f"{file_key}.%(ext)s"),
         "socket_timeout": 30,
@@ -98,7 +100,6 @@ def youtube_opts(file_key):
         "concurrent_fragment_downloads": 8,
         "http_chunk_size": 8 * 1024 * 1024,
 
-        # کمک برای حل مشکل signature و n challenge
         "extractor_args": {
             "youtube": {
                 "player_client": ["android", "web"]
@@ -124,10 +125,13 @@ def _youtube_download_sync(query):
     file_key = str(uuid.uuid4())
 
     with yt_dlp.YoutubeDL(youtube_opts(file_key)) as ydl:
-        info = ydl.extract_info(f"ytsearch1:{query}", download=True)
+        if query.startswith("http://") or query.startswith("https://"):
+            info = ydl.extract_info(query, download=True)
+        else:
+            info = ydl.extract_info(f"ytsearch1:{query}", download=True)
 
-        if info and "entries" in info and info["entries"]:
-            info = info["entries"][0]
+            if info and "entries" in info and info["entries"]:
+                info = info["entries"][0]
 
         if not info:
             raise RuntimeError("نتیجه‌ای از YouTube پیدا نشد.")
@@ -201,7 +205,13 @@ async def soundcloud_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
     if not query:
         return await update.message.reply_text("🎵 اسم آهنگ را بنویس.")
 
-    cache_key = "yt_" + query.lower().strip()
+    url_match = URL_RE.search(query)
+    if url_match:
+        cache_key = "yt_url_" + url_match.group(0)
+        query_for_download = url_match.group(0)
+    else:
+        cache_key = "yt_search_" + query.lower().strip()
+        query_for_download = query
 
     if cache_key in MUSIC_CACHE:
         return await context.bot.send_audio(
@@ -211,7 +221,7 @@ async def soundcloud_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
             reply_markup=ADD_BTN if update.effective_chat.type == "private" else None,
         )
 
-    msg = await update.message.reply_text("🔍 در حال جستجو و دانلود از YouTube...")
+    msg = await update.message.reply_text("🎧 در حال جستجو و دانلود صوت از YouTube...")
 
     path = None
 
@@ -220,7 +230,7 @@ async def soundcloud_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
         loop = asyncio.get_running_loop()
 
         info, path = await asyncio.wait_for(
-            loop.run_in_executor(executor, _youtube_download_sync, query),
+            loop.run_in_executor(executor, _youtube_download_sync, query_for_download),
             timeout=180
         )
 
@@ -233,7 +243,7 @@ async def soundcloud_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
         )
 
         if not sent:
-            await msg.edit_text("❌ فایل بزرگ است یا تلگرام قبول نکرد.")
+            await msg.edit_text("❌ فایل صوتی بزرگ است یا تلگرام قبول نکرد.")
             return
 
         if sent.audio:
@@ -246,7 +256,7 @@ async def soundcloud_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
         await msg.edit_text("⏳ دانلود طول کشید. یک آهنگ دیگر امتحان کن.")
 
     except Exception as e:
-        await msg.edit_text(f"❌ خطا در دانلود از YouTube:\n{e}")
+        await msg.edit_text(f"❌ خطا در دانلود صوت از YouTube:\n{e}")
 
     finally:
         clean_file(path)
@@ -256,4 +266,4 @@ async def soundcloud_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
 async def music_select_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     cq = update.callback_query
     if cq:
-        await cq.answer("این نسخه فقط با جستجوی مستقیم از YouTube کار می‌کند.", show_alert=True)
+        await cq.answer("این نسخه فقط دانلود صوت مستقیم از YouTube دارد.", show_alert=True)
