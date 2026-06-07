@@ -20,7 +20,22 @@ os.makedirs(os.path.dirname(COOKIE_FILE), exist_ok=True)
 os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
 
 # ==========================
+# Netscape HTTP Cookie File
+# https://curl.haxx.se/rfc/cookie_spec.html
+# This is a generated file! Do not edit.
 
+.youtube.com	TRUE	/	TRUE	1799716340	PREF	tz=Europe.Berlin
+.youtube.com	TRUE	/	TRUE	1799284338	SOCS	CAISNQgDEitib3FfaWRlbnRpdHlmcm9udGVuZHVpc2VydmVyXzIwMjUxMjAzLjA4X3AwGgJkZSACGgYIgKrYyQY
+.youtube.com	TRUE	/	TRUE	1780708338	VISITOR_INFO1_LIVE	OBpYWqO2PUs
+.youtube.com	TRUE	/	TRUE	1780708338	__Secure-BUCKET	CMwB
+.youtube.com	TRUE	/	TRUE	1765158139	GPS	1
+.youtube.com	TRUE	/	TRUE	1796692339	__Secure-1PSIDTS	sidts-CjUBflaCdXw0BMpNcWTswjNj9kSTCUikMRVp8SuVT_JoGAFhFl_MJvLS3ftPW9rWFD3CnYgLuhAA
+.youtube.com	TRUE	/	TRUE	1796692339	__Secure-3PSIDTS	sidts-CjUBflaCdXw0BMpNcWTswjNj9kSTCUikMRVp8SuVT_JoGAFhFl_MJvLS3ftPW9rWFD3CnYgLuhAA
+.youtube.com	TRUE	/	TRUE	1799716339	__Secure-3PAPISID	AOsg0oVY2BzPpMhS/A-m7HOsYdLPV2GIfj
+.youtube.com	TRUE	/	TRUE	1799716339	__Secure-3PSID	g.a0004Qh-S6-CFqRdti3b654-KxwWrvQJQbgz6rckuGjEc5RWikuMDtjfNEQeE6b6Eqo5dJcKgAACgYKAZoSARISFQHGX2MipahvK-2rV6VcBoeXjT7CChoVAUF8yKpL-8c4xFJasshYpQ8zkXin0076
+.youtube.com	TRUE	/	TRUE	1799716339	LOGIN_INFO	AFmmF2swRQIgYVveaSordutJGSFaMl84shpElRnOPoIJgsy-CxerUAICIQD-N79Q6VXrD9fAWQSUENWRJGYd-rZwrVEXNZ9Fbim1Ng:QUQ3MjNmeWdnTGZhMDdETlh0VnZJSjdQTmlsdlNLT25wQjdMR0V4RDhjbTNPQmdpc1BkT2ZjTzdaeUFFbGpmOGl6dVJiZ0Z4aXpnTXRlZ0hOaFFyZmdPaVhSSUotdEpxYjZBUWxIR1VpbzdENW5YZk9VUWUyU09MVDhlYVJLSW5Ua2dIX0NxUE1reC01cXJiZ3Q5Q2k1WHEzQjFTWUU1X2JR
+.youtube.com	TRUE	/	TRUE	1796692342	__Secure-3PSIDCC	AKEyXzUz1hjL4pvz7e4Xds0RI79bLVLBda5rRq4fk0h1iR6cmjfXECHR-Va7O7aFFzjHqhlN
+.youtube.com	TRUE	/	TRUE	1765156945	CONSISTENCY	AKreu9u4PZW-RMLZjZIB2lnbvo0U5PW5YtwWANbvhpRTtamsIGCLyb5bbikgUUINKxXbC-ZUsvTnco8HInOr7VweXQ203sAUMjWlimKDX2vtBC40CbJZpPZQ1ek
 # ==========================
 
 COOKIE_DATA = r"""
