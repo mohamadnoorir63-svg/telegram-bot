@@ -66,7 +66,7 @@ def find_file(file_key):
     return None
 
 
-def yt_opts(file_key):
+def base_opts(file_key):
     opts = {
         "quiet": True,
         "no_warnings": True,
@@ -74,72 +74,118 @@ def yt_opts(file_key):
         "nopart": True,
         "noplaylist": True,
         "overwrites": True,
-
-        # فرمت‌هایی که روی سرورت دیدیم
-        "format": "140/251/250/249/18/best",
-
         "outtmpl": os.path.join(DOWNLOAD_FOLDER, f"{file_key}.%(ext)s"),
         "socket_timeout": 40,
         "retries": 10,
         "fragment_retries": 10,
         "http_chunk_size": 8 * 1024 * 1024,
         "concurrent_fragment_downloads": 8,
-
         "extractor_args": {
             "youtube": {
                 "player_client": ["android", "web"]
             }
         },
-
-        "postprocessors": [
-            {
-                "key": "FFmpegExtractAudio",
-                "preferredcodec": "mp3",
-                "preferredquality": "192",
-            }
-        ],
     }
 
-    if os.path.exists(COOKIE_FILE):
+    if os.path.exists(COOKIE_FILE) and os.path.getsize(COOKIE_FILE) > 50:
         opts["cookiefile"] = COOKIE_FILE
 
     return opts
 
 
+def download_opts(file_key, fmt_id):
+    opts = base_opts(file_key)
+    opts["format"] = fmt_id
+    opts["postprocessors"] = [
+        {
+            "key": "FFmpegExtractAudio",
+            "preferredcodec": "mp3",
+            "preferredquality": "192",
+        }
+    ]
+    return opts
+
+
+def pick_format(info):
+    formats = info.get("formats") or []
+
+    real = []
+    for f in formats:
+        fmt_id = str(f.get("format_id") or "")
+        if fmt_id.startswith("sb"):
+            continue
+
+        acodec = f.get("acodec")
+        vcodec = f.get("vcodec")
+
+        if acodec and acodec != "none":
+            real.append(f)
+
+    if not real:
+        return None
+
+    priority = ["140", "251", "250", "249", "18"]
+
+    for p in priority:
+        for f in real:
+            if str(f.get("format_id")) == p:
+                return p
+
+    audio_only = [
+        f for f in real
+        if f.get("vcodec") == "none" and f.get("acodec") != "none"
+    ]
+
+    if audio_only:
+        return str(audio_only[0].get("format_id"))
+
+    return str(real[0].get("format_id"))
+
+
 def download_youtube_audio(query):
     file_key = str(uuid.uuid4())
 
-    with yt_dlp.YoutubeDL(yt_opts(file_key)) as ydl:
-        if query.startswith("http://") or query.startswith("https://"):
-            info = ydl.extract_info(query, download=True)
-        else:
-            result = ydl.extract_info(f"ytsearch1:{query}", download=True)
+    probe_opts = base_opts(file_key)
+    probe_opts["format"] = "best"
 
+    with yt_dlp.YoutubeDL(probe_opts) as ydl:
+        if query.startswith("http://") or query.startswith("https://"):
+            info = ydl.extract_info(query, download=False)
+        else:
+            result = ydl.extract_info(f"ytsearch1:{query}", download=False)
             if not result or not result.get("entries"):
                 raise RuntimeError("نتیجه‌ای از YouTube پیدا نشد.")
-
             info = result["entries"][0]
 
-        if not info:
-            raise RuntimeError("اطلاعات ویدیو دریافت نشد.")
+    if not info:
+        raise RuntimeError("اطلاعات ویدیو دریافت نشد.")
 
-        title = info.get("title") or query
-        video_id = info.get("id") or file_key
+    title = info.get("title") or query
+    video_id = info.get("id") or file_key
+    webpage_url = info.get("webpage_url") or info.get("original_url") or query
 
-        mp3_path = os.path.join(DOWNLOAD_FOLDER, f"{file_key}.mp3")
+    fmt_id = pick_format(info)
 
-        if os.path.exists(mp3_path):
-            path = mp3_path
-        else:
-            path = find_file(file_key)
+    if not fmt_id:
+        raise RuntimeError("برای این ویدیو فقط storyboard پیدا شد و صوت واقعی موجود نیست.")
 
-        if not path or not os.path.exists(path):
-            raise RuntimeError("فایل صوتی ساخته نشد.")
+    with yt_dlp.YoutubeDL(download_opts(file_key, fmt_id)) as ydl:
+        ydl.extract_info(webpage_url, download=True)
 
-        return {
-            "id": video_id,
-            "title": title,
-        }, path
+    mp3_path = os.path.join(DOWNLOAD_FOLDER, f"{file_key}.mp3")
+
+    if os.path.exists(mp3_path):
+        path = mp3_path
+    else:
+        path = find_file(file_key)
+
+    if not path or not os.path.exists(path):
+        raise RuntimeError("فایل صوتی ساخته نشد.")
+
+    return {
+        "id": video_id,
+        "title": title,
+    }, path
 
 
 async def send_audio_file(context, chat_id, path, title, reply_markup=None):
@@ -233,24 +279,4 @@ async def soundcloud_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
             await msg.edit_text("❌ فایل بزرگ است یا تلگرام قبول نکرد.")
             return
 
-        if sent.audio:
-            MUSIC_CACHE[cache_key] = sent.audio.file_id
-            save_cache()
-
-        await msg.delete()
-
-    except asyncio.TimeoutError:
-        await msg.edit_text("⏳ دانلود طول کشید. یک آهنگ دیگر امتحان کن.")
-
-    except Exception as e:
-        await msg.edit_text(f"❌ خطا در دانلود از YouTube:\n{e}")
-
-    finally:
-        clean_file(path)
-        cleanup_old_files()
-
-
-async def music_select_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    cq = update.callback_query
-    if cq:
-        await cq.answer("این نسخه فقط دانلود مستقیم YouTube دارد.", show_alert=True)
+        if
