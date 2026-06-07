@@ -88,7 +88,8 @@ def youtube_opts(file_key):
         "overwrites": True,
 
         # فرمت پایدار برای YouTube
-        "format": "140/251/250/249/bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio/best",
+        
+        "format": "bv*+ba/bestaudio/best/b",
 
         "outtmpl": os.path.join(DOWNLOAD_FOLDER, f"{file_key}.%(ext)s"),
         "socket_timeout": 30,
